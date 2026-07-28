@@ -190,6 +190,24 @@ $('doUp').onclick=async()=>{
   const ext=(file.name.split('.').pop()||(isVid?'mp4':'jpg')).toLowerCase().replace(/[^a-z0-9]/g,'')||(isVid?'mp4':'jpg');
   const name='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)+'.'+ext;
   prog('女娲碎了一颗石…(可关闭本页,上传不会断)');
+  // 分片上传(2026-07-28 晚高峰应急):CF 回源限流,>384KB 的文件按 256KB 切片逐片传,
+  // 每片几秒内完成,绕开 Cloudflare 100s 超时(524);小文件仍直传
+  const CHUNK=256*1024;
+  async function uploadFile(){
+    if(file.size<=384*1024){
+      const r=await fetch('/api/upload?dir='+dir+'&name='+encodeURIComponent(name),{method:'POST',body:file});
+      const d=await r.json();if(!r.ok)throw new Error(d.error||'上传失败');return d;
+    }
+    const total=Math.ceil(file.size/CHUNK);
+    let last=null;
+    for(let i=0;i<total;i++){
+      prog('正在上传 '+(i+1)+'/'+total+' 片(高峰期限速,分片慢传)…');
+      const r=await fetch('/api/upload/chunk?dir='+dir+'&name='+encodeURIComponent(name)+'&seq='+i+'&total='+total,{method:'POST',body:file.slice(i*CHUNK,(i+1)*CHUNK)});
+      const d=await r.json();if(!r.ok)throw new Error(d.error||'上传失败(第 '+(i+1)+' 片)');
+      last=d;
+    }
+    return last;
+  }
   // 灵蕴去重(2026-07-26 主人定):同一张照片按内容哈希只计一次 +5 进度,重复上传不刷分
   let dup=false;
   if(!isVid){
@@ -201,9 +219,7 @@ $('doUp').onclick=async()=>{
     }catch(e){}
   }
   try{
-    const r=await fetch('/api/upload?dir='+dir+'&name='+encodeURIComponent(name),{method:'POST',body:file});
-    const d=await r.json();
-    if(!r.ok)throw new Error(d.error||'上传失败');
+    const d=await uploadFile();
     if(d.mt){ctx.mode.myUploadTokens=ctx.mode.myUploadTokens||{};ctx.mode.myUploadTokens[name]=d.mt;} // 媒体令牌:本张图片以后走 ?mt= 过图片代理
     playUploadHint(()=>{ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('女娲碎了一颗石。你收回了一片光。');}); // 提示音先播,TTS 排队等播完再开口(不混音)
     goldDust(); // 昆仑灵鉴:灵蕴归位,金色微尘 2 秒

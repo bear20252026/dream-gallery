@@ -18,7 +18,7 @@ const { gateData } = require('./lib/store');
 const { serveGatePage, sseRegister, handleApply, handleGateStatus, approvalGate, GATE_HASH, hasGateCookie, handleRename } = require('./lib/gate');
 const { tokenOk, handleAdminList, handleAdminDecide, handleAdminBulk } = require('./lib/admin');
 const { handleQuizStart, handleQuizSubmit, handleQuizState, handleQuizInvite, handleQuizJudge } = require('./lib/quiz');
-const { serveStatic, handleList, handleUpload, handleDelete } = require('./lib/files');
+const { serveStatic, handleList, handleUpload, handleUploadChunk, handleDelete } = require('./lib/files');
 const { handlePublicConfig, handleAdminMode, handleAdminLinks, handleAdminDemo, handleAdminCaption, handleMyLinks, canServeMedia } = require('./lib/siteconfig');
 const { handleVisionAnalyze } = require('./lib/vision');
 const { handleTrackClick, handleClicksClear, handleExportXlsx, handleTrackError } = require('./lib/track');
@@ -174,6 +174,8 @@ const handler = (req, res) => {
       handleUpload(req, res, query, true);
       return;
     }
+    // 分片上传(2026-07-28 晚高峰应急:CF 回源限流,>1MB 直传 524;256KB/片逐片传)
+    if (pathname === '/api/upload/chunk' && req.method === 'POST') { handleUploadChunk(req, res, query); return; }
     // 文件列表公开只读(画廊/白板墙需要);上传/删除仍需 TOKEN
     if (pathname === '/api/files' && req.method === 'GET') { handleList(req, res, query); return; }
     if (TOKEN && query.token !== TOKEN && req.headers['x-token'] !== TOKEN) {

@@ -94,6 +94,7 @@ node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色�
 - **媒体可见性规矩(2026-07-28 深化④,单一源)**:**下载放行与墙面上墙共用一张决策表 `src/shared/mediarules.mjs`**(纯函数零依赖)——服务端 `canServeMedia` 经 Node≥22.12 的 require(ESM) 取用,客户端 mode.js(上墙/纹理)/paintings.js(配文/视频调度)经 ESM import 取用;**改可见性规则只许改这一个文件**(旧规矩"改可见性必须同步服务端 canServeMedia"已由此落地)。「归类」各侧自备(服务端按 dk/mt 指纹,客户端按 siteconfig 下发的 myUploads),「归类之后怎么办」全在决策表:`wallDecision`(演示/本人/图库/他人)、`contentAllowed`、`captionAllowed`、`serveDecision`(下载+CDN 公开标记)。验收:scripts/probe/media-rules-probe.js(8 项)+ test.js 媒体门禁段。
 - **媒体文件级门禁(2026-07-26 紧急堵口;2026-07-27 增补 mt 令牌)**:上传即签发 `uploads[name].mt`(hex20),`/api/siteconfig` 下发 `myUploadTokens`,`loadTexCapped` 给本人上传的 URL(含缩略图)拼 `?mt=`——QQ/UC 浏览器图片代理改用代理 UA 请求 `<img>` 也能认出本人(否则粉框"Photo Loading");存量上传服务端启动时自动补发。`/photos/*`、`/videos/*` 经 siteconfig.js `canServeMedia()` 判定(决策表见上条);`/api/files` 无 token 时同规则过滤,带 token 全量。**场景里的"隐藏"不等于文件不可下**。
 - 公开上传禁止覆盖同名文件(409);白板与后台(token)上传仍可覆盖。
+- **分片上传(2026-07-28 晚高峰应急,主人定)**:Cloudflare 边缘→源站回源带宽被运营商压到 ~12-40KB/s 时,>1MB 直传撑满 100s 超时 → 524(2026-07-28 19 点实测)。方案:前端 >384KB 自动按 **256KB/片** 走 `POST /api/upload/chunk?(dir,name,seq,total)`,服务端 `.chunks/` 暂存、最后一片重组+直传同一后处理(aid/mt/compressJob/abuseCheck 全走);规则与直传一致(409 禁覆盖/413 总量与单片 400KB 上限/24h 残片自动清扫)。验收:scripts/probe/chunk-upload-probe.js(9 项,含 md5 一致性)。
 - sw.js 不拦截带 `Range` 头的请求:Cache API 禁止存 206,拦截即视频全挂。
 - 畸形 URL 必须 400 而不是崩进程:`decodeURIComponent` 已包 try/catch,新增路径解析同样要接异常。
 - 门禁/权限逻辑改任何一处都要跑 `node scripts/test/test.js`(含审批门/VIP/答题评分回归)。
