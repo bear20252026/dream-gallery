@@ -22,3 +22,7 @@ scripts/artifacts/
 
 # 本地 ffmpeg 发行包(体积大,与代码无关)
 tools/ffmpeg/
+
+# 探针截图与临时文件(永不入库)
+debug-final.png
+.audit-tmp-*
