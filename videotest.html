@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>视频播放诊断 - 梦幻画廊</title>
+<style>
+body{margin:0;padding:16px;background:#1a0a14;color:#fff;font-family:sans-serif}
+h1{font-size:18px;color:#ffb6c8}
+.tip{font-size:13px;color:rgba(255,255,255,.5);margin-bottom:16px}
+.v{margin-bottom:20px}
+.v .name{font-size:12px;color:#feca57;margin-bottom:6px;word-break:break-all}
+.v .status{font-size:12px;margin-left:8px}
+.ok{color:#7dff9a}.bad{color:#ff6b6b}
+video{width:100%;max-width:400px;background:#000;border-radius:8px}
+</style>
+</head>
+<body>
+<h1>视频播放诊断</h1>
+<div class="tip">点每个视频的播放按钮：有画面 = 正常；只有声音/全黑 = 该视频有问题。结果告诉我即可。</div>
+<div id="list">加载中...</div>
+<script>
+fetch('/api/files?dir=videos').then(r=>r.json()).then(d=>{
+const list=document.getElementById('list');
+const files=(d.videos||[]).filter(f=>/\.mp4$/i.test(f.name));
+if(!files.length){list.textContent='没有找到视频';return}
+list.innerHTML='';
+files.forEach((f,i)=>{
+const div=document.createElement('div');div.className='v';
+const name=document.createElement('div');name.className='name';
+name.textContent=(i+1)+'. '+f.name;
+const st=document.createElement('span');st.className='status';name.appendChild(st);
+const v=document.createElement('video');
+v.src=f.url+'?t='+Date.now(); // 防缓存
+v.controls=true;v.muted=false;v.playsInline=true;v.preload='metadata';
+v.addEventListener('playing',()=>{st.textContent='▶ 播放中';st.className='status ok';
+setTimeout(()=>{
+// 播放 1 秒后检查是否真的解出了画面
+if(v.videoWidth>0&&v.videoHeight>0){st.textContent='▶ 有画面 ('+v.videoWidth+'x'+v.videoHeight+')'}
+else{st.textContent='✗ 无画面';st.className='status bad'}
+},1000);});
+v.addEventListener('error',()=>{st.textContent='✗ 解码失败(错误码 '+(v.error&&v.error.code)+')';st.className='status bad'});
+div.appendChild(name);div.appendChild(v);
+list.appendChild(div);
+});
+}).catch(e=>{document.getElementById('list').textContent='加载失败: '+e.message});
+</script>
+</body>
+</html>

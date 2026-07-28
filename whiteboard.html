@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>希沃白板</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+:root{--bg-primary:#fff;--bg-toolbar:#fff8e1;--text-primary:#333;--accent:#f0c040;--accent-hover:#e0b030;--border:#e8d5a0;--canvas-bg:#fff;--btn-bg:#fffbe6;--btn-active:#f0c040;--btn-hover:#fff3c0;--icon-color:#b8860b}
+body.dark-mode{--bg-primary:#0d0d1a;--bg-toolbar:#1a1a2e;--text-primary:#f0f0f0;--accent:#f0c040;--accent-hover:#e0b030;--border:#2a2a4a;--canvas-bg:#0d0d1a;--btn-bg:#1e1e3a;--btn-active:#f0c040;--btn-hover:#2a2a50;--icon-color:#f0c040}
+body{width:100vw;height:100vh;overflow:hidden;background:var(--bg-primary);font-family:'Microsoft YaHei','PingFang SC',sans-serif;transition:background .3s}
+.top-bar{position:fixed;top:0;left:0;right:0;height:50px;background:var(--bg-toolbar);border-bottom:2px solid var(--border);display:flex;align-items:center;justify-content:space-between;padding:0 15px;z-index:100;transition:all .3s}
+.top-left,.top-right{display:flex;align-items:center;gap:8px}
+.top-btn{width:38px;height:38px;border:2px solid var(--border);border-radius:10px;background:var(--btn-bg);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s;color:var(--icon-color);touch-action:manipulation}
+.top-btn:hover{background:var(--btn-hover);transform:scale(1.08)}
+.top-btn:active{transform:scale(.92)}
+.top-btn svg{width:20px;height:20px;fill:currentColor}
+.mode-toggle{display:flex;align-items:center;gap:6px;padding:5px 12px;border:2px solid var(--border);border-radius:20px;background:var(--btn-bg);cursor:pointer;transition:all .3s;color:var(--icon-color);font-size:13px;font-weight:bold;touch-action:manipulation}
+.mode-toggle:hover{background:var(--btn-hover)}
+.mode-toggle svg{width:18px;height:18px;fill:currentColor}
+#canvas{position:fixed;top:0;left:0;width:100vw;height:100vh;background:var(--canvas-bg);cursor:crosshair;touch-action:none;z-index:1;transition:background .3s}
+.bottom-bar{position:fixed;bottom:0;left:0;right:0;height:75px;background:var(--bg-toolbar);border-top:2px solid var(--border);display:flex;align-items:center;justify-content:center;gap:12px;padding:0 15px;z-index:100;transition:all .3s}
+.tool-btn{width:55px;height:55px;border:2px solid var(--border);border-radius:14px;background:var(--btn-bg);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:all .15s;color:var(--icon-color);position:relative;touch-action:manipulation}
+.tool-btn:hover{background:var(--btn-hover);transform:translateY(-2px)}
+.tool-btn:active{transform:scale(.95)}
+.tool-btn.active{background:var(--btn-active);color:#fff;border-color:var(--accent-hover);box-shadow:0 0 20px rgba(240,192,64,.5)}
+.tool-btn svg{width:22px;height:22px;fill:currentColor}
+.tool-btn span{font-size:10px;font-weight:bold;color:currentColor}
+.popup{position:absolute;bottom:80px;left:50%;transform:translateX(-50%) scale(0);background:var(--bg-toolbar);border:2px solid var(--border);border-radius:16px;padding:15px;box-shadow:0 10px 30px rgba(0,0,0,.3);transition:transform .2s cubic-bezier(.34,1.56,.64,1);z-index:200}
+.popup.show{transform:translateX(-50%) scale(1)}
+.thickness-popup{display:flex;flex-direction:column;gap:10px;min-width:140px}
+.thickness-option{display:flex;align-items:center;gap:12px;cursor:pointer;padding:6px 12px;border-radius:8px;transition:background .2s}
+.thickness-option:hover{background:var(--btn-hover)}
+.thickness-line{background:var(--icon-color);border-radius:3px;transition:all .2s}
+.thickness-option:hover .thickness-line{background:var(--accent)}
+.thickness-option span{color:var(--text-primary);font-size:12px;font-weight:600}
+.color-picker{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;padding:12px}
+.color-option{width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:all .2s;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.color-option:hover{transform:scale(1.25);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+.color-option.selected{border-color:var(--text-primary);transform:scale(1.15);box-shadow:0 0 0 3px var(--accent)}
+.shape-popup{display:flex;flex-direction:column;gap:12px;padding:12px;min-width:200px}
+.shape-row{display:flex;gap:12px;justify-content:center}
+.shape-option{width:50px;height:50px;border:2px solid var(--border);border-radius:12px;background:var(--btn-bg);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}
+.shape-option:hover{background:var(--btn-hover);transform:scale(1.12)}
+.shape-option.active{background:var(--btn-active);border-color:var(--accent-hover);box-shadow:0 0 15px rgba(240,192,64,.4)}
+.shape-option svg{width:26px;height:26px;fill:var(--icon-color)}
+.shape-option.active svg{fill:#fff}
+.fill-toggle{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 12px;border:2px solid var(--border);border-radius:10px;background:var(--btn-bg);cursor:pointer;transition:all .2s;color:var(--icon-color);font-size:13px;font-weight:bold}
+.fill-toggle:hover{background:var(--btn-hover)}
+.fill-toggle.active{background:var(--btn-active);color:#fff;border-color:var(--accent-hover)}
+.fill-toggle svg{width:18px;height:18px;fill:currentColor}
+.hint-text{position:fixed;top:60px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:8px 18px;border-radius:25px;font-size:13px;pointer-events:none;opacity:0;transition:opacity .3s;z-index:300;white-space:nowrap}
+.hint-text.show{opacity:1}
+.confirm-dialog{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:500}
+.confirm-dialog.show{display:flex}
+.confirm-box{background:var(--bg-toolbar);border:2px solid var(--border);border-radius:20px;padding:28px;text-align:center;max-width:300px;color:var(--text-primary);box-shadow:0 20px 50px rgba(0,0,0,.3)}
+.confirm-box h3{margin-bottom:12px;color:var(--accent);font-size:18px}
+.confirm-box p{margin-bottom:22px;color:var(--text-secondary);font-size:14px}
+.confirm-btns{display:flex;gap:12px;justify-content:center}
+.confirm-btn{padding:10px 24px;border:none;border-radius:10px;cursor:pointer;font-size:14px;font-weight:bold;transition:all .2s;touch-action:manipulation}
+.confirm-btn.yes{background:#e74c3c;color:#fff}
+.confirm-btn.yes:hover{background:#c0392b;transform:scale(1.05)}
+.confirm-btn.no{background:var(--btn-bg);color:var(--text-primary);border:2px solid var(--border)}
+.confirm-btn.no:hover{background:var(--btn-hover);transform:scale(1.05)}
+.color-indicator{position:fixed;top:55px;right:15px;width:20px;height:20px;border-radius:50%;border:2px solid var(--border);z-index:50;transition:all .3s;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.manage-panel{position:fixed;top:55px;right:15px;width:260px;max-height:60vh;overflow-y:auto;background:var(--bg-toolbar);border:2px solid var(--border);border-radius:16px;padding:14px;box-shadow:0 10px 30px rgba(0,0,0,.3);z-index:400;display:none}
+.manage-panel.show{display:block}
+.manage-panel h3{margin-bottom:10px;color:var(--accent);font-size:15px}
+.manage-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;margin-bottom:6px;background:var(--btn-bg);border:1px solid var(--border)}
+.manage-item img{width:48px;height:36px;object-fit:cover;border-radius:4px;background:#fff}
+.manage-item .mname{flex:1;font-size:11px;color:var(--text-primary);word-break:break-all}
+.manage-item .mdel{border:none;border-radius:6px;background:#e74c3c;color:#fff;font-size:12px;padding:4px 8px;cursor:pointer;flex-shrink:0}
+.manage-item .mdel:hover{background:#c0392b}
+.manage-empty{font-size:13px;color:var(--text-primary);opacity:.6;text-align:center;padding:12px}
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:600;cursor:zoom-out}
+.lightbox.show{display:flex}
+.lightbox img{max-width:92vw;max-height:88vh;border-radius:8px;box-shadow:0 20px 60px rgba(0,0,0,.5);background:#fff}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div class="color-indicator" id="colorIndicator" style="background:#000"></div>
+<div class="top-bar">
+<div class="top-left">
+<button class="top-btn" id="undoBtn" title="撤回">
+<svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+</button>
+<button class="top-btn" id="redoBtn" title="重做">
+<svg viewBox="0 0 24 24"><path d="M18.4 10.6C16.55 8.99 14.15 8 11.5 8c-4.65 0-8.58 3.03-9.96 7.22L3.9 16c1.05-3.19 4.05-5.5 7.6-5.5 1.95 0 3.73.72 5.12 1.88L13 16h9V7l-3.6 3.6z"/></svg>
+</button>
+<button class="top-btn" id="saveBtn" title="保存到画廊">
+<svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+</button>
+</div>
+<div class="top-right">
+<button class="top-btn" id="manageBtn" title="作品管理">
+<svg viewBox="0 0 24 24"><path d="M3 5h18v2H3V5zm0 6h18v2H3v-2zm0 6h18v2H3v-2z"/></svg>
+</button>
+<button class="mode-toggle" id="modeToggle">
+<svg id="sunIcon" viewBox="0 0 24 24"><path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zM2 13h2c.55 0 1-.45 1-1s-.45-1-1-1H2c-.55 0-1 .45-1 1s.45 1 1 1zm18 0h2c.55 0 1-.45 1-1s-.45-1-1-1h-2c-.55 0-1 .45-1 1s.45 1 1 1zM11 2v2c0 .55.45 1 1 1s1-.45 1-1V2c0-.55-.45-1-1-1s-1 .45-1 1zm0 18v2c0 .55.45 1 1 1s1-.45 1-1v-2c0-.55-.45-1-1-1s-1 .45-1 1zM5.99 4.58a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.06 1.06c.39.39 1.03.39 1.41 0s.39-1.03 0-1.41L5.99 4.58zm12.37 12.37a.996.996 0 00-1.41 0 .996.996 0 000 1.41l1.06 1.06c.39.39 1.03.39 1.41 0 .39-.39.39-1.03 0-1.41l-1.06-1.06zm1.06-10.96a.996.996 0 000-1.41.996.996 0 00-1.41 0l-1.06 1.06c-.39.39-.39 1.03 0 1.41s1.03.39 1.41 0l1.06-1.06zM7.05 18.36a.996.996 0 000 1.41.996.996 0 001.41 0l1.06-1.06c.39-.39.39-1.03 0-1.41s-1.03.39-1.41 0l-1.06 1.06z"/></svg>
+<svg id="moonIcon" viewBox="0 0 24 24" style="display:none"><path d="M9 2c-1.05 0-2.05.16-3 .46 1.69 1.24 2.97 3.02 3.57 5.08.6 2.06.46 4.27-.4 6.24-.86 1.97-2.34 3.59-4.2 4.61A9.03 9.03 0 0018 12.03c.02-2.54-.97-4.98-2.75-6.77C13.47 3.47 11.29 2 9 2z"/></svg>
+<span id="modeText">白天</span>
+</button>
+</div>
+</div>
+<div class="hint-text" id="hintText"></div>
+<div class="manage-panel" id="managePanel">
+<h3>白板作品管理</h3>
+<div id="manageList"></div>
+</div>
+<div class="lightbox" id="lightbox"><img id="lightboxImg" alt="作品预览"></div>
+<div class="bottom-bar">
+<button class="tool-btn active" id="penBtn" data-tool="pen">
+<svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 000-1.41l-2.34-2.34a.996.996 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+<span>画笔</span>
+</button>
+<button class="tool-btn" id="eraserBtn" data-tool="eraser">
+<svg viewBox="0 0 24 24"><path d="M15.14 3c-.51 0-1.02.2-1.41.59L2.59 14.73c-.78.78-.78 2.05 0 2.83L5.03 20h7.94l8.44-8.44c.78-.78.78-2.05 0-2.83l-4.88-4.88c-.39-.39-.9-.59-1.41-.59zm-4.88 16l-2.81-2.81 7.44-7.44 2.81 2.81-7.44 7.44z"/></svg>
+<span>橡皮</span>
+</button>
+<button class="tool-btn" id="thicknessBtn" data-tool="thickness">
+<svg viewBox="0 0 24 24"><path d="M3 17h18v2H3v-2zm0-7h18v5H3v-5zm0-4h18v2H3V6z"/></svg>
+<span>粗细</span>
+</button>
+<button class="tool-btn" id="shapeBtn" data-tool="shape">
+<svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2zm0 3.99L19.53 20H4.47L12 5.99zM11 16h2v2h-2zm0-6h2v4h-2z"/></svg>
+<span>图形</span>
+</button>
+<button class="tool-btn" id="highlighterBtn" data-tool="highlighter">
+<svg viewBox="0 0 24 24"><path d="M6 14l3 3v5h6v-5l3-3V9H6v5zm5-12h2v5h-2V2zM3.5 5.88l1.41-1.41 2.12 2.12L5.62 8H3.5V5.88zM16.96 6.5l2.12-2.12 1.41 1.41L18.38 8h-2.12V6.5z"/></svg>
+<span>荧光笔</span>
+</button>
+<button class="tool-btn" id="colorBtn" data-tool="color">
+<svg viewBox="0 0 24 24"><path d="M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67 0 1.38-1.12 2.5-2.5 2.5zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5 0-.16-.08-.28-.14-.35-.41-.46-.63-1.05-.63-1.65 0-1.38 1.12-2.5 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z"/><circle cx="6.5" cy="11.5" r="1.5"/><circle cx="9.5" cy="7.5" r="1.5"/><circle cx="14.5" cy="7.5" r="1.5"/><circle cx="17.5" cy="11.5" r="1.5"/></svg>
+<span>颜色</span>
+<div id="colorDot" style="position:absolute;top:6px;right:6px;width:12px;height:12px;border-radius:50%;background:#000;border:1px solid #999"></div>
+</button>
+</div>
+<div class="popup thickness-popup" id="thicknessPopup">
+<div class="thickness-option" data-size="2"><div class="thickness-line" style="width:40px;height:2px"></div><span>细</span></div>
+<div class="thickness-option" data-size="5"><div class="thickness-line" style="width:40px;height:5px"></div><span>中</span></div>
+<div class="thickness-option" data-size="10"><div class="thickness-line" style="width:40px;height:10px"></div><span>粗</span></div>
+<div class="thickness-option" data-size="20"><div class="thickness-line" style="width:40px;height:20px"></div><span>超粗</span></div>
+</div>
+<div class="popup color-picker" id="colorPicker">
+<div class="color-option selected" style="background:#000" data-color="#000000"></div>
+<div class="color-option" style="background:#e74c3c" data-color="#e74c3c"></div>
+<div class="color-option" style="background:#e67e22" data-color="#e67e22"></div>
+<div class="color-option" style="background:#f1c40f" data-color="#f1c40f"></div>
+<div class="color-option" style="background:#2ecc71" data-color="#2ecc71"></div>
+<div class="color-option" style="background:#1abc9c" data-color="#1abc9c"></div>
+<div class="color-option" style="background:#3498db" data-color="#3498db"></div>
+<div class="color-option" style="background:#9b59b6" data-color="#9b59b6"></div>
+<div class="color-option" style="background:#e91e63" data-color="#e91e63"></div>
+<div class="color-option" style="background:#795548" data-color="#795548"></div>
+<div class="color-option" style="background:#607d8b" data-color="#607d8b"></div>
+<div class="color-option" style="background:#fff;border:2px solid #ccc" data-color="#ffffff"></div>
+<div class="color-option" style="background:#ffc0cb" data-color="#ffc0cb"></div>
+<div class="color-option" style="background:#00bcd4" data-color="#00bcd4"></div>
+<div class="color-option" style="background:#8bc34a" data-color="#8bc34a"></div>
+<div class="color-option" style="background:#1a237e" data-color="#1a237e"></div>
+<div class="color-option" style="background:#9e9e9e" data-color="#9e9e9e"></div>
+<div class="color-option" style="background:#ffd700" data-color="#ffd700"></div>
+</div>
+<div class="popup shape-popup" id="shapePopup">
+<div class="shape-row">
+<div class="shape-option active" data-shape="circle" title="圆形"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/></svg></div>
+<div class="shape-option" data-shape="triangle" title="三角形"><svg viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z"/></svg></div>
+<div class="shape-option" data-shape="rectangle" title="矩形"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/></svg></div>
+</div>
+<div class="shape-row">
+<div class="fill-toggle" id="fillToggle">
+<svg viewBox="0 0 24 24"><path d="M16.56 8.94L7.62 0 6.21 1.41l2.38 2.38-5.15 5.15c-.59.59-.59 1.54 0 2.12l5.5 5.5c.29.29.68.44 1.06.44s.77-.15 1.06-.44l5.5-5.5c.59-.58.59-1.53 0-2.12zM5.21 10l5.5-5.5L14.79 9H5.21zM19 13.5S20 15 20 17c0 2.5-1.5 4-3 4s-3-1.5-3-4c0-2 1-3.5 1-3.5s1.5 1 2 1.5c.5-.5 2-1.5 2-1.5zM17 21c1 0 2-1 2-2 0-.5-.5-1-1-1s-1 .5-1 1c0 1-1 2-2 2z"/></svg>
+<span id="fillToggleText">空心</span>
+</div>
+</div>
+</div>
+<div class="confirm-dialog" id="confirmDialog">
+<div class="confirm-box">
+<h3>确认清空</h3>
+<p>确定要擦除所有内容吗？此操作无法撤销。</p>
+<div class="confirm-btns">
+<button class="confirm-btn yes" id="confirmYes">确定清空</button>
+<button class="confirm-btn no" id="confirmNo">取消</button>
+</div>
+</div>
+</div>
+<script>
+const canvas=document.getElementById('canvas');
+const ctx=canvas.getContext('2d');
+let isDrawing=false,currentTool='pen',currentColor='#000000',currentSize=3,currentShape='circle',startX=0,startY=0,snapshot=null,lastX=0,lastY=0;
+let isFillShape=false;
+let history=[],historyStep=-1;
+const MAX_HISTORY=50;
+
+function resizeCanvas(){
+const rect=canvas.getBoundingClientRect();
+const dpr=window.devicePixelRatio||1;
+const tempCanvas=document.createElement('canvas');
+tempCanvas.width=canvas.width||rect.width*dpr;
+tempCanvas.height=canvas.height||rect.height*dpr;
+const tempCtx=tempCanvas.getContext('2d');
+if(canvas.width>0)tempCtx.drawImage(canvas,0,0);
+canvas.width=rect.width*dpr;
+canvas.height=rect.height*dpr;
+ctx.scale(dpr,dpr);
+if(canvas.width>0&&tempCanvas.width>0)ctx.drawImage(tempCanvas,0,0,rect.width,rect.height);
+updateBrush();
+}
+resizeCanvas();
+window.addEventListener('resize',()=>requestAnimationFrame(resizeCanvas));
+
+function updateBrush(){
+ctx.lineCap='round';
+ctx.lineJoin='round';
+if(currentTool==='highlighter'){ctx.globalAlpha=.35;ctx.lineWidth=currentSize*3;ctx.strokeStyle=currentColor}
+else if(currentTool==='eraser'){ctx.globalAlpha=1;ctx.lineWidth=currentSize*4;ctx.strokeStyle=document.body.classList.contains('dark-mode')?'#0d0d1a':'#ffffff'}
+else{ctx.globalAlpha=1;ctx.lineWidth=currentSize;ctx.strokeStyle=currentColor}
+}
+
+function saveHistory(){
+historyStep++;
+if(historyStep<history.length)history.length=historyStep;
+history.push(canvas.toDataURL());
+if(history.length>MAX_HISTORY){history.shift();historyStep--}
+}
+
+function undo(){
+if(historyStep>0){historyStep--;restoreHistory();showHint('已撤回')}
+else if(historyStep===0){historyStep=-1;ctx.clearRect(0,0,canvas.width,canvas.height);showHint('已清空画布')}
+else showHint('没有可撤回的内容');
+}
+
+function redo(){
+if(historyStep<history.length-1){historyStep++;restoreHistory();showHint('已重做')}
+else showHint('没有可重做的内容');
+}
+
+function restoreHistory(){
+const img=new Image();
+img.onload=function(){ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width/(window.devicePixelRatio||1),canvas.height/(window.devicePixelRatio||1))};
+img.src=history[historyStep];
+}
+setTimeout(()=>saveHistory(),100);
+
+function getPos(e){
+const rect=canvas.getBoundingClientRect();
+let cx,cy;
+if(e.touches&&e.touches.length>0){cx=e.touches[0].clientX;cy=e.touches[0].clientY}
+else if(e.changedTouches&&e.changedTouches.length>0){cx=e.changedTouches[0].clientX;cy=e.changedTouches[0].clientY}
+else{cx=e.clientX;cy=e.clientY}
+return{x:cx-rect.left,y:cy-rect.top}
+}
+
+function startDrawing(e){
+if(e.target!==canvas)return;
+e.preventDefault();
+isDrawing=true;
+const pos=getPos(e);
+startX=lastX=pos.x;startY=lastY=pos.y;
+updateBrush();
+if(currentTool==='shape')snapshot=ctx.getImageData(0,0,canvas.width,canvas.height);
+ctx.beginPath();
+ctx.arc(startX,startY,ctx.lineWidth/2,0,Math.PI*2);
+ctx.fillStyle=ctx.strokeStyle;
+ctx.globalAlpha=currentTool==='highlighter'?.35:1;
+ctx.fill();
+ctx.beginPath();
+ctx.moveTo(startX,startY);
+}
+
+function draw(e){
+if(!isDrawing)return;
+e.preventDefault();
+const pos=getPos(e);
+if(currentTool==='shape'){
+ctx.putImageData(snapshot,0,0);
+ctx.beginPath();
+const w=pos.x-startX,h=pos.y-startY;
+updateBrush();
+if(currentShape==='circle'){
+const r=Math.sqrt(w*w+h*h);
+ctx.arc(startX,startY,r,0,Math.PI*2);
+if(isFillShape){ctx.fillStyle=currentColor;ctx.globalAlpha=.5;ctx.fill();ctx.globalAlpha=1;ctx.stroke()}
+else{ctx.stroke()}
+}
+else if(currentShape==='triangle'){
+ctx.moveTo(startX,startY);
+ctx.lineTo(pos.x,pos.y);
+ctx.lineTo(startX-w,pos.y);
+ctx.closePath();
+if(isFillShape){ctx.fillStyle=currentColor;ctx.globalAlpha=.5;ctx.fill();ctx.globalAlpha=1;ctx.stroke()}
+else{ctx.stroke()}
+}
+else if(currentShape==='rectangle'){
+ctx.rect(startX,startY,w,h);
+if(isFillShape){ctx.fillStyle=currentColor;ctx.globalAlpha=.5;ctx.fill();ctx.globalAlpha=1;ctx.stroke()}
+else{ctx.stroke()}
+}
+}else{
+updateBrush();
+ctx.beginPath();
+ctx.moveTo(lastX,lastY);
+ctx.lineTo(pos.x,pos.y);
+ctx.stroke();
+lastX=pos.x;lastY=pos.y;
+}
+}
+
+function stopDrawing(e){if(!isDrawing)return;isDrawing=false;saveHistory()}
+
+canvas.addEventListener('mousedown',startDrawing);
+canvas.addEventListener('mousemove',draw);
+canvas.addEventListener('mouseup',stopDrawing);
+canvas.addEventListener('mouseleave',stopDrawing);
+canvas.addEventListener('touchstart',startDrawing,{passive:false});
+canvas.addEventListener('touchmove',draw,{passive:false});
+canvas.addEventListener('touchend',stopDrawing);
+canvas.addEventListener('touchcancel',stopDrawing);
+
+const toolBtns=document.querySelectorAll('.tool-btn');
+const thicknessPopup=document.getElementById('thicknessPopup');
+const shapePopup=document.getElementById('shapePopup');
+const colorPicker=document.getElementById('colorPicker');
+
+function closeAllPopups(){thicknessPopup.classList.remove('show');shapePopup.classList.remove('show');colorPicker.classList.remove('show')}
+
+toolBtns.forEach(btn=>{
+btn.addEventListener('click',e=>{
+e.stopPropagation();
+const tool=btn.dataset.tool;
+closeAllPopups();
+if(tool==='thickness'){thicknessPopup.classList.toggle('show');return}
+if(tool==='shape'){shapePopup.classList.toggle('show');if(currentTool==='shape'){toolBtns.forEach(b=>b.classList.remove('active'));btn.classList.add('active')}return}
+if(tool==='eraser'){if(historyStep>=0)document.getElementById('confirmDialog').classList.add('show');else showHint('画布为空');return}
+currentTool=tool;
+toolBtns.forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+if(tool==='highlighter')currentSize=Math.max(currentSize,8);
+updateBrush();
+showHint({pen:'画笔模式',eraser:'橡皮擦',highlighter:'荧光笔模式',shape:'图形工具'}[tool]||tool);
+});
+});
+
+document.querySelectorAll('.thickness-option').forEach(opt=>{
+opt.addEventListener('click',e=>{e.stopPropagation();currentSize=parseInt(opt.dataset.size);thicknessPopup.classList.remove('show');showHint('线条粗细: '+currentSize+'px');updateBrush()});
+});
+
+document.querySelectorAll('.shape-option').forEach(opt=>{
+opt.addEventListener('click',e=>{e.stopPropagation();currentShape=opt.dataset.shape;document.querySelectorAll('.shape-option').forEach(o=>o.classList.remove('active'));opt.classList.add('active');shapePopup.classList.remove('show');currentTool='shape';toolBtns.forEach(b=>b.classList.remove('active'));document.getElementById('shapeBtn').classList.add('active');showHint('已选择: '+{circle:'圆形',triangle:'三角形',rectangle:'矩形'}[currentShape])});
+});
+
+const fillToggle=document.getElementById('fillToggle');
+const fillToggleText=document.getElementById('fillToggleText');
+fillToggle.addEventListener('click',e=>{
+e.stopPropagation();
+isFillShape=!isFillShape;
+fillToggle.classList.toggle('active');
+fillToggleText.textContent=isFillShape?'实心':'空心';
+showHint(isFillShape?'图形已切换为实心':'图形已切换为空心');
+});
+
+const colorIndicator=document.getElementById('colorIndicator');
+const colorDot=document.getElementById('colorDot');
+// 「颜色」按钮:常驻工具栏,点按直接打开颜色选择器(不再需要长按画笔)
+document.getElementById('colorBtn').addEventListener('click',e=>{
+e.stopPropagation();
+closeAllPopups();
+colorPicker.classList.toggle('show');
+});
+document.querySelectorAll('.color-option').forEach(opt=>{
+opt.addEventListener('click',e=>{e.stopPropagation();currentColor=opt.dataset.color;document.querySelectorAll('.color-option').forEach(o=>o.classList.remove('selected'));opt.classList.add('selected');colorPicker.classList.remove('show');colorIndicator.style.background=currentColor;if(colorDot)colorDot.style.background=currentColor;updateBrush();showHint('颜色已更改')});
+});
+
+let colorPickerTimer;
+const penBtn=document.getElementById('penBtn');
+function openColorPicker(){closeAllPopups();colorPicker.classList.add('show')}
+penBtn.addEventListener('mousedown',()=>colorPickerTimer=setTimeout(openColorPicker,500));
+penBtn.addEventListener('mouseup',()=>clearTimeout(colorPickerTimer));
+penBtn.addEventListener('mouseleave',()=>clearTimeout(colorPickerTimer));
+penBtn.addEventListener('touchstart',()=>colorPickerTimer=setTimeout(openColorPicker,500));
+penBtn.addEventListener('touchend',()=>clearTimeout(colorPickerTimer));
+
+document.getElementById('undoBtn').addEventListener('click',()=>undo());
+document.getElementById('redoBtn').addEventListener('click',()=>redo());
+
+// 保存画布为 PNG 并上传到后端 photos 目录(可在画廊中展出)
+document.getElementById('saveBtn').addEventListener('click',async()=>{
+const tmp=document.createElement('canvas');
+tmp.width=canvas.width;tmp.height=canvas.height;
+const tc=tmp.getContext('2d');
+tc.fillStyle=document.body.classList.contains('dark-mode')?'#0d0d1a':'#ffffff';
+tc.fillRect(0,0,tmp.width,tmp.height);
+tc.drawImage(canvas,0,0);
+const blob=await new Promise(r=>tmp.toBlob(r,'image/png'));
+const name='whiteboard-'+new Date().toISOString().replace(/[:.]/g,'-')+'.png';
+showHint('正在保存...');
+try{
+// 服务器启用 TOKEN 鉴权时,需用 whiteboard.html?token=xxx 打开本页,保存会自动带上
+const tk=new URLSearchParams(location.search).get('token');
+const res=await fetch('/api/upload?dir=photos&name='+encodeURIComponent(name)+(tk?'&token='+encodeURIComponent(tk):''),{method:'POST',body:blob});
+if(res.ok)showHint('你的手迹，已列入昆仑壁藏。');
+else showHint('保存失败,请重试');
+}catch(e){showHint('保存失败:请通过 http://localhost:3000 访问页面');}
+});
+
+document.addEventListener('keydown',e=>{
+if(e.ctrlKey&&e.key==='z'){e.preventDefault();undo()}
+if((e.ctrlKey&&e.key==='y')||(e.ctrlKey&&e.shiftKey&&e.key==='z')){e.preventDefault();redo()}
+});
+
+document.getElementById('confirmYes').addEventListener('click',()=>{ctx.clearRect(0,0,canvas.width,canvas.height);saveHistory();document.getElementById('confirmDialog').classList.remove('show');showHint('已擦除所有内容')});
+document.getElementById('confirmNo').addEventListener('click',()=>document.getElementById('confirmDialog').classList.remove('show'));
+
+const modeToggle=document.getElementById('modeToggle');
+const sunIcon=document.getElementById('sunIcon');
+const moonIcon=document.getElementById('moonIcon');
+const modeText=document.getElementById('modeText');
+let isDarkMode=false;
+modeToggle.addEventListener('click',()=>{
+isDarkMode=!isDarkMode;
+document.body.classList.toggle('dark-mode');
+if(isDarkMode){sunIcon.style.display='none';moonIcon.style.display='block';modeText.textContent='黑夜';showHint('已切换至黑夜模式')}
+else{sunIcon.style.display='block';moonIcon.style.display='none';modeText.textContent='白天';showHint('已切换至白天模式')}
+if(currentTool==='eraser')updateBrush();
+});
+
+let hintTimeout;
+function showHint(text){
+const hint=document.getElementById('hintText');
+hint.textContent=text;
+hint.classList.add('show');
+clearTimeout(hintTimeout);
+hintTimeout=setTimeout(()=>hint.classList.remove('show'),2000);
+}
+
+// ===== 白板作品管理(列表 + 删除,调用后端 API) =====
+const managePanel=document.getElementById('managePanel');
+const manageList=document.getElementById('manageList');
+function apiToken(){const tk=new URLSearchParams(location.search).get('token');return tk?'&token='+encodeURIComponent(tk):'';}
+
+async function loadManage(){
+try{
+const res=await fetch('/api/files?dir=photos'+apiToken());
+const data=await res.json();
+const files=(data.photos||[]).filter(f=>/^whiteboard-.*\.png$/i.test(f.name)).sort((a,b)=>b.mtime.localeCompare(a.mtime));
+if(files.length===0){manageList.innerHTML='<div class="manage-empty">还没有保存的作品</div>';return}
+manageList.innerHTML='';
+files.forEach(f=>{
+const row=document.createElement('div');row.className='manage-item';
+const img=document.createElement('img');img.src=f.url;img.loading='lazy';
+img.style.cursor='zoom-in';
+img.onclick=e=>{e.stopPropagation();document.getElementById('lightboxImg').src=f.url;document.getElementById('lightbox').classList.add('show')};
+const name=document.createElement('div');name.className='mname';
+name.textContent=f.name.replace(/^whiteboard-/,'').replace('T',' ').slice(0,19);
+const del=document.createElement('button');del.className='mdel';del.textContent='删除';
+del.onclick=async()=>{
+if(!confirm('确定删除这张作品吗？画廊展示墙上的也会同步消失。'))return;
+try{
+const r=await fetch('/api/files/photos/'+encodeURIComponent(f.name)+'?x=1'+apiToken(),{method:'DELETE'});
+if(r.ok){showHint('已删除');loadManage()}
+else showHint('删除失败');
+}catch(e){showHint('删除失败:请通过服务器访问页面')}
+};
+row.appendChild(img);row.appendChild(name);row.appendChild(del);
+manageList.appendChild(row);
+});
+}catch(e){manageList.innerHTML='<div class="manage-empty">加载失败</div>'}
+}
+
+document.getElementById('manageBtn').addEventListener('click',e=>{
+e.stopPropagation();
+managePanel.classList.toggle('show');
+if(managePanel.classList.contains('show'))loadManage();
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.manage-panel')&&!e.target.closest('#manageBtn'))managePanel.classList.remove('show')});
+document.getElementById('lightbox').addEventListener('click',()=>document.getElementById('lightbox').classList.remove('show'));
+
+document.addEventListener('click',e=>{if(!e.target.closest('.tool-btn')&&!e.target.closest('.popup'))closeAllPopups()});
+setTimeout(()=>showHint('欢迎使用希沃白板！轻触即可绘画'),500);
+</script>
+</body>
+</html>

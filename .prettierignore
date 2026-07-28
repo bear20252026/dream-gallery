@@ -1,0 +1,13 @@
+# 不参与排版的目录/文件
+node_modules
+dist
+vendor
+origin
+scripts/artifacts
+photos
+videos
+music
+# 历史大文件保持原貌,不批量重排(2026-07-27 定:只排版新写/正在改的文件)
+data.js
+gate_data.json
+package-lock.json

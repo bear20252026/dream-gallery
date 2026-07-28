@@ -1,0 +1,69 @@
+/* 梦幻画廊主样式 — 由 index.html 内嵌 <style> 抽离(2026-07-27 Vite 结构整改) */
+/* 经 <link rel=stylesheet> 引入:本地原生直跑可读,Vite 构建自动压缩+hash */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-touch-callout:none}
+body{background:#1a0a14;overflow:hidden;touch-action:manipulation;font-family:'Courier New',monospace;height:100vh;width:100vw;position:fixed}
+#c{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+#o{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none}
+#t{color:rgba(255,200,220,0.9);font-size:14px;letter-spacing:4px;text-shadow:0 0 12px rgba(255,150,180,0.5);position:absolute;top:16px;left:50%;transform:translateX(-50%);text-align:center}
+#m{position:absolute;top:12px;right:12px;width:150px;height:140px;background:rgba(10,5,8,0.8);border:1px solid rgba(255,150,180,0.25);border-radius:6px;pointer-events:auto;cursor:pointer;overflow:hidden}
+#m canvas{width:100%;height:100%;display:block}
+/* 内嵌面板(白板/音乐等分支页) */
+#panelOv{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;background:rgba(10,5,10,0.92)}
+#panelBar{height:46px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:rgba(30,15,25,0.95);border-bottom:1px solid rgba(255,150,180,0.25)}
+#panelTitle{color:#ffb6c8;font-size:14px;letter-spacing:2px}
+#panelClose{border:1px solid rgba(255,150,180,0.4);background:rgba(255,107,107,0.15);color:#fff;font-size:13px;padding:7px 18px;border-radius:20px;cursor:pointer;font-family:inherit}
+#panelClose:active{transform:scale(.94);background:rgba(255,107,107,0.35)}
+#panelFrame{flex:1;border:none;width:100%;background:#fff}
+#j{position:absolute;bottom:30px;left:20px;width:110px;height:110px;pointer-events:auto;z-index:20}
+#jb{position:absolute;width:100px;height:100px;border-radius:50%;background:rgba(255,150,180,0.12);border:2px solid rgba(255,150,180,0.3);top:50%;left:50%;transform:translate(-50%,-50%)}
+#jt{position:absolute;width:40px;height:40px;border-radius:50%;background:rgba(255,170,200,0.4);border:2px solid rgba(255,180,210,0.5);top:50%;left:50%;transform:translate(-50%,-50%)}
+#jt.a{background:rgba(255,190,220,0.6)}
+#lk{position:absolute;bottom:30px;right:20px;width:80px;height:80px;pointer-events:auto;z-index:20;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,rgba(70,18,38,0.92) 42%,rgba(40,10,24,0.55) 68%,transparent 72%);border-radius:50%}
+#lk svg{filter:drop-shadow(0 0 6px rgba(255,90,140,0.55))}
+#li{width:50px;height:50px;border-radius:50%;background:rgba(255,150,180,0.08);border:2px dashed rgba(255,150,180,0.25);display:flex;align-items:center;justify-content:center}
+#sc{position:absolute;top:50px;left:12px;z-index:15;pointer-events:auto}
+#sc label{color:rgba(255,180,200,0.45);font-size:9px;display:block}
+#sc input{width:60px;accent-color:#ff80a0;height:3px}
+#nc{position:absolute;top:82px;left:12px;z-index:15;pointer-events:auto}
+#nc label{color:rgba(255,180,200,0.45);font-size:9px;display:block}
+#nc input{width:60px;accent-color:#ff80a0;height:3px}
+#ab{position:absolute;bottom:30px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;background:rgba(255,100,150,0.2);border:1px solid rgba(255,150,180,0.3);color:rgba(255,200,220,0.7);padding:5px 12px;border-radius:14px;font-size:10px;letter-spacing:1px;cursor:pointer}
+#ab.p{background:rgba(255,100,150,0.4);color:#fff}
+#l{position:fixed;top:0;left:0;width:100%;height:100%;background:radial-gradient(ellipse 120% 80% at 50% 38%,#331626 0%,#22101c 45%,#120811 100%);z-index:100;display:flex;flex-direction:column;justify-content:center;align-items:center;color:#ffb6c8;transition:opacity 1s}
+#l::before{content:'';position:absolute;left:50%;top:42%;width:340px;height:340px;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle,rgba(255,182,120,0.10) 0%,rgba(255,182,120,0.04) 45%,transparent 70%);pointer-events:none}
+#l .x{font-size:19px;letter-spacing:6px;font-weight:600;animation:b 1.5s ease-in-out infinite;text-shadow:0 0 24px rgba(255,170,150,0.35)}
+#l .y{font-size:11px;letter-spacing:2px;color:rgba(255,180,200,0.5);margin-top:6px}
+@keyframes b{0%,100%{opacity:0.3}50%{opacity:1}}
+/* 温柔度测试面板 */
+#gtP{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;background:rgba(10,4,8,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);opacity:0;transition:opacity 0.5s}
+#gtP.show{display:flex;opacity:1}
+.gtC{max-width:460px;width:88%;max-height:82vh;overflow-y:auto;background:rgba(30,12,22,0.95);border:1px solid rgba(255,130,170,0.25);border-radius:20px;padding:28px 24px;color:#ffe0e8;position:relative;box-shadow:0 0 60px rgba(255,100,150,0.15)}
+.gtC::-webkit-scrollbar{width:4px}
+.gtC::-webkit-scrollbar-thumb{background:rgba(255,130,170,0.3);border-radius:4px}
+.gtH{font-size:22px;text-align:center;margin-bottom:4px;color:#ffb6c8;letter-spacing:3px;font-weight:bold}
+.gtS{text-align:center;font-size:11px;color:rgba(255,180,200,0.5);margin-bottom:20px;letter-spacing:2px}
+.gtQ{margin-bottom:18px;padding:14px;background:rgba(255,100,150,0.06);border-radius:12px;border:1px solid rgba(255,130,170,0.1)}
+.gtQL{font-size:13px;color:#ffd0d8;margin-bottom:10px;line-height:1.6}
+.gtO{display:block;width:100%;text-align:left;padding:8px 12px;margin:5px 0;background:rgba(255,130,170,0.08);border:1px solid rgba(255,130,170,0.15);border-radius:8px;color:#ffe4ec;font-size:12px;cursor:pointer;transition:all 0.25s}
+.gtO:hover{background:rgba(255,130,170,0.2);border-color:rgba(255,130,170,0.35);transform:translateX(3px)}
+.gtO.sel{background:rgba(255,100,150,0.35);border-color:#ff6b8a}
+.gtB{display:block;width:100%;padding:12px;background:linear-gradient(135deg,#ff6b8a,#ff8fab);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:bold;cursor:pointer;margin-top:16px;letter-spacing:4px;transition:all 0.3s}
+.gtB:hover{transform:scale(1.03);box-shadow:0 4px 20px rgba(255,100,150,0.4)}
+.gtR{text-align:center;display:none}
+.gtScore{font-size:64px;font-weight:bold;background:linear-gradient(135deg,#ff6b8a,#ffd700);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:10px 0}
+.gtHeart{font-size:48px;margin:10px 0;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.15)}}
+.gtRT{font-size:16px;color:#ffb6c8;margin:10px 0;line-height:1.7}
+.gtRD{font-size:12px;color:rgba(255,200,220,0.7);line-height:1.8;margin-top:8px}
+.gtClose{position:absolute;top:12px;right:16px;color:rgba(255,180,200,0.5);font-size:20px;cursor:pointer;transition:color 0.2s}
+.gtClose:hover{color:#ff6b8a}
+/* 进度条 */
+.gtProg{height:3px;background:rgba(255,130,170,0.15);border-radius:3px;margin-bottom:16px;overflow:hidden}
+.gtProgF{height:100%;background:linear-gradient(90deg,#ff6b8a,#ff8fab);border-radius:3px;transition:width 0.4s;width:0%}
+/* 放大后的AI文字介绍面板 */
+#aiPanel{position:fixed;bottom:60px;left:50%;transform:translateX(-50%) translateY(20px);z-index:30;max-width:480px;width:85%;background:rgba(20,8,16,0.7);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,150,180,0.2);border-radius:16px;padding:18px 22px;opacity:0;transition:opacity 0.6s ease,transform 0.6s ease;pointer-events:none}
+#aiPanel.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#aiPanel .aiTag{color:rgba(255,150,180,0.6);font-size:10px;letter-spacing:3px;margin-bottom:8px;text-transform:uppercase}
+#aiPanel .aiText{color:rgba(255,220,230,0.88);font-size:13px;line-height:1.75;letter-spacing:0.5px;font-family:'Courier New',serif}
+#aiPanel .aiLine{width:40px;height:1px;background:rgba(255,150,180,0.3);margin:10px 0}
+#aiPanel .aiStar{color:rgba(255,180,160,0.4);font-size:11px;letter-spacing:2px}

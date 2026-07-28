@@ -1,0 +1,277 @@
+[
+  {
+    "id": 1,
+    "subject": "英语",
+    "q": "The \"epistemological rupture\" proposed by Gaston Bachelard implies that scientific progress is not a gradual accumulation of knowledge, but rather a series of discontinuous breaks. Which of the following best exemplifies this rupture in the context of quantum mechanics?",
+    "correct": "The replacement of the deterministic causality of classical mechanics by the probabilistic uncertainty of quantum states",
+    "wrongs": [
+      "The development of the Schrödinger equation based on the wave-particle duality of light",
+      "The discovery of the electron by J.J. Thomson using cathode ray tubes",
+      "The formulation of the Heisenberg uncertainty principle after the mathematical failure of classical models"
+    ]
+  },
+  {
+    "id": 2,
+    "subject": "英语",
+    "q": "In ecocritical discourse, the term \"solastalgia\" (coined by Glenn Albrecht) refers to a form of emotional or existential distress caused by environmental change. How does solastalgia fundamentally differ from the traditional concept of nostalgia?",
+    "correct": "Nostalgia is a longing for a past time, whereas solastalgia is a distinct psychic pain caused by the destruction of one's physical home and living environment in the present",
+    "wrongs": [
+      "Nostalgia is a personal emotion, while solastalgia is entirely a collective social response to industrial urbanization",
+      "Solastalgia is a form of clinical depression that can be cured by medical intervention, while nostalgia is not",
+      "Solastalgia only affects indigenous populations, whereas nostalgia affects all demographic groups equally"
+    ]
+  },
+  {
+    "id": 3,
+    "subject": "英语",
+    "q": "The linguistic phenomenon \"catachresis\" refers to the deliberate misuse of words to create a novel rhetorical effect. In post-colonial studies, the term \"catachresis\" is often used to describe:",
+    "correct": "The adoption and subversive re-appropriation of colonial language by the colonized, who deliberately deploy misnomers to destabilize colonial authority",
+    "wrongs": [
+      "The unintentional spelling mistakes made by colonial administrators when recording indigenous languages",
+      "The process of simplifying complex grammatical structures to make a foreign language easier to teach",
+      "The inevitable mis-translation that occurs when an oral culture is transcribed into a written system for the first time"
+    ]
+  },
+  {
+    "id": 4,
+    "subject": "英语",
+    "q": "\"The cormorant and the fisherman share a tacit, antagonistic symbiosis.\" In this sentence, the word \"antagonistic\" most precisely connotes:",
+    "correct": "A paradoxical interaction where two organisms achieve mutual benefit but do so through mutual behavioral coercion and continuous negotiation",
+    "wrongs": [
+      "An aggressive and violent conflict between two parties that ends in mutual destruction",
+      "A dynamic relationship where both parties are in constant competition for the same limited resource, leading to biological exclusion",
+      "A state of ecological dependency that is inherently unstable, with one species inevitably evolving to outcompete the other"
+    ]
+  },
+  {
+    "id": 5,
+    "subject": "英语",
+    "q": "A writer who employs an \"exophonic\" style is one who:",
+    "correct": "Deliberately writes in a language that is not their native tongue, using syntactic estrangement to create new aesthetic possibilities and critical perspectives",
+    "wrongs": [
+      "Uses a highly metaphorical and poetic style that requires extensive external annotation to be understood by the general public",
+      "Composes literature in two or more languages simultaneously, allowing the text to exist in a perpetual state of intra-lingual translation",
+      "Exclusively uses words borrowed from other languages to decorate their native writing, creating a cosmetic multicultural veneer"
+    ]
+  },
+  {
+    "id": 6,
+    "subject": "英语",
+    "q": "In the study of epistemology, the term \"veridical perception\" distinguishes between:",
+    "correct": "A perception that accurately corresponds to an external, objective reality, contrasted with hallucination or illusion",
+    "wrongs": [
+      "A perception that is derived from logical deduction rather than sensory input, forming the basis of rationalism",
+      "A perception that is shared by multiple observers, making it a socially constructed truth",
+      "A perception that is morally acceptable, thus influencing the ethical dimension of cognition"
+    ]
+  },
+  {
+    "id": 7,
+    "subject": "英语",
+    "q": "The linguistic concept of \"polysemy\" refers to a single word having multiple related meanings. In the context of post-colonial criticism, the polysemy of the word \"frontier\" can be deconstructed to reveal:",
+    "correct": "A historically charged signifier that simultaneously implies progress, colonial expansion, and the erasure of indigenous lifeworlds",
+    "wrongs": [
+      "A neutral geographical term that denotes a physical line separating two sovereign states without ideological weight",
+      "A linguistic error in early cartography that led to the misrepresentation of native territories",
+      "A purely metaphorical tool used in American literature to depict the wilderness as a space of individual freedom"
+    ]
+  },
+  {
+    "id": 8,
+    "subject": "英语",
+    "q": "In the philosophy of history, the term \"presentism\" is subjected to severe critique due to its tendency to:",
+    "correct": "Interpret past events exclusively through the moral and conceptual frameworks of the present day, leading to anachronistic errors",
+    "wrongs": [
+      "Assign a deterministic teleological significance to historical progress, assuming the present is the necessary outcome of the past",
+      "Deny the existence of any universal historical truth, arguing that all narratives are equally valid and contingent",
+      "Over-emphasize the role of individual agency in history, thereby ignoring the structural constraints of economic and environmental forces"
+    ]
+  },
+  {
+    "id": 9,
+    "subject": "英语",
+    "q": "In the aesthetics of tragedy, the Aristotelian concept of \"catharsis\" suggests that the audience experiences a purgation of emotions through pity and fear. A contemporary defense of this theory might argue that catharsis operates on a cognitive level by:",
+    "correct": "Enabling the audience to re-experience and symbolically resolve traumatic or repressed collective anxieties within a safe narrative framework",
+    "wrongs": [
+      "Reinforcing the audience's adherence to conventional moral norms and social codes",
+      "Provoking a purely physiological response of arousal and relaxation, independent of any cognitive engagement with the plot",
+      "Encouraging the audience to detach themselves emotionally from the characters so that they can judge the moral outcome impartially"
+    ]
+  },
+  {
+    "id": 10,
+    "subject": "英语",
+    "q": "The phrase \"ecological footprint,\" widely used in environmental discourse, constitutes a metaphor that fundamentally implies:",
+    "correct": "A precise and measurable calculation of the physical space required to sustain a human population's resource consumption",
+    "wrongs": [
+      "A moral judgment against industrialized nations for their excessive appropriation of natural capital",
+      "A political tool for justifying population control policies in developing countries, based on alleged scarcity",
+      "A poetic expression of the delicate balance between human culture and the natural world, suggesting humanity leaves no permanent mark on the planet"
+    ]
+  },
+  {
+    "id": 11,
+    "subject": "英语",
+    "q": "The term \"epistemic injustice,\" coined by Miranda Fricker, refers to the wrong done to someone in their capacity as a knower. In the context of environmental science, epistemic injustice can manifest when:",
+    "correct": "Indigenous ecological knowledge is dismissed as anecdotal or unscientific by formal academic institutions, thereby excluding crucial information from global climate models",
+    "wrongs": [
+      "Advanced computer models are given precedence over direct observational data, leading to a technological bias in policy-making",
+      "Environmental NGOs are excluded from government-led consultations because they lack official scientific accreditation",
+      "Scientists from developing countries are denied equal access to high-tier scientific journals due to linguistic barriers"
+    ]
+  },
+  {
+    "id": 12,
+    "subject": "英语",
+    "q": "In logic and rhetoric, a \"straw man fallacy\" occurs when someone misrepresents an opponent's argument to make it easier to attack. A sophisticated use of this fallacy in political discourse often involves:",
+    "correct": "Deliberately exaggerating an opponent's position to a ridiculous extreme, then dismantling that caricature instead of engaging with the original nuance",
+    "wrongs": [
+      "Attacking a minor, irrelevant point in an opponent's argument while ignoring their main thesis",
+      "Claiming that an opponent's proposal will inevitably lead to a chain of disastrous consequences, without providing causal evidence for that chain",
+      "Citing a flawed or exceptional instance as representative of the opponent's entire position"
+    ]
+  },
+  {
+    "id": 13,
+    "subject": "英语",
+    "q": "In contemporary philosophical discussions of consciousness, the term \"phenomenal consciousness\" refers to the subjective, qualitative feel of an experience (e.g., the redness of red). An ongoing dispute between physicalists and dualists over this topic most fundamentally revolves around:",
+    "correct": "Whether the explanatory gap between physical brain states and subjective experience can be bridged by future neuroscience, or whether it represents an ontological gulf",
+    "wrongs": [
+      "Whether consciousness is an emergent property of complex systems or a fundamental feature of the universe itself",
+      "Whether artificial intelligence can ever achieve self-awareness if it lacks a biological body",
+      "Whether the concept of \"qualia\" is itself a linguistic illusion and should be eliminated from scientific discourse"
+    ]
+  },
+  {
+    "id": 14,
+    "subject": "英语",
+    "q": "The word \"panopticon,\" originally a prison design proposed by Jeremy Bentham, has been metaphorically appropriated by philosophers to critique modern surveillance societies. In this metaphor, the core mechanism of social control is not actual observation but:",
+    "correct": "The omnipresent possibility of being watched, which induces self-disciplining behavior in the observed population regardless of whether a watcher is actually present",
+    "wrongs": [
+      "The physical segregation of the observed individuals, preventing them from collaborating or forming collective resistance",
+      "The intrusive collection of digital data, which is stored indefinitely and used for predictive policing",
+      "The use of violent force and strict penalties to ensure absolute compliance with legal codes"
+    ]
+  },
+  {
+    "id": 15,
+    "subject": "英语",
+    "q": "In the philosophy of time, the distinction between the \"A-series\" (past, present, future) and the \"B-series\" (earlier, later, simultaneous) challenges our intuitive understanding of the present moment. Under the B-series, the present is not a distinct metaphysical property but merely:",
+    "correct": "A subjective indexical standpoint determined by the speaker's location in time, lacking objective reality",
+    "wrongs": [
+      "A privileged stage in the universe's evolution, where events are uniquely real while past and future are unreal",
+      "A physical singularity that exists independently of observers, marking the cosmological time scale",
+      "A temporary boundary between two sets of events, moving constantly in a fixed direction"
+    ]
+  },
+  {
+    "id": 16,
+    "subject": "英语",
+    "q": "In deconstructionist literary theory, the concept of \"différance\" (Derrida) posits that meaning is never fully present but is perpetually deferred through a network of differing signifiers. This thesis fundamentally destabilizes the notion of:",
+    "correct": "The structuralist belief in the stable, binary opposition between signifier and signified",
+    "wrongs": [
+      "The phenomenological reduction of consciousness to an absolute, self-present sphere of experience",
+      "The logical positivists' insistence that all meaningful propositions must be empirically verifiable",
+      "The hermeneutic tradition's focus on the \"authorial intention\" as the ultimate horizon of textual interpretation"
+    ]
+  },
+  {
+    "id": 17,
+    "subject": "英语",
+    "q": "The Greek concept of \"nomos\" (law, custom, distribution) is often contrasted with \"physis\" (nature). In the context of contemporary environmental philosophy, this ancient distinction resurfaces in the debate over:",
+    "correct": "Whether climate change represents a failure of human \"nomos\" (law and governance) to regulate its technological \"physis\" (the forces unleashed by industrial civilization)",
+    "wrongs": [
+      "Whether ecosystem services can be adequately valued within the framework of neoliberal economics, or whether nature possesses a radically incommensurable worth",
+      "Whether the \"rights of nature\" should be codified into legal frameworks, thereby extending personhood to non-human entities",
+      "Whether the deep ecology movement's call for biocentric egalitarianism is practically achievable in a global capitalist order"
+    ]
+  },
+  {
+    "id": 18,
+    "subject": "英语",
+    "q": "In Keats's concept of \"Negative Capability,\" the poet is capable of being \"in uncertainties, mysteries, doubts, without any irritable reaching after fact and reason.\" If this idea is applied to the epistemology of science, it suggests that:",
+    "correct": "Scientific progress requires a temporary suspension of dogmatic commitment to existing paradigms, allowing the mind to remain open to anomalies that would otherwise be rationally rejected",
+    "wrongs": [
+      "Poets are inherently better scientists than analytical philosophers, because they tolerate ambiguity better",
+      "Science should abandon the empirical method and embrace intuitive knowledge as its primary source of truth",
+      "The scientific method is fundamentally flawed because it demands absolute certainty where none can be found"
+    ]
+  },
+  {
+    "id": 19,
+    "subject": "英语",
+    "q": "In technological philosophy, the term \"technological determinism\" is often attacked for its reductionism. A sophisticated rebuttal to this view might argue that technology does not inherently follow a fixed evolutionary path, but rather:",
+    "correct": "Its development is co-constituted by social, political, and cultural forces that select, modify, or suppress certain technical trajectories",
+    "wrongs": [
+      "Technological progress is a linear, inevitable consequence of the accumulation of scientific knowledge, regardless of the society in which it emerges",
+      "The global market is the sole driver of technological innovation, and it operates independently of local cultural variations",
+      "Technology is essentially a neutral tool whose social effects are determined solely by the intentions of its users"
+    ]
+  },
+  {
+    "id": 20,
+    "subject": "英语",
+    "q": "In feminist epistemology, the concept of \"situated knowledge\" (Haraway) asserts that knowledge is always partial and located. This view is a direct challenge to:",
+    "correct": "The objectivist ideal of a \"view from nowhere,\" which posits that true scientific knowledge is independent of the observer's social position and embodied experience",
+    "wrongs": [
+      "The existentialist claim that knowledge is constructed through radical individual freedom",
+      "The empiricist tradition's insistence that all data must be collected through sensory experience",
+      "The Marxist perspective that scientific knowledge is ultimately grounded in class consciousness"
+    ]
+  },
+  {
+    "id": 21,
+    "subject": "英语",
+    "q": "The term \"ontological security\" in psychological sociology refers to the confidence that most human beings have in the continuity and order of their social and material world. In the context of climate change, ontological security is most profoundly threatened by:",
+    "correct": "The physical destruction of familiar coastal landscapes and predictable seasonal cycles, which destabilizes the stable emotional attachment to one's \"home environment\"",
+    "wrongs": [
+      "The widespread use of scientific models to predict the future, which reduces individual agency and induces a paralyzing sense of fatalism",
+      "The accelerated pace of technological innovation, which disrupts traditional community structures and replaces them with algorithmic governance",
+      "The increasing cost of insurance and food due to inflation, which fundamentally undermines the financial security of middle-class households"
+    ]
+  },
+  {
+    "id": 22,
+    "subject": "英语",
+    "q": "In the philosophy of mind, the \"hard problem of consciousness\" (Chalmers) is the difficulty of explaining why physical processes in the brain give rise to subjective experience (qualia). A strict physicalist response to this problem would most likely:",
+    "correct": "Claim that subjective experience is a sort of \"user illusion\" created by the brain's computational architecture and is not a fundamental feature of reality",
+    "wrongs": [
+      "Suggest that consciousness is a property of all matter (panpsychism), thus avoiding the explanatory gap by endowing elementary particles with primitive minds",
+      "Argue that the hard problem is a pseudo-problem caused by the misuse of language and concepts, and once language is clarified, the problem will dissolve",
+      "Propose a new fundamental law of nature that bridges the causal gap between neuronal firing and the first-person experience"
+    ]
+  },
+  {
+    "id": 23,
+    "subject": "英语",
+    "q": "In colonial discourse analysis, the notion of \"hybridity\" (Bhabha) challenges the binary division between colonizer and colonized. A common criticism against the celebratory use of hybridity is that it:",
+    "correct": "Tends to gloss over the persistent structural inequalities and material violence that still define the conditions of the formerly colonized subjects",
+    "wrongs": [
+      "Fails to account for the linguistic complexity of the colonial encounter, reducing it to a simple act of translation",
+      "Overestimates the degree to which the colonized population actively resists the colonial power",
+      "Necessarily leads to a form of cultural commodification, where hybrid identities are turned into marketable consumer products"
+    ]
+  },
+  {
+    "id": 24,
+    "subject": "英语",
+    "q": "In the study of non-verbal communication, \"proxemics\" refers to the study of personal space and its cultural variation. When this concept is applied to the architectural design of modern urban public transit systems, the most overlooked ergonomic variable is often:",
+    "correct": "The optimal distance between passengers in a crowded subway car to reduce psychological stress and aggression, which is heavily shaped by both cultural norms and physical constraints",
+    "wrongs": [
+      "The lighting intensity in stations, which plays a minor role in the perception of space compared to the length of the corridors",
+      "The speed of escalators, which is a pure engineering problem and unrelated to human spatial perception",
+      "The frequency of announcements, which overrides all other factors in passenger comfort"
+    ]
+  },
+  {
+    "id": 25,
+    "subject": "英语",
+    "q": "The satirical term \"eco-chic\" is often used to critique consumerism disguised as environmentalism. Its most potent critique lies in the fact that:",
+    "correct": "It promotes a false dichotomy between \"green\" and \"non-green\" products, thereby perpetuating the myth of an environmentally friendly industrial capitalism",
+    "wrongs": [
+      "It turns sustainable consumption into a high-end lifestyle accessory, allowing the affluent to feel morally superior without making any sacrifice in their material standard of living",
+      "It encourages the growth of green technology, which in the long run benefits the global environment regardless of the initial consumerist motives",
+      "It focuses on individual choices rather than systemic industrial changes, which is a deliberate distraction from the need for macro-level regulations"
+    ]
+  }
+]

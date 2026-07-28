@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>隐私保护指引 · 梦幻画廊</title>
+<style>
+body{margin:0;min-height:100vh;background:linear-gradient(160deg,#16101e,#241226 55%,#101822);color:#e8e0d8;font-family:'Microsoft YaHei',serif;padding:0 0 120px}
+.wrap{max-width:720px;margin:0 auto;padding:36px 22px 0}
+h1{color:#ffd9c4;font-size:24px;text-align:center;letter-spacing:6px;margin:12px 0 4px}
+.sub{text-align:center;color:rgba(255,217,196,.55);font-size:12px;letter-spacing:3px;margin-bottom:26px}
+.sec{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:16px;padding:20px 22px;margin-bottom:16px}
+.sec h2{color:#ffe2c4;font-size:16px;margin:0 0 10px;letter-spacing:2px}
+.sec h2::before{content:'◆ ';color:#c98a4b;font-size:13px}
+.sec p,.sec li{font-size:13px;line-height:2;color:rgba(232,224,216,.88)}
+.sec ul{margin:6px 0;padding-left:20px}
+.k{color:#ffd9a8;background:rgba(255,217,168,.1);padding:1px 8px;border-radius:6px;font-size:12px}
+#consentBar{position:fixed;left:0;right:0;bottom:0;display:none;background:rgba(20,10,18,.97);border-top:1px solid rgba(255,214,170,.4);padding:16px 20px;text-align:center;z-index:50}
+#consentBar label{font-size:14px;color:#ffe2c4;cursor:pointer}
+#consentBar input{width:18px;height:18px;vertical-align:-3px;margin-right:8px;accent-color:#c98a4b}
+#okBtn{margin-top:10px;width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;font-size:15px;letter-spacing:3px;cursor:pointer}
+#okBtn:disabled{opacity:.35;cursor:not-allowed}
+</style>
+<script>
+// 防复制(2026-07-27 主人定):公开展示不可复制,只有后台能修改/复制;
+// 后台协议编辑器(about:srcdoc 或 contentEditable 环境)自动失效,不影响编辑
+(function(){
+  if(location.href==='about:srcdoc')return;
+  var st=document.createElement('style');
+  st.textContent='html,body{user-select:none!important;-webkit-user-select:none!important;-webkit-touch-callout:none!important}';
+  document.head.appendChild(st);
+  function guard(e){if(document.body&&document.body.contentEditable==='true')return;e.preventDefault();return false;}
+  ['copy','cut','contextmenu','selectstart','dragstart'].forEach(function(ev){document.addEventListener(ev,guard,true);});
+})();
+</script>
+</head>
+<body>
+<div class="wrap">
+<h1>隐 私 保 护 指 引</h1>
+<div class="sub">梦幻画廊 · 昆仑灵鉴 · 更新日期:2026 年 7 月 26 日 · 生效日期:2026 年 7 月 26 日</div>
+
+<div class="sec">
+<h2>前言</h2>
+<p><b>我们的使命,是让每一段被珍藏的回忆都被温柔安放。</b>我们相信,凡人眼中的光,值得被一座山记住。《梦幻画廊·昆仑灵鉴》(以下简称"本画廊")由中国(上海)自由贸易试验区梦幻绮光数字文化科技互动娱乐国际联合控股集团股份有限公司发行,联合全球开发及运营团队共同运营。我们深知个人信息保护的重要性,将一如既往地重视并持续改进您的隐私保护体验。</p>
+<p><b>我们提醒您:在使用本画廊前,请您务必仔细阅读并透彻理解本指引。</b>您可以选择不使用本画廊;但如果您继续使用,您的使用行为将被视为对本指引全部内容的认可。</p>
+<p>本画廊在信息处理活动中遵循"最小必要"原则。本指引要点如下:</p>
+<ul>
+<li>我们将按功能场景逐一说明相关信息的处理范围与方式,以便您了解针对某一特定功能所涉及的信息种类、处理目的及处理方式;</li>
+<li>答题、浏览、凝视等核心体验均在您的设备本地即时完成,不形成持续性记录档案;</li>
+<li>您上传的任何内容,均请您在设备本地进行处理,本画廊平台不予存储;</li>
+<li>您可以通过本指引所列途径更正雅号、申请删除上传内容、清除本机数据,或停止使用本画廊服务。</li>
+</ul>
+<p>请您注意:本指引所描述的处理方式,可能因您使用的设备型号、操作系统版本、浏览器版本等因素存在差异。您继续使用本画廊的行为,即视为您已阅读并理解本指引的全部内容。</p>
+</div>
+
+<div class="sec">
+<h2>一、我们不收集的信息</h2>
+<p>经审慎评估,以下信息不属于本画廊服务所必需,本画廊承诺一律不予收集:</p>
+<p><b>1. 答题记录。</b>心象共鸣(《补天残卷》十问)的题目、选项及作答文本,仅限在您的浏览器本地查看、即时评定,评定完成后即行销毁。本画廊不会将您的答卷上传至服务器留存,亦不会将其用于任何形式的评估、画像或分析。</p>
+<p><b>2. 设备隐私标识。</b>本画廊不获取 IMEI、IMSI、设备序列号、MAC 地址、Android ID、OAID、IDFA 等可用于唯一识别您设备的标识符;不获取精准地理位置信息(包括 GPS、基站、Wi-Fi 列表);不读取通讯录、通话记录、短信、日历、相册目录及应用程序列表。</p>
+<p><b>3. 生物识别信息。</b>本画廊未设置亦不会启用人脸、声纹、指纹、虹膜等任何生物识别功能,不收集相关生物特征信息。</p>
+<p><b>4. 行为画像数据。</b>本画廊不统计您的点击行为、不追踪您的游览路径、不分析您的兴趣偏好,亦不向您提供个性化推荐服务。</p>
+</div>
+
+<div class="sec">
+<h2>二、仅在本地处理的少量信息</h2>
+<p>下列信息仅在<span class="k">您的设备本地</span>由您的浏览器进行处理,请您知悉其处理范围与存储期限:</p>
+<p><b>1. 您上传的内容。</b>您在画廊建筑内上传的图片、视频及其他文件,<b>仅在您的设备本地查看与处理,不进入本平台服务器</b>;仅当您使用户外白板并主动保存作品时,该部分白板内容将在白板展示墙上公开展示,并由本平台予以存储。请您注意:请仅上传您依法有权分享、且适宜公开呈现的内容。</p>
+<p><b>2. 游览偏好与进度信息。</b>您的天穹进度、六灵蕴收集状态、展厅配色、雅号前缀等个性化设置,均保存于您本机的浏览器存储中,不会同步至服务器或其他设备。更换设备或清除浏览器数据后,上述信息将不可恢复。</p>
+<p><b>3. 雅号。</b>雅号系您主动填写、用于在本画廊中标识称呼的信息。您可以随时对其进行修改或停用。</p>
+<p><b>4. 回声壁发言。</b>您在昆仑回声壁中主动发布的文字内容,仅保留最近 100 条,超出部分将被系统自动移除且不可恢复。</p>
+</div>
+
+<div class="sec">
+<h2>三、信息的存储</h2>
+<p><b>1. 存储范围与目的。</b>本平台仅存储您通过户外白板主动保存并公开展示的作品内容,存储目的在于实现白板展示墙的公开展示功能。除此之外,本画廊不以任何形式建立或维护您的个人信息档案。</p>
+<p><b>2. 存储期限。</b>我们在为实现本指引所述目的所必需且最短的期间内保留上述信息;当您申请删除或撤回同意时,我们将在合理期限内予以删除。相关法律法规对保存期限另有要求的(如合规、审计、争议解决之必要),我们按其规定的必要期限保存。超出上述期限后,我们会对相关信息进行删除或匿名化处理,法律法规另有规定的除外。</p>
+<p><b>3. 存储地域。</b>我们依照法律法规的规定,仅将在中华人民共和国境内收集和产生的信息存储于中华人民共和国境内,不涉及跨境传输;如未来确需跨境传输的,我们将单独向您明确告知(包括出境的目的、接收方、使用方式与范围、安全保障措施、安全风险等),征得您的授权同意,并确保接收方具备充足的个人信息保护能力。</p>
+<p><b>4. 停止运营时的处理。</b>如本画廊停止运营服务,我们将及时停止收集行为,并在合理期限内对持有的上述信息进行删除或匿名化处理;经匿名化处理的数据不再属于个人信息范畴。</p>
+<p><b>5. 安全保护。</b>我们将采取一切合理可行的措施保护信息安全,包括访问控制、最小授权与凭证分级管控;同时请您理解,任何安全措施都无法保证信息的绝对安全。</p>
+</div>
+
+<div class="sec">
+<h2>四、第三方基础服务</h2>
+<p>为保障页面访问质量、媒体加载速度及语音合成等基础功能的实现,本画廊使用下列第三方提供的技术型基础服务:</p>
+<ul>
+<li><b>内容分发网络(Cloudflare)</b>:仅承担媒体文件的缓存与就近传输,不涉及对您个人信息的收集、存储或画像;</li>
+<li><b>语音合成服务</b>:仅将页面固定文案转换为语音输出,处理过程中不夹带任何与您相关的个人信息。</li>
+</ul>
+<p>除上述情形外,本画廊不会向任何第三方主动共享、转让您的信息,亦未接入广告联盟、数据分析服务及第三方社交登录服务。</p>
+<p>依据相关法律法规及国家标准,在下列情形中,我们可能会在不事先征得您授权同意的情况下处理相关信息:</p>
+<ul>
+<li>为订立、履行您作为一方当事人的合同所必需;</li>
+<li>为履行法定职责或者法定义务所必需;</li>
+<li>为应对突发公共卫生事件,或者紧急情况下为保护自然人的生命健康和财产安全所必需;</li>
+<li>依照《中华人民共和国个人信息保护法》规定,在合理范围内处理您自行公开或者其他已经合法公开的信息;</li>
+<li>法律、行政法规规定的其他情形。</li>
+</ul>
+</div>
+
+<div class="sec">
+<h2>五、信息安全</h2>
+<p>您的信息安全对我们至关重要。我们将严格遵守相关法律法规,采取业内认可的合理可行措施,防止信息遭到未经授权的访问、披露、使用、修改、损坏或丢失,包括但不限于:使用加密传输(SSL)保护传输过程;建立访问控制机制,确保仅授权人员可访问相关系统;对服务端访问实行最小授权与凭证分级管控,敏感配置信息仅保存于受控环境,不向任何访客公开。</p>
+<p>我们制定了安全事故预警机制与应急预案。一旦发生信息安全事件,我们将按照法律法规的要求及时向您告知:事件的基本情况和可能的影响、我们已采取或将要采取的处置措施、您可自主防范和降低风险的建议,以及我们对您的补救措施,并立即启动应急预案,力求将损失最小化。</p>
+<p>安全提示:尽管已采取上述合理有效措施,请您理解,由于技术的限制以及可能存在的各种恶意手段,我们无法保证信息百分之百的安全。也请您采取积极措施保护本机数据安全,包括但不限于不将您的设备借予不可信的人、定期清理浏览器站点数据。</p>
+</div>
+
+<div class="sec">
+<h2>五之二、Cookie 及同类技术</h2>
+<p>为保障您的正常使用,本画廊会在您的设备上使用 Cookie 与浏览器本地存储(localStorage/sessionStorage),用于:记住您的通行状态与雅号、保存您的游览偏好与进度、记录您对《用户协议》《隐私保护指引》的阅读状态。</p>
+<p>上述技术仅实现前述功能所必需,不含任何追踪或广告用途。您可以通过浏览器设置管理或清除 Cookie 与站点数据;清除后,您的部分偏好与进度将不可恢复,但不影响您继续使用本画廊的基本功能。</p>
+</div>
+
+<div class="sec">
+<h2>六、您的权利</h2>
+<p>依照相关法律法规,您在使用本画廊服务期间享有如下权利,各项权利的行使方式如下:</p>
+<ul>
+<li><b>查询与更正</b>:雅号可随时在「昆仑罗盘→设置」中修改;您的进度与偏好信息保存于您的浏览器中,可随时查阅;</li>
+<li><b>删除</b>:您上传的内容,可通过「昆仑回声壁」留言申请删除,我们将在核实后 15 个工作日内处理完毕;您本机存储的数据可通过清除浏览器站点数据即时删除;</li>
+<li><b>撤回同意</b>:您可以随时停止使用本画廊服务,停止之日即视为撤回同意;您也可通过清除浏览器站点数据,使《用户协议》《隐私保护指引》恢复首次阅读流程;</li>
+<li><b>投诉与建议</b>:您可以通过本指引所载联系方式提出,我们将在收到后验证必要信息,并在 15 个工作日内予以答复。</li>
+</ul>
+</div>
+
+<div class="sec">
+<h2>七、未成年人保护</h2>
+<p>若您是未满 18 周岁的未成年人,请在监护人的陪同与指导下使用本画廊,并在上传任何内容、填写任何称呼前征得监护人的同意。我们根据国家相关法律法规的规定保护未成年人的个人信息,只会在法律法规允许、监护人明确同意或保护未成年人权益所必要的情况下,处理未成年人的相关信息。若您是未成年人的监护人,当您对所监护的未成年人在本画廊中的行为存在疑问时,请通过本指引所载方式与我们联系;<b>如果我们发现在未事先获得可证实的监护人同意的情况下收集了未成年人的相关信息,我们将尽快删除相关数据。</b></p>
+<p><b>我们倡导</b>每一位未成年访客与监护人共同熟读并践行《新时代青少年网络文明公约》:</p>
+<p style="text-align:center;line-height:2.2;color:#ffd9a8;background:rgba(255,217,168,.06);border-radius:12px;padding:14px 10px;margin-top:8px">强国使命心头记，时代新人笃于行。<br>向上向善共营造，上网用网要文明。<br>善恶美丑知明辨，诚信友好永传承。<br>传播中国好故事，抒写青春爱国情。<br>个人信息防泄露，谣言蜚语莫轻听。<br>适度上网防沉迷，饭圈乱象请绕行。<br>远离污秽不炫富，谨防诈骗常提醒。<br>与人为善拒网暴，守好底线不欺凌。<br>线上新知勤学习，数字素养常提升。<br>网络安全靠你我，共筑清朗好环境。</p>
+</div>
+
+<div class="sec">
+<h2>八、本指引如何更新</h2>
+<p>我们会根据产品/服务的更新情况及法律法规的相关要求,适时更新本指引的条款。<b>未经您明确同意,我们不会削减您按照当前生效指引所享有的权利。</b>本指引更新后,我们将在页面显著位置提示或以其他合理方式提醒您,以便您及时了解本指引的最新版本;公示后继续使用的,视为您已阅读、理解并接受更新后的指引。</p>
+</div>
+
+<div class="sec">
+<h2>九、联系我们</h2>
+<p>如您对本指引或个人信息保护相关事宜有任何疑问、投诉、建议,您可以通过如下方式与我们联系:</p>
+<p>1. 通过画廊内的「昆仑回声壁」在线留言反馈;<br>
+2. 发送邮件至法务/合规邮箱 <span class="k">legal@dreamlight.com.hk</span>(梅向荣先生团队直通);<br>
+3. 写信至:中国(上海)自由贸易试验区陆家嘴环路1233号汇亚大厦T2栋38楼 法务部(收);或全球总部(香港):中国香港特别行政区中环皇后大道中99号中环中心56楼5601-5605室。</p>
+<p>我们将在核实必要信息后尽快审核所涉请求,并在 15 个工作日或法律法规规定的期限内完成处理。此外,在与个人信息有关的如下情形下,我们将无法回复您的请求:</p>
+<ul>
+<li>与我们履行法律法规规定的义务相关的;</li>
+<li>与国家安全、国防安全直接有关的;</li>
+<li>与公共安全、公共卫生、重大公共利益直接相关的;</li>
+<li>与刑事侦查、起诉、审判和执行判决等直接相关的;</li>
+<li>有充分证据表明您存在主观恶意或滥用权利的;</li>
+<li>出于维护您或其他个人的生命、财产等重大合法权益但又很难得到本人授权同意的;</li>
+<li>响应您的请求将导致您或其他个人、组织的合法权益受到严重损害的;</li>
+<li>涉及商业秘密的。</li>
+</ul>
+</div>
+
+<div class="sec">
+<h2>十、争议解决</h2>
+<p>本指引的解释及争议解决均适用中华人民共和国境内(不含港澳台)地区法律。任何因本指引以及我们处理个人信息事宜引起的争议,双方应尽量友好协商解决;协商不成的,任何一方均有权将争议提交至深圳市南山区人民法院进行一审诉讼。如果您认为我们处理个人信息的行为损害了您的合法权益,您也可以选择向有关政府部门反映。本指引的章节标题仅为方便阅读而设,不影响正文任何规定的含义或解释。</p>
+</div>
+
+<div class="sec">
+<h2>十一、名词解释</h2>
+<p><b>个人信息</b>:以电子或者其他方式记录的与已识别或者可识别的自然人有关的各种信息,不包括匿名化处理后的信息。</p>
+<p><b>敏感个人信息</b>:一旦泄露或者非法使用,容易导致自然人的人格尊严受到侵害或者人身、财产安全受到危害的个人信息,包括生物识别、宗教信仰、特定身份、医疗健康、金融账户、行踪轨迹等信息,以及不满十四周岁未成年人的个人信息。</p>
+<p><b>设备信息</b>:通常包括设备品牌、设备型号、操作系统类型及版本、语言设置、分辨率、网络接入方式、IP 地址、浏览器类型和设置、UA 等(本画廊仅使用其中的浏览器 UA 信息)。</p>
+<p><b>SSL</b>:在传输通信协议之上实现的一种安全协议,通过公开密钥与对称密钥技术实现信息保密传输。</p>
+<p><b>Cookie 及同类技术</b>:包含字符串的小文件及可实现类似用途的其他技术,存放于您的设备内,用于记住您的状态与偏好。</p>
+<p><b>匿名化</b>:通过对个人信息的技术处理,使得个人信息主体无法被识别或者关联,且处理后的信息不能被复原的过程。</p>
+<p><b>去标识化</b>:通过对个人信息的技术处理,使其在不借助额外信息的情况下,无法识别或关联个人信息主体的过程。</p>
+</div>
+
+
+</div>
+
+<div id="consentBar">
+  <label><input type="checkbox" id="ck"> 我已阅读并同意《隐私保护指引》</label><br>
+  <button id="okBtn" disabled>同意并进入画廊</button>
+</div>
+
+<script>
+// 自动慢速滚动播放(与说明书同规;用户手动滚动/点击即转为手动)
+var autoScroll=true;
+function stopAuto(){autoScroll=false;}
+window.addEventListener('wheel',stopAuto,{passive:true});
+window.addEventListener('touchstart',stopAuto,{passive:true});
+var _st=setInterval(function(){
+  if(!autoScroll){clearInterval(_st);return;}
+  window.scrollBy(0,1);
+  if(window.innerHeight+window.scrollY>=document.body.scrollHeight-2)clearInterval(_st);
+},50);
+function reachedBottom(){return window.innerHeight+window.scrollY>=document.body.scrollHeight-140;}
+
+(function(){
+  var consent=location.search.indexOf('consent')>=0 && !sessionStorage.getItem('privacyConsented');
+  var bar=document.getElementById('consentBar'),ck=document.getElementById('ck'),ok=document.getElementById('okBtn');
+  if(!consent)return;
+  bar.style.display='block';
+  var strict=!localStorage.getItem('consentDone'); // 首访=严格模式;回访=轻量模式(2026-07-26 主人定)
+  function enterGallery(){
+    sessionStorage.setItem('privacyConsented','1');
+    // 三连读第三站:游戏社区公约
+    location.href='community.html?consent=1';
+  }
+  if(!strict){
+    // 轻量:不冻时间、不必勾选、不锁面板,一键进展厅(也可直接关面板)
+    ok.textContent='继续阅读《游戏社区公约》→';
+    ok.disabled=false;
+    ok.onclick=enterGallery;
+    return;
+  }
+  // 严格模式:锁死面板 + 读满 20 秒 + 勾选 + 滚到底,四重门槛缺一不可
+  if(window.parent&&window.parent.setPanelLock)window.parent.setPanelLock(true);
+  var left=20;
+  function syncBtn(){ok.disabled=!(left<=0&&ck.checked&&reachedBottom());}
+  ok.textContent='请完整阅读('+left+'s)';
+  var t=setInterval(function(){
+    left--;
+    if(left<=0){clearInterval(t);ok.textContent='同意并继续阅读《游戏社区公约》';syncBtn();}
+    else ok.textContent='请完整阅读('+left+'s)';
+  },1000);
+  ck.onchange=syncBtn;
+  window.addEventListener('scroll',syncBtn,{passive:true});
+  ok.onclick=function(){
+    if(left>0||!ck.checked||!reachedBottom())return;
+    // 链式阅读:此处不释放面板锁,直接进入游戏社区公约;三站都签完才解锁(见 community.html)
+    enterGallery();
+  };
+})();
+</script>
+</body>
+</html>
