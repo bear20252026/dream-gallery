@@ -70,7 +70,7 @@ node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色�
 
 - Windows + Git Bash;Node 必须 `export PATH="/c/Program Files/nodejs:$PATH"`。
 - 云端:阿里云 `101.133.235.110`,pm2 进程名 `gallery`,目录 `/opt/gallery/`。SSH 密钥:`~/Downloads/网站私钥bear1.pem`。部署:`scp -i <密钥> <文件> root@…:/tmp/ && ssh -i <密钥> … "mv … /opt/gallery/"`(只改 src/ 静态文件不用 pm2 restart;改 server.js/lib/ 才需要)。
-- AI 阅卷双通道(lib/quiz.js):主 `AI_GRADE_API_KEY`(pm2 环境,moonshot 端点 kimi-k2.6)→ 备 `AI_GRADE_API_KEY_BACKUP`(.env,Kimi Code 会员 key,走 `https://api.kimi.com/coding/v1`,模型 kimi-for-coding,思考型 max_tokens 1500);均失败回退本地细则。评分纪律(2026-07-25 放宽):切题保底 5 分/一般 10 分/优秀鼓励满分 19;低于 25 字最多 4 分;字数只加不扣;评语 ≤50 字。注意:测 AI 改动时 `node scripts/test/test.js` 会屏蔽真实 key(评分用例须确定性走本地细则)。
+- **AI 通道单一源(2026-07-28 主人定)=lib/aichannels.js**:全站 AI 能力(文本/视觉/语音)唯一入口,**小米 MiMo 首选**(MIMO_API_KEY 走环境变量,不落盘):文本 mimo-v2.5-pro → moonshot kimi-k2.6 → kimi-for-coding;视觉 mimo-v2.5 → moonshot-v1-8k-vision → kimi-for-coding;语音 mimo-v2.5-tts(限免)→ edge-tts 本地兜底(在 tts.js synth 内)。消费方:quiz.js 阅卷/vision.js 配文/chat.js 昆仑之灵/tts.js 语音。**新增/调整 AI 通道只许改 aichannels.js**;测试屏蔽 key 必须连同 MIMO_API_KEY 一起屏蔽(test.js 评分用例确定性走本地细则)。
 - 无头浏览器验证:`node scripts/probe/debug-browser.js <url> [秒]`(抓 console/pageerror/失败请求);截图注意无头环境加载比真机慢,等 15s+ 再操作。
 
 ## 约定

@@ -532,7 +532,7 @@ async function testQuiz(base) {
     await testGate(base3);
     const base4 = await startServer(3213, { GATE_MODE: 'approval', TOKEN: 't1' });
     await testApproval(base4);
-    const base5 = await startServer(3214, { AI_GRADE_API_KEY: '', AI_GRADE_API_KEY_BACKUP: '' }); // 屏蔽真实 AI key:评分测试必须确定性地走本地细则
+    const base5 = await startServer(3214, { AI_GRADE_API_KEY: '', AI_GRADE_API_KEY_BACKUP: '', MIMO_API_KEY: '' }); // 屏蔽真实 AI key:评分测试必须确定性地走本地细则
     await testQuiz(base5);
   } catch (e) {
     failed++;
