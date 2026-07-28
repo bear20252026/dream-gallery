@@ -1,5 +1,5 @@
 // main.js — 入口模块：按原始执行顺序导入各副作用模块，最后启动动画循环
-window.__BUILD__='2026-07-28-r6'; // 部署序号(诊断+刷新产物哈希,绕开边缘节点缓存的 404)
+window.__BUILD__='2026-07-28-r7'; // 部署序号(诊断+刷新产物哈希,绕开边缘节点缓存的 404)
 import {ctx} from './ctx.js';
 import './ui/overlay.js';       // 弹层注册处(冷核心,必须最先 import:Esc 栈优先级靠监听器注册顺序)
 import './state/store.js';      // 存档登记处(冷核心,紧随 overlay:全站 localStorage 唯一入口 ctx.store)

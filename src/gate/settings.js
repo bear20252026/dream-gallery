@@ -153,10 +153,12 @@ function checkSkyMs(){
   const v=skyVal(),had=ctx.store.num('skyMs');
   for(let i=SKY_MS.length-1;i>=0;i--){
     const [m,big,tts]=SKY_MS[i];
-    if(v>=m&&had<m){ctx.store.setNum('skyMs',m);showMs(big,tts,m===100);return;}
+    if(v>=m&&had<m){ctx.store.setNum('skyMs',m);showMs(big,tts,m===100);if(m===100&&ctx.scene.kintsugiOn)ctx.scene.kintsugiOn();return;}
   }
 }
 ctx.kunlun.checkSkyMs=checkSkyMs;
+// 金缮天花板(2026-07-28 C1):启动时已达成(里程碑档已记 或 进度值满)直接点亮;新里程碑触发走上面钩子
+if((ctx.store.num('skyMs')>=100||skyVal()>=100)&&ctx.scene.kintsugiOn)ctx.scene.kintsugiOn();
 // 天穹改独立三级页(2026-07-26 主人定:与聊天/六灵蕴同规——居中呈现,✕/点外圈/Esc 均可退出)
 const skyOv=document.createElement('div');
 skyOv.id='skyOv';

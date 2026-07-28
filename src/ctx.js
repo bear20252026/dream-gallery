@@ -161,7 +161,7 @@ ctx.player=aliasNS(['pl','jD','ks','mv','drM','viewMode','quizPassed','quizPassS
 // 场景内核(scene.js 写入:场景/相机/渲染器/拾取/边界/灯光/ uniforms)
 ctx.scene=aliasNS(['s','cam','rnd','ray','mP2','iG','tL','loadTexCapped','bounds',
   'WH','OL','OR','OT','OBE','OBR','IL','IR','IRT','IRB','floorW','floorD','bW','bD',
-  'pyrHeight','groundUniforms','skyUniforms','pls','ambL','hemiL','L','jT','jB','aB','avatar']);
+  'pyrHeight','groundUniforms','skyUniforms','pls','ambL','hemiL','L','jT','jB','aB','avatar','kintsugiOn']);
 // 媒体与户外(media.js/effects.js/desert.js/signs.js 写入)
 ctx.media=aliasNS(['vidEl','v45El','vidTex','v45Tex','vidMesh','v45Mesh','drawMusicCanvas','bigScreenHold',
   'desert','dayHour','updateFireworks','pG','pC','signMesh','signMat','wb','mpMesh','mpMat','guideMesh',

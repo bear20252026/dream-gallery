@@ -332,7 +332,7 @@ async function beginQuiz(track){
 }
 
 function renderQuiz(d){
-  judgedQ={};rightCount=0; // 逐题批改状态(2026-07-26):每题判过即锁,答对一题裂纹亮一丝
+  judgedQ={};rightCount=0;window._qzHalfTold=false; // 逐题批改状态(2026-07-26):每题判过即锁,答对一题裂纹亮一丝;半程反馈复位
   let html=`<h2>答 题 中</h2><div class="qsub">9 道选择题(每题 9 分)+ 1 道问答题(19 分) · 点选即批改,判过不可改</div>`;
   d.mc.forEach((m,i)=>{
     html+=`<div class="qz-q"><div class="qz-head">${QZ_TITLES[i]||('第 '+(i+1)+' 题')} · ${m.subject}</div><div class="qz-stem">${escH(m.q)}</div>`;
@@ -374,6 +374,11 @@ function renderQuiz(d){
           }
         }
         if(d.right){rightCount++;skyTo(0.06+0.5*(rightCount/10),true);}
+        // C3 半程轻反馈(2026-07-28,设计文档钦定防流失):答满 5 题提示一次,不打断节奏
+        if(!window._qzHalfTold&&Object.keys(judgedQ).filter(k=>judgedQ[k]).length>=5){
+          window._qzHalfTold=true;
+          ctx.modeToast&&ctx.modeToast('你已经完成了一半的女娲问心。');
+        }
       }catch(e){judgedQ[q]=false;} // 网络异常:解锁允许重判
     });
   });
