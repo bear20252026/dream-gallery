@@ -186,14 +186,48 @@ function finale(){
   setTimeout(()=>{fl.style.transition='opacity 1.2s';fl.style.opacity='0';setTimeout(()=>fl.remove(),1300);},900);
   bell(523,0.2,3);
   const nick=ctx.store.str('nick')||'藏梦人';
-  bigText('六合藏梦人 · '+nick,3200);
+  // B4 称号解锁卡片(2026-07-28,设计文档第六卷):正式卡片取代大字一闪
   ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('六合藏梦人。这是昆仑能给你的，最完整的名字。天穹已经合上了，六灵蕴已经归位了。你不再需要修补任何东西。你只需要——继续记住，继续凝视。');
   // 自动冠以「六合藏梦人·」前缀(saveNick 机制已认 kunlunPrefix,主人再保存一次昵称即生效)
   if(ctx.store.str('prefix')!=='六合藏梦人·'){
     ctx.store.setStr('prefix','六合藏梦人·');
-    ctx.ui.modeToast&&ctx.ui.modeToast('前缀「六合藏梦人·」已备好，再保存一次昵称即生效。');
   }
+  setTimeout(()=>showTitleCard(nick),1000);
 }
+
+// 称号卡片:✦六合归位✦ / 六合藏梦人·雅号 / 昆仑给你的完整名字;[确认][稍后修改]
+// 弹层三铁律走 overlay 注册处(✕+点外圈+Esc);雅号经 textContent 注入(防 XSS)
+function showTitleCard(nick){
+  const d=document.createElement('div');
+  d.id='titleCardOv';
+  d.style.cssText='position:fixed;inset:0;z-index:396;display:flex;align-items:center;justify-content:center;background:rgba(10,6,14,.55)';
+  d.innerHTML='<style>@keyframes tcSpin{to{transform:rotate(360deg)}}</style>'
+    +'<div style="position:relative;max-width:88vw;text-align:center;padding:38px 42px 26px;border-radius:22px;overflow:hidden;background:linear-gradient(160deg,rgba(40,26,34,.97),rgba(26,16,28,.97));border:1px solid rgba(255,214,170,.45);box-shadow:0 20px 70px rgba(0,0,0,.6)">'
+    +'<div style="position:absolute;inset:-45%;background:conic-gradient(#7ddb7a,#ff5a4a,#e8a03c,#dfeaf5,#7cc8e8,#f0a860,#7ddb7a);opacity:.15;animation:tcSpin 14s linear infinite"></div>'
+    +'<button id="tcX" style="position:absolute;top:10px;right:12px;z-index:2;background:none;border:none;color:rgba(255,226,196,.6);font-size:16px;cursor:pointer">✕</button>'
+    +'<div style="position:relative">'
+    +'<div style="font-size:15px;letter-spacing:8px;color:#ffd9a8;margin-bottom:16px">✦ 六 合 归 位 ✦</div>'
+    +'<div id="tcName" style="font-size:clamp(22px,5.6vw,34px);letter-spacing:3px;color:#ffe9c4;text-shadow:0 0 26px rgba(255,200,100,.5);line-height:1.5"></div>'
+    +'<div style="margin-top:12px;font-size:13px;letter-spacing:3px;color:rgba(255,226,196,.65)">—— 昆仑给你的完整名字 ——</div>'
+    +'<div style="margin-top:24px;display:flex;gap:12px;justify-content:center">'
+    +'<button id="tcOk" style="padding:10px 26px;border:none;border-radius:12px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;font-size:14px;letter-spacing:2px;cursor:pointer">确 认</button>'
+    +'<button id="tcLater" style="padding:10px 18px;border:1px solid rgba(255,255,255,.3);border-radius:12px;background:transparent;color:#dcc;font-size:14px;letter-spacing:2px;cursor:pointer">稍后修改</button>'
+    +'</div></div></div>';
+  document.body.appendChild(d);
+  d.querySelector('#tcName').textContent='六合藏梦人 · '+nick;
+  const api=ctx.overlay.register(d,{x:'#tcX',
+    onClose(){api.unregister();d.remove();},
+  });
+  api.open(); // 必须经 open() 入 Esc 栈,否则 Esc/点外圈管不到这张卡(2026-07-28 探针抓获)
+  const done=(toSettings)=>{
+    api.close();
+    if(toSettings)ctx.ui.modeToast&&ctx.ui.modeToast('在右下角 ⚙ 设置里，随时可以改雅号。');
+    else ctx.ui.modeToast&&ctx.ui.modeToast('前缀「六合藏梦人·」已备好，再保存一次昵称即生效。');
+  };
+  d.querySelector('#tcOk').onclick=()=>done(false);
+  d.querySelector('#tcLater').onclick=()=>done(true);
+}
+bag.custom.push(()=>{const d=document.getElementById('titleCardOv');if(d)d.remove();}); // HMR 清理:卡片元素随模块重载移除
 
 // ===================== 主循环(250ms 节流三项检测) =====================
 let chk=0;

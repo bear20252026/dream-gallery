@@ -208,6 +208,12 @@ if(!ctx.store.flag('prologueDone')&&!/noprologue/.test(location.search)){
     else later(waitConsent,1000);
   };
   later(waitConsent,1500);
+}else if(!/noprologue/.test(location.search)){
+  // C6 回归文案(2026-07-28,设计文档防流失):老访客再来,残镜小字静候(每会话一次,有进度才说)
+  if(!sessionStorage.getItem('kunlunWelcomeBack')&&(ctx.store.num('quiz')>0||ctx.store.num('up')>0)){
+    sessionStorage.setItem('kunlunWelcomeBack','1');
+    setTimeout(()=>{ctx.ui.modeToast&&ctx.ui.modeToast('上次你带来了几片灵蕴。它们还在等你。');},6000);
+  }
 }
 
 bag.custom.push(()=>{

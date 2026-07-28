@@ -1,5 +1,5 @@
 // main.js — 入口模块：按原始执行顺序导入各副作用模块，最后启动动画循环
-window.__BUILD__='2026-07-28-r7'; // 部署序号(诊断+刷新产物哈希,绕开边缘节点缓存的 404)
+window.__BUILD__='2026-07-28-r8'; // 部署序号(诊断+刷新产物哈希,绕开边缘节点缓存的 404)
 import {ctx} from './ctx.js';
 import './ui/overlay.js';       // 弹层注册处(冷核心,必须最先 import:Esc 栈优先级靠监听器注册顺序)
 import './state/store.js';      // 存档登记处(冷核心,紧随 overlay:全站 localStorage 唯一入口 ctx.store)
@@ -248,3 +248,11 @@ setTimeout(function(){
   }catch(e){}
 },3000);
 console.log('梦幻画廊 展厅+回字大厅 已启动');
+
+// C6 退出文案(2026-07-28,设计文档第 19 步):切走/关闭页面时留一句;切回时即见
+// (已冠前缀的六合藏梦人追加一行;modeToast 轻提示,不打断)
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden)return;
+  const crowned=ctx.store&&ctx.store.str('prefix')==='六合藏梦人·';
+  ctx.ui.modeToast&&ctx.ui.modeToast('你带走的不只是记忆。昆仑留着你的光。'+(crowned?' 六合藏梦人，天穹与心象皆已完整。':''));
+});
