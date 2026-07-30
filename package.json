@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "check": "node scripts/gen/check.js",
-    "test": "node scripts/test/test.js && node scripts/test/test-mobile.js",
+    "test": "node scripts/test/test-store.js && node scripts/test/test.js && node scripts/test/test-mobile.js",
     "debug": "node scripts/probe/debug-browser.js",
     "dev": "node scripts/gen/dev.js",
     "build": "vite build",

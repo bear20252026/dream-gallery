@@ -12,7 +12,7 @@ const http = require('http');
 const path = require('path');
 const { URL } = require('url');
 
-const { ROOT, PORT, TOKEN, GATE_ANSWER, GATE_QUESTION, GATE_MODE, MEDIA_DIRS } = require('./lib/config');
+const { ROOT, PORT, TOKEN, CORS_ORIGIN, GATE_ANSWER, GATE_QUESTION, GATE_MODE, MEDIA_DIRS } = require('./lib/config');
 const { sendJson, readBody, safeJoin, isValidName } = require('./lib/util');
 const { gateData } = require('./lib/store');
 const { serveGatePage, sseRegister, handleApply, handleGateStatus, approvalGate, GATE_HASH, hasGateCookie, handleRename } = require('./lib/gate');
@@ -69,10 +69,10 @@ const handler = (req, res) => {
     handleDocsPost(req, res); return;
   }
 
-  // CORS 预检
+  // CORS 预检(CORS_ORIGIN 可配,默认 *;收紧后台跨域时设环境变量即可,不硬编码)
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': CORS_ORIGIN,
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type',
     });
@@ -129,55 +129,53 @@ const handler = (req, res) => {
     return;
   }
 
-  // API 路由
+  // ===================== API 路由(路由表:顺序即优先级) =====================
   if (pathname.startsWith('/api/')) {
-    // 聊天室(公开读,发言按设备限流;数据全员可见,仅留最近100条)
-    if (pathname === '/api/chat' && req.method === 'GET') { handleChatList(req, res); return; }
-    if (pathname === '/api/chat' && req.method === 'POST') { handleChatPost(req, res); return; }
-    // 答题系统(公开,进馆门禁)
-    if (pathname === '/api/quiz/start' && req.method === 'GET') { handleQuizStart(req, res, query); return; }
-    if (pathname === '/api/quiz/submit' && req.method === 'POST') { handleQuizSubmit(req, res); return; }
-    if (pathname === '/api/quiz/judge' && req.method === 'POST') { handleQuizJudge(req, res); return; }
-    if (pathname === '/api/quiz/state' && req.method === 'GET') { handleQuizState(req, res); return; }
-    if (pathname === '/api/quiz/invite' && req.method === 'POST') { handleQuizInvite(req, res); return; }
-    // AI 看图配文(公开,仅限本人上传)
-    if (pathname === '/api/vision/analyze' && req.method === 'POST') { handleVisionAnalyze(req, res); return; }
-    // 链接点击埋点(公开;数据仅后台 token 可见,普通用户无法查看)
-    if (pathname === '/api/track/click' && req.method === 'POST') { handleTrackClick(req, res); return; }
-    // 访客端 JS 报错回传(公开;仅后台可见)
-    if (pathname === '/api/track/error' && req.method === 'POST') { handleTrackError(req, res); return; }
-    // TTS 语音合成代理(公开,按设备限流 30 次/天,文案哈希缓存)
-    if (pathname === '/api/tts' && req.method === 'GET') { handleTts(req, res, query); return; }
-    // 点击记录:批量清理 / 导出 Excel(token)
-    if (pathname === '/api/admin/clicks/clear' && req.method === 'POST') { handleClicksClear(req, res, query); return; }
-    if (pathname === '/api/admin/export.xlsx' && req.method === 'GET') { handleExportXlsx(req, res, query); return; }
-    if (pathname === '/api/admin/alerts' && req.method === 'POST') { handleAdminAlerts(req, res, query); return; }
-    // 答题记录(需 TOKEN;无论是否开启审批门都可用)
-    if (pathname === '/api/admin/quiz' && req.method === 'GET') {
-      if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权' }); return; }
-      const devMap = {};
-      for (const a of Object.values(gateData.applicants)) {
-        if (a.dk) devMap[a.dk] = { answer: a.answer, brand: a.brand || '', geo: (gateData.geo && gateData.geo[a.ip]) || '' };
-      }
-      const attempts = (gateData.quizAttempts || []).slice(-100).reverse()
-        .map(at => ({ ...at, device: devMap[at.dk] || null }));
-      sendJson(res, 200, { attempts });
+    // 路由表项:{ method, match, fn }。match 为精确字符串或正则;fn 已绑定 req/res/query。
+    // tokenGate 之前的为公开/自校验接口;之后为需外层 token 的写操作(上传/删除)。
+    const routes = [
+      { method: 'GET',  match: '/api/chat',               fn: () => handleChatList(req, res) },
+      { method: 'POST', match: '/api/chat',               fn: () => handleChatPost(req, res) },
+      { method: 'GET',  match: '/api/quiz/start',         fn: () => handleQuizStart(req, res, query) },
+      { method: 'POST', match: '/api/quiz/submit',        fn: () => handleQuizSubmit(req, res) },
+      { method: 'POST', match: '/api/quiz/judge',         fn: () => handleQuizJudge(req, res) },
+      { method: 'GET',  match: '/api/quiz/state',         fn: () => handleQuizState(req, res) },
+      { method: 'POST', match: '/api/quiz/invite',        fn: () => handleQuizInvite(req, res) },
+      { method: 'POST', match: '/api/vision/analyze',     fn: () => handleVisionAnalyze(req, res) },
+      { method: 'POST', match: '/api/track/click',        fn: () => handleTrackClick(req, res) },
+      { method: 'POST', match: '/api/track/error',        fn: () => handleTrackError(req, res) },
+      { method: 'GET',  match: '/api/tts',                fn: () => handleTts(req, res, query) },
+      { method: 'POST', match: '/api/admin/clicks/clear', fn: () => handleClicksClear(req, res, query) },
+      { method: 'GET',  match: '/api/admin/export.xlsx',  fn: () => handleExportXlsx(req, res, query) },
+      { method: 'POST', match: '/api/admin/alerts',       fn: () => handleAdminAlerts(req, res, query) },
+      { method: 'GET',  match: '/api/admin/quiz',         fn: () => {
+        if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权' }); return; }
+        const devMap = {};
+        for (const a of Object.values(gateData.applicants)) {
+          if (a.dk) devMap[a.dk] = { answer: a.answer, brand: a.brand || '', geo: (gateData.geo && gateData.geo[a.ip]) || '' };
+        }
+        const attempts = (gateData.quizAttempts || []).slice(-100).reverse()
+          .map(at => ({ ...at, device: devMap[at.dk] || null }));
+        sendJson(res, 200, { attempts });
+      } },
+      // 白板作品保存对所有用户开放(仅限 whiteboard- 前缀)
+      { method: 'POST', match: '/api/upload', guard: () => /^whiteboard-/.test(String(query.name || '')), fn: () => handleUpload(req, res, query) },
+      // 访客公开上传照片/视频(图≤50MB/视频≤700MB、全格式)
+      { method: 'POST', match: '/api/upload', guard: () => query.dir === 'photos' || query.dir === 'videos', fn: () => handleUpload(req, res, query, true) },
+      // 分片上传(绕开 CF 回源限流的 524)
+      { method: 'POST', match: '/api/upload/chunk',       fn: () => handleUploadChunk(req, res, query) },
+      // 文件列表公开只读
+      { method: 'GET',  match: '/api/files',              fn: () => handleList(req, res, query) },
+    ];
+    for (const r of routes) {
+      if (req.method !== r.method) continue;
+      const matched = typeof r.match === 'string' ? pathname === r.match : r.match.test(pathname);
+      if (!matched) continue;
+      if (r.guard && !r.guard()) continue;
+      r.fn();
       return;
     }
-    // 白板作品保存对所有用户开放(仅限 whiteboard- 前缀文件;其余 API 仍需 TOKEN)
-    if (pathname === '/api/upload' && req.method === 'POST' && /^whiteboard-/.test(String(query.name || ''))) {
-      handleUpload(req, res, query);
-      return;
-    }
-    // 访客公开上传照片/视频(所有人可传、不限张数、图≤50MB/视频≤700MB、全格式;归属按设备记录)
-    if (pathname === '/api/upload' && req.method === 'POST' && (query.dir === 'photos' || query.dir === 'videos')) {
-      handleUpload(req, res, query, true);
-      return;
-    }
-    // 分片上传(2026-07-28 晚高峰应急:CF 回源限流,>1MB 直传 524;256KB/片逐片传)
-    if (pathname === '/api/upload/chunk' && req.method === 'POST') { handleUploadChunk(req, res, query); return; }
-    // 文件列表公开只读(画廊/白板墙需要);上传/删除仍需 TOKEN
-    if (pathname === '/api/files' && req.method === 'GET') { handleList(req, res, query); return; }
+    // 外层 token 门禁:以上公开/自校验接口之后,以下写操作(上传/删除)需 token
     if (TOKEN && query.token !== TOKEN && req.headers['x-token'] !== TOKEN) {
       sendJson(res, 401, { error: '未授权:缺少或错误的 token' });
       return;

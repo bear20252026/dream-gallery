@@ -24,7 +24,7 @@
 
 ```
 server.js          # 后端入口(仅 require + 路由 + listen)
-lib/               # 后端模块:config/util/store/gate/admin/quiz/files/siteconfig/vision/track/docs/chat/abuse/tts
+lib/               # 后端模块:config/util/store/gate/admin/quiz/files/siteconfig/vision/track/docs/chat/abuse/tts/aichannels(AI通道登记处,被 chat/quiz/tts/vision 复用)
 src/               # 前端 ES 模块(main.js 按序 import)
   ctx.js           # 共享总线:登记册 + 7 命名空间(ui/kunlun/player/scene/media/gallery/mode)
   ui/overlay.js    # 弹层注册处(冷核心)
