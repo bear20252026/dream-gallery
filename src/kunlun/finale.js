@@ -61,7 +61,7 @@ function skyEnter(){
   bell(98,0.18,3);wind(true); // 远处编钟+风声
   if(!ctx.store.flag('skyviewTts')){
     ctx.store.mark('skyviewTts');
-    ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('这就是你补完的天。从地面到天空，从碎片到完整——你走了多远，只有你自己知道。');
+    ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('这就是你补完的天。从地面到天空，从碎片到完整——你走了多远，只有你自己知道。','title'); // B6 称号音色
   }
 }
 function skyExit(){if(!skyOn)return;skyOn=false;wind(false);}
@@ -132,7 +132,7 @@ function playProjection(){
     card.style.opacity='0';
     setTimeout(()=>{
       card.innerHTML='<div style="'+P+'">你走过的路，天穹都记得。</div>';card.style.opacity='1';
-      ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('你走过的路，天穹都记得。');
+      ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('你走过的路，天穹都记得。','title'); // B6 称号音色
       setTimeout(()=>{ov.style.opacity='0';setTimeout(()=>{ov.remove();projBusy=false;},800);},2400);
     },500);
   })();
@@ -169,7 +169,7 @@ ctx.kunlun.eternalHandlers.spiritmark=function(cg){
   const k=cg.userData.markIndex;
   cg.userData.pulse();
   const tts=ctx.kunlun.spiritsTTS&&ctx.kunlun.spiritsTTS[k];
-  if(tts)ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(tts);
+  if(tts)ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(tts,'title'); // B6 称号音色
   if(!marksDone.includes(k)){
     marksDone.push(k);
     ctx.store.setJson('marks',marksDone);
@@ -187,7 +187,7 @@ function finale(){
   bell(523,0.2,3);
   const nick=ctx.store.str('nick')||'藏梦人';
   // B4 称号解锁卡片(2026-07-28,设计文档第六卷):正式卡片取代大字一闪
-  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('六合藏梦人。这是昆仑能给你的，最完整的名字。天穹已经合上了，六灵蕴已经归位了。你不再需要修补任何东西。你只需要——继续记住，继续凝视。');
+  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('六合藏梦人。这是昆仑能给你的，最完整的名字。天穹已经合上了，六灵蕴已经归位了。你不再需要修补任何东西。你只需要——继续记住，继续凝视。','title'); // B6 称号音色
   // 自动冠以「六合藏梦人·」前缀(saveNick 机制已认 kunlunPrefix,主人再保存一次昵称即生效)
   if(ctx.store.str('prefix')!=='六合藏梦人·'){
     ctx.store.setStr('prefix','六合藏梦人·');

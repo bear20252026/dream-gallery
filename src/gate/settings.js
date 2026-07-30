@@ -35,6 +35,14 @@ css.textContent=`
 #gearPanel .menu{margin-top:14px;border-top:1px solid rgba(255,255,255,0.12);padding-top:12px;display:flex;flex-direction:column;gap:8px}
 #gearPanel .menu button{padding:10px;border:1px solid rgba(255,255,255,0.18);border-radius:9px;background:rgba(255,255,255,0.06);color:#e8dcd0;font-size:14px;cursor:pointer;text-align:left}
 #gearPanel .menu button:hover{background:rgba(200,138,75,0.2);border-color:#c98a4b}
+#etPickList{max-height:44vh;overflow-y:auto;margin:10px 0;display:flex;flex-direction:column;gap:6px}
+#etPickList label{display:flex;align-items:center;gap:8px;font-size:12px;padding:7px 9px;border:1px solid rgba(255,255,255,.12);border-radius:8px;cursor:pointer;color:#e8dcd0}
+#etPickList label.on{background:rgba(200,138,75,.18);border-color:#c98a4b}
+#etPickList input{accent-color:#c98a4b;flex:none}
+#etPickList .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#qOv .opt{padding:13px;border:1px solid rgba(255,255,255,.18);border-radius:10px;margin:8px 0;cursor:pointer;text-align:center;font-size:14px;color:#e8dcd0}
+#qOv .opt.on{background:rgba(200,138,75,.22);border-color:#c98a4b}
+#qOv .opt small{display:block;opacity:.55;font-size:11px;margin-top:3px}
 `;
 document.head.appendChild(css);
 
@@ -63,6 +71,8 @@ panel.innerHTML=`<h4>设 置<span class="px" id="gearX">✕</span></h4>
     <button id="gmGuide">📖 元素共鸣准则(说明书)</button>
     <button id="gmSky">🌌 天穹</button>
     <button id="gmSpirits">✦ 六灵蕴</button>
+    <button id="gmSelectEternal">🖼 展厅选片</button>
+    <button id="gmQuality">🎚 画质</button>
     <button id="gmChat">💬 聊天</button>
   </div>
   <div id="skyBox" style="display:none;text-align:center;margin-top:10px"><canvas id="skyCv" width="150" height="150"></canvas><div id="skyTx" style="font-size:12px;color:#ffd9a8;letter-spacing:2px;margin-top:4px"></div><div id="skySub" style="font-size:10px;color:rgba(255,217,168,.55);margin-top:2px"></div><div id="skyLine" style="font-size:11px;color:rgba(255,235,200,.8);line-height:1.7;margin-top:5px;min-height:18px"></div><div id="skyStats" style="font-size:10px;color:rgba(255,255,255,.45);margin-top:4px"></div><div id="skyFull" style="display:none;font-size:11px;color:rgba(255,220,170,.8);line-height:1.8;margin-top:6px">天穹已合。你带来的每一片灵蕴，都回到了它该在的地方。<br>但昆仑不闭门——新的裂痕总会生出，你会回来吗？</div></div>`;
@@ -288,7 +298,7 @@ function onSettingsKey(e){
   if(panel.classList.contains('show')){panelOpen=false;panel.classList.remove('show');}
 }
 document.addEventListener('keydown',onSettingsKey);
-bag.custom.push(()=>{document.removeEventListener('keydown',onSettingsKey);skyOvApi.unregister();chatOvApi.unregister();spOvApi.unregister();});
+bag.custom.push(()=>{document.removeEventListener('keydown',onSettingsKey);skyOvApi.unregister();chatOvApi.unregister();spOvApi.unregister();etPickApi.unregister();qApi.unregister();});
 async function sendChat(){
   const inp=document.getElementById('chatInput');
   const text=(inp.value||'').trim();
@@ -389,6 +399,77 @@ document.getElementById('gmGuide').onclick=function(){
   panelOpen=false;panel.classList.remove('show');
   window.openPanel('guide.html','元素共鸣准则');
 };
+
+// ===== C2 展厅选片导入(2026-07-30) =====
+const etPickOv=document.createElement('div');
+etPickOv.id='etPickOv';
+etPickOv.style.cssText='position:fixed;inset:0;z-index:380;display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+etPickOv.innerHTML='<div style="width:min(420px,92vw);max-height:84vh;overflow-y:auto;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)">'
+  +'<div style="display:flex;align-items:center;margin-bottom:6px"><b style="letter-spacing:2px;font-size:15px">展厅选片</b><span id="etPickX" style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.55);padding:2px 8px;font-size:14px">✕</span></div>'
+  +'<div style="font-size:11px;color:rgba(255,217,168,.6);line-height:1.7;margin-bottom:4px">从「我的上传」挑选 ≤20 幅,呈现在永恒展厅西墙(仅自己可见)。选好后需抵达展厅才会显现。</div>'
+  +'<div id="etPickCount" style="font-size:12px;color:#ffd9a8;margin-bottom:6px">已选 0 / 20</div>'
+  +'<div id="etPickList"></div>'
+  +'<div id="etPickEmpty" style="display:none;font-size:12px;color:rgba(255,255,255,.5);text-align:center;padding:14px">你还没有上传过作品。先去「上传照片 / 视频」吧。</div>'
+  +'<button id="etPickSave" style="margin-top:8px;width:100%;padding:11px;border:none;border-radius:10px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;font-size:14px;cursor:pointer">保 存 选 片</button></div>';
+document.body.appendChild(etPickOv);
+const etPickApi=ctx.overlay.register(etPickOv,{x:'#etPickX'});
+let etSel=new Set();
+function etRender(list){
+  const box=document.getElementById('etPickList'),empty=document.getElementById('etPickEmpty'),cnt=document.getElementById('etPickCount');
+  box.innerHTML='';
+  if(!list.length){empty.style.display='block';cnt.textContent='已选 0 / 20';return;}
+  empty.style.display='none';
+  for(const name of list){
+    const on=etSel.has(name);
+    const lab=document.createElement('label');
+    lab.className=on?'on':'';
+    lab.innerHTML='<input type="checkbox" '+(on?'checked':'')+'><span class="nm">'+name.replace(/^whiteboard-/i,'')+'</span>';
+    lab.querySelector('input').onchange=function(){
+      if(this.checked){if(etSel.size>=20){this.checked=false;ctx.ui.modeToast&&ctx.ui.modeToast('最多选 20 幅');return;}etSel.add(name);}
+      else etSel.delete(name);
+      lab.className=this.checked?'on':'';
+      cnt.textContent='已选 '+etSel.size+' / 20';
+    };
+    box.appendChild(lab);
+  }
+  cnt.textContent='已选 '+etSel.size+' / 20';
+}
+document.getElementById('gmSelectEternal').onclick=function(){
+  panelOpen=false;panel.classList.remove('show');
+  etSel=new Set(ctx.store.json('eternalPicks',[])||[]);
+  fetch('/api/myuploads').then(r=>r.json()).then(d=>{
+    etRender((d.names||[]).filter(n=>!/^whiteboard-/i.test(n))); // 白板作品有专属墙,不选入
+    etPickApi.open();
+  }).catch(()=>{etRender([]);etPickApi.open();});
+};
+document.getElementById('etPickSave').onclick=function(){
+  ctx.store.setJson('eternalPicks',Array.from(etSel));
+  ctx.kunlun.rebuildEternalPicks&&ctx.kunlun.rebuildEternalPicks(); // 刷新展厅西墙
+  etPickApi.close();
+  ctx.ui.modeToast&&ctx.ui.modeToast('选片已保存'+(etSel.size?'（'+etSel.size+' 幅）':'（已清空）'));
+};
+
+// ===== D4 低画质手动开关(2026-07-30) =====
+const qOv=document.createElement('div');
+qOv.id='qOv';
+qOv.style.cssText='position:fixed;inset:0;z-index:380;display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+qOv.innerHTML='<div style="width:min(360px,92vw);background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)">'
+  +'<div style="display:flex;align-items:center;margin-bottom:8px"><b style="letter-spacing:2px;font-size:15px">画质</b><span id="qX" style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.55);padding:2px 8px;font-size:14px">✕</span></div>'
+  +'<div class="opt" id="qHigh">高画质 · 自动<small>按帧率自动调节清晰度(默认)</small></div>'
+  +'<div class="opt" id="qLow">低画质 · 流畅<small>锁定最低分辨率,弱机/弱网更顺滑</small></div></div>';
+document.body.appendChild(qOv);
+const qApi=ctx.overlay.register(qOv,{x:'#qX'});
+function qSync(){
+  const low=!!ctx.store.json('lowQuality',false);
+  document.getElementById('qHigh').className='opt'+(low?'':' on');
+  document.getElementById('qLow').className='opt'+(low?' on':'');
+}
+document.getElementById('gmQuality').onclick=function(){
+  panelOpen=false;panel.classList.remove('show');
+  qSync();qApi.open();
+};
+document.getElementById('qHigh').onclick=function(){ctx.setLowQuality&&ctx.setLowQuality(false);qSync();};
+document.getElementById('qLow').onclick=function(){ctx.setLowQuality&&ctx.setLowQuality(true);qSync();};
 
 // 开局即弹:页面加载 4 秒后,未起名则双弹窗同屏(上昵称下说明书)
 // 说明书的自动慢速滚动功能保留在 guide.html 内,不受影响

@@ -63,7 +63,22 @@ let lastPosT=0,lastDayT=0,lastPlsT=0,lastVidT=0;
 // 自适应画质(2026-07-25):帧率持续低自动降 pixelRatio,回升自动恢复;最多每 3 秒调一次
 const PR_STEPS=[Math.min(devicePixelRatio,2),1.5,1.25,1];
 let prIdx=0,prLastChange=0,fpsAcc=0,fpsCnt=0;
+// D4 低画质手动开关(2026-07-30):开启后强制最低 pixelRatio(最流畅),自适应只降不升
+let lowQuality=!!ctx.store.json('lowQuality',false);
+if(lowQuality){prIdx=PR_STEPS.length-1;rnd.setPixelRatio(PR_STEPS[prIdx]);}
+function setLowQuality(on){
+  lowQuality=!!on;
+  try{ctx.store.setJson('lowQuality',lowQuality);}catch(e){}
+  prIdx=lowQuality?PR_STEPS.length-1:0;
+  rnd.setPixelRatio(PR_STEPS[prIdx]);
+  if(ctx.ui.modeToast)ctx.ui.modeToast(lowQuality?'已切到「低画质·流畅」(PixelRatio=1)':'已恢复「高画质·自动」');
+}
+ctx.setLowQuality=setLowQuality; // 供设置页罗盘调用
 function adaptiveQuality(now,dt){
+  if(lowQuality){ // 手动低画质:钉死最低档,不再自适应回升
+    if(prIdx!==PR_STEPS.length-1){prIdx=PR_STEPS.length-1;rnd.setPixelRatio(PR_STEPS[prIdx]);}
+    return;
+  }
   fpsAcc+=dt;fpsCnt++;
   if(fpsAcc<2)return; // 每 2 秒评估一次
   const avg=fpsCnt/fpsAcc;fpsAcc=0;fpsCnt=0;

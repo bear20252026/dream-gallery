@@ -18,7 +18,7 @@ const { gateData } = require('./lib/store');
 const { serveGatePage, sseRegister, handleApply, handleGateStatus, approvalGate, GATE_HASH, hasGateCookie, handleRename } = require('./lib/gate');
 const { tokenOk, handleAdminList, handleAdminDecide, handleAdminBulk } = require('./lib/admin');
 const { handleQuizStart, handleQuizSubmit, handleQuizState, handleQuizInvite, handleQuizJudge } = require('./lib/quiz');
-const { serveStatic, handleList, handleUpload, handleUploadChunk, handleDelete } = require('./lib/files');
+const { serveStatic, handleList, handleUpload, handleUploadChunk, handleDelete, handleMyUploads } = require('./lib/files');
 const { handlePublicConfig, handleAdminMode, handleAdminLinks, handleAdminDemo, handleAdminCaption, handleMyLinks, canServeMedia } = require('./lib/siteconfig');
 const { handleVisionAnalyze } = require('./lib/vision');
 const { handleTrackClick, handleClicksClear, handleExportXlsx, handleTrackError } = require('./lib/track');
@@ -166,6 +166,7 @@ const handler = (req, res) => {
       { method: 'POST', match: '/api/upload/chunk',       fn: () => handleUploadChunk(req, res, query) },
       // 文件列表公开只读
       { method: 'GET',  match: '/api/files',              fn: () => handleList(req, res, query) },
+      { method: 'GET',  match: '/api/myuploads',          fn: () => handleMyUploads(req, res, query) },
     ];
     for (const r of routes) {
       if (req.method !== r.method) continue;

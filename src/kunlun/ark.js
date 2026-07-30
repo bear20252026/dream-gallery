@@ -132,6 +132,51 @@ ark.position.set(PARK.x,PARK.y,PARK.z);
 ark.visible=false;
 s.add(ark);
 
+// ===================== B3 飞舟结界(2026-07-30) =====================
+// 六灵蕴未齐:泊位四周升起半透明灵能穹顶+光环地纹,靠近即被柔和推开(绝不让访客误登沉睡飞舟);
+// 六齐(ctx.kunlun.isDone)瞬间穹顶消融(淡出),开放登舟。"按E登上飞舟"提示由 boardBtn 负责。
+const BAR_R=8.5;
+const barrier=new THREE.Group();barrier.position.set(PARK.x,PARK.y,PARK.z);barrier.visible=false;
+const domeGeo=new THREE.SphereGeometry(BAR_R,20,14,0,Math.PI*2,0,Math.PI*0.62);
+const domeMat=new THREE.MeshBasicMaterial({color:'#7cc8e8',transparent:true,opacity:0.15,side:THREE.DoubleSide,depthWrite:false,toneMapped:false,blending:THREE.AdditiveBlending});
+const dome=new THREE.Mesh(domeGeo,domeMat);barrier.add(dome);
+const barRingGeo=new THREE.TorusGeometry(BAR_R,0.05,6,28);
+const barRingMat=new THREE.MeshBasicMaterial({color:'#bfe8ff',transparent:true,opacity:0.55,toneMapped:false});
+const barRing=new THREE.Mesh(barRingGeo,barRingMat);barRing.rotation.x=Math.PI/2;barRing.position.y=-1.5; // 贴山岩地面(相对 group 原点 PARK.y)
+barrier.add(barRing);
+s.add(barrier);
+let barDissolve=-1; // -1 未消融;<0 且 visible=已触发;>=0 正在消融进度
+let barLastT=performance.now();
+function barActive(on){
+  if(on){barDissolve=-1;barrier.visible=true;domeMat.opacity=0.15;barRingMat.opacity=0.55;}
+  else if(barrier.visible&&barDissolve<0){barDissolve=0;} // 触发消融
+}
+// 结界状态机(每帧):未齐→立起;齐了→消融;软推靠近的访客
+function barTick(){
+  const now=performance.now();
+  const dtB=Math.min(0.05,(now-barLastT)/1000);barLastT=now;
+  const done=ctx.kunlun.isDone&&ctx.kunlun.isDone();
+  if(done){if(barrier.visible&&barDissolve<0)barDissolve=0;}
+  else if(!flying&&!FF.on){barActive(true);}
+  if(!barrier.visible)return;
+  barRing.rotation.z+=0.01;
+  domeMat.opacity=0.15+Math.sin(now*0.002)*0.03;
+  if(barDissolve>=0){
+    barDissolve=Math.min(1,barDissolve+dtB*0.8); // ~1.25s 淡出
+    const o=1-barDissolve;domeMat.opacity*=o;barRingMat.opacity*=o;
+    if(barDissolve>=1){barrier.visible=false;barDissolve=-1;}
+    return;
+  }
+  if(done||flying||FF.on)return;
+  // 软推:水平距泊位中心过近→温柔外推到结界边缘(不让踏进沉睡飞舟的泊位)
+  const pl=ctx.player.pl;if(!pl)return;
+  const dx=pl.p.x-PARK.x,dz=pl.p.z-PARK.z,d=Math.hypot(dx,dz);
+  if(d<BAR_R&&d>0.001){
+    pl.p.x=PARK.x+dx/d*BAR_R;pl.p.z=PARK.z+dz/d*BAR_R;
+    if(btnT%15===0)ctx.ui.modeToast&&ctx.ui.modeToast('灵蕴未满，结界仍在。集齐六灵蕴，飞舟自启。');
+  }
+}
+
 // ===================== 六航路参数(主人定稿文案) =====================
 const ROUTES=[
   {name:'东线 · 朝霞航路',spirit:'春生之芽',poem:'黎明从不等人。但它等了你。',tint:[255,183,109],pColor:'#ffd98a',mode:'rise'},
@@ -288,7 +333,7 @@ function startFree(){
   if(!ctx.store.flag('arkFFSeen')){
     ctx.store.mark('arkFFSeen');
     bigText('从现在起，风向由你决定。',3000);
-    ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('从现在起，风向由你决定。W 爬升，S 俯冲，A D 转向，空格冲刺。点去展厅可以自动导航。');
+    ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('从现在起，风向由你决定。W 爬升，S 俯冲，A D 转向，空格冲刺。点去展厅可以自动导航。','ark'); // B6 航路音色
   }
   ctx.ui.modeToast&&ctx.ui.modeToast('W 爬升 · S 俯冲 · A/D 转向 · 空格冲刺 · E 降落 · Esc 返回');
 }
@@ -470,7 +515,7 @@ function enterSeg(k){
   tintOv.style.background=`radial-gradient(circle at 50% 42%, rgba(${r.tint[0]},${r.tint[1]},${r.tint[2]},0.16), rgba(${r.tint[0]},${r.tint[1]},${r.tint[2]},0.05) 55%, rgba(0,0,0,0) 78%)`;
   tintOv.style.opacity='1';
   bigText(r.spirit+' · '+r.name);
-  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(r.poem);
+  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(r.poem,'ark'); // B6 航路音色
   chime(k);
   if(k===5){pMat.vertexColors=true;}else{pMat.vertexColors=false;pMat.color.set(r.pColor);}
   pMat.needsUpdate=true;
@@ -522,6 +567,7 @@ function applyForm(n){
   aura.material.opacity=n>=6?0.9:0;                            // 6:六色流光周身
 }
 onTick(function(){
+  barTick(); // B3 结界状态机(立起/消融/软推)
   const n=ctx.kunlun.spiritsGot?ctx.kunlun.spiritsGot():0;
   if(n!==appliedN)applyForm(n);
   ark.visible=FF.on?true:(!flying&&n>=1);

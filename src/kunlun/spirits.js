@@ -175,7 +175,7 @@ function collect(){
   const n=keys.length;
   chime(n-1);edgeFlash(sp.color);
   bigText(sp.popup);
-  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(sp.tts);
+  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(sp.tts,'spirits'); // B6 收集音色
   ctx.ui.modeToast&&ctx.ui.modeToast(sp.name+' · '+sp.emotion+' · 已收入罗盘（'+n+'/6）');
   setTimeout(()=>{
     collecting=false;

@@ -155,7 +155,7 @@ ctx.ui=aliasNS(['modeToast','kunlunSpeak','overlay','store']);
 // 昆仑神话层(天穹/灵蕴/永恒展厅/飞舟)
 ctx.kunlun=aliasNS(['flightLock','eternalHandlers','eternalClick','eternalTeleport','eternalWelcome',
   'eternalKeepOut','groundOverride','arkTeleportToPeak','letgoRecall','peakVidEl','flyAudio',
-  'spiritsGot','isDone','spiritMark','spiritsTTS','spiritsState','checkSkyMs','fadeTeleport']);
+  'spiritsGot','isDone','spiritMark','spiritsTTS','spiritsState','checkSkyMs','fadeTeleport','rebuildEternalPicks']);
 // 玩家与门禁状态
 ctx.player=aliasNS(['pl','jD','ks','mv','drM','viewMode','quizPassed','quizPassScore']);
 // 场景内核(scene.js 写入:场景/相机/渲染器/拾取/边界/灯光/ uniforms)

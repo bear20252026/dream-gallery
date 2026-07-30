@@ -513,11 +513,25 @@ skyNote.textContent='昆仑没有日夜。你来了，天就亮了。';
 skyNote.style.cssText='position:fixed;right:12px;bottom:12px;z-index:15;color:rgba(255,200,220,0.35);font-size:10px;letter-spacing:2px;pointer-events:none;font-family:inherit';
 document.body.appendChild(skyNote);
 
-// 昆仑灵鉴 TTS:昆仑开口(经 /api/tts 代理,edge-tts 中文女声;失败静默,不打扰页面)
-function kunlunSpeak(text){
+// 昆仑灵鉴 TTS:昆仑开口(经 /api/tts 代理;失败静默,不打扰页面)
+// B6 音色分层(2026-07-30):按场景传 voice 语义名,映射到不同音色,让昆仑"开口有性格"
+//   spirits=收集(柔和女声) ark=航路(清朗男声) hall=展厅(灵动女声) title=称号(沉稳男声)
+//   语义名经 KUNLUN_VOICES 落到具体引擎音色;空→后端默认音。后端双引擎都认这些 edge-tts 名。
+const KUNLUN_VOICES = {
+  spirits: 'zh-CN-XiaoxiaoNeural', // 收集:温润女声
+  ark:     'zh-CN-YunxiNeural',    // 航路:清朗男声
+  hall:    'zh-CN-XiaoyiNeural',   // 展厅:灵动女声
+  title:   'zh-CN-YunyangNeural',  // 称号:沉稳男声
+};
+function kunlunSpeak(text, voice){
   try{
     if(!text)return;
-    const a=new Audio('/api/tts?text='+encodeURIComponent(text));
+    let v = '';
+    if(typeof voice === 'string' && voice){
+      v = KUNLUN_VOICES[voice] || voice; // 语义名→音色,未知名原样透传
+    }
+    const url = '/api/tts?text='+encodeURIComponent(text) + (v ? '&voice='+encodeURIComponent(v) : '');
+    const a = new Audio(url);
     a.play().catch(()=>{});
   }catch(e){}
 }

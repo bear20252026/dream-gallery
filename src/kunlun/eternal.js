@@ -157,22 +157,25 @@ function captionFor(name){
   return (ctx.mode.myCaptions&&ctx.mode.myCaptions[name])||'你最早挂上的画之一';
 }
 let captionsFixed=false;
-function addFrame(z,url,name,mtime){
+// 通用画框构建(晨光留影 + C2 展厅选片导入 复用);位置/朝向/文案可配
+// isPainting 全字段:直接复用 paintings.js 的 3D 原位放大;不进 paintGroups(模式系统无权管这里)
+// mtime 供 letgo.js 空画框题「此处曾有过——日期」
+function buildFrame(x,z,rotY,nx,nz,url,name,mtime,caption){
   const g=new THREE.Group();
-  g.position.set(EX-0.1,FLOOR+1.8,z);
-  g.rotation.y=-Math.PI/2; // 面朝 -x(厅内)
-  // isPainting 全字段:直接复用 paintings.js 的 3D 原位放大;不进 paintGroups(模式系统无权管这里)
-  // mtime 供 letgo.js 空画框题「此处曾有过——日期」
-  g.userData={isPainting:true,ox:EX-0.1,oy:FLOOR+1.8,oz:z,nx:-1,nz:0,ry:-Math.PI/2,zoomed:false,aiDesc:'晨光留影',src:url,eternalName:name,mtime:mtime||null};
-  const frame=new THREE.Mesh(new THREE.BoxGeometry(1.3,1.6,0.07),new THREE.MeshStandardMaterial({color:'#b89040',metalness:0.75,roughness:0.3}));
+  g.position.set(x,FLOOR+1.8,z);
+  g.rotation.y=rotY;
+  g.userData={isPainting:true,ox:x,oy:FLOOR+1.8,oz:z,nx:nx,nz:nz,ry:rotY,zoomed:false,aiDesc:caption,src:url,eternalName:name,mtime:mtime||null};
+  const frame=new THREE.Mesh(new THREE.BoxGeometry(1.1,1.3,0.07),new THREE.MeshStandardMaterial({color:'#b89040',metalness:0.75,roughness:0.3}));
   g.add(frame);
   // 距离懒加载:远在 400m 高空,传送抵达后才拉纹理(quiz/模式门禁由 loadTexCapped 自带)
   const tex=loadTexCapped(url,undefined,{x:HX,z:HZ});
   const pm=new THREE.MeshStandardMaterial({map:tex,roughness:0.45,emissive:'#ffffff',emissiveMap:tex,emissiveIntensity:0.16});
-  const plane=new THREE.Mesh(new THREE.PlaneGeometry(1.14,1.44),pm);
+  const plane=new THREE.Mesh(new THREE.PlaneGeometry(0.94,1.14),pm);
   plane.position.z=0.045;g.add(plane);
   s.add(g);iG.push(g);myIG.push(g);
 }
+// 东墙·晨光留影(服务端过滤后的可见池,按 mtime 取最早三张)
+function addFrame(z,url,name,mtime){buildFrame(EX-0.1,z,-Math.PI/2,-1,0,url,name,mtime,'晨光留影');}
 const FRAME_Z=[HZ-2.2,HZ,HZ+2.2],DEMO_FILL=['201.jpg','202.jpg','203.jpg','204.jpg','205.png'];
 fetch('/api/files?dir=photos').then(r=>r.json()).then(d=>{
   const pool=(d.photos||[]).filter(f=>!/^whiteboard-/i.test(f.name)); // 白板作品有专属墙,不进晨光
@@ -181,6 +184,33 @@ fetch('/api/files?dir=photos').then(r=>r.json()).then(d=>{
   for(const dm of DEMO_FILL){if(picks.length>=3)break;if(!picks.some(p=>p.name===dm))picks.push({name:dm,mtime:null});} // 不够三张,演示照片补足
   picks.slice(0,3).forEach((p,i)=>addFrame(FRAME_Z[i],'photos/'+encodeURIComponent(p.name),p.name,p.mtime));
 }).catch(()=>{DEMO_FILL.slice(0,3).forEach((n,i)=>addFrame(FRAME_Z[i],'photos/'+n,n,null));});
+
+// ===================== C2 展厅选片导入(2026-07-30) =====================
+// 本人从「我的上传」中挑选的作品,呈现在永恒展厅西墙(私人收藏墙);
+// 可见性由 /api/myuploads 服务端按设备过滤保证(与 mediarules.isMine 同口径:仅本人上传可见),
+// 客户端只呈现「已选 ∩ 本人拥有」之名,删除的作品自动跳过。西墙网格容量 5列×3行=15 幅。
+const WX=HX-6.06; // 西墙内壁 x
+const IMP_CAP=15;
+function buildImportFrames(){
+  const picks=(ctx.store.json('eternalPicks',[])||[]);
+  if(!Array.isArray(picks)||!picks.length)return;
+  fetch('/api/myuploads').then(r=>r.json()).then(d=>{
+    const mine=new Set((d.names||[]));
+    let i=0;
+    for(const name of picks){
+      if(!mine.has(name))continue; // 已删除/非本人,跳过(不占名额)
+      if(i>=IMP_CAP)break;
+      const col=i%5,row=Math.floor(i/5);
+      const z=HZ+(-3.0+col*1.5);
+      const y=FLOOR+(0.65+row*1.1); // 3 行:0.65/1.75/2.85(画框高1.3,顶不超墙3.5)
+      buildFrame(WX+0.1,z,Math.PI/2,1,0,'photos/'+encodeURIComponent(name),name,null,'你挑入永恒展厅的画');
+      i++;
+    }
+    if(picks.length>IMP_CAP)ctx.ui.modeToast&&ctx.ui.modeToast('展厅西墙最多呈现 '+IMP_CAP+' 幅，其余已为你留作候选。');
+  }).catch(()=>{});
+}
+buildImportFrames();
+ctx.kunlun.rebuildEternalPicks=buildImportFrames; // C2:选片保存后由设置页调用,刷新西墙
 
 // ===================== 金门(地面·主展厅东北角 x=15 z=-12,两面可点;六灵蕴集齐才开) =====================
 const doorG=new THREE.Group();doorG.position.set(15,0,-12);
@@ -247,7 +277,7 @@ function welcome(){
   if(ctx.store.flag('eternalWelcomed'))return;
   ctx.store.mark('eternalWelcomed');
   bigText('永恒展厅。你终于到了。');
-  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('你终于到了。这里不在大地上，也不在天穹上。它在你与天空之间——那个只有完整的人才能抵达的位置。从前，这里是西王母存放心象碎片的地方。现在，它是你的了。');
+  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('你终于到了。这里不在大地上，也不在天穹上。它在你与天空之间——那个只有完整的人才能抵达的位置。从前，这里是西王母存放心象碎片的地方。现在，它是你的了。','hall'); // B6 展厅音色
 }
 let tpLock=false;
 function teleport(intoHall){

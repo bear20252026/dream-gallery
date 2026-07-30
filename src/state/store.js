@@ -30,6 +30,8 @@ const SCHEMA={
   upHash:       {key:'kunlunUpHash',      type:'json'}, // 已传照片哈希(防重)
   letGo:        {key:'eternalLetGo',      type:'json'}, // 已"放下"的画(软删除清单)
   marks:        {key:'eternalMarks',      type:'json'}, // 晨光留影已完成标记
+  eternalPicks: {key:'eternalPicks',      type:'json'}, // C2 展厅选片导入:本人挑选≤20的上传作品名(仅自己可见)
+  lowQuality:   {key:'kunlunLowQuality',  type:'json'}, // D4 低画质手动开关(true=强制流畅档)
   // 一次性标记(存在即真)
   spiritsIntro:   {key:'kunlunSpiritsIntro', type:'flag'}, // 灵蕴序文已播
   spiritsDone:    {key:'kunlunSpiritsDone',  type:'flag'}, // 六灵蕴终章已触发
