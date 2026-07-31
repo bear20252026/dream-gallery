@@ -43,6 +43,7 @@ css.textContent=`
 #qOv .opt{padding:13px;border:1px solid rgba(255,255,255,.18);border-radius:10px;margin:8px 0;cursor:pointer;text-align:center;font-size:14px;color:#e8dcd0}
 #qOv .opt.on{background:rgba(200,138,75,.22);border-color:#c98a4b}
 #qOv .opt small{display:block;opacity:.55;font-size:11px;margin-top:3px}
+body.lg-on .lg-glass{background:transparent!important;background-image:none!important;backdrop-filter:none!important;-webkit-backdrop-filter:none!important;box-shadow:none!important}
 `;
 document.head.appendChild(css);
 
@@ -60,6 +61,7 @@ gear.style.cursor='pointer';
 const lkOld=document.getElementById('lk');if(lkOld)lkOld.style.display='none'; // 隐藏旧粉色齿轮按钮
 const panel=document.createElement('div');
 panel.id='gearPanel';
+panel.classList.add('lg-glass'); // 液态玻璃:body.lg-on 时背景透明,玻璃面板折射 3D 场景(见 src/liquid-glass/host.js)
 panel.style.left='16px';panel.style.right='auto';panel.style.bottom='auto';panel.style.top='88px'; // 面板挂在罗盘下方
 panel.innerHTML=`<h4>设 置<span class="px" id="gearX">✕</span></h4>
   <input id="gearNickInput" maxlength="16" placeholder="你的昵称">
