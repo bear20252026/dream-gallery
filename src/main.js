@@ -32,11 +32,6 @@ import './kunlun/finale.js';      // 终章三件套·二期⑥(俯瞰天穹/心
 
 const {L,s,cam,rnd,pls,WH,skyUniforms,groundUniforms,drawMusicCanvas,vidTex,vidEl,v45Tex,v45El,tickPhysics}=ctx;
 const {jD,ks,pl,mv,drM}=ctx.player; // 玩家簇经命名空间取(别名=活委托,player.js Object.assign 后此处读到真值)
-// 液态玻璃叠加层(桌面端 + 非低画质时启用):透明 overlay 折射实时 3D 场景,见 src/liquid-glass/
-// 移动端跳过(<768) → test-mobile 门禁不受影响;延迟 900ms 等首帧 3D 渲染完成再采样
-if(window.innerWidth>=768 && !(ctx.store&&ctx.store.json('lowQuality',false))){
-  import('./liquid-glass/host.js').then(m=>{setTimeout(()=>{try{m.initLiquidGlass(ctx);}catch(e){console.warn('[liquidglass] init',e&&e.message);}},900);}).catch(()=>{});
-}
 // 注意:updateFireworks/pG/pC 不在此解构——effects.js 支持热更新,重载后 ctx 上的引用会换新,
 // 主循环必须在调用时从 ctx 读取(见下方粒子循环与烟花调用)
 
