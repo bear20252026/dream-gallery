@@ -330,7 +330,7 @@ export class LiquidGlassRenderer {
   cacheUniforms() {
     const gl = this.gl
     const elNames = [
-      'uBackdrop', 'uWallpaperSampler', 'uTabsBackdropSampler', 'uCanvasSize', 'uWallpaperSize', 'uElementOffset', 'uElementSize',
+      'uBackdrop', 'uWallpaperSampler', 'uTabsBackdropSampler', 'uSampleWallpaper', 'uCanvasSize', 'uWallpaperSize', 'uElementOffset', 'uElementSize',
       'uCornerRadii', 'uRefractionHeight', 'uRefractionAmount', 'uDepthEffect',
       'uChromaticAberration', 'uBlurRadius', 'uSaturation', 'uBrightness',
       'uContrast', 'uTintColor', 'uSurfaceColor', 'uHighlightColor',

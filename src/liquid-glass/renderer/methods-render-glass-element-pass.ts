@@ -47,6 +47,11 @@ export const glassElementPassMethods = {
       gl.bindTexture(gl.TEXTURE_2D, this.wallpaperTexture)
       gl.uniform1i(this.uEl['uWallpaperSampler'], 1)
     }
+    // sampleWallpaper: when true, the element shader samples the clean wallpaper
+    // (the live 3D scene via uWallpaperSampler) instead of the scene FBO for
+    // refraction + blur. Required for transparent-overlay mode (where the scene
+    // FBO is empty/transparent). GLSL declares it as `uniform float`.
+    gl.uniform1f(this.uEl['uSampleWallpaper'], el.sampleWallpaper ? 1 : 0)
 
     // uTabsBackdropSampler (TEXTURE2) is no longer bound — the faithful
     // sampleIndicatorBackdrop computes the tinted layer inline (wallpaper +

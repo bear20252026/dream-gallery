@@ -341,6 +341,19 @@ let popShown=false;
 function maybePop(){
   if(popShown||myName||panelOpen)return;
   if(!sessionStorage.getItem('agreementConsented')||!sessionStorage.getItem('privacyConsented')||!sessionStorage.getItem('communityConsented'))return; // 三份协议未签完,昵称弹窗不弹
+  // 液态玻璃启用(桌面端):用真液态玻璃对话框(折射 3D 场景),否则走原 DOM 弹窗
+  if(ctx.liquidGlass&&ctx.liquidGlass.enabled&&ctx.liquidGlass.showDialog){
+    ctx.liquidGlass.showDialog({
+      title:'请给出你的真言',
+      body:'古老的低语在等待回应……以便元素之力归附于你。',
+      inputPlaceholder:'写下雅号(也可日后再改)',
+      okLabel:'落 款',
+      cancelLabel:'稍后',
+      onConfirm:(nick)=>{ if(nick){saveNick(nick,()=>{popShown=true;sessionStorage.setItem('nickPopOff','1');});}else{popShown=true;sessionStorage.setItem('nickPopOff','1');} },
+      onClose:()=>{ popShown=true;sessionStorage.setItem('nickPopOff','1'); }
+    });
+    return;
+  }
   pop.classList.add('show');
   lockPop(10);
 }
