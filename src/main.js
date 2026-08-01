@@ -174,31 +174,14 @@ function an() {
     // 第三人称:相机在玩家后上方,注视玩家;小人跟随玩家位置与朝向
     const fx = -Math.sin(pl.y),
       fz = -Math.cos(pl.y);
-    let back = 3.5 + pl.pi * 1.5;
-    const up = 2.2 - pl.pi * 1.2;
-    // 相机防撞:解密通过前,相机不可进入门禁墙范围(背贴墙时相机会被推到墙内)
-    // 禁区外扩0.5米:防止近裁面插进墙体出现"一半墙内一半墙外"
-    let bx = pl.p.x,
-      bz = pl.p.z;
-    if (!ctx.player.quizPassed) {
-      while (back > 0.4) {
-        bx = pl.p.x - fx * back;
-        bz = pl.p.z - fz * back;
-        const inside = bx > -19 && bx < 19 && bz > -13 && bz < 29;
-        if (!inside) break;
-        back -= 0.3;
-      }
-      if (back < 0.4) back = 0.4;
-      bx = pl.p.x - fx * back;
-      bz = pl.p.z - fz * back;
-      // 收缩到底仍撞墙:相机退回玩家位置(宁可与玩家重合,绝不可进入墙体几何)
-      if (bx > -19 && bx < 19 && bz > -13 && bz < 29) {
-        bx = pl.p.x;
-        bz = pl.p.z;
-      }
-    }
-    // 相机贴太近时隐藏小人(仅贴墙极端情况),正常始终显示角色
-    if (ctx.scene.avatar) ctx.scene.avatar.visible = back > 1.2;
+    let back = 4.0 + pl.pi * 1.6;
+    const up = 2.6 - pl.pi * 1.3;
+    // 第三人称相机:恒位于玩家后上方,角色恒可见。
+    // 旧的"贴墙收缩→相机吸到玩家身上→隐藏角色"逻辑依赖已移除的门禁墙(见 quizgate.js:38),
+    // 会把第三人称直接退化成第一人称,已于 2026-08-02 删除。
+    const bx = pl.p.x - fx * back;
+    const bz = pl.p.z - fz * back;
+    if (ctx.scene.avatar) ctx.scene.avatar.visible = true;
     // 相机不入沙:不沉到地形之下
     let cy = pl.p.y + up;
     if (ctx.media.desert) {
@@ -214,6 +197,7 @@ function an() {
       ctx.scene.avatar.rotation.y = pl.y + Math.PI;
     } // +PI:FBX 绑定朝向补偿(可微调)
   } else {
+    if (ctx.scene.avatar) ctx.scene.avatar.visible = false; // 第一人称隐藏角色(相机即眼睛)
     cam.position.copy(pl.p);
     cam.rotation.y = pl.y;
     cam.rotation.x = pl.pi;
