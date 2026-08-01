@@ -171,16 +171,17 @@ function an() {
   tickPhysics(dt);
   // 相机每帧同步:站立时拖拽转视角/滚轮俯仰也要生效(此前只在 mv 行走时同步)
   if (ctx.player.viewMode === 1) {
-    // 第三人称:相机在玩家后上方,注视玩家;小人跟随玩家位置与朝向
+    // 第三人称(类原神越肩跟随):更近、相机≈头部高、角色落画面偏下、轻微横向偏移
+    // 旧的"贴墙收缩→吸相机→隐藏角色"死代码已于 2026-08-02 删除(依赖已移除的门禁墙)。
     const fx = -Math.sin(pl.y),
       fz = -Math.cos(pl.y);
-    let back = 4.0 + pl.pi * 1.6;
-    const up = 2.6 - pl.pi * 1.3;
-    // 第三人称相机:恒位于玩家后上方,角色恒可见。
-    // 旧的"贴墙收缩→相机吸到玩家身上→隐藏角色"逻辑依赖已移除的门禁墙(见 quizgate.js:38),
-    // 会把第三人称直接退化成第一人称,已于 2026-08-02 删除。
-    const bx = pl.p.x - fx * back;
-    const bz = pl.p.z - fz * back;
+    const rx = fz,
+      rz = -fx; // 右向单位向量(用于横向偏移)
+    const off = 0.45; // 横向偏移(米):角色不居正,更自然
+    let back = 3.2 + pl.pi * 1.1; // 距离更近(原神手感);俯仰仍微调
+    const up = 1.5 - pl.pi * 0.8; // 相机高度≈角色头部,更亲密
+    const bx = pl.p.x - fx * back + rx * off;
+    const bz = pl.p.z - fz * back + rz * off;
     if (ctx.scene.avatar) ctx.scene.avatar.visible = true;
     // 相机不入沙:不沉到地形之下
     let cy = pl.p.y + up;
@@ -189,8 +190,8 @@ function an() {
       if (cy < gy + 0.35) cy = gy + 0.35;
     }
     cam.position.set(bx, cy, bz);
-    // 注视点放在玩家前方4米:相机贴墙收缩时也不会垂直俯视地板
-    cam.lookAt(pl.p.x + fx * 4, pl.p.y + 0.8, pl.p.z + fz * 4);
+    // 注视角色上胸(而非正前方4米):角色稳居画面偏下,类原神越肩视角
+    cam.lookAt(pl.p.x, pl.p.y + 1.8, pl.p.z);
     if (ctx.scene.avatar) {
       ctx.scene.avatar.position.copy(pl.p);
       ctx.scene.avatar.position.y = 0.1;
