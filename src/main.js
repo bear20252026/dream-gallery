@@ -171,27 +171,26 @@ function an() {
   tickPhysics(dt);
   // 相机每帧同步:站立时拖拽转视角/滚轮俯仰也要生效(此前只在 mv 行走时同步)
   if (ctx.player.viewMode === 1) {
-    // 第三人称(类原神越肩跟随):更近、相机≈头部高、角色落画面偏下、轻微横向偏移
-    // 旧的"贴墙收缩→吸相机→隐藏角色"死代码已于 2026-08-02 删除(依赖已移除的门禁墙)。
+    // 第三人称(原神展示视角·锁定机位):角色居中、全身入镜、近距微俯视
+    // 固定值不受俯仰影响;配合窄FOV让角色填满画面(对标原神衣柜)
     const fx = -Math.sin(pl.y),
       fz = -Math.cos(pl.y);
-    const rx = fz,
-      rz = -fx; // 右向单位向量(用于横向偏移)
-    const off = 0.45; // 横向偏移(米):角色不居正,更自然
-    let back = 3.2 + pl.pi * 1.1; // 距离更近(原神手感);俯仰仍微调
-    const up = 1.5 - pl.pi * 0.8; // 相机高度≈角色头部,更亲密
-    const bx = pl.p.x - fx * back + rx * off;
-    const bz = pl.p.z - fz * back + rz * off;
+    const back = 1.3; // 展示级超近距离:角色占画面主体
+    const up = 1.0; // 腰部高度:自然俯视
+    const bx = pl.p.x - fx * back;
+    const bz = pl.p.z - fz * back;
     if (ctx.scene.avatar) ctx.scene.avatar.visible = true;
-    // 相机不入沙:不沉到地形之下
     let cy = pl.p.y + up;
     if (ctx.media.desert) {
       const gy = ctx.media.desert.getH(bx, bz);
       if (cy < gy + 0.35) cy = gy + 0.35;
     }
     cam.position.set(bx, cy, bz);
-    // 注视角色上胸(而非正前方4米):角色稳居画面偏下,类原神越肩视角
-    cam.lookAt(pl.p.x, pl.p.y + 1.8, pl.p.z);
+    // 注视胸部(y+1.0):近距微俯视→全身入镜,角色画面居中
+    cam.lookAt(pl.p.x, pl.p.y + 1.0, pl.p.z);
+    // 第三人称用窄FOV(50°):角色在画面中更大更突出(原神展示感);第一人称保持75°
+    cam.fov = 50;
+    cam.updateProjectionMatrix();
     if (ctx.scene.avatar) {
       ctx.scene.avatar.position.copy(pl.p);
       ctx.scene.avatar.position.y = 0.1;
@@ -217,8 +216,8 @@ function an() {
     lastDayT = now;
     ctx.media.desert.dayNight(hour);
   }
-  // 滑翔时视野拉宽,落地恢复
-  const tFov = pl.gliding ? 82 : 75;
+  // 滑翔时视野拉宽,落地恢复;第三人称保持窄FOV(展示感)
+  const tFov = pl.gliding ? 82 : ctx.player.viewMode === 1 ? 50 : 75;
   if (Math.abs(cam.fov - tFov) > 0.01) {
     cam.fov += (tFov - cam.fov) * dt * 4;
     cam.updateProjectionMatrix();
