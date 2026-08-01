@@ -118,57 +118,196 @@
  */
 
 /** @type {GalleryCtx} */
-export const ctx={};
+export const ctx = {};
 // 诊断钩子:探针脚本读取运行时状态(quizPassed/store/overlay 等)用
-if(typeof window!=='undefined')window.__ctx=ctx;
-// 统一每帧更新队列：各模块用 onTick 注册动画，由主循环统一调用，
-// 代替零散的 requestAnimationFrame 自循环（减少每帧回调，便于管理）
-ctx.tickers=[];
-ctx.onTick=fn=>ctx.tickers.push(fn);
+if (typeof window !== 'undefined') window.__ctx = ctx;
+
+// ===================== 游戏主循环(2026-08-01 引擎化改造) =====================
+import { GameLoop } from './loop.js';
+ctx.loop = new GameLoop();
+// 向后兼容:ctx.onTick(fn) → ctx.loop.on('update',fn)
+ctx.tickers = [];
+ctx.onTick = (fn) => {
+  ctx.tickers.push(fn);
+  return ctx.loop.on('update', fn);
+};
+
+// ===================== 实体注册表 + 输入管理器 =====================
+import { EntityRegistry, InputManager } from './engine.js';
+ctx.ent = new EntityRegistry();
+ctx.input = new InputManager();
+ctx.input.initDefaults();
+// 输入处理在 INPUT 阶段
+ctx.loop.on('input', (dt) => ctx.input.tick(dt));
 
 // ===================== 命名空间别名层 + 扁平写软冻结(2026-07-28 架构深化① 阶段二/三) =====================
 // 扁平路径永久可用(老代码零改动);新代码用命名空间路径,读/写都经 get/set 委托到同一个真实存储 vault——
 // 行为完全等价,HMR 热替换属性后别名自动拿到新值(比模块顶层一次性解构更稳)。
 // 阶段三(软冻结):映射属性的扁平写在 dev 环境(localhost/?ctxdebug)告警一次指路命名空间;
 //   全 src 已迁移完毕,正式环境告警应为零——若出现说明有新代码走了老路。告警不阻断行为。
-const vault={}; // 映射属性的唯一真实存储(扁平访问器与命名空间共享)
-const devWarned=new Set();
-const DEV=typeof location!=='undefined'&&(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)||/ctxdebug/.test(location.search));
-function mapProp(n){
-  Object.defineProperty(ctx,n,{enumerable:true,configurable:true,
-    get(){return vault[n];},
-    set(v){
-      if(DEV&&!devWarned.has(n)){devWarned.add(n);console.warn('[ctx软冻结] ctx.'+n+' 扁平写已废弃,请改用命名空间(ctx.ui/kunlun/player/scene/media/gallery/mode)');}
-      vault[n]=v;
-    }});
+const vault = {}; // 映射属性的唯一真实存储(扁平访问器与命名空间共享)
+const devWarned = new Set();
+const DEV =
+  typeof location !== 'undefined' &&
+  (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) || /ctxdebug/.test(location.search));
+function mapProp(n) {
+  Object.defineProperty(ctx, n, {
+    enumerable: true,
+    configurable: true,
+    get() {
+      return vault[n];
+    },
+    set(v) {
+      if (DEV && !devWarned.has(n)) {
+        devWarned.add(n);
+        console.warn(
+          '[ctx软冻结] ctx.' +
+            n +
+            ' 扁平写已废弃,请改用命名空间(ctx.ui/kunlun/player/scene/media/gallery/mode)'
+        );
+      }
+      vault[n] = v;
+    },
+  });
 }
-function aliasNS(names){
-  const ns={};
-  for(const n of names){
+function aliasNS(names) {
+  const ns = {};
+  for (const n of names) {
     mapProp(n);
-    Object.defineProperty(ns,n,{get:()=>vault[n],set:v=>{vault[n]=v;},enumerable:true});
+    Object.defineProperty(ns, n, {
+      get: () => vault[n],
+      set: (v) => {
+        vault[n] = v;
+      },
+      enumerable: true,
+    });
   }
   return Object.freeze(ns); // 冻结:新键塞不进别名集(契约探针守)
 }
 // 反馈与冷核心深模块
-ctx.ui=aliasNS(['modeToast','kunlunSpeak','overlay','store']);
+ctx.ui = aliasNS(['modeToast', 'kunlunSpeak', 'overlay', 'store']);
 // 昆仑神话层(天穹/灵蕴/永恒展厅/飞舟)
-ctx.kunlun=aliasNS(['flightLock','eternalHandlers','eternalClick','eternalTeleport','eternalWelcome',
-  'eternalKeepOut','groundOverride','arkTeleportToPeak','letgoRecall','peakVidEl','flyAudio',
-  'spiritsGot','isDone','spiritMark','spiritsTTS','spiritsState','checkSkyMs','fadeTeleport','rebuildEternalPicks']);
+ctx.kunlun = aliasNS([
+  'flightLock',
+  'eternalHandlers',
+  'eternalClick',
+  'eternalTeleport',
+  'eternalWelcome',
+  'eternalKeepOut',
+  'groundOverride',
+  'arkTeleportToPeak',
+  'letgoRecall',
+  'peakVidEl',
+  'flyAudio',
+  'spiritsGot',
+  'isDone',
+  'spiritMark',
+  'spiritsTTS',
+  'spiritsState',
+  'checkSkyMs',
+  'fadeTeleport',
+  'rebuildEternalPicks',
+]);
 // 玩家与门禁状态
-ctx.player=aliasNS(['pl','jD','ks','mv','drM','viewMode','quizPassed','quizPassScore']);
+ctx.player = aliasNS(['pl', 'jD', 'ks', 'mv', 'drM', 'viewMode', 'quizPassed', 'quizPassScore']);
 // 场景内核(scene.js 写入:场景/相机/渲染器/拾取/边界/灯光/ uniforms)
-ctx.scene=aliasNS(['s','cam','rnd','ray','mP2','iG','tL','loadTexCapped','bounds',
-  'WH','OL','OR','OT','OBE','OBR','IL','IR','IRT','IRB','floorW','floorD','bW','bD',
-  'pyrHeight','groundUniforms','skyUniforms','pls','ambL','hemiL','L','jT','jB','aB','avatar','kintsugiOn']);
+ctx.scene = aliasNS([
+  's',
+  'cam',
+  'rnd',
+  'ray',
+  'mP2',
+  'iG',
+  'tL',
+  'loadTexCapped',
+  'bounds',
+  'WH',
+  'OL',
+  'OR',
+  'OT',
+  'OBE',
+  'OBR',
+  'IL',
+  'IR',
+  'IRT',
+  'IRB',
+  'floorW',
+  'floorD',
+  'bW',
+  'bD',
+  'pyrHeight',
+  'groundUniforms',
+  'skyUniforms',
+  'pls',
+  'ambL',
+  'hemiL',
+  'L',
+  'jT',
+  'jB',
+  'aB',
+  'avatar',
+  'kintsugiOn',
+]);
 // 媒体与户外(media.js/effects.js/desert.js/signs.js 写入)
-ctx.media=aliasNS(['vidEl','v45El','vidTex','v45Tex','vidMesh','v45Mesh','drawMusicCanvas','bigScreenHold',
-  'desert','dayHour','updateFireworks','pG','pC','signMesh','signMat','wb','mpMesh','mpMat','guideMesh',
-  'ytHeart','scrollLink','mA']);
+ctx.media = aliasNS([
+  'vidEl',
+  'v45El',
+  'vidTex',
+  'v45Tex',
+  'vidMesh',
+  'v45Mesh',
+  'drawMusicCanvas',
+  'bigScreenHold',
+  'desert',
+  'dayHour',
+  'updateFireworks',
+  'pG',
+  'pC',
+  'signMesh',
+  'signMat',
+  'wb',
+  'mpMesh',
+  'mpMat',
+  'guideMesh',
+  'ytHeart',
+  'scrollLink',
+  'mA',
+  'audioManager',
+]);
 // 挂画与房屋(paintings.js/housecolor.js 写入)
-ctx.gallery=aliasNS(['paintGroups','onC3D','zoomOut','zG','hangOne','houseMats','openHouseColor']);
+ctx.gallery = aliasNS([
+  'paintGroups',
+  'onC3D',
+  'zoomOut',
+  'zG',
+  'hangOne',
+  'houseMats',
+  'openHouseColor',
+]);
 // 展示区模式(mode.js 写入:模式/名单/纹理门禁/链接系统)
-ctx.mode=aliasNS(['siteMode','demoPhotos','myUploads','myLinks','customLinks','myUploadTokens','myCaptions',
-  'applyPaintMode','applyMode','refreshMode','texAllowed','linkGuard','spawnLinkModel','trackClick',
-  'LINK_MODEL_TYPES','MOUNTABLE_ICONS','openUpload']);
+ctx.mode = aliasNS([
+  'siteMode',
+  'demoPhotos',
+  'myUploads',
+  'myLinks',
+  'customLinks',
+  'myUploadTokens',
+  'myCaptions',
+  'applyPaintMode',
+  'applyMode',
+  'refreshMode',
+  'texAllowed',
+  'linkGuard',
+  'spawnLinkModel',
+  'trackClick',
+  'LINK_MODEL_TYPES',
+  'MOUNTABLE_ICONS',
+  'openUpload',
+]);
+
+// ===================== 事件总线(2026-08-01) =====================
+// 轻量 pub/sub，新增功能只需订阅事件，无需改现有模块
+// 用法: ctx.events.on('gallery:ready', myHandler)
+//       ctx.events.emit('music:started', {track:'00002'})
+import { events } from './events.js';
+ctx.events = events;

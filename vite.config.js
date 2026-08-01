@@ -3,18 +3,48 @@
 // 构建: npm run build → dist/(全部 html 入口 + assets/* hash 分包),部署 dist 全部 + 后端
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
+import { createHtmlPlugin } from 'vite-plugin-html';
+import fs from 'fs';
+import { minify as terserMinify } from 'terser';
+
+// 构建钩子:压缩 public/sw.js,产物覆盖到 dist/sw.js(源文件不变,部署用压缩版)
+const minifySw = () => ({
+  name: 'minify-sw',
+  buildStart() {
+    const src = resolve(__dirname, 'public/sw.js');
+    if (!fs.existsSync(src)) return;
+    const code = fs.readFileSync(src, 'utf8');
+    return terserMinify(code, { compress: { drop_debugger: true, passes: 2 }, mangle: { toplevel: true }, output: { comments: false } })
+      .then(out => fs.writeFileSync(resolve(__dirname, 'public/sw.min.js'), out.code));
+  },
+  writeBundle() {
+    // Vite 复制 public/* 后,用压缩版覆盖 dist/sw.js
+    const min = resolve(__dirname, 'public/sw.min.js');
+    if (fs.existsSync(min)) fs.copyFileSync(min, resolve(__dirname, 'dist/sw.js'));
+  },
+});
 
 export default defineConfig({
   root: '.',
   // 路径别名:@/ → src/(模块内可用,如 import {ctx} from '@/ctx.js')
-  resolve: { alias: { '@': resolve(__dirname, 'src') } },
+  resolve: { alias: {
+    '@': resolve(__dirname, 'src'),
+    // Three.js 加载器(不存在于 node_modules,指向 vendor)
+    'three/examples/jsm/loaders/FBXLoader.js': resolve(__dirname, 'vendor/examples/jsm/loaders/FBXLoader.js'),
+    'three/examples/jsm/libs/fflate.module.js': resolve(__dirname, 'vendor/examples/jsm/libs/fflate.module.js'),
+    'three/examples/jsm/curves/NURBSCurve.js': resolve(__dirname, 'vendor/examples/jsm/curves/NURBSCurve.js'),
+  } },
+  plugins: [
+    minifySw(),
+    // HTML 压缩保护:去除注释、空白、多余换行
+    createHtmlPlugin({ minify: true }),
+  ],
   build: {
     outDir: 'dist',
-    // 2026-07-26 安全:不出 sourcemap——.map 能被任何人还原全部源码
+    // 安全:不出 sourcemap
     sourcemap: false,
     target: 'es2020',
     rollupOptions: {
-      // 多页应用:主展厅 + 各子页统一走构建(压缩/minify;产物仍在 dist 根,部署路径不变)
       input: {
         main:       resolve(__dirname, 'index.html'),
         admin:      resolve(__dirname, 'admin.html'),
@@ -25,22 +55,32 @@ export default defineConfig({
         privacy:    resolve(__dirname, 'privacy.html'),
         community:  resolve(__dirname, 'community.html'),
       },
+      // 分包:three.js 独立(browser 缓存 600KB,永不重复下载);业务代码 ~280KB 单独变
       output: {
-        // three.js 单独成块:业务代码更新时第三方库哈希不变,浏览器长期缓存(弱网关键)
         manualChunks(id) {
           if (id.includes('node_modules/three')) return 'three';
         },
       },
     },
-    // 生产移除 debugger;保留 console.error(页面错误显示依赖)
-    terserOptions: { compress: { drop_debugger: true, pure_funcs: ['console.log'] } },
+    // JS 强混淆:顶层变量名随机化、2 轮压缩、剥离所有注释和 console.log
+    terserOptions: {
+      compress: {
+        drop_debugger: true,
+        pure_funcs: ['console.log'],
+        passes: 2,
+      },
+      mangle: {
+        toplevel: true,
+      },
+      output: {
+        comments: false,
+      },
+    },
   },
   server: {
     port: 5173,
-    // 预热高频大文件:启动即编译,避免首次请求瀑布延迟
     warmup: { clientFiles: ['./src/main.js', './src/scene/scene.js'] },
     proxy: {
-      // 后端 API 与媒体全部代理到零依赖 Node 服务器
       '/api': 'http://localhost:3000',
       '/admin': 'http://localhost:3000',
       '/admin-media': 'http://localhost:3000',

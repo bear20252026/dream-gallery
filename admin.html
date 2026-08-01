@@ -1,711 +1,1980 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>梦幻画廊 · 管理后台</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#14101a;color:#eee;font-family:'Microsoft YaHei',sans-serif;min-height:100vh}
-.wrap{max-width:960px;margin:0 auto;padding:20px 16px 60px}
-h1{color:#ffb6c8;font-size:20px}
-.sub{color:rgba(255,255,255,.4);font-size:12px;margin:4px 0 18px}
-.tabs{display:flex;gap:8px;margin-bottom:20px;background:rgba(255,255,255,.04);padding:6px;border-radius:14px;border:1px solid rgba(255,255,255,.08)}
-.tab{flex:1;text-align:center;padding:10px 0;border-radius:10px;cursor:pointer;font-size:14px;color:rgba(255,255,255,.55);transition:all .2s;user-select:none}
-.tab:hover{color:#fff}
-.tab.active{background:linear-gradient(135deg,#ff6b6b,#feca57);color:#fff;font-weight:bold;box-shadow:0 4px 14px rgba(255,107,107,.35)}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:10px;margin-bottom:22px}
-.stat{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px 8px;text-align:center}
-.stat .num{font-size:24px;color:#feca57;font-weight:bold}
-.stat .label{font-size:11px;color:rgba(255,255,255,.5);margin-top:4px}
-.section-title{font-size:15px;color:#feca57;margin:20px 0 10px;display:flex;align-items:center;gap:8px}
-.section-title::after{content:'';flex:1;height:1px;background:rgba(254,202,87,.2)}
-.card{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:14px 16px;margin-bottom:10px;transition:border-color .2s}
-.card:hover{border-color:rgba(255,182,200,.3)}
-.card .answer{font-size:16px;color:#fff;margin-bottom:6px}
-.card .meta{font-size:12px;color:rgba(255,255,255,.45);line-height:1.8;word-break:break-all}
-.badge{display:inline-block;font-size:11px;padding:2px 10px;border-radius:10px;margin-left:6px;vertical-align:middle}
-.badge.pending{background:#feca57;color:#000}
-.badge.approved{background:#2ecc71;color:#000}
-.badge.denied{background:#e74c3c;color:#fff}
-.badge.history{background:#888;color:#fff}
-.brand-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(155,89,182,.3);color:#d5a6ff;margin-right:6px}
-.geo-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(52,152,219,.25);color:#9cd2ff;margin-right:6px}
-.actions{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
-button{border:none;border-radius:8px;padding:8px 14px;font-size:12px;cursor:pointer;color:#fff;transition:transform .1s}
-button:active{transform:scale(.95)}
-.btn-perm{background:#2ecc71}.btn-day{background:#3498db}.btn-once{background:#9b59b6}
-.btn-deny{background:#e74c3c}.btn-revoke{background:#666}.btn-del{background:#c0392b}
-.btn-note{background:#555}
-.empty{color:rgba(255,255,255,.3);font-size:13px;padding:20px;text-align:center}
-/* 统计页 */
-.chart{display:flex;align-items:flex-end;gap:3px;height:110px;background:rgba(255,255,255,.03);border-radius:14px;padding:14px 12px 8px;border:1px solid rgba(255,255,255,.07)}
-.bar{flex:1;background:linear-gradient(180deg,#ff6b6b,#feca57);border-radius:3px 3px 0 0;min-height:2px;position:relative;cursor:pointer;transition:opacity .15s}
-.bar:hover{opacity:.75}
-.bar .tip{display:none;position:absolute;bottom:105%;left:50%;transform:translateX(-50%);background:#000;padding:3px 8px;border-radius:6px;font-size:11px;white-space:nowrap;z-index:5}
-.bar:hover .tip{display:block}
-.chart-x{display:flex;gap:3px;padding:4px 12px 0;font-size:10px;color:rgba(255,255,255,.35)}
-.chart-x span{flex:1;text-align:center}
-.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;background:rgba(255,255,255,.03);border-radius:14px;padding:12px;border:1px solid rgba(255,255,255,.07)}
-.cal-head{text-align:center;font-size:11px;color:#feca57;padding:4px 0}
-.cal-cell{aspect-ratio:1;border-radius:8px;background:rgba(255,255,255,.04);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:rgba(255,255,255,.5);cursor:pointer;transition:all .15s}
-.cal-cell:hover{background:rgba(255,107,107,.25)}
-.cal-cell.has{background:rgba(255,107,107,.18);color:#fff}
-.cal-cell .c{font-size:10px;color:#feca57;margin-top:1px}
-.cal-cell.today{outline:1px solid #feca57}
-.range-btns{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
-.range-btn{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.6);padding:6px 16px;border-radius:16px;font-size:12px;cursor:pointer}
-.range-btn.active{background:linear-gradient(135deg,#ff6b6b,#feca57);color:#fff;border-color:transparent}
-.vrow{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:6px;font-size:13px}
-.vrow .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.vrow .cnt{color:#feca57;font-size:12px;white-space:nowrap}
-/* 文件页 */
-.file-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(255,255,255,.04);border-radius:10px;margin-bottom:6px;font-size:12px}
-.file-row .fname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.8)}
-.file-row .fsize{color:rgba(255,255,255,.4);white-space:nowrap}
-.upload-box{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
-.upload-box input[type=file]{font-size:12px;color:rgba(255,255,255,.6);max-width:220px}
-.toast{position:fixed;top:16px;left:50%;transform:translateX(-50%);background:#2ecc71;color:#fff;padding:10px 22px;border-radius:10px;font-size:13px;z-index:99;display:none;box-shadow:0 8px 24px rgba(0,0,0,.4)}
-.toast.err{background:#e74c3c}
-.qz-detail.show{display:block!important}
-.badge.watch{background:#e67e22;color:#fff}
-.badge.blocked{background:#c0392b;color:#fff}
-.note-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(46,204,113,.25);color:#8ef0b8;margin-right:6px}
-.pv-mask{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;z-index:200;cursor:zoom-out}
-.pv-mask.show{display:flex}
-.pv-mask img,.pv-mask video{max-width:92vw;max-height:86vh;border-radius:10px;background:#000}
-.pv-mask audio{width:80vw}
-.fname{cursor:pointer;color:#9cd2ff!important;text-decoration:underline dotted}
-</style>
-</head>
-<body>
-<div class="wrap">
-<h1>🌸 梦幻画廊 · 管理后台</h1>
-<div class="sub">此页面地址含密码，请勿分享</div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>梦幻画廊 · 管理后台</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        background: #14101a;
+        color: #eee;
+        font-family: 'Microsoft YaHei', sans-serif;
+        min-height: 100vh;
+      }
+      .wrap {
+        max-width: 960px;
+        margin: 0 auto;
+        padding: 16px 14px 60px;
+      }
+      h1 {
+        color: #ffb6c8;
+        font-size: 18px;
+        margin-bottom: 2px;
+      }
+      .sub {
+        color: rgba(255, 255, 255, 0.35);
+        font-size: 11px;
+        margin: 0 0 14px;
+      }
 
-<div class="tabs">
-  <div class="tab active" data-tab="approve" onclick="switchTab('approve')">审批</div>
-  <div class="tab" data-tab="stats" onclick="switchTab('stats')">访问统计</div>
-  <div class="tab" data-tab="history" onclick="switchTab('history')">历史</div>
-  <div class="tab" data-tab="quiz" onclick="switchTab('quiz')">答题记录</div>
-  <div class="tab" data-tab="display" onclick="switchTab('display')">展示区</div>
-  <div class="tab" data-tab="files" onclick="switchTab('files')">文件管理</div>
-  <div class="tab" data-tab="docs" onclick="switchTab('docs')">协议文档</div>
-</div>
+      /* ===== 标签栏 ===== */
+      .tabs {
+        display: flex;
+        gap: 4px;
+        margin-bottom: 16px;
+        background: rgba(255, 255, 255, 0.03);
+        padding: 4px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        flex-wrap: wrap;
+      }
+      .tab {
+        padding: 7px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.5);
+        transition: all 0.15s;
+        user-select: none;
+        white-space: nowrap;
+      }
+      .tab:hover {
+        color: #fff;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .tab.active {
+        background: linear-gradient(135deg, #ff6b6b, #feca57);
+        color: #fff;
+        font-weight: bold;
+        box-shadow: 0 2px 8px rgba(255, 107, 107, 0.25);
+      }
+      .tab.chat-tab {
+        border: 1px dashed rgba(255, 154, 158, 0.4);
+      }
+      .tab.chat-tab.active {
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-color: transparent;
+      }
 
-<!-- ========== 审批 ========== -->
-<div id="tab-approve">
-  <div class="stats" id="statsCards"></div>
-  <div id="alertBox"></div>
-  <div class="section-title">⏳ 待批准 <button class="btn-revoke" style="margin-left:auto" onclick="revokeAll()">一键撤销全部批准</button></div>
-  <div id="pending"></div>
-  <div class="section-title">✅ 已批准</div>
-  <div id="approved"></div>
-</div>
+      /* ===== 统计卡片 ===== */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .stat {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 12px;
+        padding: 12px 6px;
+        text-align: center;
+      }
+      .stat .num {
+        font-size: 22px;
+        color: #feca57;
+        font-weight: bold;
+      }
+      .stat .label {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+        margin-top: 3px;
+      }
+      .section-title {
+        font-size: 13px;
+        color: #feca57;
+        margin: 16px 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .section-title::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(254, 202, 87, 0.15);
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.045);
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 14px;
+        padding: 14px 16px;
+        margin-bottom: 10px;
+        transition: border-color 0.2s;
+      }
+      .card:hover {
+        border-color: rgba(255, 182, 200, 0.3);
+      }
+      .card .answer {
+        font-size: 16px;
+        color: #fff;
+        margin-bottom: 6px;
+      }
+      .card .meta {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.45);
+        line-height: 1.8;
+        word-break: break-all;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 10px;
+        border-radius: 10px;
+        margin-left: 6px;
+        vertical-align: middle;
+      }
+      .badge.pending {
+        background: #feca57;
+        color: #000;
+      }
+      .badge.approved {
+        background: #2ecc71;
+        color: #000;
+      }
+      .badge.denied {
+        background: #e74c3c;
+        color: #fff;
+      }
+      .badge.history {
+        background: #888;
+        color: #fff;
+      }
+      .brand-tag {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 8px;
+        background: rgba(155, 89, 182, 0.3);
+        color: #d5a6ff;
+        margin-right: 6px;
+      }
+      .geo-tag {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 8px;
+        background: rgba(52, 152, 219, 0.25);
+        color: #9cd2ff;
+        margin-right: 6px;
+      }
+      .actions {
+        margin-top: 10px;
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      button {
+        border: none;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font-size: 12px;
+        cursor: pointer;
+        color: #fff;
+        transition: transform 0.1s;
+      }
+      button:active {
+        transform: scale(0.95);
+      }
+      .btn-perm {
+        background: #2ecc71;
+      }
+      .btn-day {
+        background: #3498db;
+      }
+      .btn-once {
+        background: #9b59b6;
+      }
+      .btn-deny {
+        background: #e74c3c;
+      }
+      .btn-revoke {
+        background: #666;
+      }
+      .btn-del {
+        background: #c0392b;
+      }
+      .btn-note {
+        background: #555;
+      }
+      .empty {
+        color: rgba(255, 255, 255, 0.3);
+        font-size: 13px;
+        padding: 20px;
+        text-align: center;
+      }
+      /* 统计页 */
+      .chart {
+        display: flex;
+        align-items: flex-end;
+        gap: 3px;
+        height: 110px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 14px;
+        padding: 14px 12px 8px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .bar {
+        flex: 1;
+        background: linear-gradient(180deg, #ff6b6b, #feca57);
+        border-radius: 3px 3px 0 0;
+        min-height: 2px;
+        position: relative;
+        cursor: pointer;
+        transition: opacity 0.15s;
+      }
+      .bar:hover {
+        opacity: 0.75;
+      }
+      .bar .tip {
+        display: none;
+        position: absolute;
+        bottom: 105%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #000;
+        padding: 3px 8px;
+        border-radius: 6px;
+        font-size: 11px;
+        white-space: nowrap;
+        z-index: 5;
+      }
+      .bar:hover .tip {
+        display: block;
+      }
+      .chart-x {
+        display: flex;
+        gap: 3px;
+        padding: 4px 12px 0;
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.35);
+      }
+      .chart-x span {
+        flex: 1;
+        text-align: center;
+      }
+      .calendar {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 5px;
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 14px;
+        padding: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+      }
+      .cal-head {
+        text-align: center;
+        font-size: 11px;
+        color: #feca57;
+        padding: 4px 0;
+      }
+      .cal-cell {
+        aspect-ratio: 1;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.04);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        color: rgba(255, 255, 255, 0.5);
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .cal-cell:hover {
+        background: rgba(255, 107, 107, 0.25);
+      }
+      .cal-cell.has {
+        background: rgba(255, 107, 107, 0.18);
+        color: #fff;
+      }
+      .cal-cell .c {
+        font-size: 10px;
+        color: #feca57;
+        margin-top: 1px;
+      }
+      .cal-cell.today {
+        outline: 1px solid #feca57;
+      }
+      .range-btns {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+      .range-btn {
+        background: rgba(255, 255, 255, 0.07);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.6);
+        padding: 6px 16px;
+        border-radius: 16px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .range-btn.active {
+        background: linear-gradient(135deg, #ff6b6b, #feca57);
+        color: #fff;
+        border-color: transparent;
+      }
+      .vrow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 10px;
+        margin-bottom: 6px;
+        font-size: 13px;
+      }
+      .vrow .who {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .vrow .cnt {
+        color: #feca57;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      /* 文件页 */
+      .file-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 10px;
+        margin-bottom: 6px;
+        font-size: 12px;
+      }
+      .file-row .fname {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: rgba(255, 255, 255, 0.8);
+      }
+      .file-row .fsize {
+        color: rgba(255, 255, 255, 0.4);
+        white-space: nowrap;
+      }
+      .upload-box {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+        flex-wrap: wrap;
+      }
+      .upload-box input[type='file'] {
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.6);
+        max-width: 220px;
+      }
+      .toast {
+        position: fixed;
+        top: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #2ecc71;
+        color: #fff;
+        padding: 10px 22px;
+        border-radius: 10px;
+        font-size: 13px;
+        z-index: 99;
+        display: none;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      }
+      .toast.err {
+        background: #e74c3c;
+      }
+      .qz-detail.show {
+        display: block !important;
+      }
+      .badge.watch {
+        background: #e67e22;
+        color: #fff;
+      }
+      .badge.blocked {
+        background: #c0392b;
+        color: #fff;
+      }
+      .note-tag {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 8px;
+        background: rgba(46, 204, 113, 0.25);
+        color: #8ef0b8;
+        margin-right: 6px;
+      }
+      .pv-mask {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.9);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 200;
+        cursor: zoom-out;
+      }
+      .pv-mask.show {
+        display: flex;
+      }
+      .pv-mask img,
+      .pv-mask video {
+        max-width: 92vw;
+        max-height: 86vh;
+        border-radius: 10px;
+        background: #000;
+      }
+      .pv-mask audio {
+        width: 80vw;
+      }
+      .fname {
+        cursor: pointer;
+        color: #9cd2ff !important;
+        text-decoration: underline dotted;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>
+        🌸 梦幻画廊 · 管理后台
+        <button
+          onclick="location.reload()"
+          style="
+            margin-left: 10px;
+            font-size: 11px;
+            padding: 3px 10px;
+            background: #444;
+            border: none;
+            color: #fff;
+            border-radius: 6px;
+            cursor: pointer;
+            vertical-align: middle;
+          "
+        >
+          刷新
+        </button>
+      </h1>
+      <div class="sub">审批 · 统计 · 文件 · 对话</div>
 
-<!-- ========== 统计 ========== -->
-<div id="tab-stats" style="display:none">
-  <div class="stats" id="statCards2"></div>
-  <div class="section-title">📈 近 30 天访问趋势</div>
-  <div class="chart" id="chart"></div>
-  <div class="chart-x" id="chartX"></div>
-  <div class="section-title">📅 本月日历（点日期看明细）</div>
-  <div class="calendar" id="calendar"></div>
-  <div class="section-title">👥 访客明细</div>
-  <div class="range-btns">
-    <button class="range-btn active" onclick="setRange('day',this)">今天</button>
-    <button class="range-btn" onclick="setRange('week',this)">本周</button>
-    <button class="range-btn" onclick="setRange('month',this)">本月</button>
-    <button class="range-btn" onclick="setRange('year',this)">今年</button>
-  </div>
-  <div id="rangeList"></div>
-</div>
+      <div class="tabs">
+        <div class="tab active" data-tab="approve" onclick="switchTab('approve')">审批</div>
+        <div class="tab" data-tab="stats" onclick="switchTab('stats')">访问统计</div>
+        <div class="tab" data-tab="history" onclick="switchTab('history')">历史</div>
+        <div class="tab" data-tab="quiz" onclick="switchTab('quiz')">答题记录</div>
+        <div class="tab" data-tab="display" onclick="switchTab('display')">展示区</div>
+        <div class="tab" data-tab="files" onclick="switchTab('files')">文件管理</div>
+        <div class="tab" data-tab="docs" onclick="switchTab('docs')">协议文档</div>
+        <div class="tab chat-tab" data-tab="chat" onclick="switchTab('chat')">💬 在线对话</div>
+      </div>
 
-<!-- ========== 历史 ========== -->
-<div id="tab-history" style="display:none">
-  <div class="section-title">🕘 最近访问记录</div>
-  <div id="visitLog"></div>
-  <div class="section-title">📜 历史申请（已撤销 / 已拒绝 / 已过期）</div>
-  <div id="history"></div>
-</div>
+      <!-- ========== 审批 ========== -->
+      <div id="tab-approve">
+        <div class="stats" id="statsCards"></div>
+        <div id="alertBox"></div>
+        <div class="section-title">
+          ⏳ 待批准
+          <button class="btn-revoke" style="margin-left: auto" onclick="revokeAll()">
+            一键撤销全部批准
+          </button>
+        </div>
+        <div id="pending"></div>
+        <div class="section-title">✅ 已批准</div>
+        <div id="approved"></div>
+      </div>
 
-<!-- ========== 答题记录 ========== -->
-<div id="tab-quiz" style="display:none">
-  <div class="section-title">📝 答题记录(最近 100 条,点击展开问答详情)</div>
-  <div id="quizList"></div>
-</div>
+      <!-- ========== 统计 ========== -->
+      <div id="tab-stats" style="display: none">
+        <div class="stats" id="statCards2"></div>
+        <div class="section-title">📈 近 30 天访问趋势</div>
+        <div class="chart" id="chart"></div>
+        <div class="chart-x" id="chartX"></div>
+        <div class="section-title">📅 本月日历（点日期看明细）</div>
+        <div class="calendar" id="calendar"></div>
+        <div class="section-title">👥 访客明细</div>
+        <div class="range-btns">
+          <button class="range-btn active" onclick="setRange('day', this)">今天</button>
+          <button class="range-btn" onclick="setRange('week', this)">本周</button>
+          <button class="range-btn" onclick="setRange('month', this)">本月</button>
+          <button class="range-btn" onclick="setRange('year', this)">今年</button>
+        </div>
+        <div id="rangeList"></div>
+      </div>
 
-<!-- ========== 展示区(模式/自定义链接/演示照片/访客链接) ========== -->
-<div id="tab-display" style="display:none">
-  <div class="section-title">🖼️ 展示区模式</div>
-  <div id="modeCard" style="padding:10px 0"></div>
-  <div class="section-title">🔗 自定义链接(普通模式可挂原 3D 图案;特殊模式只建模型)</div>
-  <div style="padding:6px 0 12px">
-    <input id="clName" placeholder="名称(如 百度)" style="width:110px;padding:7px">
-    <input id="clUrl" placeholder="https://…" style="width:220px;padding:7px">
-    <select id="clIcon" style="padding:7px">
-      <option value="">不挂原图案(新建模型)</option>
-    </select>
-    <select id="clModel" style="padding:7px"></select>
-    <button class="btn-day" onclick="addCustomLink()">添加</button>
-  </div>
-  <div style="padding:0 0 12px">
-    快捷:
-    <button class="btn-day" onclick="presetLink('百度','https://www.baidu.com')">百度</button>
-    <button class="btn-day" onclick="presetLink('哔哩哔哩','https://www.bilibili.com')">哔哩哔哩</button>
-    <button class="btn-day" onclick="presetLink('王者营地','https://pvp.qq.com/cp/a20190918confrontationm/index.html')">王者营地</button>
-    <button class="btn-day" onclick="presetLink('爱奇艺','https://mbd.baidu.com/ug_share/mbox/4a83aa9e65/share?product=external&tk=50777bfaa57553a1ae74eafb54e8d53e&share_url=https%3A%2F%2Fm.iqiyi.com%2F&domain=mbd.baidu.com')">爱奇艺</button>
-  </div>
-  <div id="customLinks"></div>
-  <div class="section-title">🌟 演示照片(普通模式公开展示;特殊模式不上墙)</div>
-  <div id="demoPhotos"></div>
-  <div class="section-title">👤 访客自己的链接(可查看/复制/删除)</div>
-  <div id="userLinks"></div>
-  <div class="section-title">🧲 链接点击记录(仅后台可见)
-    <button class="btn-day" style="margin-left:8px" onclick="dl('/api/admin/export.xlsx','gallery-data.xlsx')">导出 Excel</button>
-    <button class="btn-day" onclick="exportPdf()">导出 PDF(含照片原图)</button>
-    <button class="btn-del" onclick="clearClicks()">批量清理</button>
-  </div>
-  <div id="clickList"></div>
-  <div class="section-title">🐛 访客端报错(仅后台可见)</div>
-  <div id="errList"></div>
-</div>
+      <!-- ========== 历史 ========== -->
+      <div id="tab-history" style="display: none">
+        <div class="section-title">🕘 最近访问记录</div>
+        <div id="visitLog"></div>
+        <div class="section-title">📜 历史申请（已撤销 / 已拒绝 / 已过期）</div>
+        <div id="history"></div>
+      </div>
 
-<!-- ========== 文件 ========== -->
-<div id="tab-files" style="display:none">
-  <div id="fileSections"></div>
-</div>
+      <!-- ========== 答题记录 ========== -->
+      <div id="tab-quiz" style="display: none">
+        <div class="section-title">📝 答题记录(最近 100 条,点击展开问答详情)</div>
+        <div id="quizList"></div>
+      </div>
 
-<!-- ========== 协议文档(编辑器合并入后台,2026-07-27;不进 15s 自动刷新,脏检查双保险) ========== -->
-<div id="tab-docs" style="display:none">
-  <div class="section-title">📜 协议文档编辑(原页直改,保存即生效并自动备份)</div>
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0">
-    <span class="doc-tabs">
-      <button class="range-btn on" data-f="agreement.html">用户协议</button>
-      <button class="range-btn" data-f="privacy.html">隐私保护指引</button>
-      <button class="range-btn" data-f="community.html">游戏社区公约</button>
-    </span>
-    <button class="btn-perm" id="docSave" disabled style="padding:7px 16px">保 存</button>
-    <button class="btn-day" id="docReload" style="padding:7px 12px">放弃修改</button>
-    <select id="docBak" style="padding:7px;max-width:220px"><option value="">选择备份回滚…</option></select>
-    <button class="btn-day" id="docRestore" disabled style="padding:7px 12px">回滚</button>
-    <span id="docMsg" style="font-size:12px;color:#7dff9a"></span>
-  </div>
-  <div style="font-size:11px;color:rgba(255,217,168,.55);padding:0 0 6px">下面就是访客看到的原页面——点进去直接改字,回车加行。只改文字,别删整段卡片。</div>
-  <iframe id="docFrame" style="width:100%;height:calc(100vh - 260px);min-height:420px;border:2px solid rgba(255,214,170,.35);border-radius:12px;background:#fff"></iframe>
-</div>
+      <!-- ========== 展示区(模式/自定义链接/演示照片/访客链接) ========== -->
+      <div id="tab-display" style="display: none">
+        <div class="section-title">🖼️ 展示区模式</div>
+        <div id="modeCard" style="padding: 10px 0"></div>
+        <div class="section-title">🔗 自定义链接(普通模式可挂原 3D 图案;特殊模式只建模型)</div>
+        <div style="padding: 6px 0 12px">
+          <input id="clName" placeholder="名称(如 百度)" style="width: 110px; padding: 7px" />
+          <input id="clUrl" placeholder="https://…" style="width: 220px; padding: 7px" />
+          <select id="clIcon" style="padding: 7px">
+            <option value="">不挂原图案(新建模型)</option>
+          </select>
+          <select id="clModel" style="padding: 7px"></select>
+          <button class="btn-day" onclick="addCustomLink()">添加</button>
+        </div>
+        <div style="padding: 0 0 12px">
+          快捷:
+          <button class="btn-day" onclick="presetLink('百度', 'https://www.baidu.com')">
+            百度
+          </button>
+          <button class="btn-day" onclick="presetLink('哔哩哔哩', 'https://www.bilibili.com')">
+            哔哩哔哩
+          </button>
+          <button
+            class="btn-day"
+            onclick="
+              presetLink('王者营地', 'https://pvp.qq.com/cp/a20190918confrontationm/index.html')
+            "
+          >
+            王者营地
+          </button>
+          <button
+            class="btn-day"
+            onclick="
+              presetLink(
+                '爱奇艺',
+                'https://mbd.baidu.com/ug_share/mbox/4a83aa9e65/share?product=external&tk=50777bfaa57553a1ae74eafb54e8d53e&share_url=https%3A%2F%2Fm.iqiyi.com%2F&domain=mbd.baidu.com'
+              )
+            "
+          >
+            爱奇艺
+          </button>
+        </div>
+        <div id="customLinks"></div>
+        <div class="section-title">🌟 演示照片(普通模式公开展示;特殊模式不上墙)</div>
+        <div id="demoPhotos"></div>
+        <div class="section-title">👤 访客自己的链接(可查看/复制/删除)</div>
+        <div id="userLinks"></div>
+        <div class="section-title">
+          🧲 链接点击记录(仅后台可见)
+          <button
+            class="btn-day"
+            style="margin-left: 8px"
+            onclick="dl('/api/admin/export.xlsx', 'gallery-data.xlsx')"
+          >
+            导出 Excel
+          </button>
+          <button class="btn-day" onclick="exportPdf()">导出 PDF(含照片原图)</button>
+          <button class="btn-del" onclick="clearClicks()">批量清理</button>
+        </div>
+        <div id="clickList"></div>
+        <div class="section-title">🐛 访客端报错(仅后台可见)</div>
+        <div id="errList"></div>
+      </div>
 
-</div>
-<div class="toast" id="toast"></div>
-<div class="pv-mask" id="pvMask" onclick="this.classList.remove('show');this.innerHTML=''"></div>
+      <!-- ========== 文件 ========== -->
+      <div id="tab-files" style="display: none">
+        <div id="fileSections"></div>
+      </div>
 
-<script>
-const TOKEN=new URLSearchParams(location.search).get('token')||'';
-const tk=()=>'?token='+encodeURIComponent(TOKEN);
-const tk2=()=>'&token='+encodeURIComponent(TOKEN);
-let DATA=null, RANGE='day', CAL_DATE=null;
-const $=id=>document.getElementById(id);
-const esc=s=>{const d=document.createElement('div');d.textContent=String(s==null?'':s);return d.innerHTML};
-// j():onclick 内联 JS 字符串专用转义(2026-07-28 OWASP 审计 🔴:esc() 不转引号,
-// 文件名/备注可含 ' " → 公开上传构造文件名即可在后台页执行 JS 偷地址栏 token)。
-// 凡把用户数据插进 onclick='…' / onclick="…" 的 JS 字符串位置,一律用 j() 不用 esc()。
-const j=s=>String(s==null?'':s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;');
-const fmt=t=>t?new Date(t).toLocaleString('zh-CN',{hour12:false}):'-';
-const day0=t=>{const d=new Date(t);d.setHours(0,0,0,0);return d.getTime()};
-const todayStr=(t)=>new Date(t||Date.now()).toISOString().slice(0,10);
-function toast(msg,err){const t=$('toast');t.textContent=msg;t.className='toast'+(err?' err':'');t.style.display='block';setTimeout(()=>t.style.display='none',2200)}
-function brandIcon(b){
-  if(!b)return '❓';
-  if(/iPhone|iPad/.test(b))return '🍎';
-  if(/Windows|Mac|Linux/.test(b))return '💻';
-  return '📱';
-}
-function switchTab(t){
-  document.querySelectorAll('.tab').forEach(e=>e.classList.toggle('active',e.dataset.tab===t));
-  ['approve','stats','history','quiz','display','files','docs'].forEach(x=>$('tab-'+x).style.display=x===t?'':'none');
-  if(t==='files')loadFiles();
-  if(t==='quiz')loadQuiz();
-  if(t==='display')loadDisplay();
-  if(t==='docs')loadDocs();
-}
-// ---------- 协议文档编辑(designMode 原页直改;不进自动刷新) ----------
-let docCur='agreement.html',docDirty=false,docHead='',docTail='';
-async function loadDocs(){
-  if(docDirty)return; // 有未保存修改时绝不重载(防刷没)
-  try{
-    const r=await fetch('/api/admin/docs?file='+encodeURIComponent(docCur)+tk2());
-    const d=await r.json();if(!r.ok)throw new Error(d.error||'加载失败');
-    const f=$('docFrame'),bi=d.content.indexOf('<body>'),be=d.content.lastIndexOf('</body>');
-    if(bi<0||be<0)throw new Error('文件结构异常');
-    docHead=d.content.slice(0,bi+6);docTail=d.content.slice(be);
-    f.srcdoc=d.content;
-    f.onload=()=>{
-      try{
-        const doc=f.contentDocument;
-        doc.body.contentEditable='true';doc.body.style.outline='none';
-        new MutationObserver(()=>{docDirty=true;$('docSave').disabled=false;})
-          .observe(doc.body,{childList:true,subtree:true,characterData:true});
-      }catch(e){}
-      docMsg('已加载 '+docCur);
-    };
-  }catch(e){docMsg(e.message,false);}
-}
-function docMsg(t,ok){const m=$('docMsg');m.textContent=t;m.style.color=ok===false?'#ff8a8a':'#7dff9a';setTimeout(()=>{if(m.textContent===t)m.textContent='';},4000);}
-document.querySelectorAll('.doc-tabs button').forEach(b=>b.onclick=()=>{
-  if(docDirty&&!confirm('当前修改未保存,切换文件将丢弃。继续?'))return;
-  document.querySelectorAll('.doc-tabs button').forEach(x=>x.classList.remove('on'));
-  b.classList.add('on');docCur=b.dataset.f;docDirty=false;$('docSave').disabled=true;loadDocs();
-});
-$('docSave').onclick=async()=>{
-  if(!docDirty||!confirm('确定保存并立即对访客生效?'))return;
-  $('docSave').disabled=true;
-  try{
-    const body=$('docFrame').contentDocument.body.innerHTML;
-    const r=await fetch('/api/admin/docs'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:docCur,content:docHead+body+docTail})});
-    const d=await r.json();if(!r.ok)throw new Error(d.error||'保存失败');
-    docDirty=false;$('docSave').disabled=true;loadDocBaks();
-    docMsg('已保存并生效(备份:'+d.backup+')');
-  }catch(e){$('docSave').disabled=false;docMsg(e.message,false);}
-};
-$('docReload').onclick=()=>{if(!docDirty||confirm('放弃当前修改,重新加载?')){docDirty=false;$('docSave').disabled=true;loadDocs();}};
-async function loadDocBaks(){
-  try{
-    const d=await (await fetch('/api/admin/docs?backups='+encodeURIComponent(docCur)+tk2())).json();
-    $('docBak').innerHTML='<option value="">选择备份回滚…</option>'+d.backups.map(b=>'<option>'+b+'</option>').join('');
-    $('docRestore').disabled=true;
-  }catch(e){}
-}
-$('docBak').onchange=()=>{$('docRestore').disabled=!$('docBak').value;};
-$('docRestore').onclick=async()=>{
-  if(!$('docBak').value||!confirm('回滚到 '+$('docBak').value+' ?(会先自动备份当前版)'))return;
-  try{
-    const r=await fetch('/api/admin/docs'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:docCur,restore:$('docBak').value})});
-    if(!r.ok)throw new Error((await r.json()).error||'回滚失败');
-    docDirty=false;$('docSave').disabled=true;docMsg('已回滚');loadDocs();
-  }catch(e){docMsg(e.message,false);}
-};
-// ---------- 数据 ----------
-async function load(){
-  const r=await fetch('/api/admin/list'+tk());
-  if(!r.ok){document.querySelector('.wrap').innerHTML='<h1>401 未授权：网址后请加 ?token=你的密码</h1>';return}
-  DATA=await r.json();
-  renderApprove();renderStats();renderHistory();
-}
-function levelText(a,now){
-  if(a.level==='perm')return '永久';
-  if(a.level==='day'){const left=a.approveTime+86400000-now;return left>0?'24小时(剩'+Math.ceil(left/3600000)+'时)':'24小时(已过期)'}
-  if(a.level==='once')return '仅一次'+(a.firstAccess?'(已用)':'(未用)');
-  return a.level||'-';
-}
-function cardHtml(a,now){
-  let btns='';
-  if(a.status==='pending'){
-    btns=`<button class="btn-perm" onclick="decide('${a.id}','perm')">永久</button>
+      <div id="tab-chat" style="display: none">
+        <div style="display: flex; gap: 12px; height: calc(100vh - 180px); min-height: 450px">
+          <!-- 左侧设备列表 -->
+          <div
+            style="
+              width: 220px;
+              min-width: 220px;
+              background: rgba(255, 255, 255, 0.045);
+              border: 1px solid rgba(255, 255, 255, 0.09);
+              border-radius: 14px;
+              display: flex;
+              flex-direction: column;
+              overflow: hidden;
+            "
+          >
+            <div
+              style="
+                padding: 12px 14px;
+                background: linear-gradient(
+                  90deg,
+                  rgba(161, 140, 209, 0.3),
+                  rgba(251, 194, 235, 0.2)
+                );
+                text-align: center;
+                font-size: 14px;
+                font-weight: bold;
+                color: #ffb6c8;
+              "
+            >
+              ✦ 在线设备 ✦
+            </div>
+            <div
+              style="
+                padding: 4px 14px;
+                font-size: 11px;
+                color: rgba(255, 255, 255, 0.5);
+                text-align: center;
+              "
+            >
+              <span id="chatOnlineCount">0 人在线</span>
+            </div>
+            <div id="chatDeviceList" style="flex: 1; overflow-y: auto; padding: 6px">
+              <div
+                style="
+                  text-align: center;
+                  color: rgba(255, 255, 255, 0.3);
+                  font-size: 12px;
+                  padding: 20px;
+                "
+              >
+                等待设备连接…
+              </div>
+            </div>
+          </div>
+          <!-- 右侧聊天 -->
+          <div
+            style="
+              flex: 1;
+              display: flex;
+              flex-direction: column;
+              background: rgba(255, 255, 255, 0.045);
+              border: 1px solid rgba(255, 255, 255, 0.09);
+              border-radius: 14px;
+              overflow: hidden;
+            "
+          >
+            <div
+              id="chatHeader"
+              style="
+                padding: 12px 14px;
+                background: linear-gradient(
+                  90deg,
+                  rgba(255, 154, 158, 0.3),
+                  rgba(254, 207, 239, 0.2)
+                );
+                text-align: center;
+              "
+            >
+              <div style="font-size: 14px; font-weight: bold; color: #ffb6c8">CHAT</div>
+              <div id="chatSubTitle" style="font-size: 11px; color: rgba(255, 255, 255, 0.5)">
+                选择一个设备开始对话
+              </div>
+            </div>
+            <div
+              id="chatMsgArea"
+              style="
+                flex: 1;
+                overflow-y: auto;
+                padding: 14px;
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+              "
+            >
+              <div
+                style="
+                  text-align: center;
+                  color: rgba(255, 255, 255, 0.35);
+                  font-size: 13px;
+                  padding: 30px;
+                "
+              >
+                ← 点击左侧在线设备<br />开始点对点对话
+              </div>
+            </div>
+            <div
+              style="
+                padding: 10px 14px;
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                display: flex;
+                gap: 8px;
+              "
+            >
+              <input
+                id="chatMsgInput"
+                placeholder="选择设备后输入消息…"
+                disabled
+                style="
+                  flex: 1;
+                  min-width: 0;
+                  padding: 10px 14px;
+                  border-radius: 12px;
+                  border: 1px solid rgba(255, 255, 255, 0.15);
+                  background: rgba(255, 255, 255, 0.06);
+                  color: #fff;
+                  font-size: 13px;
+                  outline: none;
+                "
+              />
+              <button
+                id="chatSendBtn"
+                disabled
+                onclick="chatSend()"
+                style="
+                  padding: 8px 16px;
+                  border: none;
+                  border-radius: 12px;
+                  background: linear-gradient(135deg, #ff9a9e, #fecfef);
+                  color: #fff;
+                  font-size: 13px;
+                  cursor: pointer;
+                "
+              >
+                发送
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ========== 协议文档 ========== -->
+      <div id="tab-docs" style="display: none">
+        <div class="section-title">📜 协议文档编辑(原页直改,保存即生效并自动备份)</div>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 0">
+          <span class="doc-tabs">
+            <button class="range-btn on" data-f="agreement.html">用户协议</button>
+            <button class="range-btn" data-f="privacy.html">隐私保护指引</button>
+            <button class="range-btn" data-f="community.html">游戏社区公约</button>
+          </span>
+          <button class="btn-perm" id="docSave" disabled style="padding: 7px 16px">保 存</button>
+          <button class="btn-day" id="docReload" style="padding: 7px 12px">放弃修改</button>
+          <select id="docBak" style="padding: 7px; max-width: 220px">
+            <option value="">选择备份回滚…</option>
+          </select>
+          <button class="btn-day" id="docRestore" disabled style="padding: 7px 12px">回滚</button>
+          <span id="docMsg" style="font-size: 12px; color: #7dff9a"></span>
+        </div>
+        <div style="font-size: 11px; color: rgba(255, 217, 168, 0.55); padding: 0 0 6px">
+          下面就是访客看到的原页面——点进去直接改字,回车加行。只改文字,别删整段卡片。
+        </div>
+        <iframe
+          id="docFrame"
+          style="
+            width: 100%;
+            height: calc(100vh - 260px);
+            min-height: 420px;
+            border: 2px solid rgba(255, 214, 170, 0.35);
+            border-radius: 12px;
+            background: #fff;
+          "
+        ></iframe>
+      </div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <div
+      class="pv-mask"
+      id="pvMask"
+      onclick="
+        this.classList.remove('show');
+        this.innerHTML = '';
+      "
+    ></div>
+
+    <script>
+      const TOKEN = new URLSearchParams(location.search).get('token') || '';
+      const tk = () => '?token=' + encodeURIComponent(TOKEN);
+      const tk2 = () => '&token=' + encodeURIComponent(TOKEN);
+      let DATA = null,
+        RANGE = 'day',
+        CAL_DATE = null;
+      const $ = (id) => document.getElementById(id);
+      const esc = (s) => {
+        const d = document.createElement('div');
+        d.textContent = String(s == null ? '' : s);
+        return d.innerHTML;
+      };
+      // j():onclick 内联 JS 字符串专用转义(2026-07-28 OWASP 审计 🔴:esc() 不转引号,
+      // 文件名/备注可含 ' " → 公开上传构造文件名即可在后台页执行 JS 偷地址栏 token)。
+      // 凡把用户数据插进 onclick='…' / onclick="…" 的 JS 字符串位置,一律用 j() 不用 esc()。
+      const j = (s) =>
+        String(s == null ? '' : s)
+          .replace(/\\/g, '\\\\')
+          .replace(/'/g, "\\'")
+          .replace(/"/g, '&quot;')
+          .replace(/</g, '&lt;');
+      const fmt = (t) => (t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '-');
+      const day0 = (t) => {
+        const d = new Date(t);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      };
+      const todayStr = (t) => {
+        var d = new Date(t || Date.now());
+        var y = d.getFullYear(),
+          m = String(d.getMonth() + 1).padStart(2, '0'),
+          day = String(d.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + day;
+      };
+      function toast(msg, err) {
+        const t = $('toast');
+        t.textContent = msg;
+        t.className = 'toast' + (err ? ' err' : '');
+        t.style.display = 'block';
+        setTimeout(() => (t.style.display = 'none'), 2200);
+      }
+      function brandIcon(b) {
+        var s = typeof b === 'object' ? b.brand || '' : b || '';
+        if (/iPhone|iPad/.test(s)) return '🍎';
+        if (/Windows|Mac|Linux/.test(s)) return '💻';
+        return '📱';
+      }
+      function brandShow(b) {
+        if (typeof b === 'object') return b.full || b.brand || '未知';
+        return String(b || '未知');
+      }
+      function switchTab(t) {
+        var panels = ['approve', 'stats', 'history', 'quiz', 'display', 'files', 'docs', 'chat'];
+        for (var i = 0; i < panels.length; i++) {
+          var p = $('tab-' + panels[i]);
+          if (p) p.style.display = panels[i] === t ? '' : 'none';
+        }
+        document.querySelectorAll('.tab').forEach(function (e) {
+          e.classList.toggle('active', e.dataset.tab === t);
+        });
+        if (t !== 'chat' && chatSse) {
+          try {
+            chatSse.close();
+          } catch (e) {}
+          chatSse = null;
+          if (chatPoll) {
+            clearInterval(chatPoll);
+            chatPoll = null;
+          }
+        }
+        var loadFn = null;
+        if (t === 'files') loadFn = loadFiles;
+        else if (t === 'quiz') loadFn = loadQuiz;
+        else if (t === 'display') loadFn = loadDisplay;
+        else if (t === 'docs') loadFn = loadDocs;
+        else if (t === 'chat') loadFn = startChat;
+        if (loadFn) setTimeout(loadFn, 200);
+      }
+      // ---------- 协议文档编辑(designMode 原页直改;不进自动刷新) ----------
+      let docCur = 'agreement.html',
+        docDirty = false,
+        docHead = '',
+        docTail = '';
+      async function loadDocs() {
+        if (docDirty) return; // 有未保存修改时绝不重载(防刷没)
+        try {
+          const r = await fetch('/api/admin/docs?file=' + encodeURIComponent(docCur) + tk2());
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || '加载失败');
+          const f = $('docFrame'),
+            bi = d.content.indexOf('<body>'),
+            be = d.content.lastIndexOf('</body>');
+          if (bi < 0 || be < 0) throw new Error('文件结构异常');
+          docHead = d.content.slice(0, bi + 6);
+          docTail = d.content.slice(be);
+          f.srcdoc = d.content;
+          f.onload = () => {
+            try {
+              const doc = f.contentDocument;
+              doc.body.contentEditable = 'true';
+              doc.body.style.outline = 'none';
+              new MutationObserver(() => {
+                docDirty = true;
+                $('docSave').disabled = false;
+              }).observe(doc.body, { childList: true, subtree: true, characterData: true });
+            } catch (e) {}
+            docMsg('已加载 ' + docCur);
+          };
+        } catch (e) {
+          docMsg(e.message, false);
+        }
+      }
+      function docMsg(t, ok) {
+        const m = $('docMsg');
+        m.textContent = t;
+        m.style.color = ok === false ? '#ff8a8a' : '#7dff9a';
+        setTimeout(() => {
+          if (m.textContent === t) m.textContent = '';
+        }, 4000);
+      }
+      document.querySelectorAll('.doc-tabs button').forEach(
+        (b) =>
+          (b.onclick = () => {
+            if (docDirty && !confirm('当前修改未保存,切换文件将丢弃。继续?')) return;
+            document.querySelectorAll('.doc-tabs button').forEach((x) => x.classList.remove('on'));
+            b.classList.add('on');
+            docCur = b.dataset.f;
+            docDirty = false;
+            $('docSave').disabled = true;
+            loadDocs();
+          })
+      );
+      $('docSave').onclick = async () => {
+        if (!docDirty || !confirm('确定保存并立即对访客生效?')) return;
+        $('docSave').disabled = true;
+        try {
+          const body = $('docFrame').contentDocument.body.innerHTML;
+          const r = await fetch('/api/admin/docs' + tk(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file: docCur, content: docHead + body + docTail }),
+          });
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || '保存失败');
+          docDirty = false;
+          $('docSave').disabled = true;
+          loadDocBaks();
+          docMsg('已保存并生效(备份:' + d.backup + ')');
+        } catch (e) {
+          $('docSave').disabled = false;
+          docMsg(e.message, false);
+        }
+      };
+      $('docReload').onclick = () => {
+        if (!docDirty || confirm('放弃当前修改,重新加载?')) {
+          docDirty = false;
+          $('docSave').disabled = true;
+          loadDocs();
+        }
+      };
+      async function loadDocBaks() {
+        try {
+          const d = await (
+            await fetch('/api/admin/docs?backups=' + encodeURIComponent(docCur) + tk2())
+          ).json();
+          $('docBak').innerHTML =
+            '<option value="">选择备份回滚…</option>' +
+            d.backups.map((b) => '<option>' + b + '</option>').join('');
+          $('docRestore').disabled = true;
+        } catch (e) {}
+      }
+      $('docBak').onchange = () => {
+        $('docRestore').disabled = !$('docBak').value;
+      };
+      $('docRestore').onclick = async () => {
+        if (
+          !$('docBak').value ||
+          !confirm('回滚到 ' + $('docBak').value + ' ?(会先自动备份当前版)')
+        )
+          return;
+        try {
+          const r = await fetch('/api/admin/docs' + tk(), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file: docCur, restore: $('docBak').value }),
+          });
+          if (!r.ok) throw new Error((await r.json()).error || '回滚失败');
+          docDirty = false;
+          $('docSave').disabled = true;
+          docMsg('已回滚');
+          loadDocs();
+        } catch (e) {
+          docMsg(e.message, false);
+        }
+      };
+      // ---------- 数据 ----------
+      async function load() {
+        const r = await fetch('/api/admin/list' + tk());
+        if (!r.ok) {
+          document.querySelector('.wrap').innerHTML =
+            '<h1>401 未授权：网址后请加 ?token=你的密码</h1>';
+          return;
+        }
+        DATA = await r.json();
+        renderApprove();
+        renderStats();
+        renderHistory();
+      }
+      function levelText(a, now) {
+        if (a.level === 'perm') return '永久';
+        if (a.level === 'day') {
+          const left = a.approveTime + 86400000 - now;
+          return left > 0 ? '24小时(剩' + Math.ceil(left / 3600000) + '时)' : '24小时(已过期)';
+        }
+        if (a.level === 'once') return '仅一次' + (a.firstAccess ? '(已用)' : '(未用)');
+        return a.level || '-';
+      }
+      function cardHtml(a, now) {
+        let btns = '';
+        if (a.status === 'pending') {
+          btns = `<button class="btn-perm" onclick="decide('${a.id}','perm')">永久</button>
 <button class="btn-day" onclick="decide('${a.id}','day')">24小时</button>
 <button class="btn-once" onclick="decide('${a.id}','once')">仅一次</button>
 <button class="btn-deny" onclick="decide('${a.id}','deny')">拒绝</button>`;
-  }else if(a.status==='approved'){
-    btns=`<button class="btn-revoke" onclick="decide('${a.id}','revoke')">撤销批准</button>`;
-  }else{
-    btns=`<button class="btn-perm" onclick="decide('${a.id}','perm')">重新批准</button>
+        } else if (a.status === 'approved') {
+          btns = `<button class="btn-revoke" onclick="decide('${a.id}','revoke')">撤销批准</button>`;
+        } else {
+          btns = `<button class="btn-perm" onclick="decide('${a.id}','perm')">重新批准</button>
 <button class="btn-day" onclick="decide('${a.id}','day')">批准24小时</button>`;
-  }
-  const ip=a.ip||'';
-  const isWatch=(DATA.watch||[]).includes(ip), isBlocked=(DATA.blocked||[]).includes(ip);
-  const badge=(a.status==='pending'?'<span class="badge pending">待批准</span>'
-    :a.status==='approved'?'<span class="badge approved">'+esc(levelText(a,now))+'</span>'
-    :a.status==='denied'?'<span class="badge denied">已拒绝</span>'
-    :'<span class="badge history">历史'+(a.historyReason==='revoked'?'·撤销':'')+'</span>')
-    +(isWatch?'<span class="badge watch">⚠ 重点关注</span>':'')
-    +(isBlocked?'<span class="badge blocked">已拉黑</span>':'')
-    +(a.vip?'<span class="badge approved" style="background:#9b59b6">VIP免答</span>':'')
-    +(a.special?'<span class="badge approved" style="background:#c98a4b">特殊访问</span>':'')
-    +(a.suspicious?'<span class="badge denied" title="'+esc(a.suspiciousReason||'')+'">⚠ 可疑</span>':'')
-    +(a.quizPassed?'<span class="badge approved">答题已过</span>':'');
-  const devBits=[];
-  if(a.dev&&a.dev.battery)devBits.push('🔋 '+esc(a.dev.battery));
-  if(a.dev&&a.dev.network)devBits.push('📶 '+esc(a.dev.network));
-  const noteBit=a.note?`<span class="note-tag">📝 ${esc(a.note)}</span>`:'';
-  return `<div class="card">
+        }
+        const ip = a.ip || '';
+        const isWatch = (DATA.watch || []).includes(ip),
+          isBlocked = (DATA.blocked || []).includes(ip);
+        const badge =
+          (a.status === 'pending'
+            ? '<span class="badge pending">待批准</span>'
+            : a.status === 'approved'
+              ? '<span class="badge approved">' + esc(levelText(a, now)) + '</span>'
+              : a.status === 'denied'
+                ? '<span class="badge denied">已拒绝</span>'
+                : '<span class="badge history">历史' +
+                  (a.historyReason === 'revoked' ? '·撤销' : '') +
+                  '</span>') +
+          (isWatch ? '<span class="badge watch">⚠ 重点关注</span>' : '') +
+          (isBlocked ? '<span class="badge blocked">已拉黑</span>' : '') +
+          (a.vip ? '<span class="badge approved" style="background:#9b59b6">VIP免答</span>' : '') +
+          (a.special
+            ? '<span class="badge approved" style="background:#c98a4b">特殊访问</span>'
+            : '') +
+          (a.suspicious
+            ? '<span class="badge denied" title="' +
+              esc(a.suspiciousReason || '') +
+              '">⚠ 可疑</span>'
+            : '') +
+          (a.quizPassed ? '<span class="badge approved">答题已过</span>' : '');
+        const devBits = [];
+        if (a.dev && a.dev.battery) devBits.push('🔋 ' + esc(a.dev.battery));
+        if (a.dev && a.dev.network) devBits.push('📶 ' + esc(a.dev.network));
+        const noteBit = a.note ? `<span class="note-tag">📝 ${esc(a.note)}</span>` : '';
+        return `<div class="card">
 <div class="answer">${brandIcon(a.brand)} 「${esc(a.answer)}」${badge}</div>
-<div class="meta">${noteBit}<span class="brand-tag">${esc(a.brand||'未知设备')}</span><span class="geo-tag">📍 ${esc(a.geo||'定位中…')}</span>IP ${esc(ip.replace('::ffff:',''))} · 访问 ${a.visits||0} 次${devBits.length?' · '+devBits.join(' · '):''}<br>申请 ${fmt(a.applyTime)}${a.approveTime?' · 批准 '+fmt(a.approveTime):''}${a.lastAccess?' · 最近访问 '+fmt(a.lastAccess):''}</div>
+<div class="meta">${noteBit}<span class="brand-tag">${brandShow(a.brand)}</span><span class="geo-tag">📍 ${esc(a.geo || '定位中…')}</span>IP ${esc(ip.replace('::ffff:', ''))} · 访问 ${a.visits || 0} 次${devBits.length ? ' · ' + devBits.join(' · ') : ''}<br>申请 ${fmt(a.applyTime)}${a.approveTime ? ' · 批准 ' + fmt(a.approveTime) : ''}${a.lastAccess ? ' · 最近访问 ' + fmt(a.lastAccess) : ''}</div>
 <div class="actions">${btns}
-<button class="btn-note" onclick="editNote('${a.id}','${j(a.note||'')}')">备注</button>
-${a.vip?`<button class="btn-deny" onclick="decide('${a.id}','unvip')">撤销VIP</button>`:`<button class="btn-once" onclick="decide('${a.id}','vip')">授予VIP免答</button>`}
-${a.special?`<button class="btn-deny" onclick="decide('${a.id}','unspecial')">取消特殊访问</button>`:`<button class="btn-day" onclick="decide('${a.id}','special')">授特殊访问</button>`}
-${a.quizPassed?`<button class="btn-revoke" onclick="decide('${a.id}','unquiz')">撤销答题权限</button>`:''}
-${isBlocked?`<button class="btn-revoke" onclick="bulk('unblock','${ip}')">解除拉黑</button>`:`<button class="btn-deny" onclick="bulk('block','${ip}')">拉黑IP</button>`}
-${isWatch?`<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消关注</button>`:`<button class="btn-day" onclick="bulk('watch','${ip}')">设为关注</button>`}</div></div>`;
-}
-async function editNote(id,old){
-  const n=prompt('给这台设备起个备注名（留空清除）:',old||'');
-  if(n===null)return;
-  const r=await fetch('/api/admin/decide'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,action:'note',note:n})});
-  if(r.ok){toast('备注已保存');load()}else toast('保存失败',1);
-}
-async function bulk(action,ip){
-  const r=await fetch('/api/admin/bulk'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,ip})});
-  if(r.ok){toast('操作成功');load()}else toast('操作失败',1);
-}
-async function revokeAll(){
-  if(!confirm('确定撤销所有人的批准？所有访客将立即被踢出！'))return;
-  const r=await fetch('/api/admin/bulk'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'revoke_all'})});
-  if(r.ok){const d=await r.json();toast('已撤销 '+d.count+' 台设备');load()}else toast('操作失败',1);
-}
-async function decide(id,action){
-  const r=await fetch('/api/admin/decide'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({id,action})});
-  if(r.ok){toast('操作成功');load()}else toast('操作失败',1);
-}
-// ---------- 审批页 ----------
-function renderApprove(){
-  const A=DATA.applicants,now=DATA.now,s=DATA.stats;
-  $('statsCards').innerHTML=statCards([
-    [s.total,'总访问'],[s.byDay[todayStr()]||0,'今日访问'],
-    [A.filter(a=>a.status==='approved').length,'已批准设备'],[A.filter(a=>a.status==='pending').length,'待批准']]);
-  renderAlerts();
-  const render=(st,empty)=>A.filter(a=>a.status===st).map(a=>cardHtml(a,now)).join('')||`<div class="empty">${empty}</div>`;
-  $('pending').innerHTML=render('pending','暂无待批准申请');
-  $('approved').innerHTML=render('approved','暂无已批准设备');
-}
-// ---------- 反刷存储预警 ----------
-const ALERT_TYPE={rate:'🚨 刷盘速率',bigfile:'📦 超大文件',volume:'💾 累计超量',storage:'🛑 存储告急'};
-function renderAlerts(){
-  const alerts=(DATA.alerts||[]).filter(a=>!a.dismissed);
-  if(!alerts.length){$('alertBox').innerHTML='';return}
-  $('alertBox').innerHTML=`<div style="background:rgba(200,40,50,.15);border:1px solid rgba(255,80,90,.5);border-radius:14px;padding:12px 16px;margin:10px 0">
+<button class="btn-note" onclick="editNote('${a.id}','${j(a.note || '')}')">备注</button>
+${a.vip ? `<button class="btn-deny" onclick="decide('${a.id}','unvip')">撤销VIP</button>` : `<button class="btn-once" onclick="decide('${a.id}','vip')">授予VIP免答</button>`}
+${a.special ? `<button class="btn-deny" onclick="decide('${a.id}','unspecial')">取消特殊访问</button>` : `<button class="btn-day" onclick="decide('${a.id}','special')">授特殊访问</button>`}
+${a.quizPassed ? `<button class="btn-revoke" onclick="decide('${a.id}','unquiz')">撤销答题权限</button>` : ''}
+${isBlocked ? `<button class="btn-revoke" onclick="bulk('unblock','${ip}')">解除拉黑</button>` : `<button class="btn-deny" onclick="bulk('block','${ip}')">拉黑IP</button>`}
+${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消关注</button>` : `<button class="btn-day" onclick="bulk('watch','${ip}')">设为关注</button>`}</div></div>`;
+      }
+      async function editNote(id, old) {
+        const n = prompt('给这台设备起个备注名（留空清除）:', old || '');
+        if (n === null) return;
+        const r = await fetch('/api/admin/decide' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, action: 'note', note: n }),
+        });
+        if (r.ok) {
+          toast('备注已保存');
+          load();
+        } else toast('保存失败', 1);
+      }
+      async function bulk(action, ip) {
+        const r = await fetch('/api/admin/bulk' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action, ip }),
+        });
+        if (r.ok) {
+          toast('操作成功');
+          load();
+        } else toast('操作失败', 1);
+      }
+      async function revokeAll() {
+        if (!confirm('确定撤销所有人的批准？所有访客将立即被踢出！')) return;
+        const r = await fetch('/api/admin/bulk' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'revoke_all' }),
+        });
+        if (r.ok) {
+          const d = await r.json();
+          toast('已撤销 ' + d.count + ' 台设备');
+          load();
+        } else toast('操作失败', 1);
+      }
+      async function decide(id, action) {
+        const r = await fetch('/api/admin/decide' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, action }),
+        });
+        if (r.ok) {
+          toast('操作成功');
+          load();
+        } else toast('操作失败', 1);
+      }
+      // ---------- 审批页 ----------
+      function renderApprove() {
+        const A = DATA.applicants,
+          now = DATA.now,
+          s = DATA.stats;
+        $('statsCards').innerHTML = statCards([
+          [s.total, '总访问'],
+          [s.byDay[todayStr()] || 0, '今日访问'],
+          [A.filter((a) => a.status === 'approved').length, '已批准设备'],
+          [A.filter((a) => a.status === 'pending').length, '待批准'],
+        ]);
+        renderAlerts();
+        const render = (st, empty) =>
+          A.filter((a) => a.status === st)
+            .map((a) => cardHtml(a, now))
+            .join('') || `<div class="empty">${empty}</div>`;
+        $('pending').innerHTML = render('pending', '暂无待批准申请');
+        $('approved').innerHTML = render('approved', '暂无已批准设备');
+      }
+      // ---------- 反刷存储预警 ----------
+      const ALERT_TYPE = {
+        rate: '🚨 刷盘速率',
+        bigfile: '📦 超大文件',
+        volume: '💾 累计超量',
+        storage: '🛑 存储告急',
+      };
+      function renderAlerts() {
+        const alerts = (DATA.alerts || []).filter((a) => !a.dismissed);
+        if (!alerts.length) {
+          $('alertBox').innerHTML = '';
+          return;
+        }
+        $('alertBox').innerHTML =
+          `<div style="background:rgba(200,40,50,.15);border:1px solid rgba(255,80,90,.5);border-radius:14px;padding:12px 16px;margin:10px 0">
     <div style="color:#ff9aa0;font-weight:700;margin-bottom:8px">⚠ 存储攻击预警 (${alerts.length} 条未处理)
       <button class="btn-revoke" style="margin-left:10px" onclick="clearAlerts()">全部忽略</button></div>
-    ${alerts.map((a)=>{const idx=DATA.alerts.indexOf(a);
-      return `<div class="file-row" style="border-color:rgba(255,80,90,.3)">
-        <span class="fname">${ALERT_TYPE[a.type]||a.type} · ${esc(a.detail)}<br>
-        <span style="opacity:.7">「${esc(a.name)}」 ${esc(a.brand||'')} · IP ${esc((a.ip||'').replace('::ffff:',''))} · ${fmt(a.t)}${a.file?' · '+esc(a.file):''}${a.size?' · '+(a.size/1024/1024).toFixed(1)+'MB':''}</span></span>
+    ${alerts
+      .map((a) => {
+        const idx = DATA.alerts.indexOf(a);
+        return `<div class="file-row" style="border-color:rgba(255,80,90,.3)">
+        <span class="fname">${ALERT_TYPE[a.type] || a.type} · ${esc(a.detail)}<br>
+        <span style="opacity:.7">「${esc(a.name)}」 ${brandShow(a.brand)} · IP ${esc((a.ip || '').replace('::ffff:', ''))} · ${fmt(a.t)}${a.file ? ' · ' + esc(a.file) : ''}${a.size ? ' · ' + (a.size / 1024 / 1024).toFixed(1) + 'MB' : ''}</span></span>
         <button class="btn-deny" onclick="blockAlertIp('${j(a.ip)}',${idx})">封闭 IP</button>
         <button class="btn-day" onclick="dismissAlert(${idx})">忽略</button>
-      </div>`}).join('')}
-  </div>`;
-}
-async function dismissAlert(idx){
-  const r=await fetch('/api/admin/alerts'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'dismiss',idx})});
-  if(r.ok){DATA.alerts[idx].dismissed=true;renderAlerts();toast('已忽略')}else toast('失败',1);
-}
-async function clearAlerts(){
-  if(!confirm('忽略全部预警?(可疑标记也会清除)'))return;
-  const r=await fetch('/api/admin/alerts'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'clear'})});
-  if(r.ok){(DATA.alerts||[]).forEach(a=>a.dismissed=true);renderAlerts();toast('已全部忽略')}else toast('失败',1);
-}
-async function blockAlertIp(ip,idx){
-  if(!ip){toast('该预警无 IP 信息',1);return}
-  if(!confirm('封闭 IP '+ip.replace('::ffff:','')+' ?该 IP 所有设备将立即无法访问(可随时在设备卡片上「解除拉黑」恢复)'))return;
-  const r=await fetch('/api/admin/bulk'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'block',ip})});
-  if(r.ok){await dismissAlert(idx);toast('已封闭,设备卡片上可一键解除');load()}else toast('封闭失败',1);
-}
-function statCards(arr){return arr.map(([n,l])=>`<div class="stat"><div class="num">${n}</div><div class="label">${l}</div></div>`).join('')}
-// ---------- 统计页 ----------
-function weekStart(t){const d=new Date(day0(t));const w=(d.getDay()+6)%7;d.setDate(d.getDate()-w);return d.getTime()}
-function monthStart(t){const d=new Date(t);d.setDate(1);d.setHours(0,0,0,0);return d.getTime()}
-function yearStart(t){const d=new Date(t);d.setMonth(0,1);d.setHours(0,0,0,0);return d.getTime()}
-function renderStats(){
-  const s=DATA.stats,visits=DATA.visits||[];
-  const t0=day0(Date.now()),w0=weekStart(Date.now()),m0=monthStart(Date.now());
-  $('statCards2').innerHTML=statCards([
-    [s.total,'总访问'],[visits.filter(v=>v.t>=t0).length,'今日'],
-    [visits.filter(v=>v.t>=w0).length,'本周'],[visits.filter(v=>v.t>=m0).length,'本月'],
-    [DATA.applicants.filter(a=>a.status==='approved').length,'已批准设备']]);
-  // 30天柱状图
-  const days=[];for(let i=29;i>=0;i--){const t=t0-i*86400000;days.push({t,label:new Date(t).getDate(),key:todayStr(t)})}
-  const max=Math.max(1,...days.map(d=>s.byDay[d.key]||0));
-  $('chart').innerHTML=days.map(d=>{const c=s.byDay[d.key]||0;return `<div class="bar" style="height:${Math.max(2,c/max*100)}%" onclick="calDay(${d.t})"><span class="tip">${d.key.slice(5)} · ${c}次</span></div>`}).join('');
-  $('chartX').innerHTML=days.map((d,i)=>`<span>${i%5===0?d.label:''}</span>`).join('');
-  renderCalendar();
-  renderRange();
-}
-function renderCalendar(){
-  const base=CAL_DATE||Date.now();
-  const first=new Date(base);first.setDate(1);
-  const startW=(first.getDay()+6)%7;
-  const dim=new Date(first.getFullYear(),first.getMonth()+1,0).getDate();
-  const s=DATA.stats;
-  let html=['一','二','三','四','五','六','日'].map(d=>`<div class="cal-head">${d}</div>`).join('');
-  for(let i=0;i<startW;i++)html+='<div></div>';
-  for(let d=1;d<=dim;d++){
-    const t=new Date(first.getFullYear(),first.getMonth(),d).getTime();
-    const c=s.byDay[todayStr(t)]||0;
-    html+=`<div class="cal-cell${c?' has':''}${todayStr(t)===todayStr()?' today':''}" onclick="calDay(${t})">${d}${c?`<span class="c">${c}</span>`:''}</div>`;
-  }
-  $('calendar').innerHTML=html;
-}
-function calDay(t){CAL_DATE=t;setRange('custom');}
-function setRange(r,btn){
-  RANGE=r;CAL_DATE=r==='custom'?CAL_DATE:null;
-  if(btn){document.querySelectorAll('.range-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active')}
-  renderRange();
-}
-function renderRange(){
-  const visits=(DATA.visits||[]).filter(v=>v.id);
-  const apps={};DATA.applicants.forEach(a=>apps[a.id]=a);
-  let from=0,title='';
-  if(RANGE==='day'){from=day0(Date.now());title='今天'}
-  else if(RANGE==='week'){from=weekStart(Date.now());title='本周'}
-  else if(RANGE==='month'){from=monthStart(Date.now());title='本月'}
-  else if(RANGE==='year'){from=yearStart(Date.now());title='今年'}
-  else{from=day0(CAL_DATE);title=todayStr(CAL_DATE)}
-  const to=RANGE==='custom'?from+86400000:Infinity;
-  const inR=visits.filter(v=>v.t>=from&&v.t<to);
-  const byId={};
-  inR.forEach(v=>{(byId[v.id]=byId[v.id]||{n:0,last:0});byId[v.id].n++;byId[v.id].last=Math.max(byId[v.id].last,v.t)});
-  const rows=Object.entries(byId).sort((a,b)=>b[1].last-a[1].last).map(([id,v])=>{
-    const a=apps[id]||{answer:'(未记录设备)',brand:'',geo:''};
-    return `<div class="vrow"><span>${brandIcon(a.brand)}</span><span class="who">「${esc(a.answer)}」 <span class="brand-tag">${esc(a.brand||'')}</span><span class="geo-tag">📍${esc(a.geo||'定位中')}</span></span><span class="cnt">${v.n} 次 · ${fmt(v.last).slice(5)}</span></div>`;
-  }).join('');
-  $('rangeList').innerHTML=`<div class="sub" style="margin:6px 0 10px">${title} · 共 ${inR.length} 次访问 · ${Object.keys(byId).length} 台设备</div>`+(rows||'<div class="empty">该时段暂无访问</div>');
-}
-// ---------- 历史页 ----------
-function renderHistory(){
-  const A=DATA.applicants,now=DATA.now;
-  const visits=(DATA.visits||[]).slice(-30).reverse();
-  const apps={};A.forEach(a=>apps[a.id]=a);
-  $('visitLog').innerHTML=visits.map(v=>{
-    const a=apps[v.id]||{answer:'(未知设备)',brand:'',geo:''};
-    return `<div class="vrow"><span>${brandIcon(a.brand)}</span><span class="who">「${esc(a.answer)}」 <span class="geo-tag">📍${esc(a.geo||'')}</span></span><span class="cnt">${fmt(v.t)}</span></div>`;
-  }).join('')||'<div class="empty">暂无访问记录</div>';
-  const hist=A.filter(a=>a.status==='history'||a.status==='denied'||(a.status==='approved'&&a.level==='day'&&now>a.approveTime+86400000)||(a.status==='approved'&&a.level==='once'&&a.firstAccess));
-  $('history').innerHTML=hist.map(a=>cardHtml(a,now)).join('')||'<div class="empty">暂无历史记录</div>';
-}
-// ---------- 答题记录页 ----------
-async function loadQuiz(){
-  const r=await fetch('/api/admin/quiz'+tk());
-  if(!r.ok){$('quizList').innerHTML='<div class="empty">加载失败</div>';return}
-  const d=await r.json();
-  if(!d.attempts.length){$('quizList').innerHTML='<div class="empty">还没有人参加解密测试</div>';return}
-  $('quizList').innerHTML=d.attempts.map((a,i)=>{
-    const dev=a.device||{};
-    const who=dev.answer?`「${esc(dev.answer)}」`:'(未申请门禁的设备)';
-    const meta=[dev.brand,dev.geo].filter(Boolean).join(' · ');
-    const trackName=a.track==='li'?'理科卷':a.track==='wen'?'文科卷':'未知卷';
-    const badge=a.passed?'<span class="badge approved">通过 '+a.total+'分</span>':'<span class="badge denied">未通过 '+a.total+'分</span>';
-    const mcReview=(a.review||[]).map((rv,j)=>`<span style="color:${rv.right?'#7dff9a':'#ff8a8a'}">${j+1}${rv.right?'✓':'✗'}</span>`).join(' ');
-    // 全量留档:每题的题目+四选项内容+所选+正解(仅后台可见)
-    const fullRows=(a.fullReview||[]).map((m,j)=>{
-      const opt=(L,c)=>`<div style="margin-left:14px;color:${L===m.correctLetter?'#7dff9a':(L===m.chosen?'#ff8a8a':'rgba(255,255,255,.6)')}">${L}. ${esc(c||'')}${L===m.correctLetter?' ✓正解':(L===m.chosen?' ✗TA选的':'')}</div>`;
-      return `<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:8px">
-        <div><b>第${j+1}题 · ${esc(m.subject||'')}</b> ${esc(m.q||'')}</div>
-        ${opt('A',m.options&&m.options.A)}${opt('B',m.options&&m.options.B)}${opt('C',m.options&&m.options.C)}${opt('D',m.options&&m.options.D)}
       </div>`;
-    }).join('');
-    return `<div class="card" style="cursor:pointer" onclick="this.querySelector('.qz-detail').classList.toggle('show')">
+      })
+      .join('')}
+  </div>`;
+      }
+      async function dismissAlert(idx) {
+        const r = await fetch('/api/admin/alerts' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'dismiss', idx }),
+        });
+        if (r.ok) {
+          DATA.alerts[idx].dismissed = true;
+          renderAlerts();
+          toast('已忽略');
+        } else toast('失败', 1);
+      }
+      async function clearAlerts() {
+        if (!confirm('忽略全部预警?(可疑标记也会清除)')) return;
+        const r = await fetch('/api/admin/alerts' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'clear' }),
+        });
+        if (r.ok) {
+          (DATA.alerts || []).forEach((a) => (a.dismissed = true));
+          renderAlerts();
+          toast('已全部忽略');
+        } else toast('失败', 1);
+      }
+      async function blockAlertIp(ip, idx) {
+        if (!ip) {
+          toast('该预警无 IP 信息', 1);
+          return;
+        }
+        if (
+          !confirm(
+            '封闭 IP ' +
+              ip.replace('::ffff:', '') +
+              ' ?该 IP 所有设备将立即无法访问(可随时在设备卡片上「解除拉黑」恢复)'
+          )
+        )
+          return;
+        const r = await fetch('/api/admin/bulk' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'block', ip }),
+        });
+        if (r.ok) {
+          await dismissAlert(idx);
+          toast('已封闭,设备卡片上可一键解除');
+          load();
+        } else toast('封闭失败', 1);
+      }
+      function statCards(arr) {
+        return arr
+          .map(
+            ([n, l]) =>
+              `<div class="stat"><div class="num">${n}</div><div class="label">${l}</div></div>`
+          )
+          .join('');
+      }
+      // ---------- 统计页 ----------
+      function weekStart(t) {
+        const d = new Date(day0(t));
+        const w = (d.getDay() + 6) % 7;
+        d.setDate(d.getDate() - w);
+        return d.getTime();
+      }
+      function monthStart(t) {
+        const d = new Date(t);
+        d.setDate(1);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      }
+      function yearStart(t) {
+        const d = new Date(t);
+        d.setMonth(0, 1);
+        d.setHours(0, 0, 0, 0);
+        return d.getTime();
+      }
+      function renderStats() {
+        var s = DATA.stats,
+          visits = DATA.visits || [];
+        var t0 = day0(Date.now()),
+          w0 = weekStart(Date.now()),
+          m0 = monthStart(Date.now());
+        $('statCards2').innerHTML = statCards([
+          [s.total, '累计'],
+          [
+            visits.filter(function (v) {
+              return v.t >= t0;
+            }).length,
+            '今日',
+          ],
+          [
+            visits.filter(function (v) {
+              return v.t >= w0;
+            }).length,
+            '本周',
+          ],
+          [
+            visits.filter(function (v) {
+              return v.t >= m0;
+            }).length,
+            '本月',
+          ],
+        ]);
+        // 30天柱状图
+        var days = [],
+          i;
+        for (i = 29; i >= 0; i--) {
+          var t = t0 - i * 86400000;
+          days.push({ t: t, label: new Date(t).getDate(), key: todayStr(t) });
+        }
+        var max = Math.max(
+          1,
+          days.reduce(function (m, d) {
+            return Math.max(m, s.byDay[d.key] || 0);
+          }, 0)
+        );
+        $('chart').innerHTML = days
+          .map(function (d) {
+            var c = s.byDay[d.key] || 0;
+            return (
+              '<div class=\"bar\" style=\"height:' +
+              Math.max(2, (c / max) * 100) +
+              '%\" onclick=\"calDay(' +
+              d.t +
+              ')\"><span class=\"tip\">' +
+              d.key.slice(5) +
+              ' · ' +
+              c +
+              '次</span></div>'
+            );
+          })
+          .join('');
+        $('chartX').innerHTML = days
+          .map(function (d, i) {
+            return '<span>' + (i % 5 === 0 ? d.label : '') + '</span>';
+          })
+          .join('');
+        renderCalendar();
+        renderRange();
+      }
+      function renderCalendar() {
+        var base = CAL_DATE || Date.now();
+        var first = new Date(base);
+        first.setDate(1);
+        var startW = (first.getDay() + 6) % 7;
+        var dim = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+        var s = DATA.stats;
+        var ym = first.getFullYear() + '年' + (first.getMonth() + 1) + '月';
+        var html =
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+          '<button class="range-btn" onclick="calMonth(-1)" style="padding:2px 10px;font-size:14px">◀</button>' +
+          '<span style="font-size:14px;color:#feca57">' +
+          ym +
+          '</span>' +
+          '<button class="range-btn" onclick="calMonth(1)" style="padding:2px 10px;font-size:14px">▶</button>' +
+          '<button class="range-btn" onclick="CAL_DATE=null;renderStats();" style="padding:2px 10px;font-size:12px;margin-left:auto">本月</button>' +
+          '</div>';
+        html += ['一', '二', '三', '四', '五', '六', '日']
+          .map((d) => '<div class="cal-head">' + d + '</div>')
+          .join('');
+        for (var i = 0; i < startW; i++) html += '<div></div>';
+        for (var d = 1; d <= dim; d++) {
+          var t = new Date(first.getFullYear(), first.getMonth(), d).getTime();
+          var c = s.byDay[todayStr(t)] || 0;
+          html +=
+            '<div class="cal-cell' +
+            (c ? ' has' : '') +
+            (todayStr(t) === todayStr() ? ' today' : '') +
+            '" onclick="calDay(' +
+            t +
+            ')">' +
+            d +
+            (c ? '<span class="c">' + c + '</span>' : '') +
+            '</div>';
+        }
+        $('calendar').innerHTML = html;
+      }
+      function calMonth(delta) {
+        var d = new Date(CAL_DATE || Date.now());
+        d.setMonth(d.getMonth() + delta);
+        CAL_DATE = d.getTime();
+        renderStats();
+      }
+      function calDay(t) {
+        CAL_DATE = t;
+        setRange('custom');
+      }
+      function setRange(r, btn) {
+        RANGE = r;
+        CAL_DATE = r === 'custom' ? CAL_DATE : null;
+        if (btn) {
+          document.querySelectorAll('.range-btn').forEach((b) => b.classList.remove('active'));
+          btn.classList.add('active');
+        }
+        renderRange();
+      }
+      function renderRange() {
+        const visits = (DATA.visits || []).filter((v) => v.id);
+        const apps = {};
+        DATA.applicants.forEach((a) => (apps[a.id] = a));
+        let from = 0,
+          title = '';
+        if (RANGE === 'day') {
+          from = day0(Date.now());
+          title = '今天';
+        } else if (RANGE === 'week') {
+          from = weekStart(Date.now());
+          title = '本周';
+        } else if (RANGE === 'month') {
+          from = monthStart(Date.now());
+          title = '本月';
+        } else if (RANGE === 'year') {
+          from = yearStart(Date.now());
+          title = '今年';
+        } else {
+          from = day0(CAL_DATE);
+          title = todayStr(CAL_DATE);
+        }
+        const to = RANGE === 'custom' ? from + 86400000 : Infinity;
+        const inR = visits.filter((v) => v.t >= from && v.t < to);
+        const byId = {};
+        inR.forEach((v) => {
+          byId[v.id] = byId[v.id] || { n: 0, last: 0 };
+          byId[v.id].n++;
+          byId[v.id].last = Math.max(byId[v.id].last, v.t);
+        });
+        const rows = Object.entries(byId)
+          .sort((a, b) => b[1].last - a[1].last)
+          .map(([id, v]) => {
+            const a = apps[id] || { answer: '(未记录设备)', brand: '', geo: '' };
+            return `<div class="vrow"><span>${brandIcon(a.brand)}</span><span class="who">「${esc(a.answer)}」 <span class="brand-tag">${brandShow(a.brand)}</span><span class="geo-tag">📍${esc(a.geo || '定位中')}</span></span><span class="cnt">${v.n} 次 · ${fmt(v.last).slice(5)}</span></div>`;
+          })
+          .join('');
+        $('rangeList').innerHTML =
+          `<div class="sub" style="margin:6px 0 10px">${title} · 共 ${inR.length} 次访问 · ${Object.keys(byId).length} 台设备</div>` +
+          (rows || '<div class="empty">该时段暂无访问</div>');
+      }
+      // ---------- 历史页 ----------
+      function renderHistory() {
+        const A = DATA.applicants,
+          now = DATA.now;
+        const visits = (DATA.visits || []).slice(-30).reverse();
+        const apps = {};
+        A.forEach((a) => (apps[a.id] = a));
+        $('visitLog').innerHTML =
+          visits
+            .map((v) => {
+              const a = apps[v.id] || { answer: '(未知设备)', brand: '', geo: '' };
+              return `<div class="vrow"><span>${brandIcon(a.brand)}</span><span class="who">「${esc(a.answer)}」 <span class="geo-tag">📍${esc(a.geo || '')}</span></span><span class="cnt">${fmt(v.t)}</span></div>`;
+            })
+            .join('') || '<div class="empty">暂无访问记录</div>';
+        const hist = A.filter(
+          (a) =>
+            a.status === 'history' ||
+            a.status === 'denied' ||
+            (a.status === 'approved' && a.level === 'day' && now > a.approveTime + 86400000) ||
+            (a.status === 'approved' && a.level === 'once' && a.firstAccess)
+        );
+        $('history').innerHTML =
+          hist.map((a) => cardHtml(a, now)).join('') || '<div class="empty">暂无历史记录</div>';
+      }
+      // ---------- 答题记录页 ----------
+      async function loadQuiz() {
+        const r = await fetch('/api/admin/quiz' + tk());
+        if (!r.ok) {
+          $('quizList').innerHTML = '<div class="empty">加载失败</div>';
+          return;
+        }
+        const d = await r.json();
+        if (!d.attempts.length) {
+          $('quizList').innerHTML = '<div class="empty">还没有人参加解密测试</div>';
+          return;
+        }
+        $('quizList').innerHTML = d.attempts
+          .map((a, i) => {
+            const dev = a.device || {};
+            const who = dev.answer ? `「${esc(dev.answer)}」` : '(未申请门禁的设备)';
+            const meta = [dev.brand, dev.geo].filter(Boolean).join(' · ');
+            const trackName = a.track === 'li' ? '理科卷' : a.track === 'wen' ? '文科卷' : '未知卷';
+            const badge = a.passed
+              ? '<span class="badge approved">通过 ' + a.total + '分</span>'
+              : '<span class="badge denied">未通过 ' + a.total + '分</span>';
+            const mcReview = (a.review || [])
+              .map(
+                (rv, j) =>
+                  `<span style="color:${rv.right ? '#7dff9a' : '#ff8a8a'}">${j + 1}${rv.right ? '✓' : '✗'}</span>`
+              )
+              .join(' ');
+            // 全量留档:每题的题目+四选项内容+所选+正解(仅后台可见)
+            const fullRows = (a.fullReview || [])
+              .map((m, j) => {
+                const opt = (L, c) =>
+                  `<div style="margin-left:14px;color:${L === m.correctLetter ? '#7dff9a' : L === m.chosen ? '#ff8a8a' : 'rgba(255,255,255,.6)'}">${L}. ${esc(c || '')}${L === m.correctLetter ? ' ✓正解' : L === m.chosen ? ' ✗TA选的' : ''}</div>`;
+                return `<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:8px">
+        <div><b>第${j + 1}题 · ${esc(m.subject || '')}</b> ${esc(m.q || '')}</div>
+        ${opt('A', m.options && m.options.A)}${opt('B', m.options && m.options.B)}${opt('C', m.options && m.options.C)}${opt('D', m.options && m.options.D)}
+      </div>`;
+              })
+              .join('');
+            return `<div class="card" style="cursor:pointer" onclick="this.querySelector('.qz-detail').classList.toggle('show')">
 <div class="answer">${brandIcon(dev.brand)} ${who} ${badge}</div>
-<div class="meta">${meta?meta+' · ':''}${trackName} · 选择 ${a.mcScore}/81 · 问答 ${a.qaScore}/19(${a.qaBy==='ai'?'AI阅卷':'本地细则'}) · ${fmt(a.t)}</div>
+<div class="meta">${meta ? meta + ' · ' : ''}${trackName} · 选择 ${a.mcScore}/81 · 问答 ${a.qaScore}/19(${a.qaBy === 'ai' ? 'AI阅卷' : '本地细则'}) · ${fmt(a.t)}</div>
 <div class="qz-detail" style="display:none;margin-top:10px">
 <div class="meta" style="color:#feca57">选择对错:${mcReview}</div>
 ${fullRows}
-<div class="meta" style="margin-top:8px;color:rgba(255,255,255,.75)"><b>问答题目:</b>${esc(a.qaQ||'')}</div>
-<div class="meta" style="margin-top:6px;padding:10px;background:rgba(255,255,255,.05);border-radius:8px;white-space:pre-wrap;word-break:break-all"><b>TA 的作答:</b>\n${esc(a.qaText||'(空)')}</div>
-${a.qaComment?`<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.qaComment)}</div>`:''}
+<div class="meta" style="margin-top:8px;color:rgba(255,255,255,.75)"><b>问答题目:</b>${esc(a.qaQ || '')}</div>
+<div class="meta" style="margin-top:6px;padding:10px;background:rgba(255,255,255,.05);border-radius:8px;white-space:pre-wrap;word-break:break-all"><b>TA 的作答:</b>\n${esc(a.qaText || '(空)')}</div>
+${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.qaComment)}</div>` : ''}
 </div></div>`;
-  }).join('');
-}
-// ---------- 文件页 ----------
-async function loadFiles(){
-  const dirs=[['photos','🖼️ 照片'],['videos','🎬 视频'],['music','🎵 音乐']];
-  const caps=(DATA&&DATA.photoCaptions)||{}, ups=(DATA&&DATA.uploaderInfo)||{};
-  const demos=(DATA&&DATA.siteConfig&&DATA.siteConfig.demoPhotos)||[];
-  let html='';
-  for(const [dir,label] of dirs){
-    const r=await fetch('/api/files?dir='+dir+tk2());
-    const d=await r.json();
-    const files=(d[dir]||[]).sort((a,b)=>b.mtime.localeCompare(a.mtime));
-    html+=`<div class="section-title">${label} (${files.length})</div>
+          })
+          .join('');
+      }
+      // ---------- 文件页 ----------
+      async function loadFiles() {
+        const dirs = [
+          ['photos', '🖼️ 照片'],
+          ['videos', '🎬 视频'],
+          ['music', '🎵 音乐'],
+        ];
+        const caps = (DATA && DATA.photoCaptions) || {},
+          ups = (DATA && DATA.uploaderInfo) || {};
+        const demos = (DATA && DATA.siteConfig && DATA.siteConfig.demoPhotos) || [];
+        let html = '';
+        for (const [dir, label] of dirs) {
+          const r = await fetch('/api/files?dir=' + dir + tk2());
+          const d = await r.json();
+          const files = (d[dir] || []).sort((a, b) => b.mtime.localeCompare(a.mtime));
+          html += `<div class="section-title">${label} (${files.length})</div>
 <div class="upload-box"><input type="file" id="up-${dir}"><button class="btn-day" onclick="upload('${dir}')">上传到 ${dir}</button></div>
-<div>${files.map(f=>{
-      const isImg=/\.(jpe?g|png|gif|webp)$/i.test(f.name);
-      const url=`/admin-media/${dir}/${encodeURIComponent(f.name)}`+tk2();
-      const cap=caps[f.name]?`<div style="font-size:12px;color:#ffd9a8;padding:2px 0">✍ ${esc(caps[f.name])}</div>`:'';
-      const who=ups[f.name]?`<span class="fsize">👤 ${esc(ups[f.name])}</span>`:'';
-      const demoBtn=dir==='photos'?(demos.includes(f.name)
-        ?`<button class="btn-revoke" onclick="toggleDemo('${j(f.name)}',false)">取消演示</button>`
-        :`<button class="btn-day" onclick="toggleDemo('${j(f.name)}',true)">设为演示</button>`):'';
-      return `<div class="file-row" style="align-items:flex-start">
-        ${isImg?`<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="pv('${dir}','${encodeURIComponent(f.name)}')">`:''}
+<div>${
+            files
+              .map((f) => {
+                const isImg = /\.(jpe?g|png|gif|webp)$/i.test(f.name);
+                const url = `/admin-media/${dir}/${encodeURIComponent(f.name)}` + tk2();
+                const cap = caps[f.name]
+                  ? `<div style="font-size:12px;color:#ffd9a8;padding:2px 0">✍ ${esc(caps[f.name])}</div>`
+                  : '';
+                const who = ups[f.name] ? `<span class="fsize">👤 ${esc(ups[f.name])}</span>` : '';
+                const demoBtn =
+                  dir === 'photos'
+                    ? demos.includes(f.name)
+                      ? `<button class="btn-revoke" onclick="toggleDemo('${j(f.name)}',false)">取消演示</button>`
+                      : `<button class="btn-day" onclick="toggleDemo('${j(f.name)}',true)">设为演示</button>`
+                    : '';
+                return `<div class="file-row" style="align-items:flex-start">
+        ${isImg ? `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="pv('${dir}','${encodeURIComponent(f.name)}')">` : ''}
         <span class="fname" onclick="pv('${dir}','${encodeURIComponent(f.name)}')" title="点击预览">${esc(f.name)}<br>${who}${cap}</span>
-        <span class="fsize">${(f.size/1024/1024).toFixed(2)}MB</span>
+        <span class="fsize">${(f.size / 1024 / 1024).toFixed(2)}MB</span>
         <button class="btn-day" onclick="dl('/admin-media/${dir}/${encodeURIComponent(f.name)}','${j(f.name)}')">下载</button>
         <button class="btn-day" onclick="copyTxt(location.origin+'/admin-media/${dir}/${encodeURIComponent(f.name)}${tk2()}')">复制链接</button>
-        ${dir==='photos'?`<button class="btn-day" onclick="editCaption('${j(f.name)}','${j(caps[f.name]||'')}')">编辑配文</button>`:''}
+        ${dir === 'photos' ? `<button class="btn-day" onclick="editCaption('${j(f.name)}','${j(caps[f.name] || '')}')">编辑配文</button>` : ''}
         ${demoBtn}
         <button class="btn-del" onclick="delFile('${dir}','${encodeURIComponent(f.name)}')">删除</button></div>`;
-    }).join('')||'<div class="empty">空</div>'}</div>`;
-  }
-  $('fileSections').innerHTML=html;
-}
-function pv(dir,name){
-  const url=`/admin-media/${dir}/${name}`+tk2();
-  const ext=decodeURIComponent(name).split('.').pop().toLowerCase();
-  const m=$('pvMask');
-  if(['jpg','jpeg','png','gif','webp'].includes(ext))m.innerHTML=`<img src="${url}">`;
-  else if(['mp4','webm'].includes(ext))m.innerHTML=`<video src="${url}" controls autoplay></video>`;
-  else if(['mp3','wav','ogg'].includes(ext))m.innerHTML=`<audio src="${url}" controls autoplay></audio>`;
-  else{toast('该格式不支持预览',1);return}
-  m.classList.add('show');
-}
-async function delFile(dir,name){
-  if(!confirm('确定删除 '+decodeURIComponent(name)+' ？不可恢复！'))return;
-  const r=await fetch(`/api/files/${dir}/${name}?x=1`+tk2(),{method:'DELETE'});
-  if(r.ok){toast('已删除');loadFiles()}else toast('删除失败',1);
-}
-async function upload(dir){
-  const inp=$('up-'+dir);
-  if(!inp.files.length){toast('请先选择文件',1);return}
-  const f=inp.files[0];
-  const r=await fetch(`/api/upload?dir=${dir}&name=${encodeURIComponent(f.name)}`+tk2(),{method:'POST',body:f});
-  if(r.ok){toast('上传成功');loadFiles()}else toast('上传失败',1);
-}
-// ---------- 展示区 ----------
-const MOUNT_ICONS={isLink2:'月球',isLink3:'滚动古文',isLink4:'墨韵文档',isLink5:'火星',isLink6:'木星',isLink7:'地球',isLink8:'全息档案',isLink9:'翠玉',isLink10:'福字',isLink11:'雅集',isLink12:'文档金库',isLink13:'祥云文档',isGarden:'秘密花园'};
-const LINK_MODELS={sphere:'水晶球',cube:'立方晶',cone:'金字塔',octa:'星钻',torus:'光环',cylinder:'玉柱',icosa:'宝石',knot:'如意结',capsule:'胶囊',dodeca:'多面晶'};
-function loadDisplay(){
-  if(!DATA)return;
-  const sc=DATA.siteConfig||{mode:'normal',customLinks:[],demoPhotos:[]};
-  // 模式卡
-  $('modeCard').innerHTML=`全局默认模式:<b style="color:${sc.mode==='special'?'#feca57':'#7dff9a'}">${sc.mode==='special'?'特殊模式(全展示)':'普通模式(默认)'}</b>
+              })
+              .join('') || '<div class="empty">空</div>'
+          }</div>`;
+        }
+        $('fileSections').innerHTML = html;
+      }
+      function pv(dir, name) {
+        const url = `/admin-media/${dir}/${name}` + tk2();
+        const ext = decodeURIComponent(name).split('.').pop().toLowerCase();
+        const m = $('pvMask');
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) m.innerHTML = `<img src="${url}">`;
+        else if (['mp4', 'webm'].includes(ext))
+          m.innerHTML = `<video src="${url}" controls autoplay></video>`;
+        else if (['mp3', 'wav', 'ogg'].includes(ext))
+          m.innerHTML = `<audio src="${url}" controls autoplay></audio>`;
+        else {
+          toast('该格式不支持预览', 1);
+          return;
+        }
+        m.classList.add('show');
+      }
+      async function delFile(dir, name) {
+        if (!confirm('确定删除 ' + decodeURIComponent(name) + ' ？不可恢复！')) return;
+        const r = await fetch(`/api/files/${dir}/${name}?x=1` + tk2(), { method: 'DELETE' });
+        if (r.ok) {
+          toast('已删除');
+          loadFiles();
+        } else toast('删除失败', 1);
+      }
+      async function upload(dir) {
+        const inp = $('up-' + dir);
+        if (!inp.files.length) {
+          toast('请先选择文件', 1);
+          return;
+        }
+        const f = inp.files[0];
+        const r = await fetch(`/api/upload?dir=${dir}&name=${encodeURIComponent(f.name)}` + tk2(), {
+          method: 'POST',
+          body: f,
+        });
+        if (r.ok) {
+          toast('上传成功');
+          loadFiles();
+        } else toast('上传失败', 1);
+      }
+      // ---------- 展示区 ----------
+      const MOUNT_ICONS = {
+        isLink2: '月球',
+        isLink3: '滚动古文',
+        isLink4: '墨韵文档',
+        isLink5: '火星',
+        isLink6: '木星',
+        isLink7: '地球',
+        isLink8: '全息档案',
+        isLink9: '翠玉',
+        isLink10: '福字',
+        isLink11: '雅集',
+        isLink12: '文档金库',
+        isLink13: '祥云文档',
+        isGarden: '秘密花园',
+      };
+      const LINK_MODELS = {
+        sphere: '水晶球',
+        cube: '立方晶',
+        cone: '金字塔',
+        octa: '星钻',
+        torus: '光环',
+        cylinder: '玉柱',
+        icosa: '宝石',
+        knot: '如意结',
+        capsule: '胶囊',
+        dodeca: '多面晶',
+      };
+      function loadDisplay() {
+        if (!DATA) return;
+        const sc = DATA.siteConfig || { mode: 'normal', customLinks: [], demoPhotos: [] };
+        // 模式卡
+        $('modeCard').innerHTML =
+          `全局默认模式:<b style="color:${sc.mode === 'special' ? '#feca57' : '#7dff9a'}">${sc.mode === 'special' ? '特殊模式(全展示)' : '普通模式(默认)'}</b>
     <button class="btn-day" onclick="setMode('normal')">切到普通</button>
     <button class="btn-day" onclick="setMode('special')">切到特殊</button>
     <div style="opacity:.6;font-size:12px;margin-top:6px">「特殊访问」按访客单独授予:在「审批」页对应设备上点「授特殊」;访客自己无法申请</div>`;
-  // 挂载下拉
-  $('clIcon').innerHTML='<option value="">不挂原图案(新建模型)</option>'+Object.entries(MOUNT_ICONS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
-  $('clModel').innerHTML=Object.entries(LINK_MODELS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('');
-  // 自定义链接列表
-  $('customLinks').innerHTML=(sc.customLinks||[]).map(l=>`<div class="file-row">
-    <span class="fname">${esc(l.name)} → <a href="${j(l.url)}" target="_blank" style="color:#8cf">${esc(l.url.slice(0,42))}</a>
-    ${l.icon?`<span class="fsize">挂在「${MOUNT_ICONS[l.icon]||l.icon}」(普通模式)</span>`:`<span class="fsize">模型「${LINK_MODELS[l.model]||l.model||'水晶球'}」</span>`}</span>
+        // 挂载下拉
+        $('clIcon').innerHTML =
+          '<option value="">不挂原图案(新建模型)</option>' +
+          Object.entries(MOUNT_ICONS)
+            .map(([k, v]) => `<option value="${k}">${v}</option>`)
+            .join('');
+        $('clModel').innerHTML = Object.entries(LINK_MODELS)
+          .map(([k, v]) => `<option value="${k}">${v}</option>`)
+          .join('');
+        // 自定义链接列表
+        $('customLinks').innerHTML =
+          (sc.customLinks || [])
+            .map(
+              (l) => `<div class="file-row">
+    <span class="fname">${esc(l.name)} → <a href="${j(l.url)}" target="_blank" style="color:#8cf">${esc(l.url.slice(0, 42))}</a>
+    ${l.icon ? `<span class="fsize">挂在「${MOUNT_ICONS[l.icon] || l.icon}」(普通模式)</span>` : `<span class="fsize">模型「${LINK_MODELS[l.model] || l.model || '水晶球'}」</span>`}</span>
     <button class="btn-day" onclick="copyTxt('${j(l.url)}')">复制</button>
-    <button class="btn-del" onclick="delCustomLink('${l.id}')">删除</button></div>`).join('')||'<div class="empty">暂无</div>';
-  // 演示照片
-  const demos=sc.demoPhotos||[];
-  $('demoPhotos').innerHTML='当前: '+(demos.map(d=>esc(d)).join('、')||'无')+
-    '<br><span style="opacity:.6;font-size:12px">在「文件管理」里对每张照片点「设为/取消演示」即可调整</span>';
-  // 访客链接
-  const ul=DATA.userLinks||[];
-  const nameOf=dk=>{const r=(DATA.applicants||[]).find(a=>a.dk===dk);return r?(r.answer||r.brand||'访客'):'访客'};
-  $('userLinks').innerHTML=ul.map(l=>`<div class="file-row">
-    <span class="fname">[${esc(nameOf(l.dk))}] ${esc(l.name)} → <a href="${j(l.url)}" target="_blank" style="color:#8cf">${esc(l.url.slice(0,42))}</a>
-    <span class="fsize">${LINK_MODELS[l.model]||l.model||''} · ${fmt(l.ts)}</span></span>
+    <button class="btn-del" onclick="delCustomLink('${l.id}')">删除</button></div>`
+            )
+            .join('') || '<div class="empty">暂无</div>';
+        // 演示照片
+        const demos = sc.demoPhotos || [];
+        $('demoPhotos').innerHTML =
+          '当前: ' +
+          (demos.map((d) => esc(d)).join('、') || '无') +
+          '<br><span style="opacity:.6;font-size:12px">在「文件管理」里对每张照片点「设为/取消演示」即可调整</span>';
+        // 访客链接
+        const ul = DATA.userLinks || [];
+        const nameOf = (dk) => {
+          const r = (DATA.applicants || []).find((a) => a.dk === dk);
+          return r ? r.answer || r.brand || '访客' : '访客';
+        };
+        $('userLinks').innerHTML =
+          ul
+            .map(
+              (l) => `<div class="file-row">
+    <span class="fname">[${esc(nameOf(l.dk))}] ${esc(l.name)} → <a href="${j(l.url)}" target="_blank" style="color:#8cf">${esc(l.url.slice(0, 42))}</a>
+    <span class="fsize">${LINK_MODELS[l.model] || l.model || ''} · ${fmt(l.ts)}</span></span>
     <button class="btn-day" onclick="copyTxt('${j(l.url)}')">复制</button>
-    <button class="btn-del" onclick="delUserLink('${l.id}')">删除</button></div>`).join('')||'<div class="empty">暂无</div>';
-  // 链接点击记录(仅后台可见)
-  const clicks=DATA.linkClicks||[];
-  $('clickList').innerHTML=clicks.map(c=>{
-    const fp=c.fp||{},dev=c.dev||{};
-    const idBits=[c.brand,c.geo,fp.scr,fp.platform?'':null].filter(Boolean).join(' · ');
-    return `<div class="card">
-      <div class="answer">${brandIcon(c.brand)} 「${esc(c.name||'访客')}」 点了 <b style="color:#8cf">${esc(c.link)}</b></div>
+    <button class="btn-del" onclick="delUserLink('${l.id}')">删除</button></div>`
+            )
+            .join('') || '<div class="empty">暂无</div>';
+        // 链接点击记录(仅后台可见)
+        const clicks = DATA.linkClicks || [];
+        $('clickList').innerHTML =
+          clicks
+            .map((c) => {
+              const fp = c.fp || {},
+                dev = c.dev || {};
+              const idBits = [c.brand, c.geo, fp.scr, fp.platform ? '' : null]
+                .filter(Boolean)
+                .join(' · ');
+              return `<div class="card">
+      <div class="answer">${brandIcon(c.brand)} 「${esc(c.name || '访客')}」 点了 <b style="color:#8cf">${esc(c.link)}</b></div>
       <div class="meta">→ ${esc(c.url)}<br>
-      ${fmt(c.t)} · IP ${esc((c.ip||'').replace('::ffff:',''))} ${esc(c.geo||'')} · ${esc(c.brand||'')}${dev.battery?' · 🔋'+esc(dev.battery):''}${dev.network?' · 📶'+esc(dev.network):''}<br>
-      屏幕 ${esc(fp.scr||'-')} · 时区 ${esc(String(fp.tz??'-'))} · 语言 ${esc(fp.lang||'-')} · ${esc(fp.platform||'')} · ${fp.cores||'-'}核 · 触屏${fp.touch?'有':'无'} · 指纹 ${esc(fp.canvas||'-')}${c.pos?` · 坐标 ${c.pos.x},${c.pos.y},${c.pos.z}`:''}</div>
+      ${fmt(c.t)} · IP ${esc((c.ip || '').replace('::ffff:', ''))} ${esc(c.geo || '')} · ${esc(c.brand || '')}${dev.battery ? ' · 🔋' + esc(dev.battery) : ''}${dev.network ? ' · 📶' + esc(dev.network) : ''}<br>
+      屏幕 ${esc(fp.scr || '-')} · 时区 ${esc(String(fp.tz ?? '-'))} · 语言 ${esc(fp.lang || '-')} · ${esc(fp.platform || '')} · ${fp.cores || '-'}核 · 触屏${fp.touch ? '有' : '无'} · 指纹 ${esc(fp.canvas || '-')}${c.pos ? ` · 坐标 ${c.pos.x},${c.pos.y},${c.pos.z}` : ''}</div>
     </div>`;
-  }).join('')||'<div class="empty">还没有点击记录</div>';
-  // 访客端 JS 报错(仅后台可见)
-  const errs=DATA.clientErrors||[];
-  $('errList').innerHTML=errs.map(e=>`<div class="card" style="border-color:rgba(255,120,120,.35)">
-    <div class="answer">🐛 ${brandIcon(e.brand)} 「${esc(e.name||'访客')}」 ${esc(e.msg.slice(0,90))}</div>
-    <div class="meta">${fmt(e.t)} · ${esc(e.brand||'')} · ${esc((e.src||'').split('/').pop())}:${e.line||'-'}</div>
-  </div>`).join('')||'<div class="empty">暂无访客报错</div>';
-}
-async function setMode(mode){
-  const r=await fetch('/api/admin/mode'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode})});
-  if(r.ok){toast('已切换');DATA.siteConfig.mode=mode;loadDisplay()}else toast('失败',1);
-}
-async function addCustomLink(){
-  const name=$('clName').value.trim(),url=$('clUrl').value.trim();
-  const icon=$('clIcon').value,model=$('clModel').value;
-  if(!name||!url){toast('名称和链接都要填',1);return}
-  const r=await fetch('/api/admin/links'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name,url,icon,model})});
-  const d=await r.json();
-  if(r.ok){toast('已添加');$('clName').value='';$('clUrl').value='';DATA.siteConfig.customLinks.push(d.item);loadDisplay()}
-  else toast(d.error||'失败',1);
-}
-function presetLink(name,url){$('clName').value=name;$('clUrl').value=url;}
-async function delCustomLink(id){
-  const r=await fetch('/api/admin/links'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'del',id})});
-  if(r.ok){DATA.siteConfig.customLinks=DATA.siteConfig.customLinks.filter(l=>l.id!==id);loadDisplay();toast('已删除')}else toast('失败',1);
-}
-async function delUserLink(id){
-  const r=await fetch('/api/admin/links'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delUser',id})});
-  if(r.ok){DATA.userLinks=DATA.userLinks.filter(l=>l.id!==id);loadDisplay();toast('已删除')}else toast('失败',1);
-}
-async function toggleDemo(name,demo){
-  const r=await fetch('/api/admin/demo'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:name,demo})});
-  const d=await r.json();
-  if(r.ok){DATA.siteConfig.demoPhotos=d.demoPhotos;toast(demo?'已设为演示':'已取消演示');loadFiles()}
-  else toast('失败',1);
-}
-async function editCaption(name,old){
-  const c=prompt('编辑「'+name+'」的 AI 配文(留空删除):',old||'');
-  if(c===null)return;
-  const r=await fetch('/api/admin/caption'+tk(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({file:name,caption:c})});
-  if(r.ok){if(DATA.photoCaptions)DATA.photoCaptions[name]=c;toast('配文已保存');loadFiles()}
-  else toast('保存失败',1);
-}
-function copyTxt(t){
-  (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('已复制')).catch(()=>{prompt('手动复制:',t)});
-}
-// 带令牌头的下载(fetch x-token → blob → 本地保存),不再依赖 URL 参数存活,任何浏览器都不会"需要授权"
-async function dl(url,filename){
-  try{
-    const r=await fetch(url,{headers:{'x-token':TOKEN}});
-    if(!r.ok){toast('下载失败:HTTP '+r.status,1);return}
-    const b=await r.blob();
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(b);
-    a.download=filename||url.split('/').pop().split('?')[0]||'download';
-    document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href),5000);
-    toast('已开始下载');
-  }catch(e){toast('下载失败:'+e.message,1)}
-}
-async function clearClicks(){
-  if(!confirm('确定清空全部链接点击记录?不可恢复!(建议先导出 Excel)'))return;
-  const r=await fetch('/api/admin/clicks/clear'+tk(),{method:'POST'});
-  if(r.ok){DATA.linkClicks=[];loadDisplay();toast('已清空')}else toast('失败',1);
-}
-// 导出 PDF:新开打印页(记录 + 答题全量 + 照片原图附录),浏览器「打印→另存为 PDF」
-async function exportPdf(){
-  const photos=await (await fetch('/api/files?dir=photos'+tk2())).json();
-  const imgs=(photos.photos||[]);
-  const clicks=(DATA.linkClicks||[]);
-  const attempts=(await (await fetch('/api/admin/quiz'+tk())).json()).attempts||[];
-  const w=window.open('','_blank');
-  const escH=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
-  let html=`<html><head><meta charset="utf-8"><title>梦幻画廊数据档案</title>
+            })
+            .join('') || '<div class="empty">还没有点击记录</div>';
+        // 访客端 JS 报错(仅后台可见)
+        const errs = DATA.clientErrors || [];
+        $('errList').innerHTML =
+          errs
+            .map(
+              (e) => `<div class="card" style="border-color:rgba(255,120,120,.35)">
+    <div class="answer">🐛 ${brandIcon(e.brand)} 「${esc(e.name || '访客')}」 ${esc(e.msg.slice(0, 90))}</div>
+    <div class="meta">${fmt(e.t)} · ${esc(e.brand || '')} · ${esc((e.src || '').split('/').pop())}:${e.line || '-'}</div>
+  </div>`
+            )
+            .join('') || '<div class="empty">暂无访客报错</div>';
+      }
+      async function setMode(mode) {
+        const r = await fetch('/api/admin/mode' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mode }),
+        });
+        if (r.ok) {
+          toast('已切换');
+          DATA.siteConfig.mode = mode;
+          loadDisplay();
+        } else toast('失败', 1);
+      }
+      async function addCustomLink() {
+        const name = $('clName').value.trim(),
+          url = $('clUrl').value.trim();
+        const icon = $('clIcon').value,
+          model = $('clModel').value;
+        if (!name || !url) {
+          toast('名称和链接都要填', 1);
+          return;
+        }
+        const r = await fetch('/api/admin/links' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'add', name, url, icon, model }),
+        });
+        const d = await r.json();
+        if (r.ok) {
+          toast('已添加');
+          $('clName').value = '';
+          $('clUrl').value = '';
+          DATA.siteConfig.customLinks.push(d.item);
+          loadDisplay();
+        } else toast(d.error || '失败', 1);
+      }
+      function presetLink(name, url) {
+        $('clName').value = name;
+        $('clUrl').value = url;
+      }
+      async function delCustomLink(id) {
+        const r = await fetch('/api/admin/links' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'del', id }),
+        });
+        if (r.ok) {
+          DATA.siteConfig.customLinks = DATA.siteConfig.customLinks.filter((l) => l.id !== id);
+          loadDisplay();
+          toast('已删除');
+        } else toast('失败', 1);
+      }
+      async function delUserLink(id) {
+        const r = await fetch('/api/admin/links' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'delUser', id }),
+        });
+        if (r.ok) {
+          DATA.userLinks = DATA.userLinks.filter((l) => l.id !== id);
+          loadDisplay();
+          toast('已删除');
+        } else toast('失败', 1);
+      }
+      async function toggleDemo(name, demo) {
+        const r = await fetch('/api/admin/demo' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: name, demo }),
+        });
+        const d = await r.json();
+        if (r.ok) {
+          DATA.siteConfig.demoPhotos = d.demoPhotos;
+          toast(demo ? '已设为演示' : '已取消演示');
+          loadFiles();
+        } else toast('失败', 1);
+      }
+      async function editCaption(name, old) {
+        const c = prompt('编辑「' + name + '」的 AI 配文(留空删除):', old || '');
+        if (c === null) return;
+        const r = await fetch('/api/admin/caption' + tk(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ file: name, caption: c }),
+        });
+        if (r.ok) {
+          if (DATA.photoCaptions) DATA.photoCaptions[name] = c;
+          toast('配文已保存');
+          loadFiles();
+        } else toast('保存失败', 1);
+      }
+      function copyTxt(t) {
+        (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject())
+          .then(() => toast('已复制'))
+          .catch(() => {
+            prompt('手动复制:', t);
+          });
+      }
+      // 带令牌头的下载(fetch x-token → blob → 本地保存),不再依赖 URL 参数存活,任何浏览器都不会"需要授权"
+      async function dl(url, filename) {
+        try {
+          const r = await fetch(url, { headers: { 'x-token': TOKEN } });
+          if (!r.ok) {
+            toast('下载失败:HTTP ' + r.status, 1);
+            return;
+          }
+          const b = await r.blob();
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(b);
+          a.download = filename || url.split('/').pop().split('?')[0] || 'download';
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+          toast('已开始下载');
+        } catch (e) {
+          toast('下载失败:' + e.message, 1);
+        }
+      }
+      async function clearClicks() {
+        if (!confirm('确定清空全部链接点击记录?不可恢复!(建议先导出 Excel)')) return;
+        const r = await fetch('/api/admin/clicks/clear' + tk(), { method: 'POST' });
+        if (r.ok) {
+          DATA.linkClicks = [];
+          loadDisplay();
+          toast('已清空');
+        } else toast('失败', 1);
+      }
+      // 导出 PDF:新开打印页(记录 + 答题全量 + 照片原图附录),浏览器「打印→另存为 PDF」
+      async function exportPdf() {
+        const photos = await (await fetch('/api/files?dir=photos' + tk2())).json();
+        const imgs = photos.photos || [];
+        const clicks = DATA.linkClicks || [];
+        const attempts = (await (await fetch('/api/admin/quiz' + tk())).json()).attempts || [];
+        const w = window.open('', '_blank');
+        const escH = (s) =>
+          String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;');
+        let html = `<html><head><meta charset="utf-8"><title>梦幻画廊数据档案</title>
   <style>body{font-family:'Microsoft YaHei';padding:24px;font-size:12px}h1{font-size:20px}h2{font-size:15px;margin-top:26px;border-bottom:1px solid #999;padding-bottom:4px}
   table{border-collapse:collapse;width:100%;margin-top:8px}td,th{border:1px solid #aaa;padding:4px 6px;text-align:left;vertical-align:top;word-break:break-all}
   .pg{page-break-before:always}.ph{text-align:center;margin-top:14px}.ph img{max-width:100%;max-height:520px;border:1px solid #ccc}
   .cap{color:#a60;font-size:13px;margin-top:6px}</style></head><body>
-  <h1>梦幻画廊 · 数据档案(${new Date().toLocaleString('zh-CN',{hour12:false})})</h1>
+  <h1>梦幻画廊 · 数据档案(${new Date().toLocaleString('zh-CN', { hour12: false })})</h1>
   <h2>一、链接点击记录(${clicks.length} 条)</h2>
   <table><tr><th>时间</th><th>昵称</th><th>IP/归属</th><th>品牌</th><th>链接</th><th>URL</th><th>屏幕/平台</th><th>指纹</th></tr>
-  ${clicks.map(c=>{const fp=c.fp||{};return `<tr><td>${new Date(c.t).toLocaleString('zh-CN',{hour12:false})}</td><td>${escH(c.name)}</td><td>${escH((c.ip||'').replace('::ffff:',''))} ${escH(c.geo||'')}</td><td>${escH(c.brand)}</td><td>${escH(c.link)}</td><td>${escH(c.url)}</td><td>${escH(fp.scr||'')} ${escH(fp.platform||'')} ${fp.cores||''}核</td><td>${escH(fp.canvas||'')}</td></tr>`}).join('')}</table>
+  ${clicks
+    .map((c) => {
+      const fp = c.fp || {};
+      return `<tr><td>${new Date(c.t).toLocaleString('zh-CN', { hour12: false })}</td><td>${escH(c.name)}</td><td>${escH((c.ip || '').replace('::ffff:', ''))} ${escH(c.geo || '')}</td><td>${escH(c.brand)}</td><td>${escH(c.link)}</td><td>${escH(c.url)}</td><td>${escH(fp.scr || '')} ${escH(fp.platform || '')} ${fp.cores || ''}核</td><td>${escH(fp.canvas || '')}</td></tr>`;
+    })
+    .join('')}</table>
   <h2>二、答题全量记录(${attempts.length} 条)</h2>
-  ${attempts.map(a=>`<table><tr><th colspan="2">${new Date(a.t).toLocaleString('zh-CN',{hour12:false})} · 总分 ${a.total} · 选择 ${a.mcScore}/81 · 问答 ${a.qaScore}/19(${a.qaBy==='ai'?'AI':'本地'})</th></tr>
-    ${(a.fullReview||[]).map((m,j)=>`<tr><td style="width:70%">${j+1}. ${escH(m.q||'')}<br>A.${escH(m.options&&m.options.A)} B.${escH(m.options&&m.options.B)} C.${escH(m.options&&m.options.C)} D.${escH(m.options&&m.options.D)}</td><td>选 ${escH(m.chosen)} / 正解 ${escH(m.correctLetter)} ${m.right?'✓':'✗'}</td></tr>`).join('')}
-    <tr><td><b>问答题目:</b>${escH(a.qaQ||'')}<br><b>作答:</b>${escH((a.qaText||'').slice(0,800))}</td><td><b>评语:</b>${escH(a.qaComment||'')}</td></tr></table>`).join('')}
+  ${attempts
+    .map(
+      (
+        a
+      ) => `<table><tr><th colspan="2">${new Date(a.t).toLocaleString('zh-CN', { hour12: false })} · 总分 ${a.total} · 选择 ${a.mcScore}/81 · 问答 ${a.qaScore}/19(${a.qaBy === 'ai' ? 'AI' : '本地'})</th></tr>
+    ${(a.fullReview || []).map((m, j) => `<tr><td style="width:70%">${j + 1}. ${escH(m.q || '')}<br>A.${escH(m.options && m.options.A)} B.${escH(m.options && m.options.B)} C.${escH(m.options && m.options.C)} D.${escH(m.options && m.options.D)}</td><td>选 ${escH(m.chosen)} / 正解 ${escH(m.correctLetter)} ${m.right ? '✓' : '✗'}</td></tr>`).join('')}
+    <tr><td><b>问答题目:</b>${escH(a.qaQ || '')}<br><b>作答:</b>${escH((a.qaText || '').slice(0, 800))}</td><td><b>评语:</b>${escH(a.qaComment || '')}</td></tr></table>`
+    )
+    .join('')}
   <h2 class="pg">三、照片原图(上传照片 + 希沃白板画作,共 ${imgs.length} 张)</h2>
-  ${imgs.map(f=>`<div class="ph"><img src="/admin-media/photos/${encodeURIComponent(f.name)}${tk2()}"><div>${escH(f.name)}</div>${(DATA.photoCaptions&&DATA.photoCaptions[f.name])?`<div class="cap">✍ ${escH(DATA.photoCaptions[f.name])}</div>`:''}</div>`).join('')}
+  ${imgs.map((f) => `<div class="ph"><img src="/admin-media/photos/${encodeURIComponent(f.name)}${tk2()}"><div>${escH(f.name)}</div>${DATA.photoCaptions && DATA.photoCaptions[f.name] ? `<div class="cap">✍ ${escH(DATA.photoCaptions[f.name])}</div>` : ''}</div>`).join('')}
   </body></html>`;
-  w.document.write(html);
-  w.document.close();
-  setTimeout(()=>w.print(),1500);
-}
-load();
-// 支持 /admin#docs 直达协议文档页(合并后台后的旧链接兼容)
-if(location.hash.slice(1)==='docs')switchTab('docs');
-// 后台自动刷新(2026-07-25 主人定):每 15 秒同步最新数据,各标签页内容一并更新,无需手动刷新
-// 注意:协议文档编辑器【故意不在】此刷新内——防未保存修改被刷没(2026-07-27)
-setInterval(async()=>{
-  await load();
-  if($('tab-files').style.display!=='none')loadFiles();
-  if($('tab-quiz').style.display!=='none')loadQuiz();
-  if($('tab-display').style.display!=='none')loadDisplay();
-},15000);
-</script>
-</body>
+        w.document.write(html);
+        w.document.close();
+        setTimeout(() => w.print(), 1500);
+      }
+
+      // ===== 💬 在线对话 =====
+      let chatCurDk = null,
+        chatSse = null,
+        chatPoll = null,
+        chatDevices = [];
+      function startChat() {
+        if (!$('tab-chat') || $('tab-chat').style.display === 'none') return;
+        if (chatSse) return;
+        chatSse = new EventSource('/api/admin/online-sse');
+        chatSse.onmessage = (e) => {
+          try {
+            const d = JSON.parse(e.data);
+            chatDevices = d.devices || [];
+            renderChatDevices();
+          } catch (x) {}
+        };
+        chatSse.onerror = () => {
+          try {
+            chatSse.close();
+          } catch (x) {}
+          chatSse = null;
+          setTimeout(startChat, 8000);
+        };
+      }
+      function renderChatDevices() {
+        if (!$('chatOnlineCount')) return;
+        $('chatOnlineCount').textContent = chatDevices.length + ' 人在线';
+        const l = $('chatDeviceList');
+        if (!l) return;
+        if (!chatDevices.length) {
+          l.innerHTML =
+            '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:12px;padding:20px">暂无在线设备</div>';
+          return;
+        }
+        l.innerHTML = chatDevices
+          .map((d) => {
+            const active =
+              d.dk === chatCurDk
+                ? ' style="border-color:#ff9a9e;background:rgba(255,154,158,.1)"'
+                : '';
+            return (
+              '<div' +
+              active +
+              ' class="file-row" onclick="chatSelect(\'' +
+              d.dk +
+              '\')" style="cursor:pointer;margin-bottom:4px"><div><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#4caf50;margin-right:4px"></span><b>' +
+              esc(d.name) +
+              '</b></div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">' +
+              Math.floor((Date.now() - d.onlineSince) / 60000) +
+              '分钟前</div></div>'
+            );
+          })
+          .join('');
+      }
+      function chatSelect(dk) {
+        chatCurDk = dk;
+        renderChatDevices();
+        const d = chatDevices.find((x) => x.dk === dk);
+        $('chatSubTitle').textContent = '点对点 · ' + esc(d ? d.name : dk);
+        $('chatMsgInput').disabled = false;
+        $('chatSendBtn').disabled = false;
+        $('chatMsgInput').placeholder = '发送消息…';
+        loadChatMsgs();
+        if (chatPoll) clearInterval(chatPoll);
+        chatPoll = setInterval(loadChatMsgs, 2500);
+      }
+      async function loadChatMsgs() {
+        if (!chatCurDk) return;
+        try {
+          const r = await fetch('/api/admin/chats?dk=' + chatCurDk);
+          const d = await r.json();
+          const cs = d.chats || [],
+            box = $('chatMsgArea');
+          if (!box) return;
+          if (!cs.length) {
+            box.innerHTML =
+              '<div style="text-align:center;color:rgba(255,255,255,.35);font-size:12px;padding:30px">暂无消息</div>';
+            return;
+          }
+          box.innerHTML = cs
+            .map((m) => {
+              const isAdmin = m.from === 'admin' || m.dir === 'admin->user';
+              const t = new Date(m.ts).toLocaleTimeString('zh-CN', {
+                hour: '2-digit',
+                minute: '2-digit',
+              });
+              const bg = isAdmin
+                ? 'linear-gradient(135deg,rgba(102,126,234,.5),rgba(118,75,162,.4))'
+                : 'rgba(255,255,255,.1)';
+              const self = isAdmin ? 'flex-end' : 'flex-start';
+              const br = isAdmin ? 'right' : 'left';
+              return (
+                '<div style="max-width:75%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5;align-self:' +
+                self +
+                ';background:' +
+                bg +
+                ';border-bottom-' +
+                br +
+                '-radius:4px;margin-bottom:4px">' +
+                esc(m.text) +
+                '<div style="font-size:10px;opacity:.5;margin-top:4px;text-align:right">' +
+                t +
+                (m.name ? ' · ' + esc(m.name) : ' · 管理员') +
+                '</div></div>'
+              );
+            })
+            .join('');
+          box.scrollTop = box.scrollHeight;
+        } catch (e) {}
+      }
+      async function chatSend() {
+        const t = $('chatMsgInput').value.trim();
+        if (!t || !chatCurDk) return;
+        $('chatMsgInput').value = '';
+        $('chatSendBtn').disabled = true;
+        try {
+          await fetch('/api/admin/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: t, target: chatCurDk }),
+          });
+          loadChatMsgs();
+        } catch (e) {
+          toast('发送失败', 1);
+        }
+        $('chatSendBtn').disabled = false;
+      }
+
+      load();
+      // 支持 /admin#docs 直达协议文档页(合并后台后的旧链接兼容)
+      if (location.hash.slice(1) === 'docs') switchTab('docs');
+      // 手动刷新按钮（顶部）—— 不再自动刷新，避免渲染几千条数据卡死浏览器
+    </script>
+  </body>
 </html>

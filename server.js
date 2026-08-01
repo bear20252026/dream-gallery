@@ -37,6 +37,8 @@ function staticDenied(rel, req) {
   if (base.startsWith('.')) return true;
   if (['lib', 'node_modules', 'origin', 'tools', 'questions', 'scripts', 'dist'].includes(seg[0])) return true;
   if (seg[0] === 'src' || seg[0] === 'vendor') {
+    // 放行 Three.js 加载器依赖(浏览器 importmap 路径)
+    if (rel.startsWith('vendor/examples/jsm/')) return false;
     const host = String(req && req.headers && req.headers.host || '');
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return true;
   }

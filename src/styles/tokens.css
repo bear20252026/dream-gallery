@@ -1,0 +1,60 @@
+/* ============================================================
+   梦幻画廊 · 昆仑灵鉴 — 设计令牌(CSS Custom Properties)
+   全站色彩/间距/字体/阴影/动画在此定义。
+   任何组件引用这些变量，改主题只需改此文件。
+   2026-08-01 架构优化
+   ============================================================ */
+
+:root {
+  /* ── 品牌色系 ── */
+  --color-primary: #ffb6c8;
+  --color-primary-soft: rgba(255, 182, 200, 0.5);
+  --color-accent: #feca57;
+  --color-accent-soft: rgba(254, 202, 87, 0.2);
+  --color-danger: #ff6b6b;
+  --color-success: #2ecc71;
+  --color-gold: #ffd700;
+
+  /* ── 背景色系 ── */
+  --bg-page: #1a0a14;
+  --bg-overlay: rgba(10, 5, 10, 0.92);
+  --bg-panel: rgba(30, 15, 25, 0.95);
+  --bg-card: rgba(20, 10, 24, 0.85);
+  --bg-input: rgba(255, 255, 255, 0.06);
+
+  /* ── 文字色系 ── */
+  --text-primary: #ffe2c4;
+  --text-secondary: rgba(255, 200, 220, 0.8);
+  --text-muted: rgba(255, 180, 200, 0.45);
+  --text-danger: #ff8080;
+
+  /* ── 边框 ── */
+  --border-subtle: rgba(255, 150, 180, 0.25);
+  --border-strong: rgba(255, 150, 180, 0.55);
+  --border-radius-sm: 8px;
+  --border-radius-md: 14px;
+  --border-radius-lg: 18px;
+
+  /* ── 间距 ── */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+
+  /* ── 字体 ── */
+  --font-display: 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Courier New', monospace;
+  --font-size-xs: 10px;
+  --font-size-sm: 12px;
+  --font-size-md: 14px;
+  --font-size-lg: 18px;
+
+  /* ── 阴影 ── */
+  --shadow-overlay: 0 16px 60px rgba(0, 0, 0, 0.55);
+  --shadow-card: 0 4px 14px rgba(0, 0, 0, 0.3);
+
+  /* ── 过渡/动画 ── */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.6s ease;
+}

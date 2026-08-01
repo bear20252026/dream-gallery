@@ -1,6 +1,6 @@
 // sw.js — Service Worker(2026-07-25):静态资源 SWR + 媒体缓存优先 + 媒体 LRU 上限
 // API 只走网络;开发环境(localhost/5173)不注册(见 index.html 注册处)
-const VER = 'gallery-v4'; // 2026-07-26 升级:协议页改为永不缓存 + 强制清理旧缓存
+const VER = 'gallery-v11'; // 2026-08-01 资深重构:统一相机/角色单一 owner + 消除双循环双重执行
 const MEDIA_CAP = 80; // 媒体缓存最多 80 个(超出逐出最旧)
 
 self.addEventListener('install', e => {

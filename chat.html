@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>画廊 · 在线管理</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      }
+      .main-container {
+        width: 100%;
+        max-width: 900px;
+        display: flex;
+        gap: 16px;
+        height: 85vh;
+        max-height: 750px;
+      }
+      /* ===== 左侧：在线设备 ===== */
+      .device-panel {
+        width: 260px;
+        min-width: 260px;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .device-header {
+        background: linear-gradient(90deg, #a18cd1 0%, #fbc2eb 100%);
+        padding: 16px 20px;
+        text-align: center;
+      }
+      .device-header h4 {
+        color: #fff;
+        font-weight: 600;
+        font-size: 15px;
+        letter-spacing: 2px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .online-count {
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .device-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+      }
+      .device-item {
+        padding: 10px 12px;
+        border-radius: 12px;
+        cursor: pointer;
+        margin-bottom: 6px;
+        border: 2px solid transparent;
+        transition: all 0.2s;
+        background: #fafafa;
+      }
+      .device-item:hover {
+        background: #f0e6ff;
+      }
+      .device-item.active {
+        border-color: #ff9a9e;
+        background: #fff0f5;
+      }
+      .device-item .d-name {
+        font-size: 13px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 2px;
+      }
+      .device-item .d-info {
+        font-size: 10px;
+        color: #999;
+      }
+      .device-item .d-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #4caf50;
+        margin-right: 4px;
+        animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.4;
+        }
+      }
+      /* ===== 右侧：聊天窗口（复刻参考设计） ===== */
+      .chat-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        overflow: hidden;
+      }
+      .chat-header {
+        background: linear-gradient(90deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+        padding: 20px;
+        text-align: center;
+        position: relative;
+      }
+      .chat-header::before {
+        content: '◆';
+        position: absolute;
+        left: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 12px;
+      }
+      .chat-header::after {
+        content: '◆';
+        position: absolute;
+        right: 20px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: rgba(255, 255, 255, 0.8);
+        font-size: 12px;
+      }
+      .chat-header h3 {
+        color: #fff;
+        font-weight: 600;
+        font-size: 18px;
+        letter-spacing: 2px;
+        text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      .chat-sub {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 11px;
+        margin-top: 2px;
+      }
+      .msg-area {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: #fafafa;
+      }
+      .msg {
+        max-width: 80%;
+        padding: 12px 16px;
+        border-radius: 18px;
+        line-height: 1.5;
+        font-size: 15px;
+        animation: fadeIn 0.3s ease;
+        word-wrap: break-word;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .msg.admin {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        align-self: flex-end;
+        border-bottom-right-radius: 4px;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      }
+      .msg.user {
+        background: white;
+        color: #333;
+        align-self: flex-start;
+        border-bottom-left-radius: 4px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        border: 1px solid #f0f0f0;
+      }
+      .msg-time {
+        font-size: 10px;
+        opacity: 0.6;
+        margin-top: 4px;
+        text-align: right;
+      }
+      .input-area {
+        padding: 16px 20px;
+        background: white;
+        border-top: 1px solid #f0f0f0;
+        display: flex;
+        gap: 10px;
+      }
+      #msgInput {
+        flex: 1;
+        padding: 12px 18px;
+        border: 2px solid #f0f0f0;
+        border-radius: 24px;
+        outline: none;
+        font-size: 15px;
+        transition: all 0.3s;
+        background: #fafafa;
+      }
+      #msgInput:focus {
+        border-color: #ff9a9e;
+        background: white;
+      }
+      #sendBtn {
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        border: none;
+        background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
+        color: white;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 4px 15px rgba(255, 154, 158, 0.4);
+      }
+      #sendBtn::after {
+        content: '↑';
+        font-size: 20px;
+        font-weight: bold;
+      }
+      #sendBtn:disabled {
+        opacity: 0.6;
+      }
+      .no-select {
+        text-align: center;
+        color: #ccc;
+        padding: 60px 0;
+        font-size: 16px;
+        letter-spacing: 2px;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #ddd;
+        border-radius: 3px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="main-container">
+      <!-- 左侧设备面板 -->
+      <div class="device-panel">
+        <div class="device-header">
+          <h4>✦ 在线设备 ✦</h4>
+          <div class="online-count" id="onlineCount">0 人在线</div>
+        </div>
+        <div class="device-list" id="deviceList">
+          <div class="no-select" style="font-size: 13px; padding: 20px">等待设备连接…</div>
+        </div>
+      </div>
+
+      <!-- 右侧聊天 -->
+      <div class="chat-container">
+        <div class="chat-header">
+          <h3 id="chatTitle">CHAT</h3>
+          <div class="chat-sub" id="chatSub">选择一个设备开始对话</div>
+        </div>
+        <div class="msg-area" id="msgArea">
+          <div class="no-select" style="font-size: 14px">
+            ← 点击左侧在线设备<br />开始点对点对话
+          </div>
+        </div>
+        <div class="input-area">
+          <input
+            type="text"
+            id="msgInput"
+            placeholder="选择设备后输入消息…"
+            autocomplete="off"
+            disabled
+          />
+          <button id="sendBtn" disabled></button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const deviceList = document.getElementById('deviceList');
+      const onlineCount = document.getElementById('onlineCount');
+      const msgArea = document.getElementById('msgArea');
+      const msgInput = document.getElementById('msgInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const chatTitle = document.getElementById('chatTitle');
+      const chatSub = document.getElementById('chatSub');
+
+      let currentDk = null;
+      let devices = [];
+      let chatPollTimer = null;
+
+      // ===================== SSE: 在线设备实时更新 =====================
+      function startDeviceSSE() {
+        const es = new EventSource('/api/admin/online-sse');
+        es.onmessage = (e) => {
+          const data = JSON.parse(e.data);
+          devices = data.devices || [];
+          renderDevices();
+        };
+        es.onerror = () => {
+          setTimeout(startDeviceSSE, 5000);
+        };
+      }
+      startDeviceSSE();
+
+      function renderDevices() {
+        onlineCount.textContent = devices.length + ' 人在线';
+        if (devices.length === 0) {
+          deviceList.innerHTML =
+            '<div class="no-select" style="font-size:13px;padding:20px">暂无在线设备</div>';
+          return;
+        }
+        const now = Date.now();
+        deviceList.innerHTML = devices
+          .map((d) => {
+            const onlineSec = Math.floor((now - d.lastSeen) / 1000);
+            const onlineMin = Math.floor((now - d.onlineSince) / 60000);
+            const active = d.dk === currentDk ? ' active' : '';
+            return `<div class="device-item${active}" onclick="selectDevice('${d.dk}')">
+      <div class="d-name"><span class="d-dot"></span>${d.name || '未知设备'}</div>
+      <div class="d-info">🕐 ${onlineMin}分钟前 · ${onlineSec < 10 ? '刚刚在线' : onlineSec + '秒前'}</div>
+    </div>`;
+          })
+          .join('');
+      }
+
+      // ===================== 选择设备 =====================
+      function selectDevice(dk) {
+        currentDk = dk;
+        const dev = devices.find((d) => d.dk === dk);
+        chatTitle.textContent = dev ? dev.name : 'CHAT';
+        chatSub.textContent = '点对点私聊 · ID: ' + dk;
+        msgInput.disabled = false;
+        sendBtn.disabled = false;
+        msgInput.placeholder = '发送消息给 ' + (dev ? dev.name : dk) + '…';
+        msgInput.focus();
+        // 清空聊天区并加载历史
+        msgArea.innerHTML = '';
+        loadChats();
+        // 开始轮询新消息
+        if (chatPollTimer) clearInterval(chatPollTimer);
+        chatPollTimer = setInterval(loadChats, 2000);
+        // 更新设备列表高亮
+        renderDevices();
+      }
+
+      // ===================== 加载聊天记录 =====================
+      async function loadChats() {
+        if (!currentDk) return;
+        try {
+          const res = await fetch('/api/admin/chats?dk=' + currentDk);
+          const data = await res.json();
+          renderMessages(data.chats || []);
+        } catch (e) {}
+      }
+
+      function renderMessages(chats) {
+        // 保留"选择设备"提示已去掉，只看是否有历史
+        const currentCount = msgArea.querySelectorAll('.msg').length;
+        if (chats.length <= currentCount) return; // 没有新消息
+        msgArea.innerHTML = '';
+        if (chats.length === 0) {
+          msgArea.innerHTML =
+            '<div class="no-select" style="font-size:13px;padding:30px">暂无消息记录</div>';
+          return;
+        }
+        chats.forEach((m) => {
+          const div = document.createElement('div');
+          div.className = 'msg ' + (m.from === 'admin' ? 'admin' : 'user');
+          const time = new Date(m.ts).toLocaleTimeString('zh-CN', {
+            hour: '2-digit',
+            minute: '2-digit',
+          });
+          div.innerHTML =
+            m.text +
+            '<div class="msg-time">' +
+            time +
+            (m.name ? ' · ' + m.name : ' · 管理员') +
+            '</div>';
+          msgArea.appendChild(div);
+        });
+        msgArea.scrollTop = msgArea.scrollHeight;
+      }
+
+      // ===================== 发送消息 =====================
+      async function send() {
+        const text = msgInput.value.trim();
+        if (!text || !currentDk) return;
+        msgInput.value = '';
+        sendBtn.disabled = true;
+        try {
+          const res = await fetch('/api/admin/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, target: currentDk }),
+          });
+          if (!res.ok) throw new Error('发送失败');
+          loadChats();
+        } catch (e) {
+          alert('发送失败，请重试');
+        }
+        sendBtn.disabled = false;
+        msgInput.focus();
+      }
+
+      sendBtn.onclick = send;
+      msgInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          send();
+        }
+      });
+    </script>
+  </body>
+</html>

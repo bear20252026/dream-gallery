@@ -63,6 +63,10 @@ async function testData() {
 }
 
 // ---------- 2. 服务器 API 行为 ----------
+// 固定测试 IP:realIP 无条件信任 x-forwarded-for,
+// 用稳定 IP 让封禁/拦截断言确定性通过(避免 me.ip 取到回环地址导致时好时坏)
+const TEST_IP = '203.0.113.5';
+const XFF = { 'x-forwarded-for': TEST_IP };
 async function testApi(base) {
   console.log('\n[服务器 API(无鉴权)]');
   const TEST_NAME = '_test_upload_' + Date.now() + '.jpg';
@@ -82,8 +86,14 @@ async function testApi(base) {
     res = await fetch(base + '/api/upload?dir=photos&name=' + TEST_NAME, { method: 'POST', body: 'hello-test' });
     ok(res.status === 201 && fs.readFileSync(testPath, 'utf8') === 'hello-test', 'POST 上传文件成功且内容正确');
 
-    const list1 = await (await fetch(base + '/api/files?dir=photos')).json();
-    ok(list1.photos.some(f => f.name === TEST_NAME), '上传后文件出现在列表中');
+    // 列表可能异步刷新,轮询最多 3 秒确认文件出现(消除偶发时序竞态)
+    let listed = false;
+    for (let i = 0; i < 15 && !listed; i++) {
+      const list1 = await (await fetch(base + '/api/files?dir=photos')).json();
+      if (list1.photos.some(f => f.name === TEST_NAME)) { listed = true; break; }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    ok(listed, '上传后文件出现在列表中');
 
     res = await fetch(base + '/api/files/photos/' + TEST_NAME, { method: 'DELETE' });
     ok(res.status === 200 && !fs.existsSync(testPath), 'DELETE 删除成功且磁盘文件已移除');
@@ -255,7 +265,7 @@ async function testApproval(base) {
   res = await fetch(base + '/api/gate/status', { headers: { cookie: cookieHeader() } });
   const st1 = await res.json();
   ok(st1.status === 'approved' && st1.enter === true, '开启后立即获得进入权限');
-  res = await fetch(base + '/', { headers: { cookie: cookieHeader() } });
+  res = await fetch(base + '/', { headers: { cookie: cookieHeader(), 'x-forwarded-for': '203.0.113.5' } });
   ok(!(await res.text()).includes('开启邀请函'), '开启后直达真正首页');
 
   // 4. 后台需 token
@@ -281,7 +291,7 @@ async function testApproval(base) {
   saveCookies(res);
   const st2 = await res.json();
   ok(st2.enter === true && !!jar.pass, '批准后状态接口补发通行证');
-  res = await fetch(base + '/', { headers: { cookie: cookieHeader() } });
+  res = await fetch(base + '/', { headers: { cookie: cookieHeader(), 'x-forwarded-for': '203.0.113.5' } });
   const home = await res.text();
   ok(res.status === 200 && !home.includes('领取邀请函'), '持通行证可访问真正首页');
 
@@ -295,14 +305,14 @@ async function testApproval(base) {
 
   // 9. 撤销批准 → 归入历史,通行证立即失效
   res = await fetch(base + '/api/admin/decide?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: jar.vid, action: 'revoke' }) });
-  res = await fetch(base + '/', { headers: { cookie: cookieHeader() } });
+  res = await fetch(base + '/', { headers: { cookie: cookieHeader(), 'x-forwarded-for': '203.0.113.5' } });
   ok((await res.text()).includes('暂时无法参观'), '撤销批准后通行证立即失效');
   res = await fetch(base + '/api/admin/list?token=t1');
   ok((await res.json()).applicants.find(a => a.id === jar.vid).status === 'history', '撤销后归入历史(不回待批准)');
 
   // 10. 拒绝 → 显示重申通道(任何用户都有权重新领取邀请函)
   res = await fetch(base + '/api/admin/decide?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: jar.vid, action: 'deny' }) });
-  res = await fetch(base + '/', { headers: { cookie: cookieHeader() } });
+  res = await fetch(base + '/', { headers: { cookie: cookieHeader(), 'x-forwarded-for': '203.0.113.5' } });
   ok((await res.text()).includes('暂时无法参观'), '被拒绝后提供重新申请通道');
 
   // 15. 链接点击埋点 → 后台可见 → 导出 xlsx(PK) → 批量清理
@@ -329,12 +339,12 @@ async function testApproval(base) {
   const rateIdx = al.alerts.findIndex(a => a.type === 'rate');
   res = await fetch(base + '/api/admin/alerts?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'dismiss', idx: rateIdx }) });
   ok(res.status === 200, '忽略单条预警成功');
-  const myIp2 = me.ip;
+  const myIp2 = TEST_IP;
   res = await fetch(base + '/api/admin/bulk?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'block', ip: myIp2 }) });
-  res = await fetch(base + '/', { headers: { cookie: cookieHeader() } });
+  res = await fetch(base + '/', { headers: { cookie: cookieHeader(), ...XFF } });
   ok((await res.text()).includes('已被拉黑'), '预警封 IP 立即生效');
   res = await fetch(base + '/api/admin/bulk?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unblock', ip: myIp2 }) });
-  res = await fetch(base + '/', { headers: { cookie: cookieHeader() } });
+  res = await fetch(base + '/', { headers: { cookie: cookieHeader(), 'x-forwarded-for': '203.0.113.5' } });
   ok(res.status === 200 && !(await res.text()).includes('已被拉黑'), '解除封禁后恢复访问(防误封)');
   for (let i = 0; i < 9; i++) { await fetch(base + '/api/files/photos/abuse_' + i + '.jpg?token=t1', { method: 'DELETE' }); }
 
@@ -344,15 +354,15 @@ async function testApproval(base) {
   ok((await res.json()).applicants.find(a => a.id === jar.vid).note === '测试备注', '设备备注已保存');
 
   // 16. 关注/拉黑 IP
-  const myIp = me.ip;
+  const myIp = TEST_IP;
   res = await fetch(base + '/api/admin/bulk?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'watch', ip: myIp }) });
   res = await fetch(base + '/api/admin/list?token=t1');
   ok((await res.json()).watch.includes(myIp), '设为重点关注生效');
   await fetch(base + '/api/admin/bulk?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unwatch', ip: myIp }) });
   res = await fetch(base + '/api/admin/bulk?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'block', ip: myIp }) });
-  res = await fetch(base + '/api/gate/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: 'x' }) });
+  res = await fetch(base + '/api/gate/apply', { method: 'POST', headers: { 'Content-Type': 'application/json', ...XFF }, body: JSON.stringify({ answer: 'x' }) });
   ok(res.status === 403, '拉黑 IP 后申请被拒绝');
-  res = await fetch(base + '/', { headers: { cookie: cookieHeader() } });
+  res = await fetch(base + '/', { headers: { cookie: cookieHeader(), ...XFF } });
   ok((await res.text()).includes('已被拉黑'), '拉黑 IP 后访问被拦截');
   await fetch(base + '/api/admin/bulk?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'unblock', ip: myIp }) });
 
@@ -370,9 +380,9 @@ async function testApproval(base) {
   const kick = await res.json();
   ok(kick.enter === false && kick.status === 'history', '无Cookie撤销后状态明确为可踢出(enter=false)');
   // 拒绝后:无 Cookie 也能拿到 denied(等待页不再卡死)
-  await fetch(base + '/api/gate/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: '无cookie访客' }) });
+  await fetch(base + '/api/gate/apply', { method: 'POST', headers: { 'Content-Type': 'application/json', ...XFF }, body: JSON.stringify({ answer: '无cookie访客' }) });
   const list4 = await (await fetch(base + '/api/admin/list?token=t1')).json();
-  const me3 = list4.applicants.find(a => a.ip === me.ip);
+  const me3 = list4.applicants.find(a => a.ip === TEST_IP);
   await fetch(base + '/api/admin/decide?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: me3.id, action: 'deny' }) });
   res = await fetch(base + '/api/gate/status'); // 不带 Cookie
   const den = await res.json();
@@ -408,10 +418,10 @@ async function testApproval(base) {
   ok((await res.text()).includes('暂时无法参观'), '伪造通行证被拦截');
 
   // 12. 设备归组:同 IP+UA 换名字申请 → 同一条记录(被撤销/拒绝后回到 pending)
-  res = await fetch(base + '/api/gate/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: '改名后的张三' }) });
+  res = await fetch(base + '/api/gate/apply', { method: 'POST', headers: { 'Content-Type': 'application/json', ...XFF }, body: JSON.stringify({ answer: '改名后的张三' }) });
   res = await fetch(base + '/api/admin/list?token=t1');
   const list3 = await res.json();
-  const sameDev = list3.applicants.filter(a => a.ip === me.ip);
+  const sameDev = list3.applicants.filter(a => a.ip === TEST_IP);
   ok(sameDev.length === 1 && sameDev[0].answer === '改名后的张三' && sameDev[0].status === 'approved', '同设备换名申请归并为一条记录');
 
   // 13. 无 Cookie 设备兜底:批准后,不带任何 Cookie 也能进入(模拟 App 内置浏览器)

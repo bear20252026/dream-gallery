@@ -1,173 +1,482 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>梦幻画廊 · 昆仑灵鉴</title>
-<link rel="stylesheet" href="/src/styles/main.css">
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#2a1030">
-<script>
-// PWA:生产环境注册 Service Worker(媒体缓存优先,静态 SWR);开发环境不注册
-if('serviceWorker' in navigator&&location.hostname!=='localhost'&&!/^(127\.|192\.168\.|10\.)/.test(location.hostname)){
-  window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});
-}
-</script>
-</head>
-<body>
-<!-- 内嵌面板:白板/音乐等分支页面,关闭即返回画廊 -->
-<div id="panelOv">
-<div id="panelBar"><span id="panelTitle"></span><button id="panelClose" onclick="closePanel()">✕ 返回画廊</button></div>
-<iframe id="panelFrame" src="about:blank"></iframe>
-</div>
-<div id="l"><div class="x">梦幻画廊 · 昆仑灵鉴</div><div class="y" id="loadY">正在布置展览...</div><div class="z" style="position:absolute;bottom:26px;left:0;right:0;text-align:center;color:rgba(255,182,200,0.45);font-size:12px;letter-spacing:2px;">本游戏为3D交互作品,寻找属于你的彩蛋</div></div>
-<script>document.getElementById('loadY').textContent=Math.random()<0.5?'女娲碎石时，有一片落进了你的相机。':'每一幅被你凝视过的画，都在昆仑多亮一盏灯。';</script>
-<div id="c"></div>
-<div id="posD" style="position:fixed;bottom:70px;left:50%;transform:translateX(-50%);z-index:30;background:rgba(0,0,0,0.6);color:#0f0;font-family:monospace;font-size:13px;padding:4px 12px;border-radius:6px;pointer-events:none;letter-spacing:1px;">X:0.00 | Y:0.00 | Z:0.00</div>
-<div id="o">
-<div id="t">梦幻画廊 &middot; 昆仑灵鉴</div>
-<div id="hp" style="position:absolute;top:36px;left:50%;transform:translateX(-50%);color:rgba(255,180,200,0.4);font-size:10px;letter-spacing:1px;white-space:nowrap;z-index:15;pointer-events:none;display:none;">WASD移动 | 鼠标拖拽转视角 | 滚轮缩放</div>
-<div id="m"><canvas id="mc"></canvas></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover"
+    />
+    <title>梦幻画廊 · 昆仑灵鉴</title>
+    <link rel="stylesheet" href="/src/styles/main.css" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#2a1030" />
+    <!-- 预加载：提前下载关键资源，页面加载时直接用缓存 -->
+    <link rel="modulepreload" href="/src/main.js" />
+    <link rel="preconnect" href="https://cdn.cloudbear.cloud" />
+    <link rel="dns-prefetch" href="https://cdn.cloudbear.cloud" />
+    <script>
+      // PWA:生产环境注册 Service Worker(媒体缓存优先,静态 SWR);开发环境不注册
+      if (
+        'serviceWorker' in navigator &&
+        location.hostname !== 'localhost' &&
+        !/^(127\.|192\.168\.|10\.)/.test(location.hostname)
+      ) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('/sw.js').catch(function () {});
+        });
+      }
+      // ===================== 版本迁移 v8(2026-07-31):所有用户回归最初状态 =====================
+      // 必须在模块加载前执行(prologue.js 会读 prologueDone 决定走新老用户分支)
+      // 强制清除序章完成标记 + 性别选择标记 → 新老访客统一重走序章和性别选择
+      // 只执行一次(写入 kunlunVer=v8 后不再清),之后正常缓存
+      (function () {
+        try {
+          if (localStorage.getItem('kunlunVer') !== 'v8') {
+            localStorage.removeItem('kunlunPrologueDone'); // 重新走序章
+            localStorage.removeItem('genderSelected'); // 重新选性别
+            localStorage.removeItem('gender'); // 清除性别存档
+            localStorage.setItem('kunlunVer', 'v8');
+          }
+        } catch (e) {}
+      })();
+    </script>
+  </head>
+  <body>
+    <!-- 内嵌面板:白板/音乐等分支页面,关闭即返回画廊 -->
+    <div id="panelOv">
+      <div id="panelBar">
+        <span id="panelTitle"></span
+        ><button id="panelClose" onclick="closePanel()">✕ 返回画廊</button>
+      </div>
+      <iframe id="panelFrame" src="about:blank"></iframe>
+    </div>
+    <div id="l">
+      <div class="x">梦幻画廊 · 昆仑灵鉴</div>
+      <div class="y" id="loadY">正在布置展览...</div>
+      <div
+        class="z"
+        style="
+          position: absolute;
+          bottom: 26px;
+          left: 0;
+          right: 0;
+          text-align: center;
+          color: rgba(255, 182, 200, 0.45);
+          font-size: 12px;
+          letter-spacing: 2px;
+        "
+      >
+        本游戏为3D交互作品,寻找属于你的彩蛋
+      </div>
+    </div>
+    <script>
+      document.getElementById('loadY').textContent =
+        Math.random() < 0.5
+          ? '女娲碎石时，有一片落进了你的相机。'
+          : '每一幅被你凝视过的画，都在昆仑多亮一盏灯。';
+    </script>
+    <div id="c"></div>
+    <div
+      id="posD"
+      style="
+        position: fixed;
+        bottom: 70px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 30;
+        background: rgba(0, 0, 0, 0.6);
+        color: #0f0;
+        font-family: monospace;
+        font-size: 13px;
+        padding: 4px 12px;
+        border-radius: 6px;
+        pointer-events: none;
+        letter-spacing: 1px;
+      "
+    >
+      X:0.00 | Y:0.00 | Z:0.00
+    </div>
+    <div id="o">
+      <div id="t">梦幻画廊 &middot; 昆仑灵鉴</div>
+      <div
+        id="hp"
+        style="
+          position: absolute;
+          top: 36px;
+          left: 50%;
+          transform: translateX(-50%);
+          color: rgba(255, 180, 200, 0.4);
+          font-size: 10px;
+          letter-spacing: 1px;
+          white-space: nowrap;
+          z-index: 15;
+          pointer-events: none;
+          display: none;
+        "
+      >
+        WASD移动 | 鼠标拖拽转视角 | 滚轮缩放
+      </div>
+      <div id="m"><canvas id="mc"></canvas></div>
 
-<div id="j"><div id="jb"></div><div id="jt"></div></div>
-<div id="lk"><div id="li"><svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,110,155,0.95)" stroke-width="2" width="26" height="26"><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="9" stroke-dasharray="4 3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/></svg></div></div>
-<button id="ab">开启音乐</button>
-<!-- AI文字介绍面板 -->
-<div id="aiPanel">
-<div class="aiTag">昆仑记忆回声</div>
-<div class="aiLine"></div>
-<div class="aiText" id="aiT"></div>
-<div class="aiLine"></div>
-<div class="aiStar">* * *</div>
-</div>
-</div>
+      <div id="j">
+        <div id="jb"></div>
+        <div id="jt"></div>
+      </div>
+      <div id="lk">
+        <div id="li">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="rgba(255,110,155,0.95)"
+            stroke-width="2"
+            width="26"
+            height="26"
+          >
+            <circle cx="12" cy="12" r="4" />
+            <circle cx="12" cy="12" r="9" stroke-dasharray="4 3" />
+            <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+          </svg>
+        </div>
+      </div>
+      <button id="ab">开启音乐</button>
+      <!-- AI文字介绍面板 -->
+      <div id="aiPanel">
+        <div class="aiTag">昆仑记忆回声</div>
+        <div class="aiLine"></div>
+        <div class="aiText" id="aiT"></div>
+        <div class="aiLine"></div>
+        <div class="aiStar">* * *</div>
+      </div>
+    </div>
 
-<!-- 温柔度测试面板 -->
-<div id="gtP">
-<div class="gtC" id="gtC">
-<div class="gtClose" onclick="closeGentleTest()">&times;</div>
-<div id="gtStart">
-<div class="gtH">&#10084; 温柔度测试</div>
-<div class="gtS">GENTLENESS TEST</div>
-<div style="text-align:center;margin:20px 0">
-<div style="font-size:56px;margin-bottom:12px">&#127800;</div>
-<div style="font-size:13px;color:rgba(255,200,220,0.7);line-height:1.8">每个人心中都住着一片花园<br>你的温柔，是花开的声音</div>
-<div style="font-size:11px;color:rgba(255,180,200,0.4);margin-top:12px">共5题 &middot; 测出你的温柔指数</div>
-</div>
-<button class="gtB" onclick="startGentleTest()">开始测试</button>
-</div>
-<div id="gtQuiz" style="display:none">
-<div class="gtH">&#10084; 温柔度测试</div>
-<div class="gtS">GENTLENESS TEST</div>
-<div class="gtProg"><div class="gtProgF" id="gtProgF"></div></div>
-<div id="gtQD"></div>
-<button class="gtB" id="gtNext" onclick="nextGentleQ()" style="display:none">下一题</button>
-</div>
-<div class="gtR" id="gtResult">
-<div style="font-size:14px;color:rgba(255,180,200,0.6);letter-spacing:3px">你的温柔指数</div>
-<div class="gtHeart" id="gtRH">&#10084;</div>
-<div class="gtScore" id="gtScore">0</div>
-<div class="gtRT" id="gtRT"></div>
-<div class="gtRD" id="gtRD"></div>
-<button class="gtB" onclick="restartGentleTest()" style="margin-top:20px">再测一次</button>
-</div>
-</div>
-</div>
+    <!-- 温柔度测试面板 -->
+    <div id="gtP">
+      <div class="gtC" id="gtC">
+        <div class="gtClose" onclick="closeGentleTest()">&times;</div>
+        <div id="gtStart">
+          <div class="gtH">&#10084; 温柔度测试</div>
+          <div class="gtS">GENTLENESS TEST</div>
+          <div style="text-align: center; margin: 20px 0">
+            <div style="font-size: 56px; margin-bottom: 12px">&#127800;</div>
+            <div style="font-size: 13px; color: rgba(255, 200, 220, 0.7); line-height: 1.8">
+              每个人心中都住着一片花园<br />你的温柔，是花开的声音
+            </div>
+            <div style="font-size: 11px; color: rgba(255, 180, 200, 0.4); margin-top: 12px">
+              共5题 &middot; 测出你的温柔指数
+            </div>
+          </div>
+          <button class="gtB" onclick="startGentleTest()">开始测试</button>
+        </div>
+        <div id="gtQuiz" style="display: none">
+          <div class="gtH">&#10084; 温柔度测试</div>
+          <div class="gtS">GENTLENESS TEST</div>
+          <div class="gtProg"><div class="gtProgF" id="gtProgF"></div></div>
+          <div id="gtQD"></div>
+          <button class="gtB" id="gtNext" onclick="nextGentleQ()" style="display: none">
+            下一题
+          </button>
+        </div>
+        <div class="gtR" id="gtResult">
+          <div style="font-size: 14px; color: rgba(255, 180, 200, 0.6); letter-spacing: 3px">
+            你的温柔指数
+          </div>
+          <div class="gtHeart" id="gtRH">&#10084;</div>
+          <div class="gtScore" id="gtScore">0</div>
+          <div class="gtRT" id="gtRT"></div>
+          <div class="gtRD" id="gtRD"></div>
+          <button class="gtB" onclick="restartGentleTest()" style="margin-top: 20px">
+            再测一次
+          </button>
+        </div>
+      </div>
+    </div>
 
-<script>
-// 全局错误捕获:屏幕显示 + 信标回传后台(仅后台可见,2026-07-25)
-(function(){
-  function beacon(msg,src,line){
-    try{
-      var body=JSON.stringify({msg:String(msg).slice(0,300),src:String(src||'').slice(0,200),line:line||0});
-      if(navigator.sendBeacon){navigator.sendBeacon('/api/track/error',new Blob([body],{type:'application/json'}));}
-      else{fetch('/api/track/error',{method:'POST',headers:{'Content-Type':'application/json'},body,keepalive:true}).catch(function(){});}
-    }catch(e){}
-  }
-  window.__errBeacon=beacon;
-  window.onerror=function(msg,url,line,col,err){beacon(msg,url,line);console.error('ERR:',msg,err);document.getElementById('l').innerHTML='<div style=color:#ff6b6b;font-size:16px;>加载出错: '+msg+'</div><div style=color:#888;font-size:12px;margin-top:8px;>行:'+line+' 列:'+col+'</div>';};
-  window.addEventListener('unhandledrejection',function(e){beacon('Promise: '+(e.reason&&e.reason.message||e.reason),e.reason&&e.reason.stack?String(e.reason.stack).split('\n')[1]:'',0);console.error('PROMISE ERR:',e.reason);document.getElementById('l').innerHTML='<div style=color:#ff6b6b;font-size:16px;>加载出错: '+e.reason+'</div>';});
-})();
-</script>
-<script>
-// 秒级踢出:SSE 长连接接收服务端踢出指令(审批变更即刻推送),10秒轮询兜底
-(function(){
-  async function recheck(){
-    try{
-      const r=await fetch('/api/gate/status');
-      if(!r.ok)return;
-      const d=await r.json();
-      if(d&&d.enter===false)location.reload();
-    }catch(e){}
-  }
-  try{
-    const es=new EventSource('/api/gate/watch');
-    es.onmessage=function(e){if(e.data==='recheck')recheck();};
-  }catch(e){}
-  setInterval(recheck,10000);
-})();
+    <script>
+      // 全局错误捕获:屏幕显示 + 信标回传后台(仅后台可见,2026-07-25)
+      (function () {
+        function beacon(msg, src, line) {
+          try {
+            var body = JSON.stringify({
+              msg: String(msg).slice(0, 300),
+              src: String(src || '').slice(0, 200),
+              line: line || 0,
+            });
+            if (navigator.sendBeacon) {
+              navigator.sendBeacon(
+                '/api/track/error',
+                new Blob([body], { type: 'application/json' })
+              );
+            } else {
+              fetch('/api/track/error', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body,
+                keepalive: true,
+              }).catch(function () {});
+            }
+          } catch (e) {}
+        }
+        window.__errBeacon = beacon;
+        window.onerror = function (msg, url, line, col, err) {
+          beacon(msg, url, line);
+          console.error('ERR:', msg, err);
+          document.getElementById('l').innerHTML =
+            '<div style=color:#ff6b6b;font-size:16px;>加载出错: ' +
+            msg +
+            '</div><div style=color:#888;font-size:12px;margin-top:8px;>行:' +
+            line +
+            ' 列:' +
+            col +
+            '</div>';
+        };
+        window.addEventListener('unhandledrejection', function (e) {
+          beacon(
+            'Promise: ' + ((e.reason && e.reason.message) || e.reason),
+            e.reason && e.reason.stack ? String(e.reason.stack).split('\n')[1] : '',
+            0
+          );
+          console.error('PROMISE ERR:', e.reason);
+          document.getElementById('l').innerHTML =
+            '<div style=color:#ff6b6b;font-size:16px;>加载出错: ' + e.reason + '</div>';
+        });
+      })();
+    </script>
+    <script>
+      // 秒级踢出:SSE 长连接接收服务端踢出指令(审批变更即刻推送),10秒轮询兜底
+      (function () {
+        async function recheck() {
+          try {
+            const r = await fetch('/api/gate/status');
+            if (!r.ok) return;
+            const d = await r.json();
+            if (d && d.enter === false) location.reload();
+          } catch (e) {}
+        }
+        try {
+          const es = new EventSource('/api/gate/watch');
+          es.onmessage = function (e) {
+            if (e.data === 'recheck') recheck();
+          };
+        } catch (e) {}
+        setInterval(recheck, 10000);
+      })();
 
-// ===== 内嵌面板:白板/音乐等分支页面在画廊内打开,关闭即返回,不重新加载 =====
-window.openPanel=function(url,title){
-  const p=document.getElementById('panelOv');
-  document.getElementById('panelTitle').textContent=title||'';
-  document.getElementById('panelFrame').src=url;
-  p.style.display='flex';
-};
-// 协议强制阅读锁(2026-07-26):锁定期内隐藏面板关闭键,Esc 同步失效,签了才放行
-window.setPanelLock=function(on){
-  const b=document.getElementById('panelClose');
-  if(b)b.style.visibility=on?'hidden':'visible';
-  window.__panelLocked=!!on;
-};
-window.closePanel=function(){
-  if(window.__panelLocked)return; // 协议强制阅读中,禁止关闭
-  const p=document.getElementById('panelOv');
-  p.style.display='none';
-  document.getElementById('panelFrame').src='about:blank'; // 停止面板内音频/画布
-};
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closePanel();});
+      // ===== 内嵌面板:白板/音乐等分支页面在画廊内打开,关闭即返回,不重新加载 =====
+      window.openPanel = function (url, title) {
+        const p = document.getElementById('panelOv');
+        document.getElementById('panelTitle').textContent = title || '';
+        document.getElementById('panelFrame').src = url;
+        p.style.display = 'flex';
+      };
+      // 协议强制阅读锁(2026-07-26):锁定期内隐藏面板关闭键,Esc 同步失效,签了才放行
+      window.setPanelLock = function (on) {
+        const b = document.getElementById('panelClose');
+        if (b) b.style.visibility = on ? 'hidden' : 'visible';
+        window.__panelLocked = !!on;
+      };
+      window.closePanel = function () {
+        if (window.__panelLocked) return; // 协议强制阅读中,禁止关闭
+        const p = document.getElementById('panelOv');
+        p.style.display = 'none';
+        document.getElementById('panelFrame').src = 'about:blank'; // 停止面板内音频/画布
+      };
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closePanel();
+      });
 
-// 昆仑灵鉴:退出告别——关闭/刷新页面前,淡出一句「昆仑留着你的光。」(不是弹窗,不拦退出)
-window.addEventListener('beforeunload',function(){
-  var d=document.createElement('div');
-  d.textContent='你带走的不只是记忆。昆仑留着你的光。';
-  d.style.cssText='position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;background:rgba(16,8,14,0.92);color:rgba(255,220,190,0.9);font-size:16px;letter-spacing:4px;pointer-events:none;opacity:0;transition:opacity .6s';
-  document.body.appendChild(d);
-  requestAnimationFrame(function(){d.style.opacity='1';});
-});
-</script>
-<script>
-// 临时错误捕获器(排查手机端加载问题):把 JS 错误直接显示在屏幕上
-(function(){
-  function show(m){
-    var el=document.getElementById('errTrap');
-    if(!el){
-      el=document.createElement('div');el.id='errTrap';
-      el.style.cssText='position:fixed;left:0;bottom:0;max-width:100%;max-height:35%;overflow:auto;z-index:99999;color:#ff8080;background:rgba(0,0,0,0.8);font-size:10px;line-height:1.4;padding:6px;white-space:pre-wrap;font-family:monospace';
-      (document.body||document.documentElement).appendChild(el);
-    }
-    el.textContent+=m+'\n';
-    if(el.textContent.length>3000)el.textContent=el.textContent.slice(-2000);
-  }
-  window.addEventListener('error',function(e){
-    show('[ERR] '+(e.message||'加载失败')+' @ '+String(e.filename||'').split('/').pop()+':'+(e.lineno||''));
-  },true);
-  window.addEventListener('unhandledrejection',function(e){
-    show('[REJ] '+((e.reason&&(e.reason.message||e.reason))||'未知'));
-  });
-  // 捕获 console.error(着色器编译失败/THREE 诊断只走这里,不进 window.onerror)
-  var _ce=console.error;
-  console.error=function(){
-    var s='';
-    for(var i=0;i<arguments.length;i++){var a=arguments[i];s+=(typeof a==='string'?a:(a&&a.message)||JSON.stringify(a))+' ';}
-    show('[CERR] '+s.slice(0,500));
-    _ce.apply(console,arguments);
-  };
-})();
-</script>
-<!-- importmap:本地原生 ESM(不经过 Vite)时把裸包名映射到 vendor 副本;Vite 构建忽略它,直接打包 node_modules -->
-<script type="importmap">{"imports":{"three":"/vendor/three.module.js","hls.js":"/vendor/hls.mjs"}}</script>
-<script type="module" src="/src/main.js"></script>
-</body>
+      // 昆仑灵鉴:退出告别——关闭/刷新页面前,淡出一句「昆仑留着你的光。」(不是弹窗,不拦退出)
+      window.addEventListener('beforeunload', function () {
+        var d = document.createElement('div');
+        d.textContent = '你带走的不只是记忆。昆仑留着你的光。';
+        d.style.cssText =
+          'position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;background:rgba(16,8,14,0.92);color:rgba(255,220,190,0.9);font-size:16px;letter-spacing:4px;pointer-events:none;opacity:0;transition:opacity .6s';
+        document.body.appendChild(d);
+        requestAnimationFrame(function () {
+          d.style.opacity = '1';
+        });
+      });
+    </script>
+    <script>
+      // 临时错误捕获器(排查手机端加载问题):把 JS 错误直接显示在屏幕上
+      (function () {
+        function show(m) {
+          var el = document.getElementById('errTrap');
+          if (!el) {
+            el = document.createElement('div');
+            el.id = 'errTrap';
+            el.style.cssText =
+              'position:fixed;left:0;bottom:0;max-width:100%;max-height:35%;overflow:auto;z-index:99999;color:#ff8080;background:rgba(0,0,0,0.8);font-size:10px;line-height:1.4;padding:6px;white-space:pre-wrap;font-family:monospace';
+            (document.body || document.documentElement).appendChild(el);
+          }
+          el.textContent += m + '\n';
+          if (el.textContent.length > 3000) el.textContent = el.textContent.slice(-2000);
+        }
+        window.addEventListener(
+          'error',
+          function (e) {
+            show(
+              '[ERR] ' +
+                (e.message || '加载失败') +
+                ' @ ' +
+                String(e.filename || '')
+                  .split('/')
+                  .pop() +
+                ':' +
+                (e.lineno || '')
+            );
+          },
+          true
+        );
+        window.addEventListener('unhandledrejection', function (e) {
+          show('[REJ] ' + ((e.reason && (e.reason.message || e.reason)) || '未知'));
+        });
+        // 捕获 console.error(着色器编译失败/THREE 诊断只走这里,不进 window.onerror)
+        var _ce = console.error;
+        console.error = function () {
+          var s = '';
+          for (var i = 0; i < arguments.length; i++) {
+            var a = arguments[i];
+            s += (typeof a === 'string' ? a : (a && a.message) || JSON.stringify(a)) + ' ';
+          }
+          show('[CERR] ' + s.slice(0, 500));
+          _ce.apply(console, arguments);
+        };
+      })();
+    </script>
+    <!-- importmap -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/vendor/three.module.js",
+          "three/examples/jsm/loaders/GLTFLoader.js": "/vendor/examples/jsm/loaders/GLTFLoader.js",
+          "three/examples/jsm/loaders/FBXLoader.js": "/vendor/examples/jsm/loaders/FBXLoader.js",
+          "three/examples/jsm/libs/fflate.module.js": "/vendor/examples/jsm/libs/fflate.module.js",
+          "three/examples/jsm/curves/NURBSCurve.js": "/vendor/examples/jsm/curves/NURBSCurve.js",
+          "hls.js": "/vendor/hls.mjs"
+        }
+      }
+    </script>
+    <script type="module" src="/src/main.js"></script>
+
+    <!-- 设备注册 + 管理员消息 -->
+    <script>
+      (function () {
+        // 心跳注册设备信息
+        var dk = '';
+        function reg() {
+          try {
+            var info = { ua: navigator.userAgent, screen: screen.width + 'x' + screen.height };
+            // 现代浏览器:用 userAgentData high-entropy API 拿精确型号
+            if (navigator.userAgentData) {
+              navigator.userAgentData
+                .getHighEntropyValues(['model', 'platformVersion', 'fullVersionList'])
+                .then(function (h) {
+                  info.model = h.model;
+                  info.platform = h.platform;
+                  info.platformVer = h.platformVersion;
+                })
+                .catch(function () {})
+                .finally(function () {
+                  doReg(info);
+                });
+            } else {
+              doReg(info);
+            }
+          } catch (e) {
+            setTimeout(reg, 25000);
+          }
+        }
+        function doReg(info) {
+          fetch('/api/device/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(info),
+          })
+            .then(function (r) {
+              return r.json();
+            })
+            .then(function (d) {
+              if (d && d.dk) {
+                dk = d.dk;
+                localStorage.setItem('_devDk', dk);
+              }
+              setTimeout(reg, 25000);
+            })
+            .catch(function () {
+              setTimeout(reg, 25000);
+            });
+        }
+
+        // 轮询管理员消息
+        function poll() {
+          try {
+            fetch('/api/device/messages')
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (d) {
+                if (d && d.msgs && d.msgs.length > 0) {
+                  d.msgs.forEach(function (m) {
+                    showAdminMsg(m.text);
+                  });
+                }
+                setTimeout(poll, 3000);
+              })
+              .catch(function () {
+                setTimeout(poll, 5000);
+              });
+          } catch (e) {
+            setTimeout(poll, 5000);
+          }
+        }
+        setTimeout(poll, 8000);
+
+        // 显示管理员消息弹窗
+        function showAdminMsg(text) {
+          var ov = document.createElement('div');
+          ov.style.cssText =
+            'position:fixed;top:12px;right:12px;z-index:600;max-width:300px;background:rgba(30,18,28,0.96);border:1px solid rgba(255,154,158,0.5);border-radius:14px;padding:14px 16px;color:#ffe2c4;font-size:13px;letter-spacing:1px;box-shadow:0 8px 30px rgba(0,0,0,.4)';
+          ov.innerHTML =
+            '<div style="font-size:10px;color:rgba(255,154,158,0.7);margin-bottom:6px">管理员消息</div>' +
+            '<div style="line-height:1.6">' +
+            text.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+            '</div>' +
+            '<div style="margin-top:8px;display:flex;gap:6px">' +
+            '<input class="_admRplInput" style="flex:1;min-width:0;padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:12px;outline:none" placeholder="回复管理员...">' +
+            '<button class="_admRplBtn" style="padding:6px 12px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff9a9e,#fecfef);color:#fff;font-size:12px;cursor:pointer">发送</button>' +
+            '</div>' +
+            '<span class="_admClose" style="position:absolute;top:4px;right:8px;cursor:pointer;font-size:14px;color:rgba(255,255,255,.4)">✕</span>';
+          document.body.appendChild(ov);
+          // 关闭按钮
+          ov.querySelector('._admClose').onclick = function () {
+            ov.remove();
+          };
+          // 发送按钮
+          ov.querySelector('._admRplBtn').onclick = function () {
+            var t = ov.querySelector('._admRplInput').value.trim();
+            if (t) {
+              fetch('/api/device/reply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: t }),
+              });
+              ov.querySelector('._admRplInput').value = '';
+            }
+          };
+          // 8秒后自动消失
+          setTimeout(function () {
+            if (ov.parentNode) ov.style.opacity = '0';
+            setTimeout(function () {
+              if (ov.parentNode) ov.remove();
+            }, 300);
+          }, 8000);
+        }
+
+        var s = document.createElement('style');
+        s.textContent =
+          '@keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}';
+        document.head.appendChild(s);
+      })();
+    </script>
+  </body>
 </html>

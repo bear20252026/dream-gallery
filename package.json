@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "check": "node scripts/gen/check.js",
+    "check": "npm run deps && npm run build && node scripts/test/test.js",
     "test": "node scripts/test/test-store.js && node scripts/test/test.js && node scripts/test/test-mobile.js",
     "debug": "node scripts/probe/debug-browser.js",
     "dev": "node scripts/gen/dev.js",
@@ -15,18 +15,38 @@
     "gen:thumbs": "node scripts/gen/gen-thumbs.js",
     "postinstall": "node scripts/gen/sync-vendor.js",
     "lint": "eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "deps": "npx depcruise src --include-only \"^src\" --no-config --output-type err",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "src/**/*.js": [
+      "prettier --write",
+      "eslint --fix",
+      "node scripts/test/test.js"
+    ],
+    "src/**/*.css": [
+      "prettier --write"
+    ],
+    "*.html": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "dependency-cruiser": "^18.1.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
     "globals": "^17.8.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
     "playwright-core": "^1.61.1",
     "prettier": "^3.9.6",
-    "vite": "^8.1.5"
+    "vite": "^8.1.5",
+    "vite-plugin-html": "^3.2.2"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1101.0",
     "dotenv": "^17.4.2",
     "hls.js": "^1.6.16",
     "three": "0.160.0"
