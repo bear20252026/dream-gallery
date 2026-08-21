@@ -165,7 +165,7 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
       on: window.__arkFF.on, lock: ctx.flightLock,
       hud: document.getElementById('arkHud').style.display,
       dx: ctx.pl.p.x - 800, dz: ctx.pl.p.z - 588,
-      arkVisible: (() => { let a = null; ctx.s.traverse(o => { if (o.type === 'Group' && !a) {} }); return true; })(),
+      arkVisible: (() => { let a = null; ctx.s.traverse(o => { if (o.type === 'Group' && !a) { a = o; } }); return !!a; })(),
     };
   });
   ok(st2.on === false && st2.lock === false, '返回地面:FF.on=false 且 flightLock 解除');

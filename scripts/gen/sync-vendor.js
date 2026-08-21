@@ -26,3 +26,26 @@ for (const [pkg, inner, out] of VENDORS) {
   fs.copyFileSync(src, path.join(DST_DIR, out));
   console.log(`[sync-vendor] vendor/${out} 已同步(${pkg}@${ver})`);
 }
+
+// Three.js 加载器依赖(vite.config.js alias 指向 vendor/):
+// FBXLoader + GLTFLoader + fflate + NURBSCurve
+const THREE_EXAMPLES = [
+  'examples/jsm/loaders/FBXLoader.js',
+  'examples/jsm/loaders/GLTFLoader.js',
+  'examples/jsm/libs/fflate.module.js',
+  'examples/jsm/curves/NURBSCurve.js',
+  'examples/jsm/curves/NURBSUtils.js',
+];
+
+for (const rel of THREE_EXAMPLES) {
+  const src = path.join(ROOT, 'node_modules', 'three', ...rel.split('/'));
+  const dst = path.join(DST_DIR, rel);
+  const dstDir = path.dirname(dst);
+  if (!fs.existsSync(src)) {
+    console.warn(`[sync-vendor] 跳过 ${rel}(node_modules 中不存在)`);
+    continue;
+  }
+  fs.mkdirSync(dstDir, { recursive: true });
+  fs.copyFileSync(src, dst);
+  console.log(`[sync-vendor] vendor/${rel} 已同步`);
+}

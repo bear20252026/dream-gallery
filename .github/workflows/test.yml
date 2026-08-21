@@ -1,11 +1,6 @@
 # 自动化测试门禁：把"全绿才部署"从人治变自动化
 # 触发：推送到 main / 任意 PR
-# 说明：
-#  - 前端构建(npm run build)是质量门禁,捕获导入/语法/打包回归
-#  - 后端原子写回归(test-store.js)是纯单测,不依赖媒体资源,干净克隆即可全绿
-#  - 完整集成测试 test.js / test-mobile.js 需要 photos/videos 媒体资源
-#    (videos/ 已 gitignore,不随仓库分发),仅在具备媒体资源的部署机或本地运行:
-#      node scripts/test/test.js && node scripts/test/test-mobile.js
+# 步骤：lint → typecheck → 单元测试 → 构建 → 后端回归
 name: CI
 
 on:
@@ -28,8 +23,28 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      - name: ESLint 代码规范检查
+        run: npm run lint
+
+      - name: TypeScript 类型检查
+        run: npm run typecheck
+
+      - name: Vitest 单元测试
+        run: npm run test:unit
+
       - name: 前端构建(质量门禁)
         run: npm run build
 
       - name: 后端原子写回归(无需媒体资源)
         run: node scripts/test/test-store.js
+
+      - name: Bundle 大小检查
+        run: |
+          MAIN_SIZE=$(wc -c < dist/assets/main-*.js 2>/dev/null || echo 0)
+          THREE_SIZE=$(wc -c < dist/assets/three-*.js 2>/dev/null || echo 0)
+          echo "main.js: ${MAIN_SIZE} bytes"
+          echo "three.js: ${THREE_SIZE} bytes"
+          # 超过 500KB 警告（不阻断，Three.js 本身就大）
+          if [ "$MAIN_SIZE" -gt 512000 ]; then
+            echo "⚠️ main.js 超过 500KB，考虑代码分割"
+          fi
