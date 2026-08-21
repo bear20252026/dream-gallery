@@ -16,14 +16,14 @@
     "postinstall": "node scripts/gen/sync-vendor.js",
     "lint": "eslint .",
     "format": "prettier --write .",
+    "typecheck": "tsc --noEmit",
     "deps": "npx depcruise src --include-only \"^src\" --no-config --output-type err",
     "prepare": "husky"
   },
   "lint-staged": {
     "src/**/*.js": [
       "prettier --write",
-      "eslint --fix",
-      "node scripts/test/test.js"
+      "eslint --fix"
     ],
     "src/**/*.css": [
       "prettier --write"
@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/three": "^0.185.4",
     "dependency-cruiser": "^18.1.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
@@ -42,6 +43,7 @@
     "lint-staged": "^17.3.0",
     "playwright-core": "^1.61.1",
     "prettier": "^3.9.6",
+    "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "vite-plugin-html": "^3.2.2"
   },

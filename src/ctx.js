@@ -117,7 +117,7 @@
  * @property {Object} avatar        头像/入场动画(若非上列归属)
  */
 
-/** @type {GalleryCtx} */
+/** @type {import('../types/ctx').GalleryCtx} */
 export const ctx = {};
 // 诊断钩子:探针脚本读取运行时状态(quizPassed/store/overlay 等)用
 if (typeof window !== 'undefined') window.__ctx = ctx;
