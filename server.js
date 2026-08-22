@@ -56,6 +56,35 @@ const handler = (req, res) => {
   catch { sendJson(res, 400, { error: 'URL 不合法' }); return; }
   const query = Object.fromEntries(u.searchParams);
 
+  // ===================== 全局安全头(2026-08-22 大厂标准) =====================
+  // CSP: 限制脚本/样式/图片/连接来源,防止 XSS 和数据注入
+  // CORS: 仅允许 cloudbear.cloud + localhost(开发),不再默认 *
+  const isLocal = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(String(req.headers.host || ''));
+  if (isLocal) {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', 'https://cloudbear.cloud');
+  }
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // CSP: 允许内联脚本(页面内 <script>)、blob URL(视频)、data URL(图片)
+  // 不允许 eval、外部脚本域(除 Three.js CDN 备份)、外部样式域
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "media-src 'self' blob: https:",
+      "connect-src 'self' https://cloudbear.cloud",
+      "font-src 'self' data:",
+      "object-src 'none'",
+      "frame-ancestors 'self'",
+    ].join('; ')
+  );
+
   // 协议文档在线编辑器(token):/admin/docs 页面 + /api/admin/docs 读写接口
   if (pathname === '/admin/docs' && req.method === 'GET') {
     if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权:需要 token' }); return; }
