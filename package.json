@@ -40,6 +40,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/three": "^0.185.4",
+    "better-sqlite3": "^13.0.3",
     "dependency-cruiser": "^18.1.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
