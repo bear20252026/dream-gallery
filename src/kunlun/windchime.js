@@ -36,10 +36,19 @@ hit.position.y=-0.12;cg.add(hit);
 cg.userData={eternalAction:'chime'};
 s.add(cg);iG.push(cg);
 
-// ===================== 声音:C5 + 泛音,2.5s 衰减 =====================
+// ===================== 声音:C5 + 泛音,2.5s 衰减(P3-3 空间化) =====================
+let spatialNode = null;
+function ensureSpatialNode(){
+  if(spatialNode) return;
+  const sa = ctx.media.spatialAudio;
+  if(!sa) return;
+  spatialNode = sa.createSpatialWebAudioNode(cg, {refDistance:8, maxDistance:30});
+}
 function chimeSound(delay){
   try{
-    const ac=chimeSound.ac||(chimeSound.ac=new (window.AudioContext||window.webkitAudioContext)());
+    ensureSpatialNode();
+    const ac = spatialNode ? spatialNode.context : (chimeSound.ac||(chimeSound.ac=new (window.AudioContext||window.webkitAudioContext)()));
+    const dest = spatialNode ? spatialNode.panner : ac.destination;
     const d=delay||0;
     [523.25,1046.5,1569.8].forEach((f,k)=>{
       const o=ac.createOscillator(),g=ac.createGain();
@@ -47,7 +56,7 @@ function chimeSound(delay){
       g.gain.setValueAtTime(0.0001,ac.currentTime+d);
       g.gain.exponentialRampToValueAtTime([0.2,0.09,0.045][k],ac.currentTime+d+0.015);
       g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+d+2.5);
-      o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+d);o.stop(ac.currentTime+d+2.6);
+      o.connect(g);g.connect(dest);o.start(ac.currentTime+d);o.stop(ac.currentTime+d+2.6);
     });
   }catch(e){}
 }
