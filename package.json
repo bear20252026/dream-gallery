@@ -19,6 +19,9 @@
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
     "test:watch": "vitest",
+    "optimize:images": "node scripts/optimize/optimize-textures.js",
+    "optimize:images:dry": "node scripts/optimize/optimize-textures.js --dry-run",
+    "optimize:models": "node scripts/optimize/optimize-models.js",
     "deps": "npx depcruise src --include-only \"^src\" --no-config --output-type err",
     "prepare": "husky"
   },
