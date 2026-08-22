@@ -42,13 +42,15 @@
     </script>
   </head>
   <body>
+    <!-- 无障碍:跳过链接(P3-4) -->
+    <a href="#c" class="skip-link" aria-label="跳过导航，直接进入画廊">跳到画廊</a>
     <!-- 内嵌面板:白板/音乐等分支页面,关闭即返回画廊 -->
-    <div id="panelOv">
+    <div id="panelOv" role="dialog" aria-modal="true" aria-label="内嵌面板">
       <div id="panelBar">
         <span id="panelTitle"></span
-        ><button id="panelClose" onclick="closePanel()">✕ 返回画廊</button>
+        ><button id="panelClose" onclick="closePanel()" aria-label="关闭面板，返回画廊">✕ 返回画廊</button>
       </div>
-      <iframe id="panelFrame" src="about:blank"></iframe>
+      <iframe id="panelFrame" src="about:blank" title="面板内容"></iframe>
     </div>
     <div id="l">
       <div class="x">梦幻画廊 · 昆仑灵鉴</div>
@@ -75,7 +77,7 @@
           ? '女娲碎石时，有一片落进了你的相机。'
           : '每一幅被你凝视过的画，都在昆仑多亮一盏灯。';
     </script>
-    <div id="c"></div>
+    <div id="c" role="application" aria-label="梦幻画廊 3D 场景" tabindex="0"></div>
     <div
       id="posD"
       style="
@@ -116,7 +118,7 @@
       >
         WASD移动 | 鼠标拖拽转视角 | 滚轮缩放
       </div>
-      <div id="m"><canvas id="mc"></canvas></div>
+      <div id="m" role="img" aria-label="小地图"><canvas id="mc"></canvas></div>
 
       <div id="j">
         <div id="jb"></div>
@@ -138,7 +140,7 @@
           </svg>
         </div>
       </div>
-      <button id="ab">开启音乐</button>
+      <button id="ab" aria-label="开启音乐" aria-pressed="false">开启音乐</button>
       <!-- AI文字介绍面板 -->
       <div id="aiPanel">
         <div class="aiTag">昆仑记忆回声</div>

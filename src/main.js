@@ -153,12 +153,16 @@ function showGuideCard() {
   if (ctx.store.str('nick')) return; // 已起名:不再显现
   const c = document.createElement('div');
   c.id = 'guideCard';
+  c.setAttribute('role', 'dialog');
+  c.setAttribute('aria-modal', 'false');
+  c.setAttribute('aria-label', '初见指引');
   c.style.cssText =
     'position:fixed;left:50%;top:64%;transform:translateX(-50%);z-index:75;background:rgba(30,18,28,0.95);border:1px solid rgba(255,214,170,0.35);border-radius:16px;padding:20px 26px;text-align:center;color:#ffe2c4';
   c.innerHTML =
     '<div style="font-size:15px;letter-spacing:2px;margin-bottom:10px">三千年来，第一个带着真意推开这扇门的，是你。<br>墙已经空了太久——挂上你的第一幅画吧。</div><div style="font-size:12px;letter-spacing:2px;margin-bottom:12px;opacity:.7">初见画廊,不妨先读《元素共鸣准则》</div>';
   const a = document.createElement('button');
   a.textContent = '读 一 读';
+  a.setAttribute('aria-label', '阅读元素共鸣准则');
   a.style.cssText =
     'padding:9px 22px;border:none;border-radius:9px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;cursor:pointer;margin-right:10px';
   a.onclick = () => {
@@ -216,6 +220,9 @@ function showGenderSelect() {
   if (document.getElementById('genderOv')) return;
   const ov = document.createElement('div');
   ov.id = 'genderOv';
+  ov.setAttribute('role', 'dialog');
+  ov.setAttribute('aria-modal', 'true');
+  ov.setAttribute('aria-label', '性别选择');
   ov.style.cssText =
     'position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.7)';
   const card = document.createElement('div');
@@ -225,10 +232,12 @@ function showGenderSelect() {
     '<div style="font-size:18px;letter-spacing:3px;margin-bottom:20px">你是男生还是女生？</div><div style="font-size:13px;opacity:.7;margin-bottom:24px">这会影响你的画廊配色方案</div>';
   const btnM = document.createElement('button');
   btnM.textContent = '男 生';
+  btnM.setAttribute('aria-label', '选择男生配色');
   btnM.style.cssText =
     'padding:12px 32px;border:none;border-radius:10px;background:linear-gradient(135deg,#4a8fc0,#2a5f8c);color:#fff;cursor:pointer;margin-right:16px;font-size:15px;letter-spacing:2px';
   const btnF = document.createElement('button');
   btnF.textContent = '女 生';
+  btnF.setAttribute('aria-label', '选择女生配色');
   btnF.style.cssText =
     'padding:12px 32px;border:none;border-radius:10px;background:linear-gradient(135deg,#e8a0b4,#c07090);color:#fff;cursor:pointer;font-size:15px;letter-spacing:2px';
   btnM.onclick = () => {

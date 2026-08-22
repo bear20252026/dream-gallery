@@ -67,3 +67,26 @@ body{background:#1a0a14;overflow:hidden;touch-action:manipulation;font-family:'C
 #aiPanel .aiText{color:rgba(255,220,230,0.88);font-size:13px;line-height:1.75;letter-spacing:0.5px;font-family:'Courier New',serif}
 #aiPanel .aiLine{width:40px;height:1px;background:rgba(255,150,180,0.3);margin:10px 0}
 #aiPanel .aiStar{color:rgba(255,180,160,0.4);font-size:11px;letter-spacing:2px}
+/* ===================== 无障碍支持(P3-4,2026-08-22) ===================== */
+/* 焦点可见样式:键盘导航时显示高亮轮廓 */
+button:focus-visible,a:focus-visible,[tabindex]:focus-visible{
+  outline:2px solid rgba(255,180,200,0.8);
+  outline-offset:2px;
+  border-radius:4px;
+}
+/* 跳过链接:屏幕阅读器专用,视觉隐藏 */
+.skip-link{
+  position:absolute;left:-9999px;top:0;z-index:9999;
+  padding:8px 16px;background:rgba(30,15,25,0.95);color:#ffb6c8;
+  font-size:13px;text-decoration:none;border-radius:0 0 8px 0;
+}
+.skip-link:focus{left:0}
+/* 高对比度模式:媒体查询 */
+@media (prefers-contrast: high){
+  *{border-color:rgba(255,255,255,0.6)!important}
+  button,a{border:1px solid rgba(255,255,255,0.5)!important}
+}
+/* 减少动画:用户偏好 */
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+}
