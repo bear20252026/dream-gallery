@@ -50,6 +50,7 @@ import {
   resizePostProcessing,
 } from './scene/postprocessing.js'; // 后处理管线(2026-08-22)
 import { initPerfMonitor } from './scene/perf-monitor.js'; // 性能监控面板(2026-08-22)
+import { initSentry } from './shared/sentry.js'; // Sentry 错误追踪(2026-08-22)
 
 const {
   L,
@@ -96,6 +97,7 @@ const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别�
 // ===================== 后处理管线初始化(2026-08-22) =====================
 initPostProcessing(rnd, s, cam);
 initPerfMonitor(rnd); // ?perf 显示性能面板
+initSentry(); // Sentry 错误追踪(需配置 DSN)
 window.addEventListener('resize', () => {
   const w = innerWidth,
     h = innerHeight;

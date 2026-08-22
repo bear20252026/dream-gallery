@@ -17,7 +17,7 @@ export default [
     files: ['src/**/*.js', 'data.js'],
     languageOptions: {
       ecmaVersion: 2022, sourceType: 'module',
-      globals: { ...globals.browser },
+      globals: { ...globals.browser, Sentry: 'readonly' },
     },
     rules: {
       ...js.configs.recommended.rules,
