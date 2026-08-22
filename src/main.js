@@ -44,6 +44,11 @@ setTimeout(function () {
 import './kunlun/letgo.js'; // 放下与召回·二期⑤(长按消解成光尘/空画框/罗盘召回;软删除铁律)
 import './kunlun/finale.js'; // 终章三件套·二期⑥(俯瞰天穹/心象投影/灵蕴归位·六合藏梦人)
 import { IdleState } from './player/states/PlayerStates.js'; // 移动状态机(2026-08-01)
+import {
+  initPostProcessing,
+  renderPostProcessing,
+  resizePostProcessing,
+} from './scene/postprocessing.js'; // 后处理管线(2026-08-22)
 
 const {
   L,
@@ -86,6 +91,17 @@ const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别�
   // 保留的吊顶灯同步削弱 pls 闪烁列表,避免对已移除灯的无效更新
   for (let i = pls.length - 1; i >= 0; i--) if (!ceil.has(pls[i].l)) pls.splice(i, 1);
 }
+
+// ===================== 后处理管线初始化(2026-08-22) =====================
+initPostProcessing(rnd, s, cam);
+window.addEventListener('resize', () => {
+  const w = innerWidth,
+    h = innerHeight;
+  rnd.setSize(w, h);
+  cam.aspect = w / h;
+  cam.updateProjectionMatrix();
+  resizePostProcessing(w, h);
+});
 
 // ===================== 动画 =====================
 let lt = performance.now();
@@ -263,7 +279,7 @@ function an() {
         'X:' + pl.p.x.toFixed(2) + ' | Y:' + pl.p.y.toFixed(2) + ' | Z:' + pl.p.z.toFixed(2);
   }
   drM();
-  rnd.render(s, cam);
+  renderPostProcessing();
 }
 an();
 // 新游戏引擎循环(与旧循环并行,分阶段 INPUT→UPDATE→RENDER→UI)
