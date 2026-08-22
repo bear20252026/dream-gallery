@@ -107,26 +107,190 @@ window.addEventListener('resize', () => {
   resizePostProcessing(w, h);
 });
 
-// ===================== 动画（使用统一循环管理器）=====================
-import { LoopManager } from './loop-manager.js';
-const loopManager = new LoopManager(ctx);
-ctx.loopManager = loopManager;
-
+// ===================== 动画 =====================
+let lt = performance.now();
+let lastPosT = 0,
+  lastDayT = 0,
+  lastPlsT = 0,
+  lastVidT = 0;
+// 自适应画质(2026-07-25):帧率持续低自动降 pixelRatio,回升自动恢复;最多每 3 秒调一次
+const PR_STEPS = [Math.min(devicePixelRatio, 2), 1.5, 1.25, 1];
+let prIdx = 0,
+  prLastChange = 0,
+  fpsAcc = 0,
+  fpsCnt = 0;
 // D4 低画质手动开关(2026-07-30):开启后强制最低 pixelRatio(最流畅),自适应只降不升
-const lowQuality = !!ctx.store.json('lowQuality', false);
+let lowQuality = !!ctx.store.json('lowQuality', false);
 if (lowQuality) {
-  loopManager.setLowQuality(true);
+  prIdx = PR_STEPS.length - 1;
+  rnd.setPixelRatio(PR_STEPS[prIdx]);
 }
-ctx.setLowQuality = (on) => loopManager.setLowQuality(on); // 供设置页罗盘调用
+function setLowQuality(on) {
+  lowQuality = !!on;
+  try {
+    ctx.store.setJson('lowQuality', lowQuality);
+  } catch (e) {}
+  prIdx = lowQuality ? PR_STEPS.length - 1 : 0;
+  rnd.setPixelRatio(PR_STEPS[prIdx]);
+  if (ctx.ui.modeToast)
+    ctx.ui.modeToast(lowQuality ? '已切到「低画质·流畅」(PixelRatio=1)' : '已恢复「高画质·自动」');
+}
+ctx.setLowQuality = setLowQuality; // 供设置页罗盘调用
+function adaptiveQuality(now, dt) {
+  if (lowQuality) {
+    // 手动低画质:钉死最低档,不再自适应回升
+    if (prIdx !== PR_STEPS.length - 1) {
+      prIdx = PR_STEPS.length - 1;
+      rnd.setPixelRatio(PR_STEPS[prIdx]);
+    }
+    return;
+  }
+  fpsAcc += dt;
+  fpsCnt++;
+  if (fpsAcc < 2) return; // 每 2 秒评估一次
+  const avg = fpsCnt / fpsAcc;
+  fpsAcc = 0;
+  fpsCnt = 0;
+  if (now - prLastChange < 3000) return;
+  if (avg < 35 && prIdx < PR_STEPS.length - 1) {
+    prIdx++;
+    rnd.setPixelRatio(PR_STEPS[prIdx]);
+    prLastChange = now;
+    // 生产环境不输出画质日志
+  } else if (avg > 52 && prIdx > 0) {
+    prIdx--;
+    rnd.setPixelRatio(PR_STEPS[prIdx]);
+    prLastChange = now;
+  }
+}
+function an() {
+  requestAnimationFrame(an);
+  const now = performance.now();
+  const dt = Math.min((now - lt) / 1000, 0.1);
+  lt = now;
+  adaptiveQuality(now, dt);
 
-// 启动统一循环管理器
-loopManager.start();
-
-// 新游戏引擎循环(与统一循环管理器并行,分阶段 INPUT→UPDATE→RENDER→UI)
+  // 画廊移动逻辑
+  let mx = jD.x,
+    mz = jD.z;
+  if (ks.w || ks.arrowup) mz += 1;
+  if (ks.s || ks.arrowdown) mz -= 1;
+  if (ks.a || ks.arrowleft) mx -= 1;
+  if (ks.d || ks.arrowright) mx += 1;
+  const mg = Math.sqrt(mx * mx + mz * mz);
+  if (mg > 0.1) {
+    mx /= mg;
+    mz /= mg;
+    const fx = -Math.sin(pl.y),
+      fz = -Math.cos(pl.y),
+      rx = Math.cos(pl.y),
+      rz = -Math.sin(pl.y);
+    mv(fx * mz + rx * mx, fz * mz + rz * mx, dt);
+  }
+  // 跳跃/滑翔物理(改 pl.p.y,须在相机同步前执行)
+  tickPhysics(dt);
+  // 相机每帧同步:站立时拖拽转视角/滚轮俯仰也要生效(此前只在 mv 行走时同步)
+  if (ctx.player.viewMode === 1) {
+    // 第三人称(原神展示视角·锁定机位):角色居中、全身入镜、近距微俯视
+    // 固定值不受俯仰影响;配合窄FOV让角色填满画面(对标原神衣柜)
+    const fx = -Math.sin(pl.y),
+      fz = -Math.cos(pl.y);
+    const back = 1.3; // 展示级超近距离:角色占画面主体
+    const up = 1.0; // 腰部高度:自然俯视
+    const bx = pl.p.x - fx * back;
+    const bz = pl.p.z - fz * back;
+    if (ctx.scene.avatar) ctx.scene.avatar.visible = true;
+    let cy = pl.p.y + up;
+    if (ctx.media.desert) {
+      const gy = ctx.media.desert.getH(bx, bz);
+      if (cy < gy + 0.35) cy = gy + 0.35;
+    }
+    cam.position.set(bx, cy, bz);
+    // 注视胸部(y+1.0):近距微俯视→全身入镜,角色画面居中
+    cam.lookAt(pl.p.x, pl.p.y + 1.0, pl.p.z);
+    // 第三人称用窄FOV(50°):角色在画面中更大更突出(原神展示感);第一人称保持75°
+    cam.fov = 50;
+    cam.updateProjectionMatrix();
+    if (ctx.scene.avatar) {
+      ctx.scene.avatar.position.copy(pl.p);
+      ctx.scene.avatar.position.y = 0.1;
+      ctx.scene.avatar.rotation.y = pl.y + Math.PI;
+    } // +PI:FBX 绑定朝向补偿(可微调)
+  } else {
+    if (ctx.scene.avatar) ctx.scene.avatar.visible = false; // 第一人称隐藏角色(相机即眼睛)
+    cam.position.copy(pl.p);
+    cam.rotation.y = pl.y;
+    cam.rotation.x = pl.pi;
+    // 滑翔气流颠簸(西域原版手感)
+    if (pl.gliding) {
+      cam.position.y += Math.sin(now * 0.008) * 0.04 + Math.sin(now * 0.013) * 0.02;
+      cam.position.x += Math.sin(now * 0.005) * 0.02;
+    }
+  }
+  // 沙漠区块/水面/飞鸟/沙暴逐帧更新
+  if (ctx.media.desert) ctx.media.desert.update(dt, now * 0.001);
+  // 统一昼夜:60秒一昼夜(西域原版流速);颜色/灯光 10Hz 刷新足够平滑,弱GPU减负
+  const hour = (12 + now / 2500) % 24;
+  ctx.media.dayHour = hour;
+  if (ctx.media.desert && now - lastDayT > 100) {
+    lastDayT = now;
+    ctx.media.desert.dayNight(hour);
+  }
+  // 滑翔时视野拉宽,落地恢复;第三人称保持窄FOV(展示感)
+  const tFov = pl.gliding ? 82 : ctx.player.viewMode === 1 ? 50 : 75;
+  if (Math.abs(cam.fov - tFov) > 0.01) {
+    cam.fov += (tFov - cam.fov) * dt * 4;
+    cam.updateProjectionMatrix();
+  }
+  // 吊灯闪烁 10Hz 节流(原本每帧33盏全刷,视觉无差别)
+  if (now - lastPlsT > 100) {
+    lastPlsT = now;
+    pls.forEach((p, i) => {
+      p.l.intensity = p.base * (1 + Math.sin(now * 0.002 + i * 1.3) * 0.06);
+    });
+  }
+  const _pG = ctx.media.pG,
+    _pC = ctx.media.pC; // effects.js 热更新后引用会换,每帧从 ctx 现取
+  const pp = _pG.attributes.position.array;
+  for (let i = 0; i < _pC; i++) {
+    pp[i * 3 + 1] += Math.sin(now * 0.0004 + i * 0.6) * 0.001;
+    if (pp[i * 3 + 1] > WH - 0.3) pp[i * 3 + 1] = 0.5;
+  }
+  _pG.attributes.position.needsUpdate = true;
+  // 更新天空 uniform
+  skyUniforms.uTime.value = performance.now() * 0.001;
+  groundUniforms.uTime.value = performance.now() * 0.001;
+  skyUniforms.uCameraPos.value.copy(pl.p);
+  groundUniforms.uCameraPos.value.copy(pl.p);
+  // 更新烟花(ctx 现取:effects.js 热更新后引用会换)
+  if (ctx.media.updateFireworks) ctx.media.updateFireworks();
+  drawMusicCanvas();
+  // 每帧动画(浮动/自转/闪烁/滚动等)现统一由 ctx.loop(引擎)的 update 阶段驱动,
+  // 见 ctx.js:ctx.onTick→ctx.loop.on('update')。此处不再重复迭代,避免与引擎循环双重执行——
+  // 此前两套独立 rAF 循环都跑 tickers,导致动画 2x 速、状态机双 tick、且相机/角色朝向顺序不定。
+  // 仅播放中才上传视频帧,且按 30Hz 节流(视频本身只有 24-30fps,60Hz 上传是纯浪费)
+  if (now - lastVidT > 33) {
+    lastVidT = now;
+    if (vidTex && vidEl && vidEl.readyState >= 2 && !vidEl.paused) vidTex.needsUpdate = true;
+    if (v45Tex && v45El && v45El.readyState >= 2 && !v45El.paused) v45Tex.needsUpdate = true;
+  }
+  // 更新坐标显示(降频到每 200ms,避免每帧写 DOM)
+  if (now - lastPosT > 200) {
+    lastPosT = now;
+    const posEl = document.getElementById('posD');
+    if (posEl)
+      posEl.textContent =
+        'X:' + pl.p.x.toFixed(2) + ' | Y:' + pl.p.y.toFixed(2) + ' | Z:' + pl.p.z.toFixed(2);
+  }
+  drM();
+  renderPostProcessing();
+}
+an();
+// 新游戏引擎循环(与旧循环并行,分阶段 INPUT→UPDATE→RENDER→UI)
 ctx.loop.start();
 // 玩家状态机:启动时初始化为空闲状态
 ctx._playerSM.change(new IdleState());
-// 每帧更新状态机(在统一循环管理器的 tickers 中,紧随物理之后执行)
+// 每帧更新状态机(在旧循环 tickers 中,紧随物理之后执行)
 ctx.onTick(function (dt) {
   ctx._playerSM.tick(dt);
 });
