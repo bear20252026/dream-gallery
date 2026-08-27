@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>梦幻画廊 · 聚会大厅</title>
+    <link rel="stylesheet" href="/src/room/room.css" />
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <div class="lobby">
+      <div class="lobby-card">
+        <h1 class="lobby-title">聚会大厅</h1>
+        <div class="lobby-sub">LOBBY · 邀 3-4 位好友同游</div>
+
+        <div class="field">
+          <label for="name">你的昵称</label>
+          <input id="name" maxlength="16" placeholder="给自己起个名字" autocomplete="off" />
+        </div>
+
+        <button class="btn" id="createBtn">创建房间</button>
+
+        <div class="divider">或 输入房间码加入</div>
+
+        <div class="field">
+          <input id="code" maxlength="6" placeholder="房间码，如 A1B2" autocomplete="off" style="text-transform: uppercase; letter-spacing: 4px; text-align: center;" />
+        </div>
+        <button class="btn ghost" id="joinBtn">加入房间</button>
+
+        <div class="hint">
+          创建后会生成房间码，发给好友即可一起进房。<br />
+          房间内可实时看到彼此走动、聊天、做表情。
+        </div>
+        <a class="back-link" href="/">← 返回单人画廊</a>
+      </div>
+    </div>
+
+    <script type="module" src="/src/room/lobby.js"></script>
+  </body>
+</html>

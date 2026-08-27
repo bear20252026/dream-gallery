@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>梦幻画廊 · 聚会房间</title>
+    <link rel="stylesheet" href="/src/room/room.css" />
+    <link rel="stylesheet" href="/src/styles/main.css" />
+  </head>
+  <body>
+    <div id="room-c"></div>
+
+    <div class="room-hud">房间 <b id="hudCode">----</b> · 在线 <b id="hudCount">0</b></div>
+    <div class="room-banner" id="banner">连接中…</div>
+
+    <button class="leave-btn" id="leaveBtn">离开房间</button>
+
+    <div class="chat">
+      <div class="chat-log" id="chatLog"></div>
+      <div class="chat-input">
+        <input id="chatInput" maxlength="200" placeholder="说点什么…" autocomplete="off" />
+        <button id="chatSend">发送</button>
+      </div>
+    </div>
+
+    <div class="emotes">
+      <button class="emote-btn" data-e="wave" title="招手">👋</button>
+      <button class="emote-btn" data-e="point" title="指向">👉</button>
+      <button class="emote-btn" data-e="sit" title="坐下">🪑</button>
+    </div>
+
+    <div class="move-pad">
+      <span></span>
+      <button data-dir="f">▲</button>
+      <span></span>
+      <button data-dir="l">◀</button>
+      <span></span>
+      <button data-dir="r">▶</button>
+      <span></span>
+      <button data-dir="b">▼</button>
+      <span></span>
+    </div>
+
+    <script type="module" src="/src/room/main.js"></script>
+  </body>
+</html>

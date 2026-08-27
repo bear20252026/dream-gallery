@@ -264,6 +264,17 @@ server.listen(PORT, () => {
   console.log(`  DELETE /api/files/<dir>/<name>          删除文件`);
 });
 
+// 多人房间(ws):大厅+房间,3-4 人实时同步。单人大地图不受影响。
+// 关闭方式:环境变量 MULTI=off
+try {
+  if (process.env.MULTI !== 'off') {
+    const attachMultiplayer = require('./lib/multiplayer');
+    attachMultiplayer(server, { path: '/ws' });
+  }
+} catch (e) {
+  console.log('[multiplayer] 未启用:', e.message);
+}
+
 // HTTPS 监听(3443,Cloudflare Origin 证书):供 Worker 加密回源,边缘↔源站全加密
 // 证书仅 Cloudflare 边缘信任(Origin CA),浏览器直连会告警属正常
 try {

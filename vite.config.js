@@ -54,6 +54,8 @@ export default defineConfig({
         agreement:  resolve(__dirname, 'agreement.html'),
         privacy:    resolve(__dirname, 'privacy.html'),
         community:  resolve(__dirname, 'community.html'),
+        lobby:      resolve(__dirname, 'lobby.html'),
+        room:       resolve(__dirname, 'room.html'),
       },
       // 分包:three.js 独立(browser 缓存 600KB,永不重复下载);业务代码 ~280KB 单独变
       output: {
