@@ -236,6 +236,44 @@ body {
   cursor: pointer;
 }
 .leave-btn:active { transform: scale(0.96); }
+.invite-btn {
+  position: fixed;
+  top: 52px;
+  right: 14px;
+  z-index: 12;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: rgba(255, 154, 158, 0.16);
+  color: var(--ink);
+  font-size: 12px;
+  letter-spacing: 1px;
+  cursor: pointer;
+  max-width: 44vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.invite-btn:active { transform: scale(0.96); }
+.room-hint {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9;
+  max-width: min(520px, 86vw);
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.7;
+  letter-spacing: 1px;
+  color: var(--ink);
+  background: rgba(20, 12, 28, 0.55);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 20px;
+  pointer-events: none;
+  display: none;
+}
 .move-pad {
   position: fixed;
   left: 14px;

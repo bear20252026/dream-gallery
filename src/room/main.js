@@ -11,6 +11,8 @@ const chatLog = document.getElementById('chatLog');
 const chatInput = document.getElementById('chatInput');
 const chatSend = document.getElementById('chatSend');
 const leaveBtn = document.getElementById('leaveBtn');
+const roomHint = document.getElementById('roomHint');
+const inviteBtn = document.getElementById('inviteBtn');
 
 const params = new URLSearchParams(location.search);
 const ROOM = (params.get('code') || '').toUpperCase();
@@ -28,7 +30,9 @@ scene.background = new THREE.Color('#241029');
 scene.fog = new THREE.Fog('#241029', 24, 60);
 
 const camera = new THREE.PerspectiveCamera(60, innerWidth / innerHeight, 0.1, 200);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+camera.position.set(0, 7, 12);
+camera.lookAt(0, 1, 0);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 container.appendChild(renderer.domElement);
@@ -58,6 +62,46 @@ const ring = new THREE.Mesh(
 ring.rotation.x = -Math.PI / 2;
 ring.position.y = 0.02;
 scene.add(ring);
+
+// 氛围装饰:环形灯柱 + 中央光柱。即使房间里只有一个人,也明显是个 3D 空间,不会"一片空白"
+function addAmbiance() {
+  const posts = 6;
+  for (let i = 0; i < posts; i++) {
+    const a = (i / posts) * Math.PI * 2;
+    const r = 8;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const post = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.12, 0.16, 2.2, 8),
+      new THREE.MeshStandardMaterial({ color: '#2a1c34', roughness: 0.8 })
+    );
+    post.position.set(x, 1.1, z);
+    scene.add(post);
+    const orb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.34, 16, 16),
+      new THREE.MeshStandardMaterial({ color: '#ffd9a0', emissive: '#ffb347', emissiveIntensity: 1.5 })
+    );
+    orb.position.set(x, 2.6, z);
+    scene.add(orb);
+  }
+  const beam = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.5, 0.95, 6, 24, 1, true),
+    new THREE.MeshBasicMaterial({ color: '#ff9a9e', transparent: true, opacity: 0.12, side: THREE.DoubleSide })
+  );
+  beam.position.y = 3;
+  scene.add(beam);
+  // 几块漂浮水晶,增加空间纵深感
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + 0.4;
+    const r = 5 + (i % 2);
+    const cry = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(0.5, 0),
+      new THREE.MeshStandardMaterial({ color: '#bff', emissive: '#88c', emissiveIntensity: 0.5, roughness: 0.3 })
+    );
+    cry.position.set(Math.cos(a) * r, 1.4 + (i % 3) * 0.5, Math.sin(a) * r);
+    scene.add(cry);
+  }
+}
+addAmbiance();
 
 // ---------- 头像 ----------
 function makeTag(text, bg) {
@@ -123,8 +167,13 @@ const padDir = { f: false, b: false, l: false, r: false };
 let lastSent = 0;
 
 function setCount() {
-  hudCount.textContent = String(remotes.size + (me ? 1 : 0));
+  const n = remotes.size + (me ? 1 : 0);
+  hudCount.textContent = String(n);
+  if (me && n <= 1) showHint(`房间暂时只有你 · 房间码 ${hudCode.textContent} · 把链接发给朋友,他们进来就能看到你`);
+  else hideHint();
 }
+function showHint(text) { roomHint.textContent = text; roomHint.style.display = 'block'; }
+function hideHint() { roomHint.style.display = 'none'; }
 
 // ---------- 网络 ----------
 let ws = null;
@@ -250,6 +299,20 @@ document.querySelectorAll('.emote-btn').forEach((b) => {
   };
 });
 leaveBtn.onclick = () => { if (ws) ws.close(); location.href = '/lobby.html'; };
+
+// 复制邀请链接(房间码已在 URL 里,朋友打开即可进同一房间)
+if (inviteBtn) {
+  inviteBtn.onclick = async () => {
+    const link = location.href;
+    try {
+      await navigator.clipboard.writeText(link);
+      inviteBtn.textContent = '已复制 ✓';
+    } catch (e) {
+      inviteBtn.textContent = link;
+    }
+    setTimeout(() => { inviteBtn.textContent = '复制邀请链接'; }, 2000);
+  };
+}
 
 // ---------- 输入 ----------
 addEventListener('keydown', (e) => {
