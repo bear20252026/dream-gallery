@@ -5,6 +5,8 @@
 // 冷核心:本模块不接 HMR(与 ctx.js 同级);热模块注册后必须在 bag.custom 里 unregister。
 // Esc 优先级:本模块在 main.js 最先 import,监听器最先注册——有弹层先关弹层并截停;
 //   栈空时放行给后注册的消费者(ark 飞行 / player 画作放大 / settings 面板)。
+// 生命周期:ctx.ui.overlay 服务在模块顶层注入(保证 Esc 监听最先注册,不被延迟到 System.init 破坏优先级);
+//   关闭/销毁出口(closeAll/destroy)由 core/ui-system.js 在组合根 dispose 时调用,实现 ui 域生命周期收口。
 import {ctx} from '../ctx.js';
 
 const layers=new Map(); // el -> cfg
@@ -62,16 +64,33 @@ function register(el,opts){
 }
 
 // Esc 统一栈(本模块最先 import,监听器最先触发;关到即止,下层弹层不吃同一个 Esc)
-document.addEventListener('keydown',e=>{
+// onEsc 命名以便 UiSystem.dispose 能精确移除该全局监听(收口生命周期,避免泄漏)
+function onEsc(e){
   if(e.key!=='Escape')return;
   for(let i=stack.length-1;i>=0;i--){
     const cfg=layers.get(stack[i]);
     if(cfg&&cfg.escapable&&closeLayer(cfg,'esc')){e.stopImmediatePropagation();return;}
   }
-});
+}
+document.addEventListener('keydown',onEsc);
+
+// 关闭全部已开弹层(保留 Esc 监听,供后续复用)——UiSystem.dispose 调用
+function closeAll(){
+  for(let i=stack.length-1;i>=0;i--)closeLayer(layers.get(stack[i]),'api');
+  stack.length=0;
+}
+// 彻底销毁:关闭全部 + 移除全局 Esc 监听 + 清空注册表(应用卸载/HMR 收口用)
+function destroyOverlay(){
+  closeAll();
+  layers.clear();
+  document.removeEventListener('keydown',onEsc);
+}
 
 ctx.ui.overlay={
   register,
   anyOpen(){return stack.length>0;},
   isUiTouch(t){return !!(t&&t.closest&&t.closest('[data-overlay]'));},
+  closeAll,
+  destroy:destroyOverlay,
 };
+export { destroyOverlay, closeAll };

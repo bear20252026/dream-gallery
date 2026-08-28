@@ -125,11 +125,16 @@ if (typeof window !== 'undefined') window.__ctx = ctx;
 // ===================== 游戏主循环(2026-08-01 引擎化改造) =====================
 import { GameLoop } from './loop.js';
 ctx.loop = new GameLoop();
-// 向后兼容:ctx.onTick(fn) → ctx.loop.on('update',fn)
+// 单一驱动:只保留 ctx.tickers 一路,由 LoopManager 在 UPDATE 阶段统一执行。
+// 早期曾同时 ctx.tickers.push 又 ctx.loop.on('update'),导致每个 onTick 每帧执行两次(双循环 bug)。
+// GameLoop 实例仍保留,仅作 timeScale(暂停)的持有者,不再自起 rAF。
 ctx.tickers = [];
 ctx.onTick = (fn) => {
   ctx.tickers.push(fn);
-  return ctx.loop.on('update', fn);
+  return () => {
+    const i = ctx.tickers.indexOf(fn);
+    if (i >= 0) ctx.tickers.splice(i, 1);
+  };
 };
 
 // ===================== 实体注册表 + 输入管理器 =====================
@@ -137,8 +142,7 @@ import { EntityRegistry, InputManager } from './engine.js';
 ctx.ent = new EntityRegistry();
 ctx.input = new InputManager();
 ctx.input.initDefaults();
-// 输入处理在 INPUT 阶段
-ctx.loop.on('input', (dt) => ctx.input.tick(dt));
+// 输入 tick 由 LoopManager 的 INPUT 阶段调用(单一主循环,不再经 ctx.loop)
 
 // ===================== 命名空间别名层 + 扁平写软冻结(2026-08-22 架构优化) =====================
 // 扁平路径永久可用(老代码零改动);新代码用命名空间路径,读/写都经 get/set 委托到同一个真实存储 vault——
@@ -155,6 +159,7 @@ import { createSceneNamespace } from './ctx-scene.js';
 import { createMediaNamespace } from './ctx-media.js';
 import { createGalleryNamespace } from './ctx-gallery.js';
 import { createModeNamespace } from './ctx-mode.js';
+import { getGameState } from './core/game-state.js';
 
 // 创建命名空间代理对象
 ctx.ui = createUINamespace(vault);
@@ -164,6 +169,38 @@ ctx.scene = createSceneNamespace(vault);
 ctx.media = createMediaNamespace(vault);
 ctx.gallery = createGalleryNamespace(vault);
 ctx.mode = createModeNamespace(vault);
+
+// ===================== Stage 4 冻结:写路径单入口早注册(2026-08-29) =====================
+// 把命名空间运行期状态 prop 的 bindNamespace 注册提前到命名空间创建处(早于任何模块导入期直写),
+// 使 player.js:28 viewMode=0 / quizgate.js:29 quizPassed=true 等导入期直写也经 gameState.set 单入口,
+// 彻底消除「导入期绕过单入口」残留缺陷。apply 直写 vault + 直发 emitPropertyChange(不经代理 set 陷阱,避免递归)。
+// 命名空间 set 陷阱对已绑 prop 委托 gameState.set;非绑 prop 维持原自写 vault + 发事件行为。
+const gs = getGameState();
+gs.bindNamespace(
+  'mode',
+  ['siteMode', 'customLinks', 'demoPhotos', 'myUploads', 'myUploadTokens', 'myLinks', 'myCaptions'],
+  (prop, val) => {
+    const old = vault[prop];
+    if (old !== val) {
+      vault[prop] = val;
+      eventBus.emitPropertyChange('mode', prop, val, old);
+    }
+  }
+);
+gs.bindNamespace('player', ['quizPassed', 'viewMode'], (prop, val) => {
+  const old = vault[prop];
+  if (old !== val) {
+    vault[prop] = val;
+    eventBus.emitPropertyChange('player', prop, val, old);
+  }
+});
+gs.bindNamespace('kunlun', ['flightLock'], (prop, val) => {
+  const old = vault[prop];
+  if (old !== val) {
+    vault[prop] = val;
+    eventBus.emitPropertyChange('kunlun', prop, val, old);
+  }
+});
 
 // 向后兼容：为所有命名空间属性创建扁平访问器
 const allNamespaces = [ctx.ui, ctx.kunlun, ctx.player, ctx.scene, ctx.media, ctx.gallery, ctx.mode];

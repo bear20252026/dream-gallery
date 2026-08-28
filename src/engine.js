@@ -171,6 +171,27 @@ export class InputManager {
     return { x: this._mouse.dx, y: this._mouse.dy };
   }
 
+  /** 原始键是否按下(供统一输入 facade 读取,不新增监听) */
+  isKeyDown(key) {
+    return !!this._keys[String(key).toLowerCase()];
+  }
+
+  /** 指针完整状态(绝对坐标 + 本帧增量 + 是否按下) */
+  get pointer() {
+    return {
+      x: this._mouse.x,
+      y: this._mouse.y,
+      dx: this._mouse.dx,
+      dy: this._mouse.dy,
+      down: this._mouse.down,
+    };
+  }
+
+  /** 触摸状态 */
+  get touch() {
+    return { active: this._touch.active, x: this._touch.x, y: this._touch.y };
+  }
+
   /** 初始化默认按键绑定和监听 */
   initDefaults() {
     this.bindAction('forward', ['w', 'arrowup']);

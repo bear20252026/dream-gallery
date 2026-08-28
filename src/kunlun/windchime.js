@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
+import {getAudioSystem} from '../core/audio-system.js'; // 阶段2:空间音频桥接(替代 ctx.media.spatialAudio)
 const bag=hotBegin('windchime');
 const {s,onTick,iG}=ctx;
 
@@ -40,7 +41,7 @@ s.add(cg);iG.push(cg);
 let spatialNode = null;
 function ensureSpatialNode(){
   if(spatialNode) return;
-  const sa = ctx.media.spatialAudio;
+  const sa = getAudioSystem();
   if(!sa) return;
   spatialNode = sa.createSpatialWebAudioNode(cg, {refDistance:8, maxDistance:30});
 }

@@ -18,7 +18,7 @@ export const MODULES = [
 
   // ── 3D 场景（依赖冷核心）──
   { name: 'scene', path: './scene/scene.js', group: 'scene' },
-  { name: 'effects', path: './scene/effects.js', group: 'scene' },
+  // effects 已迁移为 core/effects-system.js(阶段3 切片),经组合根注入 deps 注册,不再是副作用模块
   { name: 'media', path: './scene/media.js', group: 'scene' },
 
   // ── 户外元素 ──

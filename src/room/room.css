@@ -295,3 +295,65 @@ body {
 @media (hover: hover) and (pointer: fine) {
   .move-pad { display: none; } /* 桌面用键盘,移动端显示 */
 }
+
+/* ============ 小地图 ============ */
+#minimap {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 12;
+  width: 132px;
+  height: 132px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 154, 158, 0.12), transparent 60%),
+    rgba(20, 12, 28, 0.78);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  pointer-events: none;
+}
+/* 房间中心光环在小地图上的标记 */
+#minimap::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 154, 158, 0.6);
+}
+.mini-dot {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  transition: left 0.18s linear, top 0.18s linear;
+}
+.mini-dot.self {
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border-color: #fff;
+  box-shadow: 0 0 8px #fff;
+  z-index: 2;
+}
+/* ============ 开源署名 ============ */
+.attr-note {
+  position: fixed;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  z-index: 8;
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--ink-dim);
+  opacity: 0.7;
+  pointer-events: none;
+  white-space: nowrap;
+  text-align: center;
+}

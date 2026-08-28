@@ -1,6 +1,8 @@
 // player.js — 玩家移动/碰撞 + 键盘 + 鼠标 + 触摸(摇杆) + 小地图 + 状态机
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
+import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
+const gs = getGameState();
 const { cam, rnd, bounds, jT, jB, onC3D, zoomOut, OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
 
 // ===================== 移动状态机(2026-08-01) =====================
@@ -249,7 +251,7 @@ document.addEventListener('keydown', (e) => {
 });
 // V 键切换第一/第三人称
 function toggleView() {
-  ctx.player.viewMode = ctx.player.viewMode === 1 ? 0 : 1;
+  gs.set('viewMode', ctx.player.viewMode === 1 ? 0 : 1); // 阶段4:经 gameState.set 写回(读者 ctx.player.viewMode 经 vault 同步)
   if (ctx.scene.avatar) ctx.scene.avatar.visible = ctx.player.viewMode === 1;
   window.quizToast &&
     window.quizToast(

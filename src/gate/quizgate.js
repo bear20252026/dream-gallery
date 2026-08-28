@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
+import { getGameState } from '../core/game-state.js'; // 阶段4:quizPassed 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
+const gs = getGameState();
 // 热更新:先销毁旧实例(围墙/答题屏/定时器/DOM/iG/碰撞体见文末 custom),再执行新代码
 // 注意:onTick 必须在 hotBegin 之后解构,拿到的才是被捕获包装的版本
 const bag = hotBegin('quizgate');
@@ -42,12 +44,12 @@ const gateWalls = null;
 const gateBounds = [];
 
 function unlockGallery(notify) {
-  ctx.player.quizPassed = true;
+  gs.set('quizPassed', true);
   drawPanel(true);
   if (notify) window.quizToast('🎉 答题通过!天穹进度已更新');
 }
 function lockGallery(reason) {
-  ctx.player.quizPassed = false;
+  gs.set('quizPassed', false);
   drawPanel(false);
   window.quizToast(reason || '答题状态已更新');
 }
@@ -57,8 +59,8 @@ setInterval(async function () {
   try {
     const r = await fetch('/api/quiz/state');
     const d = await r.json();
-    if (d.passed && !ctx.player.quizPassed) ctx.player.quizPassed = true;
-    else if (!d.passed && ctx.player.quizPassed) ctx.player.quizPassed = false;
+    if (d.passed && !gs.get('quizPassed')) gs.set('quizPassed', true);
+    else if (!d.passed && gs.get('quizPassed')) gs.set('quizPassed', false);
   } catch (e) {}
 }, 5000);
 

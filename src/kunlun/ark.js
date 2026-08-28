@@ -9,6 +9,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
+import { getGameState } from '../core/game-state.js'; // 阶段4:flightLock 写路径收归 gameState.set(写回经 set 陷阱发事件)
+const gs = getGameState();
 const bag = hotBegin('ark');
 const spiritCount = () => spiritCount();
 const { s, onTick } = ctx;
@@ -586,7 +588,7 @@ function startFree() {
   histLast = 0;
   FF.lastT = performance.now();
   _camPos.copy(FF.pos); // 相机从船上平滑拉出
-  ctx.kunlun.flightLock = true; // 总锁:player 移动/物理/小地图/回家键全部冻结
+  gs.set('flightLock', true); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步) // 总锁:player 移动/物理/小地图/回家键全部冻结
   boardBtn.style.display = 'none';
   hud.style.display = 'block';
   ark.visible = true;
@@ -621,7 +623,7 @@ function endFree(mode) {
   // 隐藏荧光路线
   routeVisible = false;
   routeGroup.visible = false;
-  ctx.kunlun.flightLock = false;
+  gs.set('flightLock', false); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步)
   const pl = ctx.player.pl;
   if (mode === 'ground') {
     pl.p.set(PARK.x, groundY(PARK.x, PARK.z + 3) + 1.6, PARK.z + 3);
@@ -844,7 +846,7 @@ function startFlight() {
   flying = true;
   flyT0 = performance.now();
   flySeg = -1;
-  ctx.kunlun.flightLock = true; // player.js:移动/物理/小地图传送/回家键全部冻结
+  gs.set('flightLock', true); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步) // player.js:移动/物理/小地图传送/回家键全部冻结
   boardBtn.style.display = 'none';
   skipBtn.style.display = 'block';
   ark.visible = false;
@@ -894,7 +896,7 @@ function dock() {
   ctx.scene.cam.position.copy(pl.p);
   ctx.scene.cam.rotation.y = pl.y;
   ctx.scene.cam.rotation.x = pl.pi;
-  ctx.kunlun.flightLock = false;
+  gs.set('flightLock', false); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步)
   ctx.store.mark('arkFlew');
   ctx.kunlun.eternalWelcome && ctx.kunlun.eternalWelcome(); // 首到欢迎(已迎过则静默)
   ctx.ui.modeToast && ctx.ui.modeToast('已停靠 · 永恒展厅南侧平台');
@@ -1049,11 +1051,11 @@ onTick(function () {
 
 bag.custom.push(() => {
   if (flying) {
-    ctx.kunlun.flightLock = false;
+    gs.set('flightLock', false); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步)
     flying = false;
   }
   if (FF.on) {
-    ctx.kunlun.flightLock = false;
+    gs.set('flightLock', false); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步)
     FF.on = false;
   }
   boardBtn.remove();

@@ -2,6 +2,7 @@
 node_modules/
 dist/
 vendor/
+*.tgz
 
 # 密钥与证书(永不入库)
 .env

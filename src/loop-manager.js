@@ -17,7 +17,6 @@ export class LoopManager {
     this._lastPosT = 0;
     this._lastDayT = 0;
     this._lastPlsT = 0;
-    this._lastVidT = 0;
     
     // 自适应画质
     this.PR_STEPS = [Math.min(devicePixelRatio, 2), 1.5, 1.25, 1];
@@ -125,8 +124,10 @@ export class LoopManager {
     requestAnimationFrame(() => this._frame());
 
     const now = performance.now();
-    const dt = Math.min((now - this._lastTime) / 1000, 0.1);
+    let dt = Math.min((now - this._lastTime) / 1000, 0.1);
     this._lastTime = now;
+    // 兼容暂停:timeScale 由 LoopManager.pause/resume 写入 ctx.loop.timeScale
+    dt *= this.ctx.loop.timeScale ?? 1;
     
     // 更新 FPS 计数
     this.frameCount++;
@@ -156,7 +157,7 @@ export class LoopManager {
     const { ctx } = this;
     const { jD, ks, pl, mv, drM } = ctx.player;
     const { cam, rnd, pls, WH, skyUniforms, groundUniforms } = ctx.scene;
-    const { vidTex, vidEl, v45Tex, v45El, drawMusicCanvas, updateFireworks, pG, pC, desert, dayHour } = ctx.media;
+    const { desert, dayHour } = ctx.media;
 
     // 1. INPUT 阶段 - 处理输入
     this._executeInputPhase(dt, now);
@@ -177,8 +178,10 @@ export class LoopManager {
    * @param {number} now - 当前时间
    */
   _executeInputPhase(dt, now) {
-    // 输入处理已经在 ctx.loop 的 input 阶段处理
-    // 这里可以添加额外的输入处理逻辑
+    // 统一输入阶段:由 InputManager 触发已绑定动作回调并复位鼠标增量
+    if (this.ctx.input && this.ctx.input.tick) {
+      this.ctx.input.tick(dt);
+    }
   }
 
   /**
@@ -190,7 +193,7 @@ export class LoopManager {
     const { ctx } = this;
     const { jD, ks, pl, mv, drM } = ctx.player;
     const { cam, pls, WH, skyUniforms, groundUniforms } = ctx.scene;
-    const { drawMusicCanvas, updateFireworks, pG, pC, desert, dayHour } = ctx.media;
+    const { desert, dayHour } = ctx.media;
 
     // 画廊移动逻辑
     let mx = jD.x, mz = jD.z;
@@ -239,28 +242,16 @@ export class LoopManager {
       });
     }
     
-    // 漂浮粒子
-    if (pG && pC) {
-      const pp = pG.attributes.position.array;
-      for (let i = 0; i < pC; i++) {
-        pp[i * 3 + 1] += Math.sin(now * 0.0004 + i * 0.6) * 0.001;
-        if (pp[i * 3 + 1] > WH - 0.3) pp[i * 3 + 1] = 0.5;
-      }
-      pG.attributes.position.needsUpdate = true;
-    }
-    
     // 更新天空 uniform
     skyUniforms.uTime.value = performance.now() * 0.001;
     groundUniforms.uTime.value = performance.now() * 0.001;
     skyUniforms.uCameraPos.value.copy(pl.p);
     groundUniforms.uCameraPos.value.copy(pl.p);
-    
-    // 更新烟花
-    if (updateFireworks) updateFireworks();
-    
-    // 音乐画布
-    if (drawMusicCanvas) drawMusicCanvas();
-    
+
+    // 注:烟花(updateFireworks)/漂浮粒子已迁出到 EffectsSystem(engine/animate),
+    // 音乐画布(drawMusicCanvas)/视频墙纹理已迁出到 MediaSystem(presentation/render),
+    // 二者均经组合根唯一单循环经 ctx.tickers 驱动,不再在此上帝渲染器散点读取。
+
     // 执行旧的 tickers（向后兼容）
     for (const fn of ctx.tickers) {
       try {
@@ -323,16 +314,9 @@ export class LoopManager {
    */
   _executeRenderPhase(dt, now) {
     const { ctx } = this;
-    const { vidTex, vidEl, v45Tex, v45El } = ctx.media;
     const { renderPostProcessing } = ctx.scene;
 
-    // 视频纹理更新（30Hz 节流）
-    if (now - this._lastVidT > 33) {
-      this._lastVidT = now;
-      if (vidTex && vidEl && vidEl.readyState >= 2 && !vidEl.paused) vidTex.needsUpdate = true;
-      if (v45Tex && v45El && v45El.readyState >= 2 && !v45El.paused) v45Tex.needsUpdate = true;
-    }
-    
+    // 注:视频墙纹理 needsUpdate 已迁出到 MediaSystem(presentation/render),由组合根单循环驱动。
     // 后处理渲染
     if (renderPostProcessing) renderPostProcessing();
   }

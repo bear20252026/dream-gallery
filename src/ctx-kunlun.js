@@ -5,6 +5,7 @@
 // ============================================================
 
 import { eventBus } from './event-bus.js';
+import { getGameState } from './core/game-state.js';
 
 /**
  * 创建昆仑命名空间
@@ -33,15 +34,21 @@ export function createKunlunNamespace(vault) {
     'fadeTeleport',
     'rebuildEternalPicks',
   ];
-  
+
   const proxy = {};
-  
+  const gs = getGameState();
+
   for (const prop of properties) {
     Object.defineProperty(proxy, prop, {
       get() {
         return vault[prop];
       },
       set(newValue) {
+        // Stage 4 冻结:已绑运行期状态 prop(flightLock)的直写收归 gameState.set 单入口。
+        if (gs.isBound(prop)) {
+          gs.set(prop, newValue);
+          return;
+        }
         const oldValue = vault[prop];
         if (oldValue !== newValue) {
           vault[prop] = newValue;

@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { ctx } from '../ctx.js';
+import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
+const gs = getGameState();
 
 let avatarModel = null;
 let mixer = null;
@@ -56,7 +58,7 @@ function ensureDemoBtn() {
     pl.p.z = 45;
     pl.p.y = 1.6;
     pl.y = Math.PI / 2;
-    ctx.player.viewMode = 1;
+    gs.set('viewMode', 1); // 阶段4:经 gameState.set 写回(读者 ctx.player.viewMode 经 vault 同步)
     thirdReady = true;
     setStatus('第三人称显示中 · 拖动鼠标环绕观看', '#66ff99');
     setTimeout(clearStatus, 3000);

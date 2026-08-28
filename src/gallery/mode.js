@@ -18,18 +18,11 @@ ctx.mode.MOUNTABLE_ICONS=MOUNTABLE;
 const CL_BASE={x:15.7,z:14.2};
 
 let linkModels=[];
-let toastT=null;
-function toast(msg){
-  let el=document.getElementById('modeToast');
-  if(!el){
-    el=document.createElement('div');el.id='modeToast';
-    el.style.cssText='position:fixed;top:20%;left:50%;transform:translateX(-50%);background:rgba(30,16,26,0.92);color:#ffd9e4;padding:10px 22px;border-radius:12px;font-size:14px;z-index:60;pointer-events:none;border:1px solid rgba(255,182,200,0.3);transition:opacity .3s';
-    document.body.appendChild(el);
-  }
-  el.textContent=msg;el.style.opacity='1';
-  clearTimeout(toastT);toastT=setTimeout(()=>el.style.opacity='0',2200);
-}
-ctx.ui.modeToast=toast;
+// 轻提示统一入口改为事件驱动(阶段1,2026-08-27):emit 'ui:toast',
+// 由 core/toast-system 订阅渲染。全站 ctx.ui.modeToast(...) / ctx.modeToast(...) 调用经此转发,零改动。
+ctx.ui.modeToast = (msg, duration) => {
+  ctx.events.emit('ui:toast', { text: msg, duration: duration || 2200 });
+};
 
 // 每幅画的可见性规则(2026-07-25 主人修订):
 //   普通模式 = 只呈现画框:图库照片/视频的**框全部保留**,但图库内容不加载(texAllowed 拦截,显示占位)
@@ -42,6 +35,7 @@ ctx.ui.modeToast=toast;
 import {P,V,LINKS} from '../../data.js';
 import {hotBegin,hotEnd} from '../hot.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
+import {getGameState} from '../core/game-state.js'; // 阶段4:mode 运行期状态写路径收归 gameState.set(写回经 set 陷阱发事件)
 hotBegin('mode');
 const LIB=new Set(P.concat(V));
 // 内容面显隐(hangOn 固定子序:0框 1碰撞 2白卡 3内容 4镜纹);empty 标记供点击路由跳过空框
@@ -238,13 +232,16 @@ async function refreshMode(){
   try{
     const r=await fetch('/api/siteconfig');
     const d=await r.json();
-    ctx.mode.siteMode=d.mode==='special'?'special':'normal';
-    ctx.mode.customLinks=d.customLinks||[];
-    ctx.mode.demoPhotos=d.demoPhotos||[];
-    ctx.mode.myUploads=d.myUploads||[];
-    ctx.mode.myUploadTokens=d.myUploadTokens||{}; // 本人上传媒体令牌(loadTexCapped 拼 ?mt= 过图片代理)
-    ctx.mode.myLinks=d.myLinks||[];
-    ctx.mode.myCaptions=d.captions||{};
+    // 阶段4:运行期状态写路径收归 gameState.set(写回 ctx.mode + 发 mode:changed 事件,读者零改动)。
+    // bindNamespace('mode',...) 在 state-system.init 注册,refreshMode 经网络异步返回,晚于启动,故写回已就绪。
+    const gs=getGameState();
+    gs.set('siteMode', d.mode==='special'?'special':'normal');
+    gs.set('customLinks', d.customLinks||[]);
+    gs.set('demoPhotos', d.demoPhotos||[]);
+    gs.set('myUploads', d.myUploads||[]);
+    gs.set('myUploadTokens', d.myUploadTokens||{}); // 本人上传媒体令牌(loadTexCapped 拼 ?mt= 过图片代理)
+    gs.set('myLinks', d.myLinks||[]);
+    gs.set('myCaptions', d.captions||{});
     // 刷新后重新挂墙的本人上传:把 AI 配文写回画框(否则只剩通用文案"新上传的照片")
     for(const g of (ctx.gallery.paintGroups||[])){
       const n=(g.userData.src||'').split('/').pop();

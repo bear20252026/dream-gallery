@@ -5,7 +5,8 @@ import { ctx } from './ctx.js';
 import './ui/overlay.js'; // 弹层注册处(冷核心,必须最先 import:Esc 栈优先级靠监听器注册顺序)
 import './state/store.js'; // 存档登记处(冷核心,紧随 overlay:全站 localStorage 唯一入口 ctx.store)
 import './scene/scene.js'; // 场景/相机/渲染器 + 墙壁/地板/屋顶 + 天空 + 灯光
-import './scene/effects.js'; // 烟花 + 粒子
+// 烟花 + 漂浮粒子:原 scene/effects.js 改为 core/effects-system.js(阶段3 切片),
+// 不再副作用挂 ctx.media,改经组合根注入 deps 注册(见下方 createEffectsSystem 注册处)
 import './scene/media.js'; // 2D音乐演奏器 + 视频墙 + HTML5音乐
 import './gallery/signs.js'; // 户外牌子/白板入口/音乐入口
 import './gallery/markers.js'; // YES/奕彤爱心/Adorable标记 + 地板照片
@@ -49,9 +50,18 @@ import {
   renderPostProcessing,
   resizePostProcessing,
 } from './scene/postprocessing.js'; // 后处理管线(2026-08-22)
-import { initPerfMonitor } from './scene/perf-monitor.js'; // 性能监控面板(2026-08-22)
 import { initSentry } from './shared/sentry.js'; // Sentry 错误追踪(2026-08-22)
-import { initSpatialAudio, exposeToCtx } from './scene/media/spatial-audio.js'; // 3D 空间音频(2026-08-22)
+import { compositionRoot } from './core/composition-root.js'; // 组合根(阶段1,2026-08-27)
+import { createToastSystem } from './core/toast-system.js'; // 示范积木:事件驱动 toast
+import { setLoop, createLoopSystem, register } from './core/loop.js'; // 单一主循环 facade(阶段1)
+import { createInputSystem } from './core/input.js'; // 统一输入 facade(阶段1·P1-3)
+import { createAudioSystem } from './core/audio-system.js'; // 阶段2 垂直切片:空间音频积木(依赖注入,取代冻结 ctx 写)
+import { createPerfMonitorSystem } from './core/perf-monitor-system.js'; // 阶段3 切片:性能监控积木(单循环驱动,删死 ctx import)
+import { createEffectsSystem } from './core/effects-system.js'; // 阶段3 切片:粒子/烟花积木(从 LoopManager 上帝渲染器抽出,经 deps 注入)
+import { createMediaSystem } from './core/media-system.js'; // 阶段3 切片:媒体逐帧积木(音乐画布+视频纹理,从 LoopManager 上帝渲染器抽出,经 deps 注入)
+import { createStateSystem } from './core/state-system.js'; // 阶段3 切片:单向状态库(订阅事件总线,镜像命名空间状态进 game-state)
+import { createUiSystem } from './core/ui-system.js'; // 阶段3 切片:UI 域生命周期收口(组合根拥有 overlay 关闭/销毁出口)
+import { getGameState } from './core/game-state.js'; // 单例状态库(阶段3 store 真正化)
 
 const {
   L,
@@ -62,11 +72,6 @@ const {
   WH,
   skyUniforms,
   groundUniforms,
-  drawMusicCanvas,
-  vidTex,
-  vidEl,
-  v45Tex,
-  v45El,
   tickPhysics,
 } = ctx;
 const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别名=活委托,player.js Object.assign 后此处读到真值)
@@ -97,10 +102,35 @@ const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别�
 
 // ===================== 后处理管线初始化(2026-08-22) =====================
 initPostProcessing(rnd, s, cam);
-initPerfMonitor(rnd); // ?perf 显示性能面板
+// 阶段3 切片:性能监控改为 PerfMonitorSystem,由唯一组合根单循环驱动(原文件在 ?perf 下自起第二条 rAF,已消除)
+compositionRoot.register(createPerfMonitorSystem({ renderer: rnd }));
 initSentry(); // Sentry 错误追踪(需配置 DSN)
-initSpatialAudio(); // 3D 空间音频(P3-3: AudioListener 挂载到相机)
-exposeToCtx(); // 暴露空间音频 API 到 ctx.media.spatialAudio
+// 阶段2 垂直切片:空间音频作为 AudioSystem 接入组合根(经 deps 注入相机,绝不直接写冻结 ctx)
+// 旧 initSpatialAudio()/exposeToCtx() 已移除 —— 这正是首页崩溃补丁的根因,现已用 DI 取代。
+compositionRoot.register(createAudioSystem({
+  scene: ctx.scene,
+  getCamera: () => ctx.scene.cam, // 防腐适配:阶段3 相机迁移后改由 deps 直接提供
+  eventBus: ctx.events,
+}));
+// 阶段3 切片:烟花 + 漂浮粒子作为 EffectsSystem 接入组合根(engine/animate 相位)。
+// 原逻辑嵌在 LoopManager._executeUpdatePhase 里直接读 ctx.media.updateFireworks/pG/pC（上帝渲染器散点读取），
+// 现改为 deps 注入 scene 与场景常量,由唯一单循环驱动;LoopManager 不再持有该逻辑。
+compositionRoot.register(createEffectsSystem({
+  scene: ctx.scene,
+  floorW: ctx.floorW, floorD: ctx.floorD,
+  IL: ctx.IL, IR: ctx.IR, IRT: ctx.IRT, IRB: ctx.IRB,
+  OT: ctx.OT, OBR: ctx.OBR, WH: ctx.WH, bW: ctx.bW, bD: ctx.bD, pyrHeight: ctx.pyrHeight,
+}));
+// 阶段3 切片:媒体逐帧逻辑(音乐画布 drawMusicCanvas + 视频墙纹理 needsUpdate)作为 MediaSystem 接入组合根(presentation/render 相位)。
+// 原逻辑散落在 LoopManager._executeUpdatePhase / _executeRenderPhase 直接读 ctx.media.*（上帝渲染器散点读取），
+// 现改为 deps 注入 ctx.media,由唯一单循环驱动;LoopManager 不再持有该逻辑。
+compositionRoot.register(createMediaSystem({ media: ctx.media }));
+// 阶段3 切片:单向状态库 StateSystem(platform/bootstrap)订阅事件总线,把命名空间状态镜像进 game-state,
+// 使 game-state 成为系统可读/可订阅的统一状态源(读模型);写者/读者零改动。Stage 4 可把写路径也收归此处,关闭 ctx 直写。
+compositionRoot.register(createStateSystem({ eventBus: ctx.events, gameState: getGameState(), ctx }));
+// 阶段3 切片:UI 域生命周期收口 UiSystem(platform/bootstrap):overlay.js 全局 Esc 监听仍在 main.js 最先 import 以保证栈优先级,
+// 但本 System.dispose 正式拥有关闭全部弹层/移除 Esc 监听的出口,使 ui 成为组合根可管理的生命周期单元。
+compositionRoot.register(createUiSystem({ ctx }));
 window.addEventListener('resize', () => {
   const w = innerWidth,
     h = innerHeight;
@@ -114,6 +144,7 @@ window.addEventListener('resize', () => {
 import { LoopManager } from './loop-manager.js';
 const loopManager = new LoopManager(ctx);
 ctx.loopManager = loopManager;
+setLoop(loopManager); // 注入唯一主循环到 core/loop facade(新积木经 deps.loop 获取)
 
 // D4 低画质手动开关(2026-07-30):开启后强制最低 pixelRatio(最流畅),自适应只降不升
 const lowQuality = !!ctx.store.json('lowQuality', false);
@@ -122,11 +153,23 @@ if (lowQuality) {
 }
 ctx.setLowQuality = (on) => loopManager.setLowQuality(on); // 供设置页罗盘调用
 
-// 启动统一循环管理器
+// 组合根:装载新架构积木(阶段1,2026-08-27)。toast-system 订阅 'ui:toast' 事件渲染提示,
+// 全站 ctx.ui.modeToast(...) 经 mode.js 防腐转发层 emit 该事件 —— event-bus 首次被业务消费。
+// 阶段1 补:loop-system(单一主循环 facade) + input-system(统一输入 facade,每帧镜像到总线)。
+compositionRoot.register(createToastSystem());
+compositionRoot.register(createLoopSystem());
+compositionRoot.register(createInputSystem(ctx.input));
+compositionRoot.init();
+// 可观测:浏览器控制台 / 验证脚本可打印确定性装配顺序(window.__compositionRoot.list())
+window.__compositionRoot = compositionRoot;
+// 可观测:单向状态库实例(配合 __compositionRoot,验证 store 真正化)
+window.__gameState = getGameState();
+// 把组合根每帧 update 注册进唯一主循环(经 core/loop facade,不再散点 ctx.onTick / 自起 rAF)
+register((dt) => compositionRoot.update(dt));
+
+// 启动统一循环管理器(唯一主循环)。旧 ctx.loop 不再自起 rAF,避免每帧双执行。
 loopManager.start();
 
-// 新游戏引擎循环(与统一循环管理器并行,分阶段 INPUT→UPDATE→RENDER→UI)
-ctx.loop.start();
 // 玩家状态机:启动时初始化为空闲状态
 ctx._playerSM.change(new IdleState());
 // 每帧更新状态机(在统一循环管理器的 tickers 中,紧随物理之后执行)

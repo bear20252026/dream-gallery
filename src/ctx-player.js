@@ -5,6 +5,7 @@
 // ============================================================
 
 import { eventBus } from './event-bus.js';
+import { getGameState } from './core/game-state.js';
 
 /**
  * 创建玩家命名空间
@@ -14,13 +15,19 @@ import { eventBus } from './event-bus.js';
 export function createPlayerNamespace(vault) {
   const properties = ['pl', 'jD', 'ks', 'mv', 'drM', 'viewMode', 'quizPassed', 'quizPassScore'];
   const proxy = {};
-  
+  const gs = getGameState();
+
   for (const prop of properties) {
     Object.defineProperty(proxy, prop, {
       get() {
         return vault[prop];
       },
       set(newValue) {
+        // Stage 4 冻结:已绑运行期状态 prop(viewMode/quizPassed)的直写收归 gameState.set 单入口。
+        if (gs.isBound(prop)) {
+          gs.set(prop, newValue);
+          return;
+        }
         const oldValue = vault[prop];
         if (oldValue !== newValue) {
           vault[prop] = newValue;
