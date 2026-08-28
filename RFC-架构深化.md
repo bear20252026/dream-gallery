@@ -1,8 +1,8 @@
 # RFC:梦幻画廊架构深化(2026-07-28)
 
 > 本文档替代 GitHub Issue(项目无 git 仓库),按 code-arch-optimizer 技能的 RFC 模板记录五个深化候选的决策与落地。
-> 状态:⑤②③④ **已实施并上线**;① **阶段一已落地(登记册),阶段二/三为提案**。
-> 验收基线:test.js 127 项 + test-mobile 6 项全绿;专项探针 overlay 12 / store 11 / media-rules 8 / ark-free 13 / spirit-hud 5 全绿。
+> 状态:⑤②③④ **已实施并上线**;① **阶段一~五全部已上线**(2026-07-28 阶段一~三,2026-08-29 阶段四~五;候选① 至此收官)。
+> 验收基线:test.js 127 项 + test-mobile 6 项全绿;专项探针 overlay 12 / store 11 / media-rules 8 / ark-free 13 / spirit-hud 5 / ctx-bus 8 / security-fix 11 全绿;生产无头探针 `node live-verify.cjs`(组合根 9 系统 + Stage4 双路径写回 + 烟花逐帧回归)EXIT=0。
 
 ---
 
@@ -152,7 +152,7 @@ serveDecision({ dir, base, isDemo, isMine, hasMt, globalSpecial, deviceSpecial }
 
 ---
 
-## 候选① ctx 上帝总线 — ✅ 阶段一+二已上线(2026-07-28,产物 main-CTmmn1Z_ 起),阶段三为提案
+## 候选① ctx 上帝总线 — ✅ 阶段一~五全部已上线(一~三 2026-07-28;四~五 2026-08-29)
 
 ### 问题
 
@@ -187,13 +187,95 @@ ctx.player.pl / quizPassed   // 玩家与门禁:pl/jD/ks/mv/drM/viewMode/quizPas
 
 硬冻结(扁平写抛错)评估为**不实施**:扁平读(含解构)是无处不在的既有语义,抛错只有纪律收益、有断线风险;软冻结(dev 告警)已提供同等的引导力。
 
-### 依赖策略与测试策略
+### 依赖策略与测试策略(阶段一~三)
 
 纯进程内重构。回归基线:九套测试 201 项断言全绿(test.js 127 + test-mobile 6 + overlay 12 + store 11 + media-rules 8 + ark-free 13 + spirit-hud 5 + ctx-bus 8 + security-fix 11),公网无头浏览器零 pageerror。
 
 ### 实施建议(已写入 ctx.js 头部规矩)
 
 ① 新属性先登记;② 能收进深模块(overlay/store/mediarules 模式)的不挂总线;③ 新代码写命名空间路径;④ dev 控制台出现「ctx软冻结」告警=走老路了,改成命名空间。
+
+### 阶段四(组合根 + 依赖注入 + 事件总线 + 单向状态) — ✅ 已上线(2026-08-29)
+
+#### 问题
+
+阶段三解决了「属性归属与命名」,但没解决「**运行时怎么组织**」:①主循环由 `ctx.tickers` 一路 + 各模块自行 `ctx.loop.on` 拼装,谁先谁后靠 import 顺序,曾出现 `onTick` 每帧执行两次的双循环 bug;②跨模块通信靠直接改 `ctx` 属性,读者无从订阅变更(想知道 `flightLock` 何时翻转只能轮询或散点回调);③状态读写双向自由,任意模块可写任意标志,新增写入方时无法从代码推断「还有谁在监听」。
+
+#### 已落地
+
+`src/core/` 四件套 + 组合根,系统按统一契约注册,由组合根按层序装配:
+
+```js
+// src/core/system.js — 积木契约
+export function defineSystem({ name, layer, phase, order, deps, init, update, dispose }) {}
+
+// main.js — 组合根装配(唯一装配点)
+compositionRoot.register(createStateSystem({ eventBus, gameState, ctx }));
+compositionRoot.register(createInputSystem(ctx.input));
+// …共 9 个系统
+```
+
+- **四层 / 多相位**:`platform`(bootstrap/input)→ `engine`(animate/ui)→ `gameplay` → `presentation`(render/ui),相位内按 `order` 排序,不再依赖 import 顺序。
+- **事件总线** `ctx.events`(`src/core/event-bus.js`):`on/once/off/emit/onPropertyChange/emitPropertyChange`。命名空间 set 陷阱在变更时 `emitPropertyChange(ns,prop,new,old)`,同时发 `${ns}:changed:${prop}` 精确事件与 `${ns}:changed` 命名空间级事件。**坑:手动 `emit('ns:changed:prop')` 不会触发父级 `${ns}:changed` 监听,变更必须走 `emitPropertyChange`**。
+- **单向状态** `game-state.js`(`getGameState()`):`get/set/patch/subscribe/snapshot`。`state-system` 订阅 `${ns}:changed` 把变更镜像进 game-state,使其成为**统一可读 + 可订阅源**(读模型/CQRS 投影)。
+- **已抽出的 9 个系统**:`platform:bootstrap:-1000 loop` / `platform:bootstrap:0 state` / `platform:bootstrap:1 ui` / `platform:input:0 input` / `engine:animate:0 audio` / `engine:animate:0 effects` / `engine:ui:0 perf-monitor` / `presentation:render:0 media` / `presentation:ui:0 toast`。原 `src/scene/effects.js`、`src/scene/media/spatial-audio.js`、`src/scene/perf-monitor.js` 逻辑迁入 `src/core/` 后删除。
+- **每刀都先部署生产验证**:垂直切片(audio → perf-monitor → effects → media → ui)逐个 build + 部署 + 无头探针验证,未攒批。
+
+#### 依赖策略与测试策略
+
+纯进程内重构,无新外部依赖。回归基线:九套既有测试(201 项)保持全绿,新增 `live-verify.cjs` 生产无头探针(组合根 9 系统注册齐全 + 烟花 Points 逐帧 `drawRange`/position 校验和判动画未破 + 零 pageerror)。
+
+### 阶段五(写路径单入口 · 委托冻结) — ✅ 已上线(2026-08-29)
+
+#### 问题
+
+阶段四只把状态**读**侧收成单向(镜像进 game-state),**写**侧仍是双向自由:`ctx.mode.siteMode = x` 与 `gameState.set('siteMode', x)` 两条路并存。更隐蔽的是:若把绑定注册放在 `state-system.init`(运行期),则**模块导入期直写**(`player.js` 的 `viewMode=0`、`quizgate.js` 的 `quizPassed` 默认值)早于注册,会绕过 game-state,只能靠后续 seed 补值——单入口名不副实。
+
+#### 已落地(委托 delegate 变体,零破坏)
+
+```js
+// game-state.js — 写完自身 state 后 write-through 回命名空间
+set(key, value) {
+  if (state[key] === value) return;      // 幂等守卫(防回环)
+  state[key] = value; notify(key, value, old);
+  const b = nsBindings[key];
+  if (b) b.apply(key, value);            // 回写 ctx.<ns>.<prop> + 发事件
+}
+
+// ctx.js — 命名空间创建处「早注册」(早于任何模块导入期直写)
+ctx.mode = createModeNamespace(vault);
+gs.bindNamespace('mode', ['siteMode', …], (prop, val) => {
+  const old = vault[prop];
+  if (old !== val) { vault[prop] = val; eventBus.emitPropertyChange('mode', prop, val, old); }
+});  // apply 直写 vault + 直发事件,不经代理 set 陷阱 → 无递归
+
+// ctx-mode.js 等命名空间 set 陷阱
+set(newValue) {
+  if (gs.isBound(prop)) { gs.set(prop, newValue); return; }  // 已绑 → 委托单入口
+  …原自写 vault + 发事件行为…                                 // 未绑 → 维持原样
+}
+```
+
+- **写者**改走 `gameState.set`(`mode.js` 的 7 处配置下发、`quizgate.js` 门禁判定、`player.js` V 键切换、`avatar.js` 加载角色、`ark.js` 6 处 flightLock)。
+- **读者零改动**:`ctx.<ns>.<prop>` 仍经 vault 拿到新值。
+- **legacy 直写仍可用**,但自动委托到单入口——这是选「委托」而非「抛错」的原因:抛错会让上述导入期默认直写当场断线,风险与收益不成比例。
+- **早注册**使导入期直写也走单入口,彻底消除「导入期绕过」残留缺陷。
+- **已绑定**:`mode` 7 个配置下发 prop、`player`(quizPassed/viewMode)、`kunlun`(flightLock)。
+
+**刻意不绑的三类**(绑了就是负收益):①每帧高频 prop(`pl`/`jD`/`ks`/`mv`/`drM`/`dayHour`,会每帧刷事件+存储);②初始化期能力/函数注册(`applyMode`/`texAllowed`/`eternalHandlers`/`hangOne`,一次性注册非运行期状态);③集合原地变异(`houseMats`/`paintGroups`/`myUploads` 的 `.push`——**不触发 set 陷阱**,本就不发事件)。`gallery`/`media`/`ui`/`scene` 命名空间经审计基本只剩 ②③,故不逐一绑定。
+
+#### 依赖策略与测试策略
+
+纯进程内重构。回归:九套既有测试 201 项全绿 + `live-verify.cjs` 扩展为**双路径探针**:
+
+- `stage4_write_through`:对 10 个绑定 prop 走 `gameState.set`,断言 through(`ctx.<ns>.<prop>` 拿到新值)/ stored / restored。
+- `stage4_legacy_funnel`:反向走 legacy 直写 `ctx.mode.siteMode = v`,断言 `gameState.get` 立即拿到新值(证明已收归单入口)+ 事件已发 + 探针后状态复原。
+
+线上结果:`PAGE_ERRORS=0`、9 系统注册齐全、烟花逐帧动画回归、双路径探针全绿(`EXIT=0`)。
+
+#### 实施建议(已写入 AGENTS.md「写路径单入口规矩」)
+
+新增运行时可变状态时:①在 `ctx.js` 命名空间创建处 `bindNamespace` 登记;②写者一律 `gameState.set`,禁止新写 `ctx.<ns>.<prop> = v`(老代码不强制改,委托会自动收归);③先自查是否属于「刻意不绑的三类」;④改完必须跑 `node live-verify.cjs`。
 
 ---
 
@@ -205,4 +287,6 @@ ctx.player.pl / quizPassed   // 玩家与门禁:pl/jD/ks/mv/drM/viewMode/quizPas
 | 新增存档键 | 全站 grep 找同款写法 | SCHEMA 登记一行 |
 | 改分数线 | 人肉同步 4 处 | 改 1 处(+文档) |
 | 改可见性规则 | 人肉同步前后端 4 处 | 改 1 个决策表 |
-| 防回归 | 人肉记忆 AGENTS.md 规矩 | 4 个专项探针(12+11+8+2 项)可执行门禁 |
+| 新增运行时状态(候选①阶段四/五) | 任意模块直写 `ctx`,读者无从订阅变更 | `bindNamespace` 登记一行 + 写者走 `gameState.set` 单入口,自动回写 + 自动发事件(legacy 直写也自动收归) |
+| 主循环装配(候选①阶段四) | 靠 import 顺序拼 `ctx.tickers` + 各模块 `ctx.loop.on`(曾每帧跑两次) | 组合根按 `layer/phase/order` 装配 9 个系统,装配点唯一 |
+| 防回归 | 人肉记忆 AGENTS.md 规矩 | 4 个专项探针(12+11+8+2 项)可执行门禁 + 生产无头探针 `live-verify.cjs` |
