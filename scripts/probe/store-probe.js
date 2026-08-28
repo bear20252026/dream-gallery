@@ -100,7 +100,9 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   (function walk(d) { for (const f of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, f.name); if (f.isDirectory()) walk(p); else if (f.name.endsWith('.js')) srcFiles.push(p); } })(path.join(ROOT, 'src'));
   let stray = 0;
   for (const f of srcFiles) {
+    // 存档模块本体豁免(键名唯一出口):store.js 仅做 ctx 挂载,store-api.js 是真正的持久化实现
     if (f.endsWith(path.join('state', 'store.js'))) continue;
+    if (f.endsWith(path.join('state', 'store-api.js'))) continue;
     const lines = fs.readFileSync(f, 'utf8').split('\n');
     for (const ln of lines) {
       const t = ln.trim();
