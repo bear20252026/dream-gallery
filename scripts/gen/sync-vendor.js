@@ -29,12 +29,32 @@ for (const [pkg, inner, out] of VENDORS) {
 
 // Three.js 加载器依赖(vite.config.js alias 指向 vendor/):
 // FBXLoader + GLTFLoader + fflate + NURBSCurve
+// ⚠️ BufferGeometryUtils 不可省:GLTFLoader.js 顶部 `import {toTrianglesDrawMode} from '../utils/BufferGeometryUtils.js'`,
+//    漏拷会让整个开发入口(native ESM)在加载 GLTFLoader 时 404 而白屏,且报错只在浏览器控制台可见
+//    (生产走 Vite 从 node_modules 打包,不受影响,故极易漏检)。2026-08-29 修。
 const THREE_EXAMPLES = [
   'examples/jsm/loaders/FBXLoader.js',
   'examples/jsm/loaders/GLTFLoader.js',
   'examples/jsm/libs/fflate.module.js',
   'examples/jsm/curves/NURBSCurve.js',
   'examples/jsm/curves/NURBSUtils.js',
+  // GLTFLoader 的隐式依赖
+  'examples/jsm/utils/BufferGeometryUtils.js',
+  // 后处理管线(P1-1)/SkeletonUtils(角色)/FXAA 的入口及其**传递闭包**:
+  // 这些文件内部用相对路径互相 import(Pass/CopyShader/LuminosityHighPassShader/OutputShader/MaskPass),
+  // 只补入口不补闭包仍会 404。相对依赖只要文件在 vendor 下同构即可解析,无需进 importmap。
+  'examples/jsm/utils/SkeletonUtils.js',
+  'examples/jsm/shaders/FXAAShader.js',
+  'examples/jsm/shaders/CopyShader.js',
+  'examples/jsm/shaders/LuminosityHighPassShader.js',
+  'examples/jsm/shaders/OutputShader.js',
+  'examples/jsm/postprocessing/EffectComposer.js',
+  'examples/jsm/postprocessing/Pass.js',
+  'examples/jsm/postprocessing/MaskPass.js',
+  'examples/jsm/postprocessing/RenderPass.js',
+  'examples/jsm/postprocessing/ShaderPass.js',
+  'examples/jsm/postprocessing/UnrealBloomPass.js',
+  'examples/jsm/postprocessing/OutputPass.js',
 ];
 
 for (const rel of THREE_EXAMPLES) {
