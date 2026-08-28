@@ -484,7 +484,10 @@ document.querySelectorAll('.move-pad button').forEach((b) => {
   b.addEventListener('pointerleave', () => { padDir[d] = false; });
 });
 
-// ---------- 主循环 ----------
+// ---------- 主循环(独立场景循环) ----------
+// 注:room 是独立多人房间页面(自带 renderer/scene,无任何 src 文件 import 本文件),
+// 与 gallery 的 LoopManager 是不同运行时上下文,故此处保留自有 rAF,刻意不并入。
+// 强行接入 LoopManager 会引入跨场景耦合而无收益(LoopManager 绑定的是 gallery 的 ctx.scene/player/media)。
 const clock = new THREE.Clock();
 function tick() {
   const dt = Math.min(clock.getDelta(), 0.05);

@@ -127,7 +127,8 @@ import { GameLoop } from './loop.js';
 ctx.loop = new GameLoop();
 // 单一驱动:只保留 ctx.tickers 一路,由 LoopManager 在 UPDATE 阶段统一执行。
 // 早期曾同时 ctx.tickers.push 又 ctx.loop.on('update'),导致每个 onTick 每帧执行两次(双循环 bug)。
-// GameLoop 实例仍保留,仅作 timeScale(暂停)的持有者,不再自起 rAF。
+// GameLoop 实例保留,仅持有 timeScale(供 LoopManager.pause/resume/_frame 读写);
+// 阶段调度与 rAF 主循环已统一由 LoopManager 承担,GameLoop 内死实现于 2026-08-29 清理。
 ctx.tickers = [];
 ctx.onTick = (fn) => {
   ctx.tickers.push(fn);

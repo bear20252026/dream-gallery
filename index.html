@@ -10,6 +10,11 @@
     <link rel="stylesheet" href="/src/styles/main.css" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#2a1030" />
+    <!-- Sentry 错误监控:把你的 DSN 填入下方 content 即启用(留空则不加载 SDK,零开销)
+         获取 DSN:https://sentry.io 注册(免费额度) 或自建 GlitchTip(Sentry 协议兼容,可私有化)
+         DSN 形如 https://xxxxxxxx@oNNNNNN.ingest.sentry.io/NNN
+         代码侧 initSentry() 已在 main.js 调用,只差这一行 content -->
+    <meta name="sentry-dsn" content="" />
     <!-- 预加载：提前下载关键资源，页面加载时直接用缓存 -->
     <link rel="modulepreload" href="/src/main.js" />
     <link rel="preconnect" href="https://cdn.cloudbear.cloud" />
