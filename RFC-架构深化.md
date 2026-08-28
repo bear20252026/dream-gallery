@@ -2,7 +2,7 @@
 
 > 本文档替代 GitHub Issue(项目无 git 仓库),按 code-arch-optimizer 技能的 RFC 模板记录五个深化候选的决策与落地。
 > 状态:⑤②③④ **已实施并上线**;① **阶段一~五全部已上线**(2026-07-28 阶段一~三,2026-08-29 阶段四~五;候选① 至此收官)。
-> 验收基线:test.js 127 项 + test-mobile 6 项全绿;专项探针 overlay 12 / store 11 / media-rules 8 / ark-free 13 / spirit-hud 5 / ctx-bus 8 / security-fix 11 全绿;生产无头探针 `node live-verify.cjs`(组合根 9 系统 + Stage4 双路径写回 + 烟花逐帧回归)EXIT=0。
+> 验收基线(2026-08-29 复核):test-store 4 + test.js 125 + test-mobile 6 项全绿;前端单测 vitest 82 项全绿;专项探针 overlay 12 / store 11 / media-rules 8 / ark-free 13 / spirit-hud 5 / ctx-bus 8 / security-fix 13 全绿;生产无头探针 `node live-verify.cjs`(组合根 9 系统 + Stage4 双路径写回 + 烟花逐帧回归)EXIT=0。
 
 ---
 
@@ -106,6 +106,7 @@ ctx.store.houseColor(g); ctx.store.setHouseColor(g, hex); ctx.store.clearHouseCo
 ### 测试策略
 
 test.js 新增 2 项断言(出卷/状态响应携带 passScore 且等于源常量),总数 125→127。旧的"60 分字面量断言"被替代删除。
+> 注(2026-08-29):现实际为 **125** 项——此后视频文件存在性检查改为**条件跳过**(资源已迁 R2 CDN,本地不落盘),故比 127 少 2。引用基线时以实际跑出的数字为准。
 
 ### 实施建议(已写入 AGENTS.md 规矩③)
 
@@ -189,7 +190,8 @@ ctx.player.pl / quizPassed   // 玩家与门禁:pl/jD/ks/mv/drM/viewMode/quizPas
 
 ### 依赖策略与测试策略(阶段一~三)
 
-纯进程内重构。回归基线:九套测试 201 项断言全绿(test.js 127 + test-mobile 6 + overlay 12 + store 11 + media-rules 8 + ark-free 13 + spirit-hud 5 + ctx-bus 8 + security-fix 11),公网无头浏览器零 pageerror。
+纯进程内重构。回归基线:九套测试 201 项断言全绿(test.js 125 + test-mobile 6 + overlay 12 + store 11 + media-rules 8 + ark-free 13 + spirit-hud 5 + ctx-bus 8 + security-fix 13),公网无头浏览器零 pageerror。
+(分项数 2026-08-29 复核:test.js 由 127 降至 125(视频存在性检查改条件跳过),security-fix 由 11 增至 13(SVG 段改为三条断言);总和仍为 201。)
 
 ### 实施建议(已写入 ctx.js 头部规矩)
 
