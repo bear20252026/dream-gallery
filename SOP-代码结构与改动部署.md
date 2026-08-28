@@ -144,37 +144,97 @@ Cloudflare(cloudbear.cloud 域名 + HTTPS 证书 + 边缘缓存)
   node --check server.js                               # 后端
   ```
 
-### 步骤 4:测试门禁(两套全绿才能往下走)
-- **如何**:
+### 步骤 4:测试门禁(全绿才能往下走)
+- **如何**(2026-08-29 校准):
   ```bash
-  node scripts/test/test.js          # 后端 125 项:数据校验/API/安全/审批门/上传/邀请
-  node scripts/test/test-mobile.js   # 手机渲染 6 项:着色器/JS异常/空屏
+  npm test                                # = 下面三条
+  node scripts/test/test-store.js         # 存档原子写 4 项
+  node scripts/test/test.js               # 后端 125 项:数据校验/API/安全/审批门/上传/邀请
+  node scripts/test/test-mobile.js        # 手机渲染 6 项:着色器/JS异常/空屏
+  npx vitest run                          # 前端单测 82 项
+  ```
+- 专项探针(改动涉及对应领域时跑):
+  ```bash
+  node scripts/probe/overlay-probe.js       # 12 项 弹层三铁律
+  node scripts/probe/store-probe.js         # 11 项 存档单一出口
+  node scripts/probe/media-rules-probe.js   #  8 项 媒体可见性
+  node scripts/probe/ctx-bus-probe.js       #  8 项 ctx 命名空间契约
+  node scripts/probe/spirit-hud-probe.js    #  5 项 灵蕴指引
+  node scripts/probe/ark-free-probe.js      # 13 项 飞舟自由飞(含撞地钳制/疆域回推)
+  node scripts/probe/security-fix-probe.js  # 13 项 安全基线
   ```
 - 大版本加跑:`node scripts/test/verify-all.js`(门禁→模式→邀请函→特殊访问→彩蛋全链路)
-- 功能有专项探针就跑专项(如 `node scripts/probe/ark-free-probe.js`)
-- **产出**:125 + 6 全绿记录。**任何一项红,回到步骤 2,不准部署。**
+- **产出**:全绿记录(九套专项合计 201 项 + vitest 82 项)。**任何一项红,回到步骤 2,不准部署。**
+- **探针跑不起来先查开发入口**:本地门禁探针走的是仓库根 `index.html` 的**原生 ESM + importmap**
+  路径。若全部卡在 `waitForFunction` 超时,多半是 `vendor/` 缺文件——跑
+  `node scripts/gen/sync-vendor.js` 重建;新增 `three/examples/jsm/**` 依赖时须同时登记
+  `sync-vendor.js` 的 `THREE_EXAMPLES` 与 `index.html` 的 importmap(详见 AGENTS.md 相关铁律)。
 
 ### 步骤 5:构建
 - **如何**:`npm run build` → 确认 `dist/assets/` 里主包哈希变了
 - **产出**:`dist/`(index.html + assets/*)
 
 ### 步骤 6:部署
-- **如何**:
+- **如何**(2026-08-29 校准,密钥路径已更新):
   ```bash
-  cd dist && tar czf /tmp/gallery-dist.tgz . && cd ..
-  scp -i ~/Downloads/网站私钥bear1.pem /tmp/gallery-dist.tgz root@101.133.235.110:/tmp/
-  ssh -i ~/Downloads/网站私钥bear1.pem root@101.133.235.110 "cd /opt/gallery && rm -rf assets && tar xzf /tmp/gallery-dist.tgz"
-  # 只有改了 server.js / lib/ 才追加:pm2 restart gallery
+  # ① 打包(必带 --exclude=models:服务器 /opt/gallery/models 已有 311MB 且不常变)
+  cd dream-gallery && npm run build
+  cd dist && tar czf "../gallery-dist.tgz" --exclude=models . && cd ..
+
+  # ② 上传(注意:scp/ssh 是 Windows 原生 exe,源路径必须用 Windows 绝对路径)
+  scp -i "C:/Users/17296/gk.pem" "C:/Users/17296/<你的路径>/dream-gallery/gallery-dist.tgz" root@101.133.235.110:/tmp/
+
+  # ③ 服务器解包(server.js 直接服务 /opt/gallery 根目录,index.html 与 assets 都在根)
+  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110 "cd /opt/gallery && rm -rf assets && tar xzf /tmp/gallery-dist.tgz"
+
+  # ④ 只有改了 server.js / lib/ 才需要:ssh ... "pm2 restart gallery"
   ```
 - **铁律**:`dist/assets/` **整目录全量替换**——哈希变了,只传 index.html 会让旧包 404 白屏
+- **纯前端改动无需 pm2 restart**:静态文件即时生效(已线上验证)。只有后端文件变更才重启。
+- `--exclude=models` 不可省:`public/models/`(约 138MB)会被打进 `dist/models/`,但
+  `remielle.glb`/`strawberry_ship` 从本地 `/models` 加载、avatar 走 CDN,服务器现有 models 保持不动。
+  改了模型才需整包重传。
+
+### 步骤 6.5:服务器登录方法(2026-08-29 补)
+- **连接方式**:SSH 密钥登录,无密码
+  | 项 | 值 |
+  |---|---|
+  | 主机 | `101.133.235.110`(域名 `cloudbear.cloud`) |
+  | 用户 | `root` |
+  | 私钥 | 本机 `C:/Users/17296/gk.pem`(**绝不入库**,见下方安全红线) |
+  | 应用目录 | `/opt/gallery/`(pm2 进程名 `gallery`) |
+- **登录与常用命令**:
+  ```bash
+  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110      # 登录
+  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110 "pm2 status gallery"   # 查进程
+  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110 "pm2 logs gallery --lines 50"  # 查日志
+  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110 "pm2 restart gallery"  # 重启(仅后端改动需要)
+  ```
+- **🚨 安全红线(公开仓,务必遵守)**:
+  1. **私钥 `gk.pem` 永不提交**——本仓库 visibility=**PUBLIC**,私钥入库等于把服务器交给全网。
+     `.gitignore` 已拦 `*.pem` / `*.key` / `*私钥*` 兜底。
+  2. 私钥路径用 `-i` 传入即可,**不要把密钥内容粘进任何文档、对话或 issue**。
+  3. 一旦怀疑私钥泄露(误提交/误粘贴/电脑外借),**立即在云平台控制台吊销并重新签发密钥**,
+     然后更新本机 `gk.pem`,旧密钥即刻失效。
+  4. 服务器 IP 与部署细节本就已随公开仓可见,因此**密钥是唯一的防线**——它绝不能进库。
+- **Windows 路径坑**:`scp`/`ssh` 是 Windows 原生 exe,**必须用 `C:/Users/17296/gk.pem` 形式**;
+  用 Git Bash 的 `/c/Users/...` 会报 `Identity file ... not accessible`。
 
 ### 步骤 7:上线验证
-- **如何**:
+- **如何**(推荐用 `live-verify.cjs`,一次覆盖全部关键面):
+  ```bash
+  node live-verify.cjs   # EXIT=0 才算过(生产无头探针)
+  ```
+  它覆盖:零 pageerror · 组合根 9 系统注册齐全 · game-state 种子可用 · effects 烟花逐帧动画 ·
+  Stage4 双路径写回(gameState.set 写回 + legacy 直写漏斗)· **交互冒烟(真实登舟进自由飞)**。
+- 补充核对:
   ```bash
   curl -s https://cloudbear.cloud/ | grep -o 'assets/main-[^"]*\.js'   # 是新哈希
-  node scripts/probe/debug-browser.js https://cloudbear.cloud/ 15     # 无 pageerror
   ```
 - **注意**:html 有 5 分钟 gzip 内存缓存,刚部署读到旧版本不代表没传上——等 5 分钟或 pm2 restart 再验
+- **为什么要交互冒烟**:纯加载探针抓不到"只在用户操作时才执行"的代码路径。
+  2026-08-29 的 `spiritCount` 无限递归(栈溢出)就藏在飞舟可见性判定里,
+  加载期不触发、生产探针一直零报错,直到补上真实登舟才暴露。
 
 ### 步骤 8:归档
 - **如何**:新规矩/新坑写进 `AGENTS.md`;涉及后台操作的同步 `ADMIN_GUIDE.md`

@@ -18,7 +18,7 @@
 
 - **前端**:原生 ES Modules + Three.js 0.160(开发态原生 ESM 直跑,生产 Vite 8 打包)
 - **后端**:Node.js 零依赖单文件路由(`server.js` + `lib/` 14 模块),数据库即 `gate_data.json`
-- **基建**:Cloudflare CDN/R2(媒体)+ 阿里云源站(pm2 `gallery`)+ GitHub 私有仓(代码异地备份)
+- **基建**:Cloudflare CDN/R2(媒体)+ 阿里云源站(pm2 `gallery`)+ GitHub(代码异地备份,⚠️ 该仓为 PUBLIC)
 
 ## 目录结构
 
@@ -66,7 +66,7 @@ npm run build                     # → dist/(index.html + assets/* hash 分包)
 
 ## 版本与备份
 
-- 本地 git(main)+ GitHub 私有仓 `bear20252026/dream-gallery`,每次部署前 commit + push
+- 本地 git(main)+ GitHub **公开仓** `bear20252026/dream-gallery`(⚠️ PUBLIC,密钥一律不得入库),每次部署前 commit + push
 - 云端 cron:daily 03:17(数据库+照片+音乐+代码,留 14 份)/ weekly 周日 04:23(视频,留 2 份)→ `/opt/backups/`
 
 ---

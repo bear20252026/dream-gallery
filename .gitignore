@@ -5,8 +5,16 @@ vendor/
 *.tgz
 
 # 密钥与证书(永不入库)
+# ⚠️ 本仓库是**公开仓**(GitHub visibility=PUBLIC):任何私钥一旦进库等于把服务器交给全网。
+#    SSH 登录密钥(gk.pem 等)、TLS 私钥、API 凭据一律不得提交;误提交须立即吊销轮换。
 .env
 origin/
+*.pem
+*.key
+*.ppk
+*.p12
+*.pfx
+*私钥*
 
 # 运行时数据(访客数据库/缓存,属隐私数据不入代码库;备份走云端每日快照)
 gate_data.json

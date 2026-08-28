@@ -14,7 +14,7 @@
 访客上传照片/视频上墙、AI 看图配文、TTS 全站语音、双模式展示区(普通/特殊)。
 
 - **线上**:https://cloudbear.cloud(Cloudflare CDN 前置)→ 阿里云 `101.133.235.110`(pm2 进程名 `gallery`,目录 `/opt/gallery/`)
-- **代码备份**:本地 git(main)+ GitHub 私有仓 `bear20252026/dream-gallery`
+- **代码备份**:本地 git(main)+ GitHub **公开仓** `bear20252026/dream-gallery`(⚠️ PUBLIC,密钥一律不得入库)
 - **数据备份**:服务器 cron 每天 03:17(数据库+照片+音乐+代码,留 14 份)/ 每周日 04:23(视频,留 2 份)→ `/opt/backups/`
 
 ---
@@ -68,7 +68,7 @@ tools/backup-gallery.sh   云端备份脚本
 - **架构深化五项**:弹层注册处 overlay.js / 存档登记处 store.js(24+ 键收编)/ 分数线单一源(passScore 下发)/ 媒体规则单一源 mediarules.mjs(前后端同表)/ ctx 总线 7 命名空间+扁平写软冻结(610 处迁移)
 - **OWASP 审计修复**:SVG 禁脚本/admin 引号转义 j()/vid 归属优先/限额/常量时间 token/safeJoin/安全头(XFO 后收窄为仅 admin/docs——全站 SAMEORIGIN 曾误伤主站被外链嵌套)
 - **AI 通道单一源 aichannels.js**:小米 MiMo 三合一(文本 mimo-v2.5-pro/视觉 mimo-v2.5/语音 mimo-v2.5-tts)
-- **备份体系**:本地 git+GitHub 私有仓、服务器 cron 每日/每周快照
+- **备份体系**:本地 git + GitHub 公开仓(⚠️ PUBLIC,密钥不得入库)、服务器 cron 每日/每周快照
 - **隐性修复**:TTS spawn 双击回调→502 双写崩进程保险丝;畸形 URL 400;uploads 归属 vid 令牌
 - **测试体系**:test.js 127 项 + test-mobile 6 项 + 10 个专项实机探针(全部当前全绿)
 
