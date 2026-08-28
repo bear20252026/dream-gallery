@@ -131,10 +131,15 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   // [4] 实心山铁律:压低到地面以下,应被钳回 getH+3(轮询等钳制生效)
   const clamp = await page.evaluate(async () => {
     const ctx = window.__ctx, FF = window.__arkFF;
-    FF.pos.x = 800; FF.pos.z = 590;
     const gh = ctx.desert.getH(800, 590);
     const t0 = performance.now();
     do {
+      // ⚠️ 必须每轮都钉住 x/z(2026-08-29 修):飞舟以巡航 ~24m/s 持续飞行,若像
+      //   原版那样只在循环外钉一次,8s 内会飘出 ~190m,钳制按**飞舟当前位置**取地面高、
+      //   断言却拿 (800,590) 的 gh 比较,基准失效导致假失败。
+      //   (此前之所以"通过",是 spiritCount 无限递归在钳制之后抛栈溢出,中断了帧更新、
+      //    冻住漂移所致——真实缺陷修好后才暴露出本探针的取样问题。)
+      FF.pos.x = 800; FF.pos.z = 590;
       FF.pos.y = gh + 1; // 持续往山里按,等钳制把它顶回来
       await new Promise(r => setTimeout(r, 150));
     } while (FF.pos.y < gh + 2.9 && performance.now() - t0 < 8000);

@@ -12,7 +12,11 @@ import { goldenTeleport } from '../shared/teleport-fx.js';
 import { getGameState } from '../core/game-state.js'; // 阶段4:flightLock 写路径收归 gameState.set(写回经 set 陷阱发事件)
 const gs = getGameState();
 const bag = hotBegin('ark');
-const spiritCount = () => spiritCount();
+// 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
+// ⚠️ 2026-08-29 修:此处曾被误写成 `() => spiritCount()`(无限自递归 → Maximum call stack
+//    size exceeded,一进飞舟可见性判定即栈溢出)。原语义(见 git 146a721^):
+//   ark.visible=(ctx.kunlun.spiritsGot?ctx.kunlun.spiritsGot():0)>=1,与下文 804/956 行一致。
+const spiritCount = () => (ctx.kunlun.spiritsGot ? ctx.kunlun.spiritsGot() : 0);
 const { s, onTick } = ctx;
 
 const KX = 800,

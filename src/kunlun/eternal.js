@@ -8,7 +8,10 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 const bag = hotBegin('eternal');
-const spiritCount = () => spiritCount();
+// 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
+// ⚠️ 2026-08-29 修:此处曾被误写成 `() => spiritCount()`(无限自递归 → Maximum call stack
+//    size exceeded)。正确语义取自本文件 658 行既有用法。
+const spiritCount = () => (ctx.kunlun.spiritsGot ? ctx.kunlun.spiritsGot() : 0);
 const { s, onTick, loadTexCapped, iG, bounds } = ctx;
 
 // ===================== 位置与地基 =====================
