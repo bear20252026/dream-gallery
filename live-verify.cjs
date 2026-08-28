@@ -175,6 +175,7 @@ const URL = 'https://cloudbear.cloud/';
         sessionStorage.setItem('communityConsented', '1');
         sessionStorage.setItem('kunlunWelcomed', '1');
         sessionStorage.setItem('nickPopOff', '1');
+        sessionStorage.setItem('skipOpening', '1'); // 跳过首页流动开场层,避免盖住画廊交互探针(2026-08-29)
       } catch (e) {}
     });
     await p2.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -221,6 +222,40 @@ const URL = 'https://cloudbear.cloud/';
     smoke.err = String(e.message || e).slice(0, 300);
   }
 
+  // ===================== 首页开场层验证(2026-08-29) =====================
+  // 三个协议签完后,流动背景开场层(#openingOv)应出现;点「进入画廊」后应淡出移除。
+  // 不置 skipOpening,真实走一遍开场弹出→进入流程,断言零 pageerror。
+  const opening = { err: null, shown: false, dismissed: false, pageErrors: [] };
+  try {
+    const p3 = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    p3.on('pageerror', (e) => opening.pageErrors.push(String(e.message || e).slice(0, 300)));
+    await p3.addInitScript(() => {
+      try {
+        sessionStorage.setItem('agreementConsented', '1');
+        sessionStorage.setItem('privacyConsented', '1');
+        sessionStorage.setItem('communityConsented', '1');
+        localStorage.setItem('kunlunPrologueDone', '1'); // 仅验证开场层,跳过序章接管干扰
+      } catch (e) {}
+    });
+    await p3.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    opening.shown = await p3
+      .waitForSelector('#openingOv', { timeout: 8000 })
+      .then(() => true)
+      .catch(() => false);
+    if (opening.shown) {
+      await p3.waitForTimeout(700);
+      await p3.evaluate(() => {
+        const b = document.querySelector('#openingOv button');
+        if (b) b.click();
+      });
+      await p3.waitForTimeout(1600);
+      opening.dismissed = await p3.evaluate(() => !document.getElementById('openingOv'));
+    }
+    await p3.close();
+  } catch (e) {
+    opening.err = String(e.message || e).slice(0, 300);
+  }
+
   await browser.close();
 
   const result = {
@@ -238,6 +273,7 @@ const URL = 'https://cloudbear.cloud/';
     stage4_write_through: probe,
     stage4_legacy_funnel: legacy,
     interaction_smoke: smoke,
+    opening_layer: opening,
   };
   console.log('=== LIVE VERIFY RESULT ===');
   console.log(JSON.stringify(result, null, 2));
@@ -247,7 +283,9 @@ const URL = 'https://cloudbear.cloud/';
   //   ④ **全程零 pageerror**(最关键——spiritCount 栈溢出正是栽在这一项上)
   const s = result.interaction_smoke;
   const smokeOk = !!s && s.clicked && s.boarded && s.flightLock && s.pageErrors.length === 0 && !s.err;
-  const ok = result.PAGE_ERRORS === 0 && result.ui_system && result.state_system && result.effects_system && result.media_system && result.game_state && result.effects_animating && p && p.modeThrough && p.modeStored && p.modeRestored && p.qThrough && p.qStored && p.qRestored && p.vThrough && p.vStored && p.vRestored && p.fThrough && p.fStored && p.fRestored && l && l.modeFunnel && l.modeEvt && l.quizFunnel && l.quizEvt && l.viewFunnel && l.viewEvt && l.flightFunnel && l.flightEvt && l.restored && smokeOk;
+  const o = result.opening_layer;
+  const openingOk = !!o && o.shown && o.dismissed && o.pageErrors.length === 0 && !o.err;
+  const ok = result.PAGE_ERRORS === 0 && result.ui_system && result.state_system && result.effects_system && result.media_system && result.game_state && result.effects_animating && p && p.modeThrough && p.modeStored && p.modeRestored && p.qThrough && p.qStored && p.qRestored && p.vThrough && p.vStored && p.vRestored && p.fThrough && p.fStored && p.fRestored && l && l.modeFunnel && l.modeEvt && l.quizFunnel && l.quizEvt && l.viewFunnel && l.viewEvt && l.flightFunnel && l.flightEvt && l.restored && smokeOk && openingOk;
   console.log('EXIT=' + (ok ? '0' : '1'));
   process.exit(ok ? 0 : 1);
 })().catch((e) => { console.error('FATAL', e); process.exit(2); });

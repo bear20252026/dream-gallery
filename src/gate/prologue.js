@@ -332,6 +332,9 @@ async function run() {
     }, 1300);
   }
 }
+// 供首页流动开场(openTitle)在「进入画廊」后显式驱动序章;
+// 若 __openingSplashHandlesPrologue 已置位,说明开场层已接管,勿在此自动抢跑
+ctx.startPrologue = run;
 
 // 只播一次;测试/探针可用 ?noprologue 或提前 localStorage 置位跳过
 // 2026-07-31: startVidSeq 不在模块顶层调用——浏览器自动播放策略会拦截未交互的音视频。
@@ -347,9 +350,11 @@ if (!ctx.store.flag('prologueDone') && !/noprologue/.test(location.search)) {
       sessionStorage.getItem('agreementConsented') &&
       sessionStorage.getItem('privacyConsented') &&
       sessionStorage.getItem('communityConsented')
-    )
-      later(run, 1200);
-    else later(waitConsent, 1000);
+    ) {
+      // 首页流动开场已接管时,由开场层的「进入画廊」回调驱动本序章;
+      // 否则(开场层未出现/加载失败)按原逻辑自动播放,保证链路不中断
+      if (!window.__openingSplashHandlesPrologue) later(run, 1200);
+    } else later(waitConsent, 1000);
   };
   later(waitConsent, 1500);
 } else if (!/noprologue/.test(location.search)) {

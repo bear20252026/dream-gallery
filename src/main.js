@@ -21,6 +21,7 @@ import './scene/desert.js'; // 西域沙海(无限区块地形/昆仑/水波/飞
 import './scene/player.js'; // 玩家/键盘/鼠标/触摸/小地图/跳跃滑翔
 import './gate/quizgate.js'; // 入馆答题系统(悬浮答题屏 + 答题面板 + 门禁)
 import './gate/prologue.js'; // 冷启动·互动序章(残镜四幕回放+"我愿意"抉择,首访播一次)
+import { showOpening, hideOpening } from './ui/opening-bg.js'; // 首页专属开场:协议后的流动背景(z600)
 import './kunlun/peaks.js'; // 昆仑巅彩蛋(90m 登飞来峰语音 / 100m 彩蛋视频)
 import './kunlun/spirits.js'; // 六合灵蕴收集(天穹100%后开启:光柱指引/拾取/六齐终章)
 import './kunlun/eternal.js'; // 空中永恒展厅·二期①(金门/六边形浮空展厅/晨光留影)
@@ -381,6 +382,40 @@ if (
   }, 1800);
 }
 if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
+
+// ===================== 首页专属开场(2026-08-29) =====================
+// 三个用户协议全部签完后,弹出 chartogne-taillet 风格的全屏流动背景作为「首页开场」;
+// 点击「进入画廊」后淡出,若序章未播过则驱动残镜序章,否则(老访客)直接进馆。
+// 轮询而非依赖协议回调:同时覆盖「首访签完」与「回访(载入即已全签)」两种情形。
+(function watchOpening() {
+  function allConsented() {
+    return (
+      sessionStorage.getItem('agreementConsented') &&
+      sessionStorage.getItem('privacyConsented') &&
+      sessionStorage.getItem('communityConsented')
+    );
+  }
+  let shown = false;
+  function tick() {
+    if (shown) return;
+    // 测试/探针可加 ?noopening 或置 skipOpening 跳过开场层(与 ?noprologue 同机制),
+    // 避免自动化验证时开场层盖住画廊导致交互探针误判
+    if (/noopening/.test(location.search) || sessionStorage.getItem('skipOpening')) return;
+    if (!allConsented()) {
+      setTimeout(tick, 1000);
+      return;
+    }
+    shown = true;
+    showOpening(function () {
+      hideOpening();
+      // 序章只播一次:首访(prologueDone 未置)由开场进入键驱动;老访客不重播(文档 click 监听已管音乐/视频)
+      if (!ctx.store.flag('prologueDone')) {
+        if (ctx.startPrologue) ctx.startPrologue();
+      }
+    });
+  }
+  setTimeout(tick, 1200);
+})();
 
 // 静默补采设备指纹(无邀请函页时代:首次访问服务端已按 IP+UA 建档,这里补稳定指纹)
 // 之后换 App 跳转(如千问转接)也能认出同一个人
