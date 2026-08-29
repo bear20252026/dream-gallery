@@ -18,6 +18,8 @@ let uniforms = null;
 let raf = 0;
 let started = false;
 let onEnterCb = null;
+let phase = 'intro'; // intro(逐字仪式) | main(标题层)
+let introEl = null;
 
 // 全屏 quad:用 clip-space 顶点,无需相机变换
 const VERT = `
@@ -151,11 +153,19 @@ function loop() {
 }
 
 function build() {
-  // 注入流光标题所需的 keyframes(自包含,不污染全局样式表)
+  // 注入字体(同款 Sabon/Shipley,用户已确认版权自担) + 开屏仪式 keyframes(自包含)
   const style = document.createElement('style');
   style.textContent =
+    "@font-face{font-family:'Sabon';src:url('/fonts/SabonLTStd-Roman.woff2') format('woff2');font-weight:400;font-display:swap}" +
+    "@font-face{font-family:'Sabon';src:url('/fonts/SabonLTStd-Bold.woff2') format('woff2');font-weight:700;font-display:swap}" +
+    "@font-face{font-family:'SabonNext';src:url('/fonts/SabonNextLT-BlackItalic.woff2') format('woff2');font-weight:900;font-style:italic;font-display:swap}" +
+    "@font-face{font-family:'Shipley';src:url('/fonts/ShipleyRegular.woff2') format('woff2');font-weight:400;font-display:swap}" +
+    "@font-face{font-family:'Shipley';src:url('/fonts/ShipleyItalic.woff2') format('woff2');font-weight:400;font-style:italic;font-display:swap}" +
     '@keyframes obShimmer{0%{background-position:0% center}100%{background-position:200% center}}' +
-    '@keyframes obRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}';
+    '@keyframes obRise{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}' +
+    '@keyframes obChar{from{opacity:0;filter:blur(8px);transform:translateY(10px)}to{opacity:1;filter:blur(0);transform:none}}' +
+    '@keyframes obBreath{0%,100%{opacity:.3}50%{opacity:.9}}' +
+    '@keyframes obLineGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}';
   document.head.appendChild(style);
 
   ov = document.createElement('div');
@@ -166,24 +176,57 @@ function build() {
     'position:fixed;inset:0;z-index:600;background:#0a0410;opacity:0;transition:opacity .9s;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden';
 
   canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block';
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;display:block;opacity:0;transition:opacity 2.2s ease';
   ov.appendChild(canvas);
 
+  // ===== 阶段A:开屏仪式(chartogne 式逐字浮现 + 轻触启程) =====
+  phase = 'intro';
+  introEl = document.createElement('div');
+  introEl.style.cssText =
+    'position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:#040206;cursor:pointer;transition:opacity 1.4s ease';
+  const line = document.createElement('div');
+  line.style.cssText = 'display:flex;letter-spacing:.4em;padding-left:.4em';
+  const INTRO_TEXT = '凡人一念，可补天缺。';
+  [...INTRO_TEXT].forEach((ch, i) => {
+    const sp = document.createElement('span');
+    sp.textContent = ch;
+    sp.style.cssText =
+      "opacity:0;font-family:'Sabon','Songti SC','STSong','SimSun',serif;font-size:clamp(22px,4.6vw,40px);color:#e9d9b8;text-shadow:0 0 26px rgba(201,169,110,.25);animation:obChar 1.1s ease " + (0.4 + i * 0.16) + 's both';
+    line.appendChild(sp);
+  });
+  introEl.appendChild(line);
+  const hr = document.createElement('div');
+  hr.style.cssText =
+    'width:min(190px,42vw);height:1px;background:linear-gradient(90deg,transparent,rgba(201,169,110,.8),transparent);transform:scaleX(0);animation:obLineGrow 1.2s ease 2.9s both';
+  introEl.appendChild(hr);
+  const en = document.createElement('div');
+  en.textContent = 'Kunlun Lingjian · A Gallery of Dreams';
+  en.style.cssText =
+    "font-family:'Shipley',serif;font-style:italic;font-size:clamp(13px,2.2vw,17px);letter-spacing:2px;color:rgba(201,169,110,.78);opacity:0;animation:obChar 1.2s ease 3.4s both";
+  introEl.appendChild(en);
+  const tap = document.createElement('div');
+  tap.textContent = '轻 触 启 程';
+  tap.style.cssText =
+    "margin-top:22px;font-family:'Sabon','Songti SC','STSong',serif;font-size:13px;letter-spacing:9px;padding-left:9px;color:rgba(233,217,184,.65);opacity:0;animation:obChar 1s ease 4.2s both, obBreath 2.6s ease-in-out 5.4s infinite";
+  introEl.appendChild(tap);
+  ov.appendChild(introEl);
+
   const wrap = document.createElement('div');
+  wrap.id = 'obWrap';
   wrap.style.cssText =
-    'position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:18px;animation:obRise 1.4s ease both';
+    'position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:18px;opacity:0;transition:opacity 1.8s ease .7s;pointer-events:none';
   ov.appendChild(wrap);
 
   const title = document.createElement('div');
   title.textContent = '梦幻画廊 · 昆仑灵鉴';
   title.style.cssText =
-    "font-size:clamp(28px,7vw,56px);letter-spacing:10px;font-weight:600;background:linear-gradient(100deg,#ffd9a8,#ff9ab0,#c89bff,#ffd9a8);-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% auto;animation:obShimmer 6s linear infinite;text-shadow:0 0 30px rgba(255,180,150,.18)";
+    "font-family:'Sabon','Songti SC','STSong','SimSun',serif;font-size:clamp(28px,7vw,56px);letter-spacing:12px;font-weight:600;background:linear-gradient(100deg,#ffd9a8,#ff9ab0,#c89bff,#ffd9a8);-webkit-background-clip:text;background-clip:text;color:transparent;background-size:200% auto;animation:obShimmer 6s linear infinite;text-shadow:0 0 30px rgba(255,180,150,.18)";
   wrap.appendChild(title);
 
   const sub = document.createElement('div');
   sub.textContent = '每一幅被你凝视过的画，都在昆仑多亮一盏灯。';
   sub.style.cssText =
-    'font-size:clamp(12px,2.6vw,15px);letter-spacing:3px;color:rgba(255,210,200,0.62)';
+    "font-family:'Sabon','Songti SC','STSong',serif;font-size:clamp(12px,2.6vw,15px);letter-spacing:3px;color:rgba(255,210,200,0.62)";
   wrap.appendChild(sub);
 
   const btn = document.createElement('button');
@@ -229,6 +272,31 @@ function build() {
   }
 }
 
+// 阶段切换:仪式层(逐字引言) → 标题层(chartogne 式展开:背景渐亮+标题浮现)
+function toMain() {
+  if (phase !== 'intro' || !introEl) return;
+  phase = 'main';
+  introEl.style.opacity = '0';
+  introEl.style.pointerEvents = 'none';
+  setTimeout(() => {
+    if (introEl) {
+      introEl.remove();
+      introEl = null;
+    }
+  }, 1500);
+  if (canvas) canvas.style.opacity = '1';
+  const wrap = ov && document.getElementById('obWrap');
+  if (wrap) {
+    wrap.style.opacity = '1';
+    setTimeout(() => {
+      wrap.style.pointerEvents = 'auto';
+    }, 1800);
+  }
+}
+function onKey(e) {
+  if (e.key === 'Enter') toMain();
+}
+
 // 协议全签完后调用:showOpening(onEnter)
 export function showOpening(onEnter) {
   if (started) return;
@@ -242,6 +310,8 @@ export function showOpening(onEnter) {
   resize();
   window.addEventListener('resize', resize);
   window.addEventListener('pointermove', onMove);
+  window.addEventListener('keydown', onKey);
+  if (introEl) introEl.onclick = toMain; // 轻触启程
   if (renderer) loop();
   requestAnimationFrame(() => {
     if (ov) ov.style.opacity = '1';
@@ -257,6 +327,7 @@ export function hideOpening() {
     raf = 0;
     window.removeEventListener('resize', resize);
     window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('keydown', onKey);
     if (renderer) {
       renderer.dispose();
       renderer = null;
@@ -265,5 +336,7 @@ export function hideOpening() {
     ov = null;
     started = false;
     uniforms = null;
+    introEl = null;
+    phase = 'intro';
   }, 900);
 }
