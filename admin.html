@@ -881,6 +881,8 @@
       const TOKEN = new URLSearchParams(location.search).get('token') || '';
       const tk = () => '?token=' + encodeURIComponent(TOKEN);
       const tk2 = () => '&token=' + encodeURIComponent(TOKEN);
+      // admin-media 无既有查询串,必须用 ?token= 而非 &token=,否则 &token 被当路径导致 404(2026-08-29 修复)
+      const tkq = () => '?token=' + encodeURIComponent(TOKEN);
       let DATA = null,
         RANGE = 'day',
         CAL_DATE = null;
@@ -1578,7 +1580,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
             files
               .map((f) => {
                 const isImg = /\.(jpe?g|png|gif|webp)$/i.test(f.name);
-                const url = `/admin-media/${dir}/${encodeURIComponent(f.name)}` + tk2();
+                const url = `/admin-media/${dir}/${encodeURIComponent(f.name)}` + tkq();
                 const cap = caps[f.name]
                   ? `<div style="font-size:12px;color:#ffd9a8;padding:2px 0">✍ ${esc(caps[f.name])}</div>`
                   : '';
@@ -1594,7 +1596,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         <span class="fname" onclick="pv('${dir}','${encodeURIComponent(f.name)}')" title="点击预览">${esc(f.name)}<br>${who}${cap}</span>
         <span class="fsize">${(f.size / 1024 / 1024).toFixed(2)}MB</span>
         <button class="btn-day" onclick="dl('/admin-media/${dir}/${encodeURIComponent(f.name)}','${j(f.name)}')">下载</button>
-        <button class="btn-day" onclick="copyTxt(location.origin+'/admin-media/${dir}/${encodeURIComponent(f.name)}${tk2()}')">复制链接</button>
+        <button class="btn-day" onclick="copyTxt(location.origin+'/admin-media/${dir}/${encodeURIComponent(f.name)}${tkq()}')">复制链接</button>
         ${dir === 'photos' ? `<button class="btn-day" onclick="editCaption('${j(f.name)}','${j(caps[f.name] || '')}')">编辑配文</button>` : ''}
         ${demoBtn}
         <button class="btn-del" onclick="delFile('${dir}','${encodeURIComponent(f.name)}')">删除</button></div>`;
@@ -1605,7 +1607,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         $('fileSections').innerHTML = html;
       }
       function pv(dir, name) {
-        const url = `/admin-media/${dir}/${name}` + tk2();
+        const url = `/admin-media/${dir}/${name}` + tkq();
         const ext = decodeURIComponent(name).split('.').pop().toLowerCase();
         const m = $('pvMask');
         if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) m.innerHTML = `<img src="${url}">`;
@@ -1915,7 +1917,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
     )
     .join('')}
   <h2 class="pg">三、照片原图(上传照片 + 希沃白板画作,共 ${imgs.length} 张)</h2>
-  ${imgs.map((f) => `<div class="ph"><img src="/admin-media/photos/${encodeURIComponent(f.name)}${tk2()}"><div>${escH(f.name)}</div>${DATA.photoCaptions && DATA.photoCaptions[f.name] ? `<div class="cap">✍ ${escH(DATA.photoCaptions[f.name])}</div>` : ''}</div>`).join('')}
+  ${imgs.map((f) => `<div class="ph"><img src="/admin-media/photos/${encodeURIComponent(f.name)}${tkq()}"><div>${escH(f.name)}</div>${DATA.photoCaptions && DATA.photoCaptions[f.name] ? `<div class="cap">✍ ${escH(DATA.photoCaptions[f.name])}</div>` : ''}</div>`).join('')}
   </body></html>`;
         w.document.write(html);
         w.document.close();
