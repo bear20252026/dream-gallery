@@ -1,28 +1,31 @@
-// avatar.js — Mixamo 角色(FBX+贴图)替换胶囊人，第三人称显示
-// 2026-08-02 重构:加载 walk-relaxed start/loop/end 三套动画,
-// 由玩家状态机(idle/walking)驱动「起步→循环→收步」状态机 + crossfade 过渡(对标原神行走手感)
+// avatar.js — 第三人称角色(终末地「司」GLB 模型)
+// 2026-08-30 重写:原 Mixamo FBX 在 Three.js 下有致命兼容问题——
+//   FBXLoader 报「skeleton attached to more than one geometry is not supported」,
+//   蒙皮失败导致模型塌成平面(用户形容「影子趴在地上 / 纸片人」),
+//   且 39MB 单文件、动画还选错成 30 秒的 UE5 姿势。
+//   改用游戏级 GLB 模型:6 网格 / 737 骨骼 / 自带贴图,7.7MB(原 39MB)。
+//   该模型无动画,改用程序化起伏(走路上下浮动 + 身体微摆)表现移动感。
+//
+// 授权:CC-BY-4.0,必须署名(见 CREDITS.md)
+//   This work is based on "Si / Arknights Endfield"
+//   (https://sketchfab.com/3d-models/si-arknights-endfield-304e5f23db204cbd834b44138ca570d7)
+//   by Abcxyz51 (https://sketchfab.com/Abcxyz51) licensed under CC-BY-4.0
+//   (http://creativecommons.org/licenses/by/4.0/)
 import * as THREE from 'three';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
-import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
+import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行期写路径收归 gameState.set
 const gs = getGameState();
 
-let avatarModel = null;
-let mixer = null;
-let loopAction = null; // 循环走路(常态)
-let startAction = null; // 起步(一次)
-let endAction = null; // 收步(一次)
-let extraLoaded = false; // start/end 是否已加载
-let extraLoading = false;
-let thirdReady = false; // 是否进入过第三人称
-let curAnim = 'none'; // none|start|loop|end
-let wasMoving = false;
+let avatarModel = null; // gltf.scene(内层:承载贴地偏移与程序化起伏)
+let thirdReady = false;
+let bobT = 0; // 程序化起伏相位
+let footOffsetY = 0; // 脚底贴地偏移(setupModel 计算,起伏在其上叠加)
 
 // Cloudflare R2 CDN(浏览器实际读取源)
 const CDN = 'https://cdn.cloudbear.cloud/models/avatar/';
-const LOOP_URL = CDN + 'walk-relaxed-loop-378936.fbx';
-const START_URL = CDN + 'walk-relaxed-start-378926.fbx';
-const END_URL = CDN + 'walk-relaxed-end-378960.fbx';
+const MODEL_URL = CDN + 'si.glb';
+const TARGET_HEIGHT = 1.7; // 目标身高(米)
 
 // ===================== 状态条 + 看自己按钮 =====================
 let statusEl = null;
@@ -48,20 +51,21 @@ function ensureDemoBtn() {
   btn.textContent = '🎭 第三人称';
   btn.style.cssText =
     'position:fixed;bottom:80px;right:16px;z-index:9999;padding:10px 16px;border-radius:22px;background:linear-gradient(135deg,#ff6b9d,#a855f7);color:#fff;font:bold 14px/1 system-ui;border:none;cursor:pointer;box-shadow:0 4px 16px rgba(168,85,247,.5)';
+
   function enterThirdPerson() {
     var pl = ctx.player.pl;
     pl.p.x = 0;
     pl.p.z = 45;
     pl.p.y = 1.6;
     pl.y = Math.PI / 2;
-    gs.set('viewMode', 1); // 阶段4:经 gameState.set 写回(读者 ctx.player.viewMode 经 vault 同步)
+    gs.set('viewMode', 1); // 阶段4:经 gameState.set 写回
     thirdReady = true;
     setStatus('第三人称显示中 · 拖动鼠标环绕观看', '#66ff99');
     setTimeout(clearStatus, 3000);
   }
   btn.onclick = function () {
     if (avatarModel) return enterThirdPerson();
-    // 2026-08-30:角色改为按需加载,首次点击时才开始下载(39MB FBX)
+    // 按需加载:首次点击才下载模型(7.7MB GLB)
     setStatus('正在加载角色模型…', '#ffcc66');
     ensureAvatar(function () {
       if (avatarModel) enterThirdPerson();
@@ -70,20 +74,19 @@ function ensureDemoBtn() {
   document.body.appendChild(btn);
 }
 
-// ===================== FBX 加载 =====================
-function loadFbx(url, onOk, onFail, attempt) {
+// ===================== GLB 加载 =====================
+function loadModel(url, onOk, onFail, attempt) {
   attempt = attempt || 1;
   setStatus('角色加载中' + (attempt > 1 ? '(第' + attempt + '次) ' : '') + ' 0%', '#ffcc66');
-  new FBXLoader().load(
+  new GLTFLoader().load(
     url,
-    function (obj) {
-      onOk(obj);
+    function (gltf) {
+      onOk(gltf);
     },
     function (xhr) {
       if (xhr.total > 0) {
         var pct = Math.round((xhr.loaded / xhr.total) * 100);
         setStatus('角色加载中 ' + pct + '%');
-        if (pct % 20 === 0) console.log('[avatar] 加载 ' + pct + '%');
       }
     },
     function (err) {
@@ -91,7 +94,7 @@ function loadFbx(url, onOk, onFail, attempt) {
       if (attempt < 3) {
         setStatus('加载失败，' + (3 - attempt) + ' 秒后重试...', '#ff6666');
         setTimeout(function () {
-          loadFbx(url, onOk, onFail, attempt + 1);
+          loadModel(url, onOk, onFail, attempt + 1);
         }, 3000);
       } else {
         onFail && onFail(err);
@@ -100,55 +103,25 @@ function loadFbx(url, onOk, onFail, attempt) {
   );
 }
 
-// 懒加载 start/end 两套 clip(进第三人称才触发,避免首屏多下 80MB)
-function ensureExtraClips() {
-  if (extraLoaded || extraLoading || !mixer) return;
-  extraLoading = true;
-  setStatus('加载行走动画(起步/收步)…', '#ffcc66');
-  var pending = 2;
-  function done() {
-    if (--pending === 0) {
-      extraLoaded = true;
-      setStatus('行走动画就绪', '#66ff99');
-      setTimeout(clearStatus, 2000);
-    }
-  }
-  loadFbx(
-    START_URL,
-    function (o) {
-      var c = o.animations && o.animations[0];
-      if (c) {
-        startAction = mixer.clipAction(c);
-        startAction.loop = THREE.LoopOnce;
-        startAction.clampWhenFinished = true;
-      }
-      done();
-    },
-    done
-  );
-  loadFbx(
-    END_URL,
-    function (o) {
-      var c = o.animations && o.animations[0];
-      if (c) {
-        endAction = mixer.clipAction(c);
-        endAction.loop = THREE.LoopOnce;
-        endAction.clampWhenFinished = true;
-      }
-      done();
-    },
-    done
-  );
-}
-
-function setupModel(obj) {
+// ===================== 模型装配 =====================
+function setupModel(gltf) {
+  const obj = gltf.scene;
   avatarModel = obj;
 
-  // 缩放:FBX 局部 ~150 单位 × 0.012 ≈ 1.8 米
-  obj.scale.set(0.012, 0.012, 0.012);
-  obj.rotation.y = Math.PI;
+  // 自动缩放:按包围盒高度归一到目标身高,不依赖导出单位
+  const box = new THREE.Box3().setFromObject(obj);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (size.y > 0.001) obj.scale.setScalar(TARGET_HEIGHT / size.y);
 
-  // 阴影 + 防剔除 + 保留贴图(有色)
+  // 把模型原点挪到脚底并水平居中(记录在内层 obj 上,见下方 holder 说明)
+  const box2 = new THREE.Box3().setFromObject(obj);
+  obj.position.y -= box2.min.y;
+  obj.position.x -= (box2.min.x + box2.max.x) / 2;
+  obj.position.z -= (box2.min.z + box2.max.z) / 2;
+  footOffsetY = obj.position.y;
+
+  // 阴影 + 防剔除(骨骼动画包围盒会变,剔除会导致角色突然消失)
   obj.traverse(function (c) {
     if (c.isMesh) {
       c.castShadow = true;
@@ -157,128 +130,63 @@ function setupModel(obj) {
     }
   });
 
-  // 动画:取 loop clip 作为循环主体;start/end 由 ensureExtraClips 异步补充
-  if (obj.animations && obj.animations.length) {
-    const clip = obj.animations.find((a) => a.duration > 0.1) || obj.animations[0];
-    mixer = new THREE.AnimationMixer(obj);
-    loopAction = mixer.clipAction(clip);
-    loopAction.loop = THREE.LoopRepeat;
-    console.log('[avatar] loop 动画:', clip.name, clip.duration.toFixed(1) + 's');
-    // 起步/收步播完的衔接:start 结束→若仍在走则转 loop,否则转 end
-    mixer.addEventListener('finished', function (e) {
-      if (e.action === startAction) {
-        if (isMovingNow()) setAnim('loop', 0.2);
-        else setAnim('end', 0.2);
-      }
-      // end 结束:clampWhenFinished 自动保持末帧(站立),无需处理
-    });
-  }
+  // ⚠️ loop-manager 每帧覆写 ctx.scene.avatar 的 position 与 rotation.y,
+  //    直接把 obj 挂上去会把上面的贴地/居中偏移和起伏全部冲掉(角色陷地或飘空)。
+  //    故套一层 Group:holder 接受每帧定位,obj 在局部空间保留偏移与动画。
+  const holder = new THREE.Group();
+  holder.add(obj);
 
-  // 替换旧 avatar
+  // 替换旧模型
   var old = ctx.scene.avatar;
   if (old && old !== obj) {
     ctx.scene.s.remove(old);
     old.traverse(function (c) {
       if (c.geometry) c.geometry.dispose();
-      if (c.material) c.material.dispose();
+      if (c.material) {
+        const ms = Array.isArray(c.material) ? c.material : [c.material];
+        for (const m of ms) m.dispose();
+      }
     });
   }
 
-  // 头顶红球标记(确认可见)
-  var marker = new THREE.Mesh(
-    new THREE.SphereGeometry(0.22, 16, 12),
-    new THREE.MeshBasicMaterial({
-      color: 0xff3366,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.85,
-    })
-  );
-  marker.position.y = 2.1;
-  marker.renderOrder = 999;
-  obj.add(marker);
-
-  obj.visible = ctx.player.viewMode === 1;
-  ctx.scene.s.add(obj);
-  ctx.scene.avatar = obj;
+  holder.visible = ctx.player.viewMode === 1;
+  ctx.scene.s.add(holder);
+  ctx.scene.avatar = holder;
 
   window.__avatarLoaded = true;
-  setStatus('角色就绪 · 可点右下角按钮或按 V', '#66ff99');
+  setStatus('角色就绪 · 点右下角按钮切换第三人称', '#66ff99');
   setTimeout(clearStatus, 5000);
 
-  // 帧更新:仅推进动画 + 行走状态机(位置/可见性/相机 由 main.js 主循环接管)
+  // 该模型无动画,起伏/摆动由 avatarTick 程序化驱动
   ctx._avatarTick = avatarTick;
   ctx.onTick(ctx._avatarTick);
 }
 
-// ===================== 行走状态机 =====================
+// ===================== 行走状态 =====================
 function isMovingNow() {
   const sm = ctx._playerSM;
   return !!(sm && sm.current && sm.current.name === 'walking');
 }
 
-// 切到指定动画(带 crossfade),其余淡出
-function setAnim(name, fade) {
-  const map = { start: startAction, loop: loopAction, end: endAction };
-  const next = map[name];
-  if (!next) return false;
-  ['start', 'loop', 'end'].forEach(function (k) {
-    const a = map[k];
-    if (a && k !== name && a.isRunning()) a.fadeOut(fade);
-  });
-  next.reset();
-  next.setEffectiveWeight(1);
-  next.fadeIn(fade);
-  next.play();
-  curAnim = name;
-  return true;
-}
-
+// 程序化起伏:无动画时的移动表现(走路上下浮动 + 身体微摆)
 function avatarTick(dt) {
-  if (!mixer) return;
-  mixer.update(dt);
   if (!avatarModel) return;
-
-  // 进第三人称才懒加载 start/end
-  if (ctx.player.viewMode === 1) ensureExtraClips();
-
   const moving = isMovingNow();
-
-  if (!extraLoaded) {
-    // 兜底:仅 loop 可用时,走播 loop,停则淡出(保持模型默认站姿)
-    if (moving) {
-      if (curAnim !== 'loop') setAnim('loop', 0.2);
-    } else if (loopAction && loopAction.isRunning()) {
-      loopAction.fadeOut(0.2);
-      curAnim = 'idle';
-    }
-    wasMoving = moving;
-    return;
-  }
-
-  if (moving && !wasMoving) {
-    // 起步:先播 start(一次)
-    setAnim('start', 0.12);
-  } else if (!moving && wasMoving) {
-    // 收步:播 end(一次)→ 保持站立末帧
-    setAnim('end', 0.12);
-  } else if (moving && wasMoving) {
-    // 持续行走:start 结束会自动转 loop;若曾中断(如 end 态)则补回 loop
-    if (curAnim === 'end') setAnim('loop', 0.2);
-  } else if (!moving && !wasMoving) {
-    // 待机:确保是 end 站立末帧(首次进入时由 none 切到 end)
-    if (curAnim !== 'end' && curAnim !== 'start') setAnim('end', 0.2);
-  }
-  wasMoving = moving;
+  const d = Math.min(dt || 0, 0.1);
+  bobT += d * (moving ? 9 : 1.6); // 走路起伏快,待机呼吸慢
+  const amp = moving ? 0.045 : 0.012;
+  // 起伏叠加在贴地偏移之上;holder 的 y 由 loop-manager 写死,不能动
+  avatarModel.position.y = footOffsetY + Math.sin(bobT) * amp;
+  // 走路时身体左右微摆,待机时几乎不动
+  const sway = moving ? Math.sin(bobT * 0.5) * 0.03 : 0;
+  avatarModel.rotation.z = sway;
 }
 
-let avatarRequested = false;
-// ===================== 按需加载(2026-08-30 性能优化) =====================
-// FBX 走路动画 39MB,解析后实测占内存约 1.1GB。
-// 原本页面加载 2 秒后无条件下载,所有访客(含纯第一人称)都被拖垮。
-// 现改为:只有真正要进第三人称才下载,第一人称玩家零开销。
+// ===================== 按需加载 =====================
+// 模型 7.7MB,只在真正要进第三人称时下载,第一人称玩家零开销
 const avatarWaiters = [];
-/** 按需加载角色:已就绪直接回调,否则下载后回调(只下载一次) */
+let avatarRequested = false;
+/** 幂等:已就绪直接回调,否则下载后回调(失败可重试) */
 function ensureAvatar(cb) {
   if (avatarModel) {
     cb && cb();
@@ -287,10 +195,10 @@ function ensureAvatar(cb) {
   if (cb) avatarWaiters.push(cb);
   if (avatarRequested) return;
   avatarRequested = true;
-  loadFbx(
-    LOOP_URL,
-    function (obj) {
-      setupModel(obj);
+  loadModel(
+    MODEL_URL,
+    function (gltf) {
+      setupModel(gltf);
       const ws = avatarWaiters.splice(0);
       for (const w of ws) w();
     },

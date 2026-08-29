@@ -82,7 +82,9 @@ const handler = (req, res) => {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob: https:",
       "media-src 'self' blob: https:",
-      "connect-src 'self' https://cloudbear.cloud https://cdn.cloudbear.cloud",
+      // blob: 必需 —— GLTFLoader 把 GLB 内嵌贴图转成 blob: URL 后再 fetch,
+      //   不放行会报 "Couldn't load texture blob:...",角色变成无贴图白模
+      "connect-src 'self' blob: data: https://cloudbear.cloud https://cdn.cloudbear.cloud",
       "font-src 'self' data: https://fonts.gstatic.com",
       "object-src 'none'",
       "frame-ancestors 'self'",
