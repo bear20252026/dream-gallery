@@ -14,27 +14,33 @@
         box-sizing: border-box;
       }
       :root {
-        /* Notion design tokens (getdesign → DESIGN.md) */
-        --bg: #f6f5f4;          /* canvas-soft 暖纸色 */
-        --surface: #ffffff;      /* canvas / surface */
-        --border: #e6e6e6;       /* hairline */
-        --border-strong: #d6d3cf;
-        --text: #000000;         /* ink */
-        --text-2: #615d59;       /* ink-muted */
-        --text-3: #a39e98;       /* ink-faint */
-        --primary: #0075de;      /* Notion blue — 唯一结构色 */
-        --primary-hover: #005bab;/* primary-active */
-        --success: #1aae39;      /* accent-green */
-        --warning: #dd5b00;      /* accent-orange */
-        --danger: #d13a2f;
-        --radius: 8px;           /* rounded.md 工具按钮 */
-        --radius-card: 12px;     /* rounded.lg 卡片 */
-        --shadow: 0 0.175px 1.041px rgba(0,0,0,0.01), 0 0.8px 2.925px rgba(0,0,0,0.02), 0 2.025px 7.847px rgba(0,0,0,0.027);
+        /* Claude / Anthropic design tokens (getdesign → DESIGN.md) */
+        --bg: #faf9f5;            /* canvas 暖奶油底 */
+        --surface: #efe9de;        /* surface-card 奶油卡片 */
+        --surface-soft: #f5f0e8;
+        --surface-cream-strong: #e8e0d2;
+        --border: #e6dfd8;         /* hairline */
+        --border-strong: #d8cfc4;
+        --text: #141413;           /* ink 暖墨 */
+        --text-2: #6c6a64;         /* muted */
+        --text-3: #8e8b82;         /* muted-soft */
+        --primary: #cc785c;        /* 暖珊瑚 — 唯一 CTA/链接色 */
+        --primary-hover: #a9583e;  /* primary-active */
+        --success: #5db872;        /* semantic */
+        --warning: #d4a017;
+        --danger: #c64545;
+        --accent-teal: #5db8a6;
+        --accent-amber: #e8a55a;
+        --radius: 8px;             /* rounded.md 按钮/输入 */
+        --radius-card: 12px;       /* rounded.lg 卡片 */
+        --shadow: 0 1px 3px rgba(20, 20, 19, 0.08); /* 极偶尔的 hover 提浮 */
+        --serif: Georgia, 'Times New Roman', 'Songti SC', 'SimSun', serif;
+        --sans: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, 'Microsoft YaHei', sans-serif;
       }
       body {
         background: var(--bg);
         color: var(--text);
-        font-family: 'Inter', -apple-system, system-ui, 'Segoe UI', Helvetica, Arial, 'Microsoft YaHei', sans-serif;
+        font-family: var(--sans);
         min-height: 100vh;
         font-size: 14px;
         line-height: 1.6;
@@ -46,10 +52,11 @@
       }
       h1 {
         color: var(--text);
-        font-size: 19px;
-        font-weight: 600;
+        font-family: var(--serif);
+        font-size: 21px;
+        font-weight: 500;
+        letter-spacing: -0.3px;
         margin-bottom: 2px;
-        letter-spacing: 0.2px;
       }
       h1 button {
         margin-left: 10px;
@@ -99,18 +106,19 @@
         background: #f6f5f4;
       }
       .tab.active {
-        background: var(--primary);
-        color: #fff;
+        background: var(--surface-cream-strong);
+        color: var(--text);
         font-weight: 500;
-        box-shadow: 0 1px 3px rgba(0, 117, 222, 0.3);
+        box-shadow: none;
       }
       .tab.chat-tab {
         border: 1px dashed var(--border-strong);
       }
       .tab.chat-tab.active {
-        background: #111827;
+        background: #181715;
         border-color: transparent;
-        box-shadow: 0 1px 3px rgba(17, 24, 39, 0.3);
+        color: #faf9f5;
+        box-shadow: none;
       }
 
       /* ===== 统计卡片 ===== */
@@ -140,9 +148,11 @@
         margin-top: 4px;
       }
       .section-title {
-        font-size: 14px;
-        font-weight: 600;
+        font-family: var(--serif);
+        font-size: 15px;
+        font-weight: 500;
         color: var(--text);
+        letter-spacing: -0.2px;
         margin: 18px 0 10px;
         display: flex;
         align-items: center;
@@ -187,19 +197,19 @@
         margin-left: 6px;
         vertical-align: middle;
       }
-      .badge.pending { background: #fef3c7; color: #92400e; }
-      .badge.approved { background: #dcfce7; color: #166534; }
-      .badge.denied { background: #fee2e2; color: #991b1b; }
-      .badge.history { background: #f6f5f4; color: #615d59; }
-      .badge.watch { background: #ffedd5; color: #9a3412; }
-      .badge.blocked { background: #fecaca; color: #991b1b; }
+      .badge.pending { background: #f3e7cf; color: #7a5a1e; }
+      .badge.approved { background: #dff0e0; color: #2f6e3a; }
+      .badge.denied { background: #f5dddd; color: #8c2f2f; }
+      .badge.history { background: #efe9de; color: #6c6a64; }
+      .badge.watch { background: #fae7c8; color: #7a5a1e; }
+      .badge.blocked { background: #f5d0d0; color: #8c2f2f; }
       .brand-tag {
         display: inline-block;
         font-size: 11px;
         padding: 2px 8px;
         border-radius: 6px;
-        background: #f3e8ff;
-        color: #7c3aed;
+        background: #f6e8d0;
+        color: #8a5a1e;
         margin-right: 6px;
       }
       .geo-tag {
@@ -207,8 +217,8 @@
         font-size: 11px;
         padding: 2px 8px;
         border-radius: 6px;
-        background: #eff6ff;
-        color: #0075de;
+        background: #ddf0ea;
+        color: #2f7d6b;
         margin-right: 6px;
       }
       .note-tag {
@@ -216,8 +226,8 @@
         font-size: 11px;
         padding: 2px 8px;
         border-radius: 6px;
-        background: #ecfdf5;
-        color: #059669;
+        background: #dff0e0;
+        color: #2f6e3a;
         margin-right: 6px;
       }
       .actions {
@@ -244,19 +254,19 @@
         cursor: not-allowed;
       }
       .btn-perm { background: var(--success); }
-      .btn-perm:hover { background: #15803d; }
+      .btn-perm:hover { background: #3f9550; }
       .btn-day { background: var(--primary); }
       .btn-day:hover { background: var(--primary-hover); }
-      .btn-once { background: #7c3aed; }
-      .btn-once:hover { background: #6d28d9; }
+      .btn-once { background: #181715; }
+      .btn-once:hover { background: #252320; }
       .btn-deny { background: var(--danger); }
-      .btn-deny:hover { background: #b91c1c; }
-      .btn-revoke { background: #6b7280; }
-      .btn-revoke:hover { background: #615d59; }
+      .btn-deny:hover { background: #a02e2e; }
+      .btn-revoke { background: #6c6a64; }
+      .btn-revoke:hover { background: #4f4d48; }
       .btn-del { background: #b91c1c; }
-      .btn-del:hover { background: #991b1b; }
+      .btn-del:hover { background: #8c2f2f; }
       .btn-note { background: #615d59; }
-      .btn-note:hover { background: #31302e; }
+      .btn-note:hover { background: #4a4a46; }
       .empty {
         color: var(--text-3);
         font-size: 13px;
@@ -277,7 +287,7 @@
       }
       .bar {
         flex: 1;
-        background: linear-gradient(180deg, #4aa3e8, #0075de);
+        background: linear-gradient(180deg, #e5b0a2, #cc785c);
         border-radius: 3px 3px 0 0;
         min-height: 2px;
         position: relative;
@@ -526,7 +536,7 @@
       }
       input:focus, select:focus, textarea:focus {
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
+        box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.18);
       }
     </style>
   </head>
@@ -702,7 +712,7 @@
                 text-align: center;
                 font-size: 14px;
                 font-weight: 600;
-                color: #31302e;
+                color: #6c6a64;
               "
             >
                在线设备
@@ -750,7 +760,7 @@
                 text-align: center;
               "
             >
-              <div style="font-size: 14px; font-weight: 600; color: #31302e">设备对话</div>
+              <div style="font-size: 14px; font-weight: 600; color: #6c6a64">设备对话</div>
               <div id="chatSubTitle" style="font-size: 11px; color: #6b7280">
                 选择一个设备开始对话
               </div>
@@ -809,7 +819,7 @@
                   padding: 8px 16px;
                   border: none;
                   border-radius: 12px;
-                  background: #0075de;
+                  background: #cc785c;
                   color: #fff;
                   font-size: 13px;
                   cursor: pointer;
@@ -1948,7 +1958,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           .map((d) => {
             const active =
               d.dk === chatCurDk
-                ? ' style="border-color:#0075de;background:rgba(0,117,222,.08)"'
+                ? ' style="border-color:#cc785c;background:rgba(204,120,92,.1)"'
                 : '';
             return (
               '<div' +
