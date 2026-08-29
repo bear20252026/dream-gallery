@@ -515,6 +515,36 @@
       .pv-mask audio {
         width: 80vw;
       }
+      /* 页面内确认弹窗(2026-08-29 替代 confirm:沙箱 iframe 中 confirm 被禁,弹窗永远返回 false 导致无法删除等) */
+      .cfm {
+        position: fixed;
+        inset: 0;
+        background: rgba(20, 20, 19, 0.45);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 300;
+      }
+      .cfm.show { display: flex; }
+      .cfm-box {
+        background: #faf9f5;
+        border: 1px solid #e6dfd8;
+        border-radius: 12px;
+        padding: 22px 24px;
+        max-width: 420px;
+        width: 90%;
+        box-shadow: 0 12px 32px rgba(20, 20, 19, 0.18);
+      }
+      .cfm-msg {
+        font-size: 14px;
+        color: #141413;
+        line-height: 1.6;
+        margin-bottom: 18px;
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .cfm-btns { display: flex; gap: 10px; justify-content: flex-end; }
+
       .fname {
         cursor: pointer;
         color: var(--primary) !important;
@@ -876,6 +906,7 @@
         this.innerHTML = '';
       "
     ></div>
+    <div class="cfm" id="cfm"><div class="cfm-box"><div class="cfm-msg" id="cfmMsg"></div><div class="cfm-btns"><button class="btn-day" id="cfmOk">确定</button><button class="btn-revoke" id="cfmCancel">取消</button></div></div></div>
 
     <script>
       const TOKEN = new URLSearchParams(location.search).get('token') || '';
@@ -883,6 +914,15 @@
       const tk2 = () => '&token=' + encodeURIComponent(TOKEN);
       // admin-media 无既有查询串,必须用 ?token= 而非 &token=,否则 &token 被当路径导致 404(2026-08-29 修复)
       const tkq = () => '?token=' + encodeURIComponent(TOKEN);
+      function confirmAsync(msg) {
+        return new Promise(function (resolve) {
+          var m = $('cfm'), ok = $('cfmOk'), cancel = $('cfmCancel');
+          $('cfmMsg').textContent = msg;
+          m.classList.add('show');
+          ok.onclick = function () { m.classList.remove('show'); resolve(true); };
+          cancel.onclick = function () { m.classList.remove('show'); resolve(false); };
+        });
+      }
       let DATA = null,
         RANGE = 'day',
         CAL_DATE = null;
@@ -1002,8 +1042,8 @@
       }
       document.querySelectorAll('.doc-tabs button').forEach(
         (b) =>
-          (b.onclick = () => {
-            if (docDirty && !confirm('当前修改未保存,切换文件将丢弃。继续?')) return;
+          (b.onclick = async () => {
+            if (docDirty && !(await confirmAsync('当前修改未保存,切换文件将丢弃。继续?'))) return;
             document.querySelectorAll('.doc-tabs button').forEach((x) => x.classList.remove('on'));
             b.classList.add('on');
             docCur = b.dataset.f;
@@ -1013,7 +1053,7 @@
           })
       );
       $('docSave').onclick = async () => {
-        if (!docDirty || !confirm('确定保存并立即对访客生效?')) return;
+        if (!docDirty || !(await confirmAsync('确定保存并立即对访客生效?'))) return;
         $('docSave').disabled = true;
         try {
           const body = $('docFrame').contentDocument.body.innerHTML;
@@ -1033,8 +1073,8 @@
           docMsg(e.message, false);
         }
       };
-      $('docReload').onclick = () => {
-        if (!docDirty || confirm('放弃当前修改,重新加载?')) {
+      $('docReload').onclick = async () => {
+        if (!docDirty || (await confirmAsync('放弃当前修改,重新加载?'))) {
           docDirty = false;
           $('docSave').disabled = true;
           loadDocs();
@@ -1057,7 +1097,7 @@
       $('docRestore').onclick = async () => {
         if (
           !$('docBak').value ||
-          !confirm('回滚到 ' + $('docBak').value + ' ?(会先自动备份当前版)')
+          !(await confirmAsync('回滚到 ' + $('docBak').value + ' ?(会先自动备份当前版)'))
         )
           return;
         try {
@@ -1175,7 +1215,7 @@ ${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消
         } else toast('操作失败', 1);
       }
       async function revokeAll() {
-        if (!confirm('确定撤销所有人的批准？所有访客将立即被踢出！')) return;
+        if (!(await confirmAsync('确定撤销所有人的批准？所有访客将立即被踢出！'))) return;
         const r = await fetch('/api/admin/bulk' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1260,7 +1300,7 @@ ${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消
         } else toast('失败', 1);
       }
       async function clearAlerts() {
-        if (!confirm('忽略全部预警?(可疑标记也会清除)')) return;
+        if (!(await confirmAsync('忽略全部预警?(可疑标记也会清除)'))) return;
         const r = await fetch('/api/admin/alerts' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1278,11 +1318,11 @@ ${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消
           return;
         }
         if (
-          !confirm(
+          !(await confirmAsync(
             '封闭 IP ' +
               ip.replace('::ffff:', '') +
               ' ?该 IP 所有设备将立即无法访问(可随时在设备卡片上「解除拉黑」恢复)'
-          )
+          ))
         )
           return;
         const r = await fetch('/api/admin/bulk' + tk(), {
@@ -1622,7 +1662,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         m.classList.add('show');
       }
       async function delFile(dir, name) {
-        if (!confirm('确定删除 ' + decodeURIComponent(name) + ' ？不可恢复！')) return;
+        if (!(await confirmAsync('确定删除 ' + decodeURIComponent(name) + ' ？不可恢复！'))) return;
         const r = await fetch(`/api/files/${dir}/${name}?x=1` + tk2(), { method: 'DELETE' });
         if (r.ok) {
           toast('已删除');
@@ -1873,7 +1913,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         }
       }
       async function clearClicks() {
-        if (!confirm('确定清空全部链接点击记录?不可恢复!(建议先导出 Excel)')) return;
+        if (!(await confirmAsync('确定清空全部链接点击记录?不可恢复!(建议先导出 Excel)'))) return;
         const r = await fetch('/api/admin/clicks/clear' + tk(), { method: 'POST' });
         if (r.ok) {
           DATA.linkClicks = [];
