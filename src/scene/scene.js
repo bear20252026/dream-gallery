@@ -1,6 +1,7 @@
 // scene.js — 场景/相机/渲染器初始化 + 墙壁/地板/屋顶 + 天空系统 + 灯光 + 天空时间控制
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
+import {createPaperTerrainMaterial,updatePaperTerrain} from './paper-floor.js'; // 山河舆图·纸质地形地板(2026-08-29)
 
 const L=document.getElementById('l'),C=document.getElementById('c'),jT=document.getElementById('jt'),jB=document.getElementById('jb'),aB=document.getElementById('ab'),hP=document.getElementById('hp');
 // 电脑端显示操作提示
@@ -222,13 +223,13 @@ wI.forEach(wi=>{
 // ===================== 地板（画廊内部拼花）+ 云影外部地面 =====================
 const floorW=OR-OL; // 36
 const floorD=OBR-OT; // 40
-const floorTL=new THREE.TextureLoader();
-const floorTex=floorTL.load('floor_tile.png');
-floorTex.wrapS=floorTex.wrapT=THREE.RepeatWrapping;
-floorTex.repeat.set(9,10);
-floorTex.colorSpace=THREE.SRGBColorSpace;
-const floorM=new THREE.Mesh(new THREE.PlaneGeometry(floorW,floorD),new THREE.MeshStandardMaterial({map:floorTex,roughness:0.65,metalness:0.02}));
+// 原拼花地板贴图(floor_tile.png)已被下方「山河舆图」纸质地形材质取代,纹理不再加载
+// 山河舆图地板:Chartogne 式纸质地形(高度图起伏+纸纹+等高线金描),细分以支持顶点位移
+const paperFloorMat=createPaperTerrainMaterial({height:0.22,contours:13,lineColor:'#c9a96e'});
+const floorM=new THREE.Mesh(new THREE.PlaneGeometry(floorW,floorD,120,132),paperFloorMat);
 floorM.rotation.x=-Math.PI/2;floorM.position.z=(OT+OBR)/2;s.add(floorM);
+// 自包含逐帧驱动(uTime 用于纸面微流动;起伏为纯视觉,不参与碰撞)
+ctx.onTick(()=>updatePaperTerrain(paperFloorMat,performance.now()*0.001));
 
 // 云影外部地面（覆盖建筑周围大片区域）
 
