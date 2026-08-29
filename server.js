@@ -78,7 +78,7 @@ const handler = (req, res) => {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "media-src 'self' blob: https:",
-      "connect-src 'self' https://cloudbear.cloud",
+      "connect-src 'self' https://cloudbear.cloud https://cdn.cloudbear.cloud",
       "font-src 'self' data:",
       "object-src 'none'",
       "frame-ancestors 'self'",
