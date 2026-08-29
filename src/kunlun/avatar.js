@@ -48,11 +48,7 @@ function ensureDemoBtn() {
   btn.textContent = '🎭 第三人称';
   btn.style.cssText =
     'position:fixed;bottom:80px;right:16px;z-index:9999;padding:10px 16px;border-radius:22px;background:linear-gradient(135deg,#ff6b9d,#a855f7);color:#fff;font:bold 14px/1 system-ui;border:none;cursor:pointer;box-shadow:0 4px 16px rgba(168,85,247,.5)';
-  btn.onclick = function () {
-    if (!avatarModel) {
-      setStatus('角色未加载好,请稍候', '#ff6666');
-      return;
-    }
+  function enterThirdPerson() {
     var pl = ctx.player.pl;
     pl.p.x = 0;
     pl.p.z = 45;
@@ -62,6 +58,14 @@ function ensureDemoBtn() {
     thirdReady = true;
     setStatus('第三人称显示中 · 拖动鼠标环绕观看', '#66ff99');
     setTimeout(clearStatus, 3000);
+  }
+  btn.onclick = function () {
+    if (avatarModel) return enterThirdPerson();
+    // 2026-08-30:角色改为按需加载,首次点击时才开始下载(39MB FBX)
+    setStatus('正在加载角色模型…', '#ffcc66');
+    ensureAvatar(function () {
+      if (avatarModel) enterThirdPerson();
+    });
   };
   document.body.appendChild(btn);
 }
@@ -268,17 +272,34 @@ function avatarTick(dt) {
   wasMoving = moving;
 }
 
-// ===================== 启动 =====================
-function start() {
-  if (ctx.scene.s) {
-    loadFbx(LOOP_URL, setupModel, function () {
+let avatarRequested = false;
+// ===================== 按需加载(2026-08-30 性能优化) =====================
+// FBX 走路动画 39MB,解析后实测占内存约 1.1GB。
+// 原本页面加载 2 秒后无条件下载,所有访客(含纯第一人称)都被拖垮。
+// 现改为:只有真正要进第三人称才下载,第一人称玩家零开销。
+const avatarWaiters = [];
+/** 按需加载角色:已就绪直接回调,否则下载后回调(只下载一次) */
+function ensureAvatar(cb) {
+  if (avatarModel) {
+    cb && cb();
+    return;
+  }
+  if (cb) avatarWaiters.push(cb);
+  if (avatarRequested) return;
+  avatarRequested = true;
+  loadFbx(
+    LOOP_URL,
+    function (obj) {
+      setupModel(obj);
+      const ws = avatarWaiters.splice(0);
+      for (const w of ws) w();
+    },
+    function () {
       window.__avatarFailed = true;
-      setStatus('角色加载失败(网络/CDN)。可刷新重试', '#ff6666');
-    });
-  } else setTimeout(start, 200);
+      avatarRequested = false; // 允许重试
+      setStatus('角色加载失败(网络/CDN)。可点击重试', '#ff6666');
+    }
+  );
 }
 
-setTimeout(function () {
-  ensureDemoBtn();
-  start();
-}, 2000);
+setTimeout(ensureDemoBtn, 2000);
