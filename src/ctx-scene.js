@@ -48,6 +48,8 @@ export function createSceneNamespace(vault) {
     'aB',
     'avatar',
     'kintsugiOn',
+    'renderPostProcessing',
+    'resizePostProcessing',
   ];
   
   const proxy = {};
