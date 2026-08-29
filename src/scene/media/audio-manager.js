@@ -45,7 +45,7 @@ if (!sessionStorage.getItem('kunlunWelcomed')) {
     'click',
     function () {
       sessionStorage.setItem('kunlunWelcomed', '1');
-      kunlunSpeak('凡人一念，可扑天缺。欢迎来到梦幻画廊·���仑灵鉴。');
+      ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('凡人一念，可扑天缺。欢迎来到梦幻画廊·���仑灵鉴。');
     },
     { once: true }
   );

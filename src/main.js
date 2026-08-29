@@ -54,6 +54,7 @@ import {
 import { initSentry } from './shared/sentry.js'; // Sentry 错误追踪(2026-08-22)
 import { compositionRoot } from './core/composition-root.js'; // 组合根(阶段1,2026-08-27)
 import { createToastSystem } from './core/toast-system.js'; // 示范积木:事件驱动 toast
+import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外壳:手绘对话框+任务栏+系统菜单(2026-08-29)
 import { setLoop, createLoopSystem, register } from './core/loop.js'; // 单一主循环 facade(阶段1)
 import { createInputSystem } from './core/input.js'; // 统一输入 facade(阶段1·P1-3)
 import { createAudioSystem } from './core/audio-system.js'; // 阶段2 垂直切片:空间音频积木(依赖注入,取代冻结 ctx 写)
@@ -158,6 +159,7 @@ ctx.setLowQuality = (on) => loopManager.setLowQuality(on); // 供设置页罗盘
 // 全站 ctx.ui.modeToast(...) 经 mode.js 防腐转发层 emit 该事件 —— event-bus 首次被业务消费。
 // 阶段1 补:loop-system(单一主循环 facade) + input-system(统一输入 facade,每帧镜像到总线)。
 compositionRoot.register(createToastSystem());
+compositionRoot.register(createGameShellSystem()); // 手绘游戏外壳(对话框/任务栏/菜单)
 compositionRoot.register(createLoopSystem());
 compositionRoot.register(createInputSystem(ctx.input));
 compositionRoot.init();
