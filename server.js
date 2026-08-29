@@ -117,16 +117,16 @@ const handler = (req, res) => {
     if (pathname === '/api/gate/status' && req.method === 'GET') { handleGateStatus(req, res); return; }
     if (pathname === '/api/gate/watch' && req.method === 'GET') { sseRegister(req, res); return; }
     if (pathname === '/api/gate/rename' && req.method === 'POST') { handleRename(req, res); return; }
-    // 主人后台页面 + 接口(需 TOKEN)
-    if (pathname === '/admin' && req.method === 'GET') {
-      if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权:需要 token' }); return; }
-      serveStatic(req, res, path.join(ROOT, 'admin.html'));
-      return;
-    }
-    if (pathname === '/api/admin/list' && req.method === 'GET') { handleAdminList(req, res, query); return; }
-    if (pathname === '/api/admin/decide' && req.method === 'POST') { handleAdminDecide(req, res, query); return; }
-    if (pathname === '/api/admin/bulk' && req.method === 'POST') { handleAdminBulk(req, res, query); return; }
   }
+  // 主人后台页面 + 接口(需 TOKEN;不依赖审批门开关,始终可用)
+  if (pathname === '/admin' && req.method === 'GET') {
+    if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权:需要 token' }); return; }
+    serveStatic(req, res, path.join(ROOT, 'admin.html'));
+    return;
+  }
+  if (pathname === '/api/admin/list' && req.method === 'GET') { handleAdminList(req, res, query); return; }
+  if (pathname === '/api/admin/decide' && req.method === 'POST') { handleAdminDecide(req, res, query); return; }
+  if (pathname === '/api/admin/bulk' && req.method === 'POST') { handleAdminBulk(req, res, query); return; }
   // 站点配置:公开读 + 后台写(不依赖审批门开关,始终可用)
   if (pathname === '/api/siteconfig' && req.method === 'GET') { handlePublicConfig(req, res); return; }
   if (pathname === '/api/admin/mode' && req.method === 'POST') { handleAdminMode(req, res, query); return; }
