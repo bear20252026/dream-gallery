@@ -1,5 +1,6 @@
 // audio-manager.js — 统一音频管理器 + TTS 昆仑开口 + HTML5 背景音乐
 import { ctx } from '../../ctx.js';
+import { onMediaChanged } from '../../media-push.js'; // 服务端主动推送:后台增删音乐即刷新(2026-08-29)
 // 惰性读取 aB:scene.js 在 main.js 第 6 行已执行,vault['aB'] 已填充;
 // 不做顶层解构,直接在事件回调里读 ctx.scene.aB,防御打包器重排。
 
@@ -103,6 +104,11 @@ function ensureMusic() {
   }
   // 每 60s 同步一次音乐列表(轻量,后台增删音乐无需刷新页面即进入轮换)
   setInterval(refreshMusicList, 60000);
+  // 服务端主动推送:后台增删音乐 → 立即刷新列表(不等轮询)
+  onMediaChanged(function (d) {
+    if (d && d.dir === 'music') refreshMusicList();
+    else if (d) refreshMusicList(); // 增删 photos/videos 不影响音乐,但保底刷新一次无妨
+  });
 }
 setTimeout(function () {
   ctx.scene.aB.addEventListener('click', () => {

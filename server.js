@@ -26,6 +26,7 @@ const { handleDocsGet, handleDocsPost } = require('./lib/docs');
 const { handleChatList, handleChatPost } = require('./lib/chat');
 const { handleAdminAlerts } = require('./lib/abuse');
 const { handleTts } = require('./lib/tts');
+const { mediaSseRegister } = require('./lib/media-push'); // 媒体变更 SSE 推送(2026-08-29)
 
 // 公开静态黑名单:点文件、后端目录、私钥/脚本/文档、数据库与清单文件
 // 根目录 .js 仅放行 data.js/sw.js(前端 ESM 需要),其余根级 js 均为后端/工具脚本
@@ -176,6 +177,8 @@ const handler = (req, res) => {
       { method: 'POST', match: '/api/track/click',        fn: () => handleTrackClick(req, res) },
       { method: 'POST', match: '/api/track/error',        fn: () => handleTrackError(req, res) },
       { method: 'GET',  match: '/api/tts',                fn: () => handleTts(req, res, query) },
+      // 媒体变更即时推送:游戏页长连接,文件增删后服务端主动广播(2026-08-29)
+      { method: 'GET',  match: '/api/media/sse',          fn: () => mediaSseRegister(req, res) },
       { method: 'POST', match: '/api/admin/clicks/clear', fn: () => handleClicksClear(req, res, query) },
       { method: 'GET',  match: '/api/admin/export.xlsx',  fn: () => handleExportXlsx(req, res, query) },
       { method: 'POST', match: '/api/admin/alerts',       fn: () => handleAdminAlerts(req, res, query) },

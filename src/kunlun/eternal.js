@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
+import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片即刷新晨光(2026-08-29)
 const bag = hotBegin('eternal');
 // 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
 // ⚠️ 2026-08-29 修:此处曾被误写成 `() => spiritCount()`(无限自递归 → Maximum call stack
@@ -514,6 +515,10 @@ function refreshMorning() {
 refreshMorning();
 // 每 45s 同步一次晨光(与新媒体墙同步周期一致;仅集合变化才重建)
 setInterval(refreshMorning, 45000);
+// 服务端主动推送:后台增删照片 → 立即刷新晨光三帧(不等轮询)
+onMediaChanged(function (d) {
+  if (!d || d.dir === 'photos') refreshMorning();
+});
 
 // ===================== C2 展厅选片导入(2026-07-30) =====================
 // 本人从「我的上传」中挑选的作品,呈现在永恒展厅西墙(私人收藏墙);

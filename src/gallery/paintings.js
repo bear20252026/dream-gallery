@@ -1,6 +1,7 @@
 // paintings.js — 挂画系统 + 白板作品固定展示区 + 3D原位放大系统(onC3D/zoomIn/zoomOut)
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
+import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片/视频即同步新媒体墙(2026-08-29)
 import { P, V, AI_DESC, LINKS, VIDEO_WALL_SOURCES } from '../../data.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
 const {
@@ -631,6 +632,10 @@ function syncNewMedia() {
 }
 // 每 45s 增量同步一次新媒体墙(晨光/白板/音乐各自有同步)
 setInterval(syncNewMedia, 45000);
+// 服务端主动推送:后台增删照片/视频 → 立即同步新媒体墙(不等轮询)
+onMediaChanged(function (d) {
+  if (!d || d.dir === 'photos' || d.dir === 'videos') syncNewMedia();
+});
 
 // ===== 3D原位放大系统（平滑飞出动效 + 景深虚化 + 物理摇晃）=====
 // ray/mP2 由 scene.js 创建并经 ctx 共享
