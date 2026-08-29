@@ -14,25 +14,27 @@
         box-sizing: border-box;
       }
       :root {
-        --bg: #f4f5f7;
-        --surface: #ffffff;
-        --border: #e5e7eb;
-        --border-strong: #d1d5db;
-        --text: #1f2329;
-        --text-2: #6b7280;
-        --text-3: #9ca3af;
-        --primary: #2563eb;
-        --primary-hover: #1d4ed8;
-        --success: #16a34a;
-        --warning: #d97706;
-        --danger: #dc2626;
-        --radius: 8px;
-        --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+        /* Notion design tokens (getdesign → DESIGN.md) */
+        --bg: #f6f5f4;          /* canvas-soft 暖纸色 */
+        --surface: #ffffff;      /* canvas / surface */
+        --border: #e6e6e6;       /* hairline */
+        --border-strong: #d6d3cf;
+        --text: #000000;         /* ink */
+        --text-2: #615d59;       /* ink-muted */
+        --text-3: #a39e98;       /* ink-faint */
+        --primary: #0075de;      /* Notion blue — 唯一结构色 */
+        --primary-hover: #005bab;/* primary-active */
+        --success: #1aae39;      /* accent-green */
+        --warning: #dd5b00;      /* accent-orange */
+        --danger: #d13a2f;
+        --radius: 8px;           /* rounded.md 工具按钮 */
+        --radius-card: 12px;     /* rounded.lg 卡片 */
+        --shadow: 0 0.175px 1.041px rgba(0,0,0,0.01), 0 0.8px 2.925px rgba(0,0,0,0.02), 0 2.025px 7.847px rgba(0,0,0,0.027);
       }
       body {
         background: var(--bg);
         color: var(--text);
-        font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        font-family: 'Inter', -apple-system, system-ui, 'Segoe UI', Helvetica, Arial, 'Microsoft YaHei', sans-serif;
         min-height: 100vh;
         font-size: 14px;
         line-height: 1.6;
@@ -53,7 +55,7 @@
         margin-left: 10px;
         font-size: 12px;
         padding: 3px 12px;
-        background: #f3f4f6;
+        background: #f6f5f4;
         border: 1px solid var(--border);
         color: var(--text-2);
         border-radius: 6px;
@@ -94,13 +96,13 @@
       }
       .tab:hover {
         color: var(--text);
-        background: #f3f4f6;
+        background: #f6f5f4;
       }
       .tab.active {
         background: var(--primary);
         color: #fff;
         font-weight: 500;
-        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+        box-shadow: 0 1px 3px rgba(0, 117, 222, 0.3);
       }
       .tab.chat-tab {
         border: 1px dashed var(--border-strong);
@@ -121,7 +123,7 @@
       .stat {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: var(--radius);
+        border-radius: var(--radius-card);
         padding: 14px 8px;
         text-align: center;
         box-shadow: var(--shadow);
@@ -155,7 +157,7 @@
       .card {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: var(--radius);
+        border-radius: var(--radius-card);
         padding: 14px 16px;
         margin-bottom: 10px;
         box-shadow: var(--shadow);
@@ -188,7 +190,7 @@
       .badge.pending { background: #fef3c7; color: #92400e; }
       .badge.approved { background: #dcfce7; color: #166534; }
       .badge.denied { background: #fee2e2; color: #991b1b; }
-      .badge.history { background: #f3f4f6; color: #4b5563; }
+      .badge.history { background: #f6f5f4; color: #615d59; }
       .badge.watch { background: #ffedd5; color: #9a3412; }
       .badge.blocked { background: #fecaca; color: #991b1b; }
       .brand-tag {
@@ -206,7 +208,7 @@
         padding: 2px 8px;
         border-radius: 6px;
         background: #eff6ff;
-        color: #2563eb;
+        color: #0075de;
         margin-right: 6px;
       }
       .note-tag {
@@ -250,11 +252,11 @@
       .btn-deny { background: var(--danger); }
       .btn-deny:hover { background: #b91c1c; }
       .btn-revoke { background: #6b7280; }
-      .btn-revoke:hover { background: #4b5563; }
+      .btn-revoke:hover { background: #615d59; }
       .btn-del { background: #b91c1c; }
       .btn-del:hover { background: #991b1b; }
-      .btn-note { background: #4b5563; }
-      .btn-note:hover { background: #374151; }
+      .btn-note { background: #615d59; }
+      .btn-note:hover { background: #31302e; }
       .empty {
         color: var(--text-3);
         font-size: 13px;
@@ -275,7 +277,7 @@
       }
       .bar {
         flex: 1;
-        background: linear-gradient(180deg, #60a5fa, #2563eb);
+        background: linear-gradient(180deg, #4aa3e8, #0075de);
         border-radius: 3px 3px 0 0;
         min-height: 2px;
         position: relative;
@@ -524,7 +526,7 @@
       }
       input:focus, select:focus, textarea:focus {
         border-color: var(--primary);
-        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
       }
     </style>
   </head>
@@ -696,11 +698,11 @@
             <div
               style="
                 padding: 12px 14px;
-                background: #f3f4f6;
+                background: #f6f5f4;
                 text-align: center;
                 font-size: 14px;
                 font-weight: 600;
-                color: #374151;
+                color: #31302e;
               "
             >
                在线设备
@@ -744,11 +746,11 @@
               id="chatHeader"
               style="
                 padding: 12px 14px;
-                background: #f3f4f6;
+                background: #f6f5f4;
                 text-align: center;
               "
             >
-              <div style="font-size: 14px; font-weight: 600; color: #374151">设备对话</div>
+              <div style="font-size: 14px; font-weight: 600; color: #31302e">设备对话</div>
               <div id="chatSubTitle" style="font-size: 11px; color: #6b7280">
                 选择一个设备开始对话
               </div>
@@ -807,7 +809,7 @@
                   padding: 8px 16px;
                   border: none;
                   border-radius: 12px;
-                  background: #2563eb;
+                  background: #0075de;
                   color: #fff;
                   font-size: 13px;
                   cursor: pointer;
@@ -1536,8 +1538,8 @@ ${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消
 <div class="qz-detail" style="display:none;margin-top:10px">
 <div class="meta" style="color:#d97706">选择对错:${mcReview}</div>
 ${fullRows}
-<div class="meta" style="margin-top:8px;color:#4b5563"><b>问答题目:</b>${esc(a.qaQ || '')}</div>
-<div class="meta" style="margin-top:6px;padding:10px;background:#f3f4f6;border-radius:8px;white-space:pre-wrap;word-break:break-all"><b>TA 的作答:</b>\n${esc(a.qaText || '(空)')}</div>
+<div class="meta" style="margin-top:8px;color:#615d59"><b>问答题目:</b>${esc(a.qaQ || '')}</div>
+<div class="meta" style="margin-top:6px;padding:10px;background:#f6f5f4;border-radius:8px;white-space:pre-wrap;word-break:break-all"><b>TA 的作答:</b>\n${esc(a.qaText || '(空)')}</div>
 ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.qaComment)}</div>` : ''}
 </div></div>`;
           })
@@ -1946,7 +1948,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           .map((d) => {
             const active =
               d.dk === chatCurDk
-                ? ' style="border-color:#2563eb;background:rgba(37,99,235,.08)"'
+                ? ' style="border-color:#0075de;background:rgba(0,117,222,.08)"'
                 : '';
             return (
               '<div' +
