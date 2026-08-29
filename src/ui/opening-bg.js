@@ -288,9 +288,9 @@ function toMain() {
   const wrap = ov && document.getElementById('obWrap');
   if (wrap) {
     wrap.style.opacity = '1';
-    setTimeout(() => {
-      wrap.style.pointerEvents = 'auto';
-    }, 1800);
+    // 立即放开点击:阶段A 的仪式层(z-index 3)覆盖全屏,已天然挡住误触;
+    // 此前延迟 1.8s 才放开,一旦时序异常会导致「进入画廊」按钮点不动、用户卡在开屏层。
+    wrap.style.pointerEvents = 'auto';
   }
 }
 function onKey(e) {

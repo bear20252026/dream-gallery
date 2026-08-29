@@ -389,10 +389,21 @@ if (
 }
 if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
 
-// ===================== 首页专属开场(2026-08-29) =====================
-// 三个用户协议全部签完后,弹出 chartogne-taillet 风格的全屏流动背景作为「首页开场」;
-// 点击「进入画廊」后淡出,若序章未播过则驱动残镜序章,否则(老访客)直接进馆。
-// 轮询而非依赖协议回调:同时覆盖「首访签完」与「回访(载入即已全签)」两种情形。
+// ===================== 开场流程统一调度(2026-08-29 顺序梳理) =====================
+// 正常游戏顺序(单一入口,杜绝双轮询抢跑):
+//   ① 协议三连读(用户协议 → 隐私指引 → 社区公约,必须签完)
+//   ↓
+//   ② 首页开场(开屏:逐字启程仪式 → 标题层 → 点「进入画廊」)
+//   ↓
+//   ③ 残镜序章(仅首访播一次;由本处在开屏结束后显式驱动)
+//   ↓
+//   ④ 3D 画廊
+// 2026-08-29 修订:此前 prologue.js 与开场层各自轮询 consent,存在竞态——
+// 序章可能在开场层之前抢跑(z-index 500 被 600 盖住,用户在开屏上点击时剧情已播完)。
+// 现改为:序章一律由本处驱动;prologue.js 仅保留"开场层不可用"时的延迟兜底。
+function startPrologueIfNeeded() {
+  if (!ctx.store.flag('prologueDone') && ctx.startPrologue) ctx.startPrologue();
+}
 (function watchOpening() {
   function allConsented() {
     return (
@@ -401,23 +412,27 @@ if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
       sessionStorage.getItem('communityConsented')
     );
   }
-  let shown = false;
+  // 测试/探针可加 ?noopening 或置 skipOpening 跳过开场层(与 ?noprologue 同机制)
+  const skipOpening = /noopening/.test(location.search) || !!sessionStorage.getItem('skipOpening');
+  let done = false;
   function tick() {
-    if (shown) return;
-    // 测试/探针可加 ?noopening 或置 skipOpening 跳过开场层(与 ?noprologue 同机制),
-    // 避免自动化验证时开场层盖住画廊导致交互探针误判
-    if (/noopening/.test(location.search) || sessionStorage.getItem('skipOpening')) return;
+    if (done) return;
+    // ① 协议未签完:一律等待(协议先行)
     if (!allConsented()) {
       setTimeout(tick, 1000);
       return;
     }
-    shown = true;
+    done = true;
+    // 开场层被显式跳过:标记后直接进序章(不再等开屏)
+    if (skipOpening) {
+      window.__openingSplashSkipped = true;
+      startPrologueIfNeeded();
+      return;
+    }
+    // ② 开屏 → 用户点「进入画廊」→ ③ 序章
     showOpening(function () {
       hideOpening();
-      // 序章只播一次:首访(prologueDone 未置)由开场进入键驱动;老访客不重播(文档 click 监听已管音乐/视频)
-      if (!ctx.store.flag('prologueDone')) {
-        if (ctx.startPrologue) ctx.startPrologue();
-      }
+      startPrologueIfNeeded();
     });
   }
   setTimeout(tick, 1200);

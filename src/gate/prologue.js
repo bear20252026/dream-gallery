@@ -297,6 +297,7 @@ function finish(openQuizAfter) {
 }
 
 async function run() {
+  window.__prologueStarted = true; // 供兜底逻辑判断(避免重复播放)
   build();
   document.addEventListener('keydown', onKey);
   await line('三千年了。', 2600, '三千年了。');
@@ -344,16 +345,20 @@ function _startOnInteract() {
   if (ctx.startVidSeq) ctx.startVidSeq();
 }
 if (!ctx.store.flag('prologueDone') && !/noprologue/.test(location.search)) {
-  // 法规层优先:三连读(用户协议/隐私指引/社区公约)未签完前序章静候,签完再播;
+  // 2026-08-29 顺序梳理:序章统一由 main.js 的开场调度驱动(协议 → 开屏 → 序章 → 3D)。
+  // 此前本处与开场层各自轮询 consent,存在竞态——序章(z-index 500)可能被开屏(600)盖住先播完,
+  // 用户点「进入画廊」时剧情已错过。现仅保留兜底:只有开场层被明确跳过
+  // (main 置 __openingSplashSkipped)且尚未播过时才自动播,保证链路不中断。
   const waitConsent = () => {
     if (
       sessionStorage.getItem('agreementConsented') &&
       sessionStorage.getItem('privacyConsented') &&
       sessionStorage.getItem('communityConsented')
     ) {
-      // 首页流动开场已接管时,由开场层的「进入画廊」回调驱动本序章;
-      // 否则(开场层未出现/加载失败)按原逻辑自动播放,保证链路不中断
-      if (!window.__openingSplashHandlesPrologue) later(run, 1200);
+      later(() => {
+        if (window.__prologueStarted) return; // 已由 main 的开场回调驱动
+        if (window.__openingSplashSkipped) later(run, 600); // 开场层被跳过 → 兜底自动播
+      }, 2600); // 延后足够久,等 main 的开场决策到位
     } else later(waitConsent, 1000);
   };
   later(waitConsent, 1500);
