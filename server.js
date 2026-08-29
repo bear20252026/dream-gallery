@@ -72,16 +72,18 @@ const handler = (req, res) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   // CSP: 允许内联脚本(页面内 <script>)、blob URL(视频)、data URL(图片)
   // 不允许 eval、外部脚本域(除 Three.js CDN 备份)、外部样式域
+  // 2026-08-29:放行 Google Fonts(官网落地页用 Noto Serif SC,Preloader 等待 document.fonts.ready,
+  //   不放行会导致页面永远停在渐变 Preloader 而不显示内容)
   res.setHeader(
     'Content-Security-Policy',
     [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
-      "style-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob: https:",
       "media-src 'self' blob: https:",
       "connect-src 'self' https://cloudbear.cloud https://cdn.cloudbear.cloud",
-      "font-src 'self' data:",
+      "font-src 'self' data: https://fonts.gstatic.com",
       "object-src 'none'",
       "frame-ancestors 'self'",
     ].join('; ')
@@ -236,7 +238,9 @@ const handler = (req, res) => {
   }
 
   // 静态文件:/ → index.html
-  const rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
+  // 官网落地页子目录回落(2026-08-29):/landing 与 /landing/ → /landing/index.html
+  if (rel === 'landing' || rel === 'landing/') rel = 'landing/index.html';
   // 媒体文件级门禁(2026-07-26):普通用户仅演示照片/白板/户外大屏/本人上传,其余 403
   const mediaMatch = rel.match(/^(photos|videos)\/(.+)$/);
   if (mediaMatch && !canServeMedia(req, mediaMatch[1], mediaMatch[2])) {
