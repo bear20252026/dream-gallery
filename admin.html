@@ -5,100 +5,143 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>梦幻画廊 · 管理后台</title>
     <style>
+/* ================================================================
+         管理后台 · 专业浅色主题(2026-08-29 重设计,替换原糖果卡通风)
+         ================================================================ */
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
+      :root {
+        --bg: #f4f5f7;
+        --surface: #ffffff;
+        --border: #e5e7eb;
+        --border-strong: #d1d5db;
+        --text: #1f2329;
+        --text-2: #6b7280;
+        --text-3: #9ca3af;
+        --primary: #2563eb;
+        --primary-hover: #1d4ed8;
+        --success: #16a34a;
+        --warning: #d97706;
+        --danger: #dc2626;
+        --radius: 8px;
+        --shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+      }
       body {
-        background: #14101a;
-        color: #eee;
-        font-family: 'Microsoft YaHei', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
         min-height: 100vh;
+        font-size: 14px;
+        line-height: 1.6;
       }
       .wrap {
-        max-width: 960px;
+        max-width: 1100px;
         margin: 0 auto;
-        padding: 16px 14px 60px;
+        padding: 20px 18px 60px;
       }
       h1 {
-        color: #ffb6c8;
-        font-size: 18px;
+        color: var(--text);
+        font-size: 19px;
+        font-weight: 600;
         margin-bottom: 2px;
+        letter-spacing: 0.2px;
+      }
+      h1 button {
+        margin-left: 10px;
+        font-size: 12px;
+        padding: 3px 12px;
+        background: #f3f4f6;
+        border: 1px solid var(--border);
+        color: var(--text-2);
+        border-radius: 6px;
+        cursor: pointer;
+        vertical-align: middle;
+      }
+      h1 button:hover {
+        background: #e5e7eb;
+        color: var(--text);
       }
       .sub {
-        color: rgba(255, 255, 255, 0.35);
-        font-size: 11px;
-        margin: 0 0 14px;
+        color: var(--text-3);
+        font-size: 12px;
+        margin: 0 0 16px;
       }
 
       /* ===== 标签栏 ===== */
       .tabs {
         display: flex;
-        gap: 4px;
-        margin-bottom: 16px;
-        background: rgba(255, 255, 255, 0.03);
-        padding: 4px;
-        border-radius: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
+        gap: 2px;
+        margin-bottom: 18px;
+        background: var(--surface);
+        padding: 5px;
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
         flex-wrap: wrap;
+        box-shadow: var(--shadow);
       }
       .tab {
-        padding: 7px 12px;
-        border-radius: 8px;
+        padding: 7px 14px;
+        border-radius: 6px;
         cursor: pointer;
-        font-size: 12px;
-        color: rgba(255, 255, 255, 0.5);
+        font-size: 13px;
+        color: var(--text-2);
         transition: all 0.15s;
         user-select: none;
         white-space: nowrap;
       }
       .tab:hover {
-        color: #fff;
-        background: rgba(255, 255, 255, 0.05);
+        color: var(--text);
+        background: #f3f4f6;
       }
       .tab.active {
-        background: linear-gradient(135deg, #ff6b6b, #feca57);
+        background: var(--primary);
         color: #fff;
-        font-weight: bold;
-        box-shadow: 0 2px 8px rgba(255, 107, 107, 0.25);
+        font-weight: 500;
+        box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
       }
       .tab.chat-tab {
-        border: 1px dashed rgba(255, 154, 158, 0.4);
+        border: 1px dashed var(--border-strong);
       }
       .tab.chat-tab.active {
-        background: linear-gradient(135deg, #667eea, #764ba2);
+        background: #111827;
         border-color: transparent;
+        box-shadow: 0 1px 3px rgba(17, 24, 39, 0.3);
       }
 
       /* ===== 统计卡片 ===== */
       .stats {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
-        gap: 8px;
-        margin-bottom: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+        margin-bottom: 18px;
       }
       .stat {
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.07);
-        border-radius: 12px;
-        padding: 12px 6px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 14px 8px;
         text-align: center;
+        box-shadow: var(--shadow);
       }
       .stat .num {
-        font-size: 22px;
-        color: #feca57;
-        font-weight: bold;
+        font-size: 24px;
+        color: var(--primary);
+        font-weight: 600;
+        font-variant-numeric: tabular-nums;
       }
       .stat .label {
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.4);
-        margin-top: 3px;
+        font-size: 12px;
+        color: var(--text-3);
+        margin-top: 4px;
       }
       .section-title {
-        font-size: 13px;
-        color: #feca57;
-        margin: 16px 0 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        margin: 18px 0 10px;
         display: flex;
         align-items: center;
         gap: 8px;
@@ -107,70 +150,72 @@
         content: '';
         flex: 1;
         height: 1px;
-        background: rgba(254, 202, 87, 0.15);
+        background: var(--border);
       }
       .card {
-        background: rgba(255, 255, 255, 0.045);
-        border: 1px solid rgba(255, 255, 255, 0.09);
-        border-radius: 14px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
         padding: 14px 16px;
         margin-bottom: 10px;
+        box-shadow: var(--shadow);
         transition: border-color 0.2s;
       }
       .card:hover {
-        border-color: rgba(255, 182, 200, 0.3);
+        border-color: var(--border-strong);
       }
       .card .answer {
-        font-size: 16px;
-        color: #fff;
+        font-size: 15px;
+        font-weight: 500;
+        color: var(--text);
         margin-bottom: 6px;
       }
       .card .meta {
         font-size: 12px;
-        color: rgba(255, 255, 255, 0.45);
+        color: var(--text-2);
         line-height: 1.8;
         word-break: break-all;
       }
       .badge {
         display: inline-block;
         font-size: 11px;
+        font-weight: 500;
         padding: 2px 10px;
-        border-radius: 10px;
+        border-radius: 999px;
         margin-left: 6px;
         vertical-align: middle;
       }
-      .badge.pending {
-        background: #feca57;
-        color: #000;
-      }
-      .badge.approved {
-        background: #2ecc71;
-        color: #000;
-      }
-      .badge.denied {
-        background: #e74c3c;
-        color: #fff;
-      }
-      .badge.history {
-        background: #888;
-        color: #fff;
-      }
+      .badge.pending { background: #fef3c7; color: #92400e; }
+      .badge.approved { background: #dcfce7; color: #166534; }
+      .badge.denied { background: #fee2e2; color: #991b1b; }
+      .badge.history { background: #f3f4f6; color: #4b5563; }
+      .badge.watch { background: #ffedd5; color: #9a3412; }
+      .badge.blocked { background: #fecaca; color: #991b1b; }
       .brand-tag {
         display: inline-block;
         font-size: 11px;
         padding: 2px 8px;
-        border-radius: 8px;
-        background: rgba(155, 89, 182, 0.3);
-        color: #d5a6ff;
+        border-radius: 6px;
+        background: #f3e8ff;
+        color: #7c3aed;
         margin-right: 6px;
       }
       .geo-tag {
         display: inline-block;
         font-size: 11px;
         padding: 2px 8px;
-        border-radius: 8px;
-        background: rgba(52, 152, 219, 0.25);
-        color: #9cd2ff;
+        border-radius: 6px;
+        background: #eff6ff;
+        color: #2563eb;
+        margin-right: 6px;
+      }
+      .note-tag {
+        display: inline-block;
+        font-size: 11px;
+        padding: 2px 8px;
+        border-radius: 6px;
+        background: #ecfdf5;
+        color: #059669;
         margin-right: 6px;
       }
       .actions {
@@ -181,41 +226,39 @@
       }
       button {
         border: none;
-        border-radius: 8px;
-        padding: 8px 14px;
+        border-radius: 6px;
+        padding: 7px 14px;
         font-size: 12px;
+        font-weight: 500;
         cursor: pointer;
         color: #fff;
-        transition: transform 0.1s;
+        transition: filter 0.1s;
       }
       button:active {
-        transform: scale(0.95);
+        filter: brightness(0.92);
       }
-      .btn-perm {
-        background: #2ecc71;
+      button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
       }
-      .btn-day {
-        background: #3498db;
-      }
-      .btn-once {
-        background: #9b59b6;
-      }
-      .btn-deny {
-        background: #e74c3c;
-      }
-      .btn-revoke {
-        background: #666;
-      }
-      .btn-del {
-        background: #c0392b;
-      }
-      .btn-note {
-        background: #555;
-      }
+      .btn-perm { background: var(--success); }
+      .btn-perm:hover { background: #15803d; }
+      .btn-day { background: var(--primary); }
+      .btn-day:hover { background: var(--primary-hover); }
+      .btn-once { background: #7c3aed; }
+      .btn-once:hover { background: #6d28d9; }
+      .btn-deny { background: var(--danger); }
+      .btn-deny:hover { background: #b91c1c; }
+      .btn-revoke { background: #6b7280; }
+      .btn-revoke:hover { background: #4b5563; }
+      .btn-del { background: #b91c1c; }
+      .btn-del:hover { background: #991b1b; }
+      .btn-note { background: #4b5563; }
+      .btn-note:hover { background: #374151; }
       .empty {
-        color: rgba(255, 255, 255, 0.3);
+        color: var(--text-3);
         font-size: 13px;
-        padding: 20px;
+        padding: 24px;
         text-align: center;
       }
       /* 统计页 */
@@ -223,15 +266,16 @@
         display: flex;
         align-items: flex-end;
         gap: 3px;
-        height: 110px;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 14px;
+        height: 130px;
+        background: var(--surface);
+        border-radius: var(--radius);
         padding: 14px 12px 8px;
-        border: 1px solid rgba(255, 255, 255, 0.07);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
       }
       .bar {
         flex: 1;
-        background: linear-gradient(180deg, #ff6b6b, #feca57);
+        background: linear-gradient(180deg, #60a5fa, #2563eb);
         border-radius: 3px 3px 0 0;
         min-height: 2px;
         position: relative;
@@ -239,7 +283,7 @@
         transition: opacity 0.15s;
       }
       .bar:hover {
-        opacity: 0.75;
+        opacity: 0.8;
       }
       .bar .tip {
         display: none;
@@ -247,7 +291,8 @@
         bottom: 105%;
         left: 50%;
         transform: translateX(-50%);
-        background: #000;
+        background: #111827;
+        color: #f9fafb;
         padding: 3px 8px;
         border-radius: 6px;
         font-size: 11px;
@@ -260,9 +305,9 @@
       .chart-x {
         display: flex;
         gap: 3px;
-        padding: 4px 12px 0;
+        padding: 6px 12px 0;
         font-size: 10px;
-        color: rgba(255, 255, 255, 0.35);
+        color: var(--text-3);
       }
       .chart-x span {
         flex: 1;
@@ -272,44 +317,53 @@
         display: grid;
         grid-template-columns: repeat(7, 1fr);
         gap: 5px;
-        background: rgba(255, 255, 255, 0.03);
-        border-radius: 14px;
+        background: var(--surface);
+        border-radius: var(--radius);
         padding: 12px;
-        border: 1px solid rgba(255, 255, 255, 0.07);
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
       }
       .cal-head {
         text-align: center;
         font-size: 11px;
-        color: #feca57;
+        font-weight: 500;
+        color: var(--text-2);
         padding: 4px 0;
       }
       .cal-cell {
         aspect-ratio: 1;
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.04);
+        border-radius: 6px;
+        background: #f9fafb;
+        border: 1px solid transparent;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         font-size: 11px;
-        color: rgba(255, 255, 255, 0.5);
+        color: var(--text-2);
         cursor: pointer;
         transition: all 0.15s;
       }
       .cal-cell:hover {
-        background: rgba(255, 107, 107, 0.25);
+        background: #eff6ff;
+        color: var(--primary);
       }
       .cal-cell.has {
-        background: rgba(255, 107, 107, 0.18);
-        color: #fff;
+        background: #dbeafe;
+        color: var(--text);
+        border-color: #bfdbfe;
+      }
+      .cal-cell.has:hover {
+        background: #bfdbfe;
       }
       .cal-cell .c {
         font-size: 10px;
-        color: #feca57;
+        color: var(--primary);
         margin-top: 1px;
+        font-weight: 500;
       }
       .cal-cell.today {
-        outline: 1px solid #feca57;
+        outline: 2px solid var(--primary);
       }
       .range-btns {
         display: flex;
@@ -318,28 +372,39 @@
         flex-wrap: wrap;
       }
       .range-btn {
-        background: rgba(255, 255, 255, 0.07);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.6);
+        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        color: var(--text-2);
         padding: 6px 16px;
-        border-radius: 16px;
+        border-radius: 6px;
         font-size: 12px;
         cursor: pointer;
       }
+      .range-btn:hover {
+        border-color: var(--primary);
+        color: var(--primary);
+      }
       .range-btn.active {
-        background: linear-gradient(135deg, #ff6b6b, #feca57);
+        background: var(--primary);
         color: #fff;
-        border-color: transparent;
+        border-color: var(--primary);
+      }
+      .range-btn.on {
+        background: var(--primary);
+        color: #fff;
+        border-color: var(--primary);
       }
       .vrow {
         display: flex;
         align-items: center;
         gap: 8px;
         padding: 9px 12px;
-        background: rgba(255, 255, 255, 0.04);
-        border-radius: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
         margin-bottom: 6px;
         font-size: 13px;
+        box-shadow: var(--shadow);
       }
       .vrow .who {
         flex: 1;
@@ -349,9 +414,11 @@
         white-space: nowrap;
       }
       .vrow .cnt {
-        color: #feca57;
+        color: var(--primary);
         font-size: 12px;
+        font-weight: 500;
         white-space: nowrap;
+        font-variant-numeric: tabular-nums;
       }
       /* 文件页 */
       .file-row {
@@ -359,10 +426,12 @@
         align-items: center;
         gap: 10px;
         padding: 8px 12px;
-        background: rgba(255, 255, 255, 0.04);
-        border-radius: 10px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
         margin-bottom: 6px;
         font-size: 12px;
+        box-shadow: var(--shadow);
       }
       .file-row .fname {
         flex: 1;
@@ -370,10 +439,10 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        color: rgba(255, 255, 255, 0.8);
+        color: var(--text);
       }
       .file-row .fsize {
-        color: rgba(255, 255, 255, 0.4);
+        color: var(--text-3);
         white-space: nowrap;
       }
       .upload-box {
@@ -385,7 +454,7 @@
       }
       .upload-box input[type='file'] {
         font-size: 12px;
-        color: rgba(255, 255, 255, 0.6);
+        color: var(--text-2);
         max-width: 220px;
       }
       .toast {
@@ -393,42 +462,26 @@
         top: 16px;
         left: 50%;
         transform: translateX(-50%);
-        background: #2ecc71;
+        background: var(--success);
         color: #fff;
         padding: 10px 22px;
-        border-radius: 10px;
+        border-radius: 8px;
         font-size: 13px;
+        font-weight: 500;
         z-index: 99;
         display: none;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 8px 24px rgba(16, 24, 40, 0.18);
       }
       .toast.err {
-        background: #e74c3c;
+        background: var(--danger);
       }
       .qz-detail.show {
         display: block !important;
       }
-      .badge.watch {
-        background: #e67e22;
-        color: #fff;
-      }
-      .badge.blocked {
-        background: #c0392b;
-        color: #fff;
-      }
-      .note-tag {
-        display: inline-block;
-        font-size: 11px;
-        padding: 2px 8px;
-        border-radius: 8px;
-        background: rgba(46, 204, 113, 0.25);
-        color: #8ef0b8;
-        margin-right: 6px;
-      }
       .pv-mask {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.9);
+        background: rgba(17, 24, 39, 0.92);
         display: none;
         align-items: center;
         justify-content: center;
@@ -442,7 +495,7 @@
       .pv-mask video {
         max-width: 92vw;
         max-height: 86vh;
-        border-radius: 10px;
+        border-radius: 8px;
         background: #000;
       }
       .pv-mask audio {
@@ -450,15 +503,35 @@
       }
       .fname {
         cursor: pointer;
-        color: #9cd2ff !important;
+        color: var(--primary) !important;
         text-decoration: underline dotted;
+      }
+      /* 协议文档编辑 */
+      .doc-tabs {
+        display: flex;
+        gap: 4px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      input, select, textarea {
+        border: 1px solid var(--border-strong);
+        border-radius: 6px;
+        background: var(--surface);
+        color: var(--text);
+        font-size: 13px;
+        padding: 7px;
+        outline: none;
+      }
+      input:focus, select:focus, textarea:focus {
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
       }
     </style>
   </head>
   <body>
     <div class="wrap">
       <h1>
-        🌸 梦幻画廊 · 管理后台
+         梦幻画廊 · 管理后台
         <button
           onclick="location.reload()"
           style="
@@ -486,7 +559,7 @@
         <div class="tab" data-tab="display" onclick="switchTab('display')">展示区</div>
         <div class="tab" data-tab="files" onclick="switchTab('files')">文件管理</div>
         <div class="tab" data-tab="docs" onclick="switchTab('docs')">协议文档</div>
-        <div class="tab chat-tab" data-tab="chat" onclick="switchTab('chat')">💬 在线对话</div>
+        <div class="tab chat-tab" data-tab="chat" onclick="switchTab('chat')"> 在线对话</div>
       </div>
 
       <!-- ========== 审批 ========== -->
@@ -494,25 +567,25 @@
         <div class="stats" id="statsCards"></div>
         <div id="alertBox"></div>
         <div class="section-title">
-          ⏳ 待批准
+           待批准
           <button class="btn-revoke" style="margin-left: auto" onclick="revokeAll()">
             一键撤销全部批准
           </button>
         </div>
         <div id="pending"></div>
-        <div class="section-title">✅ 已批准</div>
+        <div class="section-title"> 已批准</div>
         <div id="approved"></div>
       </div>
 
       <!-- ========== 统计 ========== -->
       <div id="tab-stats" style="display: none">
         <div class="stats" id="statCards2"></div>
-        <div class="section-title">📈 近 30 天访问趋势</div>
+        <div class="section-title"> 近 30 天访问趋势</div>
         <div class="chart" id="chart"></div>
         <div class="chart-x" id="chartX"></div>
-        <div class="section-title">📅 本月日历（点日期看明细）</div>
+        <div class="section-title"> 本月日历（点日期看明细）</div>
         <div class="calendar" id="calendar"></div>
-        <div class="section-title">👥 访客明细</div>
+        <div class="section-title"> 访客明细</div>
         <div class="range-btns">
           <button class="range-btn active" onclick="setRange('day', this)">今天</button>
           <button class="range-btn" onclick="setRange('week', this)">本周</button>
@@ -524,23 +597,23 @@
 
       <!-- ========== 历史 ========== -->
       <div id="tab-history" style="display: none">
-        <div class="section-title">🕘 最近访问记录</div>
+        <div class="section-title"> 最近访问记录</div>
         <div id="visitLog"></div>
-        <div class="section-title">📜 历史申请（已撤销 / 已拒绝 / 已过期）</div>
+        <div class="section-title"> 历史申请（已撤销 / 已拒绝 / 已过期）</div>
         <div id="history"></div>
       </div>
 
       <!-- ========== 答题记录 ========== -->
       <div id="tab-quiz" style="display: none">
-        <div class="section-title">📝 答题记录(最近 100 条,点击展开问答详情)</div>
+        <div class="section-title"> 答题记录(最近 100 条,点击展开问答详情)</div>
         <div id="quizList"></div>
       </div>
 
       <!-- ========== 展示区(模式/自定义链接/演示照片/访客链接) ========== -->
       <div id="tab-display" style="display: none">
-        <div class="section-title">🖼️ 展示区模式</div>
+        <div class="section-title"> 展示区模式</div>
         <div id="modeCard" style="padding: 10px 0"></div>
-        <div class="section-title">🔗 自定义链接(普通模式可挂原 3D 图案;特殊模式只建模型)</div>
+        <div class="section-title"> 自定义链接(普通模式可挂原 3D 图案;特殊模式只建模型)</div>
         <div style="padding: 6px 0 12px">
           <input id="clName" placeholder="名称(如 百度)" style="width: 110px; padding: 7px" />
           <input id="clUrl" placeholder="https://…" style="width: 220px; padding: 7px" />
@@ -579,12 +652,12 @@
           </button>
         </div>
         <div id="customLinks"></div>
-        <div class="section-title">🌟 演示照片(普通模式公开展示;特殊模式不上墙)</div>
+        <div class="section-title"> 演示照片(普通模式公开展示;特殊模式不上墙)</div>
         <div id="demoPhotos"></div>
-        <div class="section-title">👤 访客自己的链接(可查看/复制/删除)</div>
+        <div class="section-title"> 访客自己的链接(可查看/复制/删除)</div>
         <div id="userLinks"></div>
         <div class="section-title">
-          🧲 链接点击记录(仅后台可见)
+           链接点击记录(仅后台可见)
           <button
             class="btn-day"
             style="margin-left: 8px"
@@ -596,7 +669,7 @@
           <button class="btn-del" onclick="clearClicks()">批量清理</button>
         </div>
         <div id="clickList"></div>
-        <div class="section-title">🐛 访客端报错(仅后台可见)</div>
+        <div class="section-title"> 访客端报错(仅后台可见)</div>
         <div id="errList"></div>
       </div>
 
@@ -623,24 +696,20 @@
             <div
               style="
                 padding: 12px 14px;
-                background: linear-gradient(
-                  90deg,
-                  rgba(161, 140, 209, 0.3),
-                  rgba(251, 194, 235, 0.2)
-                );
+                background: #f3f4f6;
                 text-align: center;
                 font-size: 14px;
-                font-weight: bold;
-                color: #ffb6c8;
+                font-weight: 600;
+                color: #374151;
               "
             >
-              ✦ 在线设备 ✦
+               在线设备
             </div>
             <div
               style="
                 padding: 4px 14px;
                 font-size: 11px;
-                color: rgba(255, 255, 255, 0.5);
+                color: #6b7280;
                 text-align: center;
               "
             >
@@ -650,7 +719,7 @@
               <div
                 style="
                   text-align: center;
-                  color: rgba(255, 255, 255, 0.3);
+                  color: #9ca3af;
                   font-size: 12px;
                   padding: 20px;
                 "
@@ -675,16 +744,12 @@
               id="chatHeader"
               style="
                 padding: 12px 14px;
-                background: linear-gradient(
-                  90deg,
-                  rgba(255, 154, 158, 0.3),
-                  rgba(254, 207, 239, 0.2)
-                );
+                background: #f3f4f6;
                 text-align: center;
               "
             >
-              <div style="font-size: 14px; font-weight: bold; color: #ffb6c8">CHAT</div>
-              <div id="chatSubTitle" style="font-size: 11px; color: rgba(255, 255, 255, 0.5)">
+              <div style="font-size: 14px; font-weight: 600; color: #374151">设备对话</div>
+              <div id="chatSubTitle" style="font-size: 11px; color: #6b7280">
                 选择一个设备开始对话
               </div>
             </div>
@@ -702,7 +767,7 @@
               <div
                 style="
                   text-align: center;
-                  color: rgba(255, 255, 255, 0.35);
+                  color: #9ca3af;
                   font-size: 13px;
                   padding: 30px;
                 "
@@ -742,7 +807,7 @@
                   padding: 8px 16px;
                   border: none;
                   border-radius: 12px;
-                  background: linear-gradient(135deg, #ff9a9e, #fecfef);
+                  background: #2563eb;
                   color: #fff;
                   font-size: 13px;
                   cursor: pointer;
@@ -757,7 +822,7 @@
 
       <!-- ========== 协议文档 ========== -->
       <div id="tab-docs" style="display: none">
-        <div class="section-title">📜 协议文档编辑(原页直改,保存即生效并自动备份)</div>
+        <div class="section-title"> 协议文档编辑(原页直改,保存即生效并自动备份)</div>
         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 0">
           <span class="doc-tabs">
             <button class="range-btn on" data-f="agreement.html">用户协议</button>
@@ -770,9 +835,9 @@
             <option value="">选择备份回滚…</option>
           </select>
           <button class="btn-day" id="docRestore" disabled style="padding: 7px 12px">回滚</button>
-          <span id="docMsg" style="font-size: 12px; color: #7dff9a"></span>
+          <span id="docMsg" style="font-size: 12px; color: #16a34a"></span>
         </div>
-        <div style="font-size: 11px; color: rgba(255, 217, 168, 0.55); padding: 0 0 6px">
+        <div style="font-size: 12px; color: #6b7280; padding: 0 0 6px">
           下面就是访客看到的原页面——点进去直接改字,回车加行。只改文字,别删整段卡片。
         </div>
         <iframe
@@ -781,7 +846,7 @@
             width: 100%;
             height: calc(100vh - 260px);
             min-height: 420px;
-            border: 2px solid rgba(255, 214, 170, 0.35);
+            border: 1px solid #d1d5db;
             border-radius: 12px;
             background: #fff;
           "
@@ -914,7 +979,7 @@
       function docMsg(t, ok) {
         const m = $('docMsg');
         m.textContent = t;
-        m.style.color = ok === false ? '#ff8a8a' : '#7dff9a';
+        m.style.color = ok === false ? '#ff8a8a' : '#16a34a';
         setTimeout(() => {
           if (m.textContent === t) m.textContent = '';
         }, 4000);
@@ -1057,7 +1122,7 @@
         const devBits = [];
         if (a.dev && a.dev.battery) devBits.push('🔋 ' + esc(a.dev.battery));
         if (a.dev && a.dev.network) devBits.push('📶 ' + esc(a.dev.network));
-        const noteBit = a.note ? `<span class="note-tag">📝 ${esc(a.note)}</span>` : '';
+        const noteBit = a.note ? `<span class="note-tag"> ${esc(a.note)}</span>` : '';
         return `<div class="card">
 <div class="answer">${brandIcon(a.brand)} 「${esc(a.answer)}」${badge}</div>
 <div class="meta">${noteBit}<span class="brand-tag">${brandShow(a.brand)}</span><span class="geo-tag">📍 ${esc(a.geo || '定位中…')}</span>IP ${esc(ip.replace('::ffff:', ''))} · 访问 ${a.visits || 0} 次${devBits.length ? ' · ' + devBits.join(' · ') : ''}<br>申请 ${fmt(a.applyTime)}${a.approveTime ? ' · 批准 ' + fmt(a.approveTime) : ''}${a.lastAccess ? ' · 最近访问 ' + fmt(a.lastAccess) : ''}</div>
@@ -1317,7 +1382,7 @@ ${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消
         var html =
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
           '<button class="range-btn" onclick="calMonth(-1)" style="padding:2px 10px;font-size:14px">◀</button>' +
-          '<span style="font-size:14px;color:#feca57">' +
+          '<span style="font-size:14px;color:#d97706">' +
           ym +
           '</span>' +
           '<button class="range-btn" onclick="calMonth(1)" style="padding:2px 10px;font-size:14px">▶</button>' +
@@ -1451,14 +1516,14 @@ ${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消
             const mcReview = (a.review || [])
               .map(
                 (rv, j) =>
-                  `<span style="color:${rv.right ? '#7dff9a' : '#ff8a8a'}">${j + 1}${rv.right ? '✓' : '✗'}</span>`
+                  `<span style="color:${rv.right ? '#16a34a' : '#ff8a8a'}">${j + 1}${rv.right ? '✓' : '✗'}</span>`
               )
               .join(' ');
             // 全量留档:每题的题目+四选项内容+所选+正解(仅后台可见)
             const fullRows = (a.fullReview || [])
               .map((m, j) => {
                 const opt = (L, c) =>
-                  `<div style="margin-left:14px;color:${L === m.correctLetter ? '#7dff9a' : L === m.chosen ? '#ff8a8a' : 'rgba(255,255,255,.6)'}">${L}. ${esc(c || '')}${L === m.correctLetter ? ' ✓正解' : L === m.chosen ? ' ✗TA选的' : ''}</div>`;
+                  `<div style="margin-left:14px;color:${L === m.correctLetter ? '#16a34a' : L === m.chosen ? '#ff8a8a' : 'rgba(255,255,255,.6)'}">${L}. ${esc(c || '')}${L === m.correctLetter ? ' ✓正解' : L === m.chosen ? ' ✗TA选的' : ''}</div>`;
                 return `<div style="margin-top:8px;padding:8px;background:rgba(255,255,255,.04);border-radius:8px">
         <div><b>第${j + 1}题 · ${esc(m.subject || '')}</b> ${esc(m.q || '')}</div>
         ${opt('A', m.options && m.options.A)}${opt('B', m.options && m.options.B)}${opt('C', m.options && m.options.C)}${opt('D', m.options && m.options.D)}
@@ -1469,10 +1534,10 @@ ${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消
 <div class="answer">${brandIcon(dev.brand)} ${who} ${badge}</div>
 <div class="meta">${meta ? meta + ' · ' : ''}${trackName} · 选择 ${a.mcScore}/81 · 问答 ${a.qaScore}/19(${a.qaBy === 'ai' ? 'AI阅卷' : '本地细则'}) · ${fmt(a.t)}</div>
 <div class="qz-detail" style="display:none;margin-top:10px">
-<div class="meta" style="color:#feca57">选择对错:${mcReview}</div>
+<div class="meta" style="color:#d97706">选择对错:${mcReview}</div>
 ${fullRows}
-<div class="meta" style="margin-top:8px;color:rgba(255,255,255,.75)"><b>问答题目:</b>${esc(a.qaQ || '')}</div>
-<div class="meta" style="margin-top:6px;padding:10px;background:rgba(255,255,255,.05);border-radius:8px;white-space:pre-wrap;word-break:break-all"><b>TA 的作答:</b>\n${esc(a.qaText || '(空)')}</div>
+<div class="meta" style="margin-top:8px;color:#4b5563"><b>问答题目:</b>${esc(a.qaQ || '')}</div>
+<div class="meta" style="margin-top:6px;padding:10px;background:#f3f4f6;border-radius:8px;white-space:pre-wrap;word-break:break-all"><b>TA 的作答:</b>\n${esc(a.qaText || '(空)')}</div>
 ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.qaComment)}</div>` : ''}
 </div></div>`;
           })
@@ -1481,7 +1546,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       // ---------- 文件页 ----------
       async function loadFiles() {
         const dirs = [
-          ['photos', '🖼️ 照片'],
+          ['photos', ' 照片'],
           ['videos', '🎬 视频'],
           ['music', '🎵 音乐'],
         ];
@@ -1503,7 +1568,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
                 const cap = caps[f.name]
                   ? `<div style="font-size:12px;color:#ffd9a8;padding:2px 0">✍ ${esc(caps[f.name])}</div>`
                   : '';
-                const who = ups[f.name] ? `<span class="fsize">👤 ${esc(ups[f.name])}</span>` : '';
+                const who = ups[f.name] ? `<span class="fsize"> ${esc(ups[f.name])}</span>` : '';
                 const demoBtn =
                   dir === 'photos'
                     ? demos.includes(f.name)
@@ -1597,7 +1662,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         const sc = DATA.siteConfig || { mode: 'normal', customLinks: [], demoPhotos: [] };
         // 模式卡
         $('modeCard').innerHTML =
-          `全局默认模式:<b style="color:${sc.mode === 'special' ? '#feca57' : '#7dff9a'}">${sc.mode === 'special' ? '特殊模式(全展示)' : '普通模式(默认)'}</b>
+          `全局默认模式:<b style="color:${sc.mode === 'special' ? '#d97706' : '#16a34a'}">${sc.mode === 'special' ? '特殊模式(全展示)' : '普通模式(默认)'}</b>
     <button class="btn-day" onclick="setMode('normal')">切到普通</button>
     <button class="btn-day" onclick="setMode('special')">切到特殊</button>
     <div style="opacity:.6;font-size:12px;margin-top:6px">「特殊访问」按访客单独授予:在「审批」页对应设备上点「授特殊」;访客自己无法申请</div>`;
@@ -1667,7 +1732,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           errs
             .map(
               (e) => `<div class="card" style="border-color:rgba(255,120,120,.35)">
-    <div class="answer">🐛 ${brandIcon(e.brand)} 「${esc(e.name || '访客')}」 ${esc(e.msg.slice(0, 90))}</div>
+    <div class="answer"> ${brandIcon(e.brand)} 「${esc(e.name || '访客')}」 ${esc(e.msg.slice(0, 90))}</div>
     <div class="meta">${fmt(e.t)} · ${esc(e.brand || '')} · ${esc((e.src || '').split('/').pop())}:${e.line || '-'}</div>
   </div>`
             )
@@ -1843,7 +1908,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         setTimeout(() => w.print(), 1500);
       }
 
-      // ===== 💬 在线对话 =====
+      // =====  在线对话 =====
       let chatCurDk = null,
         chatSse = null,
         chatPoll = null,
@@ -1874,14 +1939,14 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         if (!l) return;
         if (!chatDevices.length) {
           l.innerHTML =
-            '<div style="text-align:center;color:rgba(255,255,255,.3);font-size:12px;padding:20px">暂无在线设备</div>';
+            '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:20px">暂无在线设备</div>';
           return;
         }
         l.innerHTML = chatDevices
           .map((d) => {
             const active =
               d.dk === chatCurDk
-                ? ' style="border-color:#ff9a9e;background:rgba(255,154,158,.1)"'
+                ? ' style="border-color:#2563eb;background:rgba(37,99,235,.08)"'
                 : '';
             return (
               '<div' +
@@ -1890,7 +1955,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
               d.dk +
               '\')" style="cursor:pointer;margin-bottom:4px"><div><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#4caf50;margin-right:4px"></span><b>' +
               esc(d.name) +
-              '</b></div><div style="font-size:10px;color:rgba(255,255,255,.4);margin-top:2px">' +
+              '</b></div><div style="font-size:10px;color:#9ca3af;margin-top:2px">' +
               Math.floor((Date.now() - d.onlineSince) / 60000) +
               '分钟前</div></div>'
             );
@@ -1919,7 +1984,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           if (!box) return;
           if (!cs.length) {
             box.innerHTML =
-              '<div style="text-align:center;color:rgba(255,255,255,.35);font-size:12px;padding:30px">暂无消息</div>';
+              '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:30px">暂无消息</div>';
             return;
           }
           box.innerHTML = cs
