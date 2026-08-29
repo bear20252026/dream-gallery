@@ -109,4 +109,11 @@
   2. 左上**任务栏 HUD**：当前主线 + 子进度(灵蕴 X/6、展厅挂画 Y/20、飞舟状态)，由 game-state 实时驱动。
   3. 右上朱印**系统菜单**：问昆仑 / 操作指引 / 任务册 / 继续(模态弹层,走 ctx.overlay)。
 - **联动**：`kunlunSpeak` 升级落手绘框 → 序章/答题/上传/换色等全部昆仑台词自动呈现；开场欢迎语已改走 `ctx.ui.kunlunSpeak`。
-- **验证**：构建通过 + `npm test` 135/135 + 运行时探针无 JS 报错。commit 83b8207。尚未 push。
+- **验证**：构建通过 + `npm test` 135/135 + 运行时探针无 JS 报错。commit 83b8207。已 push(main) 并**已上线部署**(见下)。
+
+### 部署机制校正（2026-08-29 实测，重要）
+- 交接笔记写的 `cd /opt/gallery && git pull && npm install && pm2 restart` **不成立**：`/opt/gallery` 不是 git 仓库。
+- 线上是**另一套更旧的独立前端**（`three.mjs`+`js/`+`src/kunlun|shared`，无 `node_modules/three`；vite 走 `three.mjs`，静态由 `server.js` 服务根级 `/assets`，且拒绝 `/dist`）。本仓库(组合根重构 + `src/core/gameshell-system.js`)是**不同代码库**。
+- 正确部署(可回滚)：本地 `npm run build` → 打包 `dist/` 为 tar → `scp` 到服务器 → 先按既有 `.frontend-bak-<ts>.tgz` 惯例备份线上 `index.html`+各 html 入口+`assets/`+`manifest.json`+`sw.js` → `tar xzf` 覆盖 `/opt/gallery` 根 → `pm2 restart gallery`。
+- 生产监听 `:3000`(pm2 `gallery`)；前端经 Cloudflare 隧道对外。验证：`curl 127.0.0.1:3000` 200 + 新 hash 资源 200，pm2 日志无报错。回滚：解压对应 `.frontend-bak-*.tgz` 覆盖即可。
+- 私钥用完已删(`/tmp/gk.pem`)；后续部署从桌面交接笔记重新提取，永不入库。
