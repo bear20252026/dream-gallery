@@ -314,11 +314,15 @@ export class LoopManager {
    */
   _executeRenderPhase(dt, now) {
     const { ctx } = this;
-    const { renderPostProcessing } = ctx.scene;
+    const { renderPostProcessing, rnd, s, cam } = ctx.scene;
 
     // 注:视频墙纹理 needsUpdate 已迁出到 MediaSystem(presentation/render),由组合根单循环驱动。
-    // 后处理渲染
-    if (renderPostProcessing) renderPostProcessing();
+    // 后处理渲染(优先,composer 渲染整场景);若后处理未接入则退回直接渲染,避免场景空白。
+    if (renderPostProcessing) {
+      renderPostProcessing();
+    } else if (rnd && s && cam) {
+      rnd.render(s, cam);
+    }
   }
 
   /**

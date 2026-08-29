@@ -104,6 +104,10 @@ const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别�
 
 // ===================== 后处理管线初始化(2026-08-22) =====================
 initPostProcessing(rnd, s, cam);
+// 关键接线:组合根唯一循环(loop-manager._executeRenderPhase)只认 ctx.scene.renderPostProcessing
+// 来绘制 3D 场景。若此处不挂上,场景永远不被渲染——表现为「地图空白,但 HUD/对话框正常」。
+ctx.scene.renderPostProcessing = renderPostProcessing;
+ctx.scene.resizePostProcessing = resizePostProcessing;
 // 阶段3 切片:性能监控改为 PerfMonitorSystem,由唯一组合根单循环驱动(原文件在 ?perf 下自起第二条 rAF,已消除)
 compositionRoot.register(createPerfMonitorSystem({ renderer: rnd }));
 initSentry(); // Sentry 错误追踪(需配置 DSN)
