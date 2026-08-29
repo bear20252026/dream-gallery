@@ -27,6 +27,7 @@ const { handleChatList, handleChatPost } = require('./lib/chat');
 const { handleAdminAlerts } = require('./lib/abuse');
 const { handleTts } = require('./lib/tts');
 const { mediaSseRegister } = require('./lib/media-push'); // 媒体变更 SSE 推送(2026-08-29)
+const { handleBigscreenGet, handleBigscreenUpload, handleBigscreenDelete } = require('./lib/bigscreen'); // 户外大屏软编码+后台管理(2026-08-29)
 
 // 公开静态黑名单:点文件、后端目录、私钥/脚本/文档、数据库与清单文件
 // 根目录 .js 仅放行 data.js/sw.js(前端 ESM 需要),其余根级 js 均为后端/工具脚本
@@ -179,6 +180,8 @@ const handler = (req, res) => {
       { method: 'GET',  match: '/api/tts',                fn: () => handleTts(req, res, query) },
       // 媒体变更即时推送:游戏页长连接,文件增删后服务端主动广播(2026-08-29)
       { method: 'GET',  match: '/api/media/sse',          fn: () => mediaSseRegister(req, res) },
+      // 户外大屏配置(软编码):游戏端拉取,后台管理后可即时生效(2026-08-29)
+      { method: 'GET',  match: '/api/bigscreen',          fn: () => handleBigscreenGet(req, res) },
       { method: 'POST', match: '/api/admin/clicks/clear', fn: () => handleClicksClear(req, res, query) },
       { method: 'GET',  match: '/api/admin/export.xlsx',  fn: () => handleExportXlsx(req, res, query) },
       { method: 'POST', match: '/api/admin/alerts',       fn: () => handleAdminAlerts(req, res, query) },
@@ -216,6 +219,9 @@ const handler = (req, res) => {
       return;
     }
     if (pathname === '/api/upload' && req.method === 'POST') { handleUpload(req, res, query); return; }
+    // 户外大屏后台管理:上传替换/清空槽位(2026-08-29)
+    if (pathname === '/api/admin/bigscreen/upload' && req.method === 'POST') { handleBigscreenUpload(req, res, query); return; }
+    if (pathname === '/api/admin/bigscreen/delete' && req.method === 'POST') { handleBigscreenDelete(req, res, query); return; }
     const delMatch = pathname.match(/^\/api\/files\/([^/]+)\/(.+)$/);
     if (delMatch && req.method === 'DELETE') { handleDelete(res, delMatch[1], delMatch[2]); return; }
   }

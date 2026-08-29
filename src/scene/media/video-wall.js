@@ -13,6 +13,7 @@
 //   playMusic(0,0) → playVideo(V1) → playMusic(1,2) → playVideo(V2) → playVideo(V3) → for V45 playVideo → loop
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
+import { onMediaChanged } from '../../media-push.js'; // 后台改大屏 → 重新拉配置(2026-08-29)
 
 /**
  * CDN 根路径。音频和视频统一从 R2 加载。
@@ -20,44 +21,27 @@ import { ctx } from '../../ctx.js';
  */
 const CDN = 'https://cdn.cloudbear.cloud/';
 
-// ===================== 视频源 =====================
-/**
- * 主屏视频列表（1号/2号/3号HLS）
- * @type {{src:string, x:number, y:number, z:number, sx:number, mesh3:boolean, plays:number}[]}
- */
-const VID_ALL = [
-  {
-    src: CDN + 'videos/户外大屏/户外大屏1号.mp4',
-    x: 67.51,
-    y: 46.6,
-    z: 15.97,
-    sx: 2.5,
-    mesh3: false,
-    plays: 1,
-  },
-  {
-    src: CDN + 'videos/户外大屏/户外大屏2号.mp4',
-    x: 67.51,
-    y: 46.6,
-    z: 15.97,
-    sx: 2.5,
-    mesh3: false,
-    plays: 2,
-  },
-  {
-    src: CDN + 'videos/户外大屏/hls/户外大屏3号.m3u8',
-    x: -0.67,
-    y: 46.6,
-    z: 99.99,
-    sx: 1,
-    mesh3: true,
-    plays: 1,
-  },
-];
-const V45 = [
-  { src: CDN + 'videos/户外大屏/户外大屏4号.mp4', x: 0.58, y: 46.6, z: -100.02, sx: 2.5, plays: 1 },
-  { src: CDN + 'videos/户外大屏/户外大屏5号.mp4', x: 0.58, y: 46.6, z: -100.02, sx: 2.5, plays: 2 },
-];
+// ===================== 大屏配置(软编码,2026-08-29) =====================
+// 由 /api/bigscreen 提供(服务端 gate_data.bigscreen,后台可上传/清空槽位)。
+// 结构: { slot,label,group,file,src,x,y,z,sx,hls,plays } — src=CDN 完整 URL
+let BIG = { main: [], v45: [] };
+
+function reloadBigscreen() {
+  return fetch('/api/bigscreen')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.ok && Array.isArray(d.slots)) {
+        BIG.main = d.slots.filter(function (s) { return s.group === 'main'; });
+        BIG.v45 = d.slots.filter(function (s) { return s.group === 'v45'; });
+      }
+    })
+    .catch(function () {});
+}
+// 后台上传/清空大屏视频 → 立即重拉配置(下次循环生效)
+onMediaChanged(function (d) {
+  if (d && d.dir === 'videos') reloadBigscreen();
+});
+reloadBigscreen();
 
 // ===================== 视频 DOM 元素（创建时无 src，避免自动加载） =====================
 const vidEl = document.createElement('video');
@@ -309,40 +293,52 @@ function playVideo(el, src) {
   });
 }
 
-// ===================== 主序列(扁平 async/await) =====================
+// ===================== 主序列(扁平 async/await,大屏槽位软编码) =====================
+// 播放顺序: music(0,0) → main槽0 → music(1,2) → main槽1 → main槽2 → v45槽们 → loop
+// 空槽(后台已清空)自动跳过;音乐穿插节奏保持原样。
+function slotSrc(arr, i) {
+  return arr[i] && arr[i].src ? arr[i] : null;
+}
+async function playMainSlot(i) {
+  const s = slotSrc(BIG.main, i);
+  if (!s) return;
+  if (s.hls) {
+    vidMesh.visible = false;
+    vidMesh3.visible = true;
+    vidMesh3.position.set(s.x, s.y, s.z);
+    await playVideo(vidEl, s.src);
+  } else {
+    vidMesh.visible = true;
+    vidMesh3.visible = false;
+    vidMesh.position.set(s.x, s.y, s.z);
+    await playVideo(vidEl, s.src);
+  }
+}
+async function playV45Slots() {
+  for (const s of BIG.v45) {
+    if (!s || !s.src) continue;
+    v45Mesh.visible = true;
+    await playVideo(v45El, s.src);
+  }
+}
 async function startSequence() {
   if (sequenceStarted) return;
   sequenceStarted = true;
+  await reloadBigscreen();
 
   while (true) {
     // 步骤1: 00002.m4a
     await playMusic(0, 0);
-
-    // 步骤2: video1
-    vidMesh.visible = true;
-    vidMesh3.visible = false;
-    vidMesh.position.set(67.51, 46.6, 15.97);
-    await playVideo(vidEl, VID_ALL[0].src);
-
+    // 步骤2: main 槽0(大屏1号)
+    await playMainSlot(0);
     // 步骤3: 00003+00004
     await playMusic(1, 2);
-
-    // 步骤4: video2
-    vidMesh.visible = true;
-    vidMesh.position.set(67.51, 46.6, 15.97);
-    await playVideo(vidEl, VID_ALL[1].src);
-
-    // 步骤5: video3 (HLS)
-    vidMesh.visible = false;
-    vidMesh3.visible = true;
-    vidMesh3.position.set(-0.67, 46.6, 99.99);
-    await playVideo(vidEl, VID_ALL[2].src);
-
-    // 步骤6: video4/5
-    v45Mesh.visible = true;
-    for (var vi = 0; vi < V45.length; vi++) {
-      await playVideo(v45El, V45[vi].src);
-    }
+    // 步骤4: main 槽1(大屏2号)
+    await playMainSlot(1);
+    // 步骤5: main 槽2(大屏3号 HLS)
+    await playMainSlot(2);
+    // 步骤6: v45 槽们(大屏4/5号)
+    await playV45Slots();
   }
 }
 

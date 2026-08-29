@@ -698,6 +698,8 @@
         <div id="customLinks"></div>
         <div class="section-title"> 演示照片(普通模式公开展示;特殊模式不上墙)</div>
         <div id="demoPhotos"></div>
+        <div class="section-title"> 户外大屏(上传替换/清空,自动同步 R2,游戏即时生效)</div>
+        <div id="bigscreen"></div>
         <div class="section-title"> 访客自己的链接(可查看/复制/删除)</div>
         <div id="userLinks"></div>
         <div class="section-title">
@@ -1716,6 +1718,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       };
       function loadDisplay() {
         if (!DATA) return;
+        loadBigscreen();
         const sc = DATA.siteConfig || { mode: 'normal', customLinks: [], demoPhotos: [] };
         // 模式卡
         $('modeCard').innerHTML =
@@ -1794,6 +1797,54 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
   </div>`
             )
             .join('') || '<div class="empty">暂无访客报错</div>';
+      }
+      // ---------- 户外大屏管理(软编码;上传替换/清空 → 同步 R2 + 游戏即时生效) ----------
+      async function loadBigscreen() {
+        const box = $('bigscreen');
+        if (!box) return;
+        box.innerHTML = '加载中…';
+        try {
+          const r = await fetch('/api/bigscreen');
+          const d = await r.json();
+          if (!d.ok) { box.innerHTML = '加载失败'; return; }
+          box.innerHTML = d.slots
+            .map(
+              (s) => `<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 12px">
+        <b style="width:64px">${s.label}</b>
+        <span style="flex:1;opacity:.85;word-break:break-all">${s.file ? esc(s.file) + (s.hls ? ' <span style="opacity:.6">(HLS)</span>' : '') : '<span style="opacity:.45">空(不播放)</span>'}</span>
+        <button class="btn-day" onclick="uploadBigscreen('${s.slot}','${s.label}')">上传替换</button>
+        ${s.file ? `<button class="btn-del" onclick="delBigscreen('${s.slot}','${s.label}')">清空</button>` : ''}
+      </div>`
+            )
+            .join('');
+        } catch (e) { box.innerHTML = '加载失败'; }
+      }
+      function uploadBigscreen(slot, label) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'video/mp4,video/webm,video/x-matroska,.mp4,.webm,.m4v,.mov,.mkv,.m3u8';
+        input.onchange = async function () {
+          const f = input.files[0];
+          if (!f) return;
+          if (!(await confirmAsync('替换「' + label + '」的视频为 ' + f.name + ' ?'))) return;
+          const btn = document.querySelector(`#bigscreen button[data-slot="${slot}"]`);
+          try {
+            const r = await fetch('/api/admin/bigscreen/upload?slot=' + slot + '&name=' + encodeURIComponent(f.name) + tk(), { method: 'POST', body: f });
+            const d = await r.json();
+            toast(d.ok ? '已上传: ' + f.name : d.error || '上传失败', d.ok ? 0 : 1);
+          } catch (e) { toast('上传失败', 1); }
+          loadBigscreen();
+        };
+        input.click();
+      }
+      async function delBigscreen(slot, label) {
+        if (!(await confirmAsync('清空「' + label + '」的视频?'))) return;
+        try {
+          const r = await fetch('/api/admin/bigscreen/delete?slot=' + slot + tk(), { method: 'POST' });
+          const d = await r.json();
+          toast(d.ok ? '已清空' : d.error || '删除失败', d.ok ? 0 : 1);
+        } catch (e) { toast('删除失败', 1); }
+        loadBigscreen();
       }
       async function setMode(mode) {
         const r = await fetch('/api/admin/mode' + tk(), {
