@@ -1650,13 +1650,14 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         const url = `/admin-media/${dir}/${name}` + tkq();
         const ext = decodeURIComponent(name).split('.').pop().toLowerCase();
         const m = $('pvMask');
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext)) m.innerHTML = `<img src="${url}">`;
-        else if (['mp4', 'webm'].includes(ext))
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif', 'heic', 'heif', 'tif', 'tiff', 'ico'].includes(ext))
+          m.innerHTML = `<img src="${url}">`;
+        else if (['mp4', 'webm', 'm4v', 'mov'].includes(ext))
           m.innerHTML = `<video src="${url}" controls autoplay></video>`;
-        else if (['mp3', 'wav', 'ogg'].includes(ext))
+        else if (['mp3', 'wav', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'flac'].includes(ext))
           m.innerHTML = `<audio src="${url}" controls autoplay></audio>`;
         else {
-          toast('该格式不支持预览', 1);
+          toast('该格式不支持在线播放(可下载后本地打开)', 1);
           return;
         }
         m.classList.add('show');

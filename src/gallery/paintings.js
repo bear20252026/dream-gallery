@@ -507,33 +507,130 @@ ctx.gallery.hangOne = hangOne;
 
 // 新上传的媒体自动上墙:拉取公开目录,把不在 data.js 列表中的照片/视频补进展厅
 // (排在列表最前保证一定挂得上;白板作品有专属展示墙,不重复上墙;失败则只挂静态列表)
+// dynAdded:本机制动态上墙的 URL 集合,用于增量同步(新增挂上/删除移除,不重排已有挂画)
+const dynAdded = new Set();
+const knownStatic = new Set(P.concat(V, VIDEO_WALL_SOURCES));
 fetch('/api/files')
   .then(function (r) {
     return r.json();
   })
   .then(function (d) {
-    const known = new Set(P.concat(V, VIDEO_WALL_SOURCES));
     const newP = (d.photos || [])
       .map(function (f) {
         return f.url.slice(1);
       })
       .filter(function (u) {
-        return !known.has(u) && !/^photos\/whiteboard-/i.test(u);
+        return !knownStatic.has(u) && !/^photos\/whiteboard-/i.test(u);
       });
     const newV = (d.videos || [])
       .map(function (f) {
         return f.url.slice(1);
       })
       .filter(function (u) {
-        return !known.has(u);
+        return !knownStatic.has(u);
       });
-    for (let i = newP.length - 1; i >= 0; i--) aM.unshift({ u: newP[i], d: '新上传的照片' });
-    for (let i = newV.length - 1; i >= 0; i--) aM.unshift({ u: newV[i], d: '新上传的视频' });
+    for (let i = newP.length - 1; i >= 0; i--) {
+      aM.unshift({ u: newP[i], d: '新上传的照片' });
+      dynAdded.add(newP[i]);
+    }
+    for (let i = newV.length - 1; i >= 0; i--) {
+      aM.unshift({ u: newV[i], d: '新上传的视频' });
+      dynAdded.add(newV[i]);
+    }
     hangPaintings();
   })
   .catch(function () {
     hangPaintings();
   });
+// 按 URL 移除动态上墙的挂画(含视频清理),用于后台删除后游戏内同步消失
+function removePaintByUrl(url) {
+  const idx = paintGroups.findIndex(function (g) {
+    return g.userData.src === url;
+  });
+  if (idx < 0) return;
+  const g = paintGroups[idx];
+  if (iV(url)) {
+    // 视频:暂停、清源、移除 body 元素与就近播放条目
+    const ev = vE.findIndex(function (e) {
+      return (e.v.src || '').endsWith(url);
+    });
+    if (ev >= 0) {
+      try {
+        vE[ev].v.pause();
+        vE[ev].v.src = '';
+        vE[ev].v.load();
+        document.body.removeChild(vE[ev].v);
+      } catch (e) {}
+      vE.splice(ev, 1);
+    }
+  }
+  g.traverse(function (obj) {
+    if (obj.material) {
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const m of mats) {
+        if (m.map) {
+          m.map.dispose();
+          m.map = null;
+        }
+        m.dispose();
+      }
+    }
+    if (obj.geometry) obj.geometry.dispose();
+  });
+  s.remove(g);
+  const ii = iG.indexOf(g);
+  if (ii >= 0) iG.splice(ii, 1);
+  paintGroups.splice(idx, 1);
+}
+// 新媒体墙增量同步(2026-08-29):后台增删照片/视频后,游戏内实时跟随;只增删对应挂画,不重排已有
+function syncNewMedia() {
+  fetch('/api/files')
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      const photos = (d.photos || []).map(function (f) {
+        return f.url.slice(1);
+      });
+      const videos = (d.videos || []).map(function (f) {
+        return f.url.slice(1);
+      });
+      const nowSet = new Set(photos.concat(videos));
+      // 1) 后台已删除 → 游戏内移除
+      for (const u of Array.from(dynAdded)) {
+        if (!nowSet.has(u)) {
+          removePaintByUrl(u);
+          const ai = aM.findIndex(function (am) {
+            return am.u === u;
+          });
+          if (ai >= 0) aM.splice(ai, 1);
+          dynAdded.delete(u);
+        }
+      }
+      // 2) 新上传 → 挂上(空位挂,不重排)
+      const newP = photos.filter(function (u) {
+        return !knownStatic.has(u) && !dynAdded.has(u) && !/^photos\/whiteboard-/i.test(u);
+      });
+      const newV = videos.filter(function (u) {
+        return !knownStatic.has(u) && !dynAdded.has(u);
+      });
+      for (let i = newP.length - 1; i >= 0; i--) {
+        const u = newP[i];
+        dynAdded.add(u);
+        aM.unshift({ u: u, d: '新上传的照片' });
+        hangOne(u, '新上传的照片');
+      }
+      for (let i = newV.length - 1; i >= 0; i--) {
+        const u = newV[i];
+        dynAdded.add(u);
+        aM.unshift({ u: u, d: '新上传的视频' });
+        hangOne(u, '新上传的视频');
+      }
+    })
+    .catch(function () {});
+}
+// 每 45s 增量同步一次新媒体墙(晨光/白板/音乐各自有同步)
+setInterval(syncNewMedia, 45000);
 
 // ===== 3D原位放大系统（平滑飞出动效 + 景深虚化 + 物理摇晃）=====
 // ray/mP2 由 scene.js 创建并经 ctx 共享

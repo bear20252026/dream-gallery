@@ -421,6 +421,7 @@ function buildFrame(x, z, rotY, nx, nz, url, name, mtime, caption) {
   s.add(g);
   iG.push(g);
   myIG.push(g);
+  return g;
 }
 // 东墙·晨光留影(服务端过滤后的可见池,按 mtime 取最早三张)
 function addFrame(z, url, name, mtime) {
@@ -428,25 +429,91 @@ function addFrame(z, url, name, mtime) {
 }
 const FRAME_Z = [HZ - 2.2, HZ, HZ + 2.2],
   DEMO_FILL = ['201.jpg', '202.jpg', '203.jpg', '204.jpg', '205.png'];
-fetch('/api/files?dir=photos')
-  .then((r) => r.json())
-  .then((d) => {
-    const pool = (d.photos || []).filter((f) => !/^whiteboard-/i.test(f.name)); // 白板作品有专属墙,不进晨光
-    pool.sort((a, b) => (a.mtime < b.mtime ? -1 : a.mtime > b.mtime ? 1 : 0)); // 最早的在前
-    const picks = pool.slice(0, 3).map((f) => ({ name: f.name, mtime: f.mtime }));
-    for (const dm of DEMO_FILL) {
-      if (picks.length >= 3) break;
-      if (!picks.some((p) => p.name === dm)) picks.push({ name: dm, mtime: null });
-    } // 不够三张,演示照片补足
-    picks
-      .slice(0, 3)
-      .forEach((p, i) =>
-        addFrame(FRAME_Z[i], 'photos/' + encodeURIComponent(p.name), p.name, p.mtime)
+// 晨光留影同步(2026-08-29):后台增删照片后,游戏内最早三幅实时跟随,不中断链条
+let mornFrames = [],
+  mornPicks = '';
+function disposeMorn() {
+  for (const g of mornFrames) {
+    g.traverse(function (obj) {
+      if (obj.material) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const m of mats) {
+          if (m.map) {
+            m.map.dispose();
+            m.map = null;
+          }
+          m.dispose();
+        }
+      }
+      if (obj.geometry) obj.geometry.dispose();
+    });
+    s.remove(g);
+    const ii = iG.indexOf(g);
+    if (ii >= 0) iG.splice(ii, 1);
+    const mi = myIG.indexOf(g);
+    if (mi >= 0) myIG.splice(mi, 1);
+  }
+  mornFrames = [];
+}
+function refreshMorning() {
+  fetch('/api/files?dir=photos')
+    .then((r) => r.json())
+    .then((d) => {
+      const pool = (d.photos || []).filter((f) => !/^whiteboard-/i.test(f.name)); // 白板作品有专属墙,不进晨光
+      pool.sort((a, b) => (a.mtime < b.mtime ? -1 : a.mtime > b.mtime ? 1 : 0)); // 最早的在前
+      const picks = pool.slice(0, 3).map((f) => ({ name: f.name, mtime: f.mtime }));
+      for (const dm of DEMO_FILL) {
+        if (picks.length >= 3) break;
+        if (!picks.some((p) => p.name === dm)) picks.push({ name: dm, mtime: null });
+      } // 不够三张,演示照片补足
+      const key = picks
+        .slice(0, 3)
+        .map((p) => p.name)
+        .join('|');
+      if (key === mornPicks) return; // 集合没变,不重建(避免纹理反复重载)
+      mornPicks = key;
+      disposeMorn();
+      picks.slice(0, 3).forEach((p, i) =>
+        mornFrames.push(
+          buildFrame(
+            EX - 0.1,
+            FRAME_Z[i],
+            -Math.PI / 2,
+            -1,
+            0,
+            'photos/' + encodeURIComponent(p.name),
+            p.name,
+            p.mtime,
+            '晨光留影'
+          )
+        )
       );
-  })
-  .catch(() => {
-    DEMO_FILL.slice(0, 3).forEach((n, i) => addFrame(FRAME_Z[i], 'photos/' + n, n, null));
-  });
+    })
+    .catch(() => {
+      const key = DEMO_FILL.slice(0, 3).join('|');
+      if (key === mornPicks) return;
+      mornPicks = key;
+      disposeMorn();
+      DEMO_FILL.slice(0, 3).forEach((n, i) =>
+        mornFrames.push(
+          buildFrame(
+            EX - 0.1,
+            FRAME_Z[i],
+            -Math.PI / 2,
+            -1,
+            0,
+            'photos/' + n,
+            n,
+            null,
+            '晨光留影'
+          )
+        )
+      );
+    });
+}
+refreshMorning();
+// 每 45s 同步一次晨光(与新媒体墙同步周期一致;仅集合变化才重建)
+setInterval(refreshMorning, 45000);
 
 // ===================== C2 展厅选片导入(2026-07-30) =====================
 // 本人从「我的上传」中挑选的作品,呈现在永恒展厅西墙(私人收藏墙);

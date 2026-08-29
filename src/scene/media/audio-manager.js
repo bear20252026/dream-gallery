@@ -57,7 +57,26 @@ ctx.ui.kunlunSpeak = kunlunSpeak;
 let mA = new Audio(),
   mOn = false,
   mAReady = false,
-  mIdx2 = 0;
+  mIdx2 = 0,
+  others = [],
+  musicEndedBound = false;
+// 同步音乐列表:后台新增/删除音乐后,游戏内播放列表随轮换实时跟随(不中断播放链)
+function refreshMusicList() {
+  fetch('/api/files?dir=music')
+    .then(function (r) {
+      return r.json();
+    })
+    .then(function (d) {
+      others = (d.music || [])
+        .map(function (f) {
+          return f.url;
+        })
+        .filter(function (u) {
+          return u !== '/music/background.mp3';
+        });
+    })
+    .catch(function () {});
+}
 function ensureMusic() {
   if (mAReady) return;
   mAReady = true;
@@ -65,27 +84,25 @@ function ensureMusic() {
   mA.loop = true;
   mA.volume = 0.5;
   mA.preload = 'auto';
-  fetch('/api/files?dir=music')
-    .then(function (r) {
-      return r.json();
-    })
-    .then(function (d) {
-      const others = (d.music || [])
-        .map(function (f) {
-          return f.url;
-        })
-        .filter(function (u) {
-          return u !== '/music/background.mp3';
-        });
-      if (!others.length) return;
-      mA.loop = false;
-      mA.addEventListener('ended', function () {
-        mA.src = others[mIdx2 % others.length];
-        mIdx2++;
+  refreshMusicList();
+  if (!musicEndedBound) {
+    musicEndedBound = true;
+    mA.addEventListener('ended', function () {
+      if (!others.length) {
+        // 列表被清空:回到循环背景乐
+        mA.loop = true;
+        mA.src = 'music/background.mp3';
         mA.play().catch(function () {});
-      });
-    })
-    .catch(function () {});
+        return;
+      }
+      mA.loop = false;
+      mA.src = others[mIdx2 % others.length];
+      mIdx2++;
+      mA.play().catch(function () {});
+    });
+  }
+  // 每 60s 同步一次音乐列表(轻量,后台增删音乐无需刷新页面即进入轮换)
+  setInterval(refreshMusicList, 60000);
 }
 setTimeout(function () {
   ctx.scene.aB.addEventListener('click', () => {
