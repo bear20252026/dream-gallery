@@ -79,13 +79,17 @@ const handler = (req, res) => {
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+      // 2026-08-30:放行 Cloudflare Web Analytics(beacon.min.js)。
+      //   CF 反代会自动向所有页面注入该统计脚本,不放行 script-src 会在浏览器控制台
+      //   与 #errTrap(左下角错误陷阱)刷"加载失败 @ beacon.min.js",移动端已累计 94 次。
+      //   上报端点是 cloudflareinsights.com(非 static 子域),需同时放行 connect-src。
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://static.cloudflareinsights.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: blob: https:",
       "media-src 'self' blob: https:",
       // blob: 必需 —— GLTFLoader 把 GLB 内嵌贴图转成 blob: URL 后再 fetch,
       //   不放行会报 "Couldn't load texture blob:...",角色变成无贴图白模
-      "connect-src 'self' blob: data: https://cloudbear.cloud https://cdn.cloudbear.cloud",
+      "connect-src 'self' blob: data: https://cloudbear.cloud https://cdn.cloudbear.cloud https://cloudflareinsights.com",
       "font-src 'self' data: https://fonts.gstatic.com",
       "object-src 'none'",
       "frame-ancestors 'self'",
