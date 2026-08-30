@@ -649,11 +649,6 @@
         >
           刷新
         </button>
-        <span
-          id="dataStamp"
-          style="margin-left: 10px; font-size: 11px; opacity: 0.65; vertical-align: middle"
-          >数据加载中…</span
-        >
       </h1>
       <div class="sub">审批 · 统计 · 文件 · 对话</div>
 
@@ -1288,38 +1283,16 @@
       };
       // ---------- 数据 ----------
       async function load() {
-        let r, d;
-        try {
-          r = await fetch('/api/admin/list' + tk());
-          if (r.status === 401) {
-            document.querySelector('.wrap').innerHTML =
-              '<h1>401 未授权：网址后请加 ?token=你的密码</h1>';
-            return;
-          }
-          if (!r.ok) throw new Error('服务返回 ' + r.status);
-          d = await r.json();
-        } catch (e) {
-          // 部署重启窗口/瞬时网络问题:明确提示并自动重试,避免误以为数据丢失
+        const r = await fetch('/api/admin/list' + tk());
+        if (!r.ok) {
           document.querySelector('.wrap').innerHTML =
-            '<h1>⏳ 数据加载失败(' +
-            esc(e.message) +
-            ')，3 秒后自动重试…</h1><p>若服务器正在更新，稍候即可恢复；已有访问记录不会丢失。</p>';
-          setTimeout(load, 3000);
+            '<h1>401 未授权：网址后请加 ?token=你的密码</h1>';
           return;
         }
-        DATA = d;
+        DATA = await r.json();
         renderApprove();
         renderStats();
         renderHistory();
-        // 数据快照时间:区分"暂时没刷出来"与"数据丢了"
-        const el = document.getElementById('dataStamp');
-        if (el)
-          el.textContent =
-            '数据时间 ' +
-            new Date().toLocaleTimeString('zh-CN', { hour12: false }) +
-            ' · 访问明细共 ' +
-            (DATA.visits || []).length +
-            ' 条';
       }
       function cardHtml(a, now) {
         let btns = '';

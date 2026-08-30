@@ -12,6 +12,15 @@ const http = require('http');
 const path = require('path');
 const { URL } = require('url');
 
+// 进程级异常兜底(2026-08-31 审计 H1):单个请求的异常不得打崩整个服务。
+// 记录后保持存活;pm2 异常重启计数仍在,连续崩溃仍会被 pm2 拉起
+process.on('uncaughtException', (e) => {
+  console.error('[uncaughtException]', e && (e.stack || e.message || e));
+});
+process.on('unhandledRejection', (e) => {
+  console.error('[unhandledRejection]', e && ((e.stack || e.message) || e));
+});
+
 const { ROOT, PORT, TOKEN, CORS_ORIGIN, MEDIA_DIRS } = require('./lib/config');
 const { sendJson, readBody, safeJoin, isValidName } = require('./lib/util');
 const { gateData, recordVisit } = require('./lib/store');
@@ -38,6 +47,9 @@ function staticDenied(rel, req) {
   const seg = rel.split('/');
   const base = seg[seg.length - 1];
   if (base.startsWith('.')) return true;
+  // 任意路径段以点开头(如 .docs-bak/ 隐藏目录)与敏感后缀一律拒绝(2026-08-31 审计:client_errors.json 曾公网可下载)
+  if (seg.some((x) => x.startsWith('.'))) return true;
+  if (/\.(bak|cjs)$/.test(base)) return true;
   if (['lib', 'node_modules', 'origin', 'tools', 'questions', 'scripts', 'dist'].includes(seg[0])) return true;
   if (seg[0] === 'src' || seg[0] === 'vendor') {
     // 放行 Three.js 加载器依赖(浏览器 importmap 路径)
@@ -47,6 +59,8 @@ function staticDenied(rel, req) {
   }
   if (/\.(pem|bat|sh|md|log)$/.test(base)) return true;
   if (['gate_data.json', 'package.json', 'package-lock.json', 'admin.html', 'docs.html'].includes(base)) return true;
+  // 根目录 .json(客户端报错日志等)一律不服务
+  if (seg.length === 1 && base.endsWith('.json')) return true;
   if (seg.length === 1 && base.endsWith('.js') && !['data.js', 'sw.js'].includes(base)) return true;
   return false;
 }
@@ -190,8 +204,9 @@ const handler = (req, res) => {
           .map(at => ({ ...at, device: devMap[at.dk] || null }));
         sendJson(res, 200, { attempts });
       } },
-      // 白板作品保存对所有用户开放(仅限 whiteboard- 前缀)
-      { method: 'POST', match: '/api/upload', guard: () => /^whiteboard-/.test(String(query.name || '')), fn: () => handleUpload(req, res, query) },
+      // 白板作品保存对所有用户开放(仅限 whiteboard- 前缀 + 图片扩展名白名单:
+      // 2026-08-31 审计 H2——原先不限扩展名,可传 whiteboard-x.html 得到主域公网 HTML=存储型 XSS)
+      { method: 'POST', match: '/api/upload', guard: () => /^whiteboard-[\w-]+\.(png|jpe?g|webp)$/i.test(String(query.name || '')), fn: () => handleUpload(req, res, query) },
       // 访客公开上传照片/视频(图≤50MB/视频≤700MB、全格式)
       { method: 'POST', match: '/api/upload', guard: () => query.dir === 'photos' || query.dir === 'videos', fn: () => handleUpload(req, res, query, true) },
       // 分片上传(绕开 CF 回源限流的 524)
