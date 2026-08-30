@@ -73,6 +73,8 @@ const TEST_IP = '203.0.113.5';
 const XFF = { 'x-forwarded-for': TEST_IP };
 async function testApi(base) {
   console.log('\n[服务器 API(无鉴权)]');
+  // 媒体目录自愈:CI/新环境 checkout 后 videos 可能不存在(git 不跟踪空目录),先确保目录在
+  for (const d of ['photos', 'videos', 'music']) fs.mkdirSync(path.join(ROOT, d), { recursive: true });
   const TEST_NAME = '_test_upload_' + Date.now() + '.jpg';
   const testPath = path.join(ROOT, 'photos', TEST_NAME);
 

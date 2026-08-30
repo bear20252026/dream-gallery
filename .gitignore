@@ -22,7 +22,8 @@ gate_data.json
 .docs-bak/
 
 # 大体积媒体(videos 已有 R2 CDN + 云端 + 原码率三处备份;gen-data 可从磁盘重建)
-videos/
+videos/*
+!videos/.gitkeep
 
 # 调试残留
 *.log
