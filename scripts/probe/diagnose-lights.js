@@ -18,9 +18,9 @@ const URL = 'https://cloudbear.cloud/';
   });
   const page = await ctx.newPage();
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('#avatar-demo-btn', { timeout: 40000 });
+  await page.waitForSelector('#viewBtn', { timeout: 40000 });
   // 跳过开屏/序章,让场景内容完全加载
-  await page.click('#avatar-demo-btn');
+  await page.click('#viewBtn');
   await page.waitForTimeout(2000);
   for (let i = 0; i < 8; i++) {
     await page.mouse.click(640, 400);

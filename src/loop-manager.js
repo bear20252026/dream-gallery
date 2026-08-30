@@ -6,6 +6,13 @@
 import { eventBus } from './event-bus.js';
 
 /**
+ * 玩家眼睛离地高度(米)——与 scene/player.js 的 `groundY(x,z) + 1.6` 保持一致。
+ * pl.p.y 存的是**眼睛**高度,而第三人称角色模型的原点在**脚底**,
+ * 所以渲染角色时要减掉这个值才能得到贴地的脚底位置。
+ */
+const EYE_HEIGHT = 1.6;
+
+/**
  * 循环管理器
  * 合并旧的 an() 循环和新的 ctx.loop，统一游戏主循环
  */
@@ -210,8 +217,19 @@ export class LoopManager {
       mv(fx * mz + rx * mx, fz * mz + rz * mx, dt);
     }
     
-    // 跳跃/滑翔物理
-    if (ctx.player.tickPhysics) ctx.player.tickPhysics(dt);
+    // 跳跃/滑翔/重力物理(player.js tickPhysics)
+    // ⚠️ 2026-08-30 修复:player.js:881 把函数挂到 **ctx.tickPhysics**(扁平,
+    //   注释写"未映射属性,保持扁平"),而这里一直在读 **ctx.player.tickPhysics**
+    //   —— 该属性从未被赋值,导致重力/跳跃/滑翔/贴地**完全没有运行过**。
+    //   表现为:玩家 y 恒定在初始 1.6,不会落地、不会跳、不会滑翔,角色"贴地飞行"。
+    //   现改为两者都试(扁平优先,命名空间回退),并显式 warn 便于日后发现同类断链。
+    const tickPhysics = ctx.tickPhysics || ctx.player.tickPhysics;
+    if (tickPhysics) {
+      tickPhysics(dt);
+    } else if (!this._warnedNoPhysics) {
+      this._warnedNoPhysics = true;
+      console.warn('[loop-manager] 未找到 tickPhysics,重力/跳跃/滑翔物理未启用');
+    }
     
     // 相机每帧同步
     this._updateCamera(dt, now);
@@ -291,7 +309,10 @@ export class LoopManager {
       cam.updateProjectionMatrix();
       if (avatar) {
         avatar.position.copy(pl.p);
-        avatar.position.y = 0.1;
+        // 脚底贴地:pl.p.y 是眼睛高度(由 player.js tickPhysics 算出 = groundY + 1.6),
+        // 减掉眼高即得脚底。原先这里硬编码 0.1,把物理算出的地形高度整个丢掉 ——
+        // 导致角色永远浮在 y=0.1:上坡陷进地里、下坡悬空、跳跃和滑翔都看不出来。
+        avatar.position.y = pl.p.y - EYE_HEIGHT;
         avatar.rotation.y = pl.y + Math.PI;
       }
     } else {

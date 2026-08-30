@@ -29,11 +29,11 @@ const URL = 'https://cloudbear.cloud/';
   });
 
   await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('#avatar-demo-btn', { timeout: 40000 });
+  await page.waitForSelector('#viewBtn', { timeout: 40000 });
   console.log('✓ 页面就绪,加载角色…');
 
   // 加载角色
-  await page.click('#avatar-demo-btn');
+  await page.click('#viewBtn');
   for (let i = 0; i < 30; i++) {
     await page.waitForTimeout(1000);
     if (await page.evaluate(() => !!window.__avatarLoaded)) break;
@@ -42,7 +42,7 @@ const URL = 'https://cloudbear.cloud/';
   console.log('角色已加载:', loaded);
 
   // 进第三人称 + 跳过序章/开屏
-  await page.click('#avatar-demo-btn');
+  await page.click('#viewBtn');
   await page.waitForTimeout(2000);
   for (let i = 0; i < 10; i++) {
     await page.mouse.click(640, 400);

@@ -27,9 +27,9 @@ page.on('pageerror', (e) => logs.push('[pageerror] ' + String(e).slice(0, 280)))
 
 await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 }).catch(() => {});
 // 按钮由 avatar.js 模块加载 2s 后创建
-await page.waitForSelector('#avatar-demo-btn', { timeout: 40000 });
+await page.waitForSelector('#viewBtn', { timeout: 40000 });
 console.log('✓ 第三人称按钮出现');
-await page.click('#avatar-demo-btn');
+await page.click('#viewBtn');
 console.log('已点击,等待 GLB…');
 
 let loaded = false;
@@ -49,7 +49,7 @@ for (let i = 0; i < 40; i++) {
 
 if (loaded) {
   // 再点一次确保进入第三人称
-  await page.click('#avatar-demo-btn');
+  await page.click('#viewBtn');
   // 等开屏仪式(Chartogne 两阶段)结束,大约 10s 后再点屏幕中央触发 clickToStart
   await page.waitForTimeout(8000);
   await page.mouse.click(640, 400);

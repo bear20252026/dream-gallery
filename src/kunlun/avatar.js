@@ -8,8 +8,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
-import { getGameState } from '../core/game-state.js';
-const gs = getGameState();
 
 let avatarHolder = null; // Group:loop-manager 每帧写入 position/rotation
 let avatarModel = null; // gltf.scene(内层:贴地偏移与动画)
@@ -44,29 +42,33 @@ function clearStatus() {
   if (statusEl) statusEl.style.opacity = '0';
 }
 
-function ensureDemoBtn() {
-  if (document.getElementById('avatar-demo-btn')) return;
-  var btn = document.createElement('button');
-  btn.id = 'avatar-demo-btn';
-  btn.textContent = '🎭 第三人称';
-  btn.style.cssText =
-    'position:fixed;bottom:80px;right:16px;z-index:9999;padding:10px 16px;border-radius:22px;background:linear-gradient(135deg,#ff6b9d,#a855f7);color:#fff;font:bold 14px/1 system-ui;border:none;cursor:pointer;box-shadow:0 4px 16px rgba(168,85,247,.5)';
-
-  function enterThirdPerson() {
-    var pl = ctx.player.pl;
-    pl.p.x = 0; pl.p.z = 45; pl.p.y = 1.6; pl.y = Math.PI / 2;
-    gs.set('viewMode', 1);
-    setStatus('第三人称显示中 · 拖动鼠标环绕观看', '#66ff99');
-    setTimeout(clearStatus, 3000);
-  }
-  btn.onclick = function () {
-    if (avatarHolder) return enterThirdPerson();
-    setStatus('正在加载角色模型…', '#ffcc66');
+// ===================== 视角模式监听(唯一入口) =====================
+// 2026-08-30:不再自建按钮。项目本来就有两个切换入口——
+//   - V 键        (scene/player.js:262)
+//   - #viewBtn    (scene/player.js:266,界面上的「人称」按钮)
+// 之前 avatar.js 又加了第三个「🎭 第三人称」按钮,导致入口分裂:
+//   点原按钮只切视角(看到的是 player.js 的胶囊小人),点新按钮才下载真人模型。
+// 现改为:订阅 viewMode,无论从哪个入口切到第三人称,都自动按需加载真人模型。
+// 加载完成后 setupModel 会把胶囊小人(旧 ctx.scene.avatar)移除并换成真人模型。
+function watchViewMode() {
+  let prompting = false;
+  ctx.onTick(function () {
+    // 已加载好 / 或不在第三人称 → 什么都不做
+    if (avatarHolder || ctx.player.viewMode !== 1) {
+      prompting = false;
+      return;
+    }
+    if (avatarRequested) return; // 正在下载,等它完成
+    if (!prompting) {
+      prompting = true;
+      setStatus('正在加载角色模型…', '#ffcc66');
+    }
     ensureAvatar(function () {
-      if (avatarHolder) enterThirdPerson();
+      prompting = false;
+      setStatus('角色已就绪', '#66ff99');
+      setTimeout(clearStatus, 2500);
     });
-  };
-  document.body.appendChild(btn);
+  });
 }
 
 // ===================== GLB 加载 =====================
@@ -252,4 +254,5 @@ function ensureAvatar(cb) {
   );
 }
 
-setTimeout(ensureDemoBtn, 2000);
+// 延迟挂载:等 ctx/player 就绪后再开始监听视角模式
+setTimeout(watchViewMode, 2000);
