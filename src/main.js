@@ -81,25 +81,47 @@ const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别�
 // 主循环必须在调用时从 ctx 读取(见下方粒子循环与烟花调用)
 
 // ===================== 灯光限额(性能) =====================
-// 点光源总数直接决定着色器体积:实测单程序编译 59盏≈822ms / 24盏≈208ms / 13盏≈103ms。
-// 手机端(防 too many uniforms,2026-07-24 血泪教训):吊顶灯每3留1,装饰氛围灯全移除,
-//   保留高空钻石灯与昆仑信标,总额≈13。
-// 电脑端(2026-07-24,视频卡顿根因治理):吊顶灯每2留1 + 移除 userData.deco 标记的装饰小灯
-//   (发光材质保留,图标仍亮),总额≈30 —— 着色器编译减半,弱 GPU 不再挤掉视频帧。
+// 光源总数直接决定着色器体积:实测单程序编译 59盏≈822ms / 24盏≈208ms / 13盏≈103ms。
+// 每个片元着色器要为**所有**光源做循环,光源数是最贵的一项——比网格/贴图都贵。
+//
+// 2026-08-30 修复(实测场景 87 盏 → 卡顿 FPS 0.8):
+//   1) 原第 98 行 `if (isMobile || o.userData.deco) rm.push(o)` 在电脑端恒为 false
+//      —— `userData.deco` 全项目只在 gallery/links.js 赋值过,而 links 模块未启用,
+//      实测 deco 灯数为 0。结果:电脑端**一盏灯都不移除**,限额形同虚设。
+//   2) 原逻辑只处理 `o.isPointLight`,完全漏掉 40 盏 SpotLight
+//      (每幅画一个射灯,paintings.js `wi < 40`),而 SpotLight 比 PointLight 更贵
+//      (多方向/角度/penumbra 计算)。
+// 现改为:走到 traverse 末尾的灯一律移除(即"不在保留名单内就删");
+//   并新增 SpotLight 限额,只保留前 SPOT_KEEP 盏画框射灯。
+// 保留名单:命中的吊顶灯(每 N 留 1) + 高空钻石灯(y>30) + 远方昆仑信标(|x|>500)。
 {
   const isMobile = 'ontouchstart' in window && Math.min(screen.width, screen.height) < 768;
   const keepEvery = isMobile ? 3 : 2;
+  const SPOT_KEEP = isMobile ? 4 : 10; // 画框射灯保留数(其余画作靠环境光)
   const ceil = new Set(pls.filter((p, i) => i % keepEvery === 0).map((p) => p.l));
   const rm = [];
+  let spotSeen = 0;
   s.traverse((o) => {
+    if (o.isSpotLight) {
+      // 前 SPOT_KEEP 盏画框射灯保留,其余连 target 一起移除(target 也是场景节点)
+      if (spotSeen < SPOT_KEEP) spotSeen++;
+      else {
+        rm.push(o);
+        if (o.target && o.target.parent) rm.push(o.target);
+      }
+      return;
+    }
     if (!o.isPointLight) return;
-    if (ceil.has(o)) return; // 保留的吊顶灯
+    if (ceil.has(o)) return; // 保留:命中的吊顶灯
     if (o.position.y > 30 || Math.abs(o.position.x) > 500) return; // 保留:钻石灯(高空)/昆仑信标(远方)
-    if (isMobile || o.userData.deco) rm.push(o);
+    rm.push(o); // 其余一律移除(不再依赖从未生效的 userData.deco)
   });
-  rm.forEach((l) => l.parent.remove(l));
+  rm.forEach((l) => l.parent && l.parent.remove(l));
   // 保留的吊顶灯同步削弱 pls 闪烁列表,避免对已移除灯的无效更新
   for (let i = pls.length - 1; i >= 0; i--) if (!ceil.has(pls[i].l)) pls.splice(i, 1);
+  if (typeof window !== 'undefined') {
+    window.__lightBudget = { removed: rm.length, keepEvery, spotKeep: SPOT_KEEP };
+  }
 }
 
 // ===================== 后处理管线初始化(2026-08-22) =====================

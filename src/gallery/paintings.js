@@ -31,6 +31,10 @@ const {
 const vE = [], // tL 由 scene.js 创建并经 ctx 共享
   fW = new THREE.MeshStandardMaterial({ color: '#5a3020', roughness: 0.7 }),
   mM = new THREE.MeshStandardMaterial({ color: '#fff8f5', roughness: 0.95 });
+// 画框射灯限额:每盏 SpotLight 都会进入所有材质的着色器循环(比 PointLight 更贵,
+//   多方向/角度/penumbra 计算)。原为 wi<40 → 40 盏射灯,实测是场景卡顿主因之一。
+//   main.js 的灯光限额在初始化时执行,而画作是异步挂上的(晚于限额),故必须在源头限制。
+const SPOT_PER_PAINTING = 8;
 function iV(u) {
   return u.endsWith('.mp4') || u.endsWith('.webm');
 }
@@ -342,7 +346,11 @@ function hangOn(wall, wi, am, off) {
   );
   ghost.position.z = fd / 2 + 0.02;
   g.add(ghost);
-  if (wi < 40) {
+  // 画框射灯限额:每个 SpotLight 都会进入所有材质的着色器循环(比 PointLight 更贵,
+//   多方向/角度/penumbra 计算)。原为 wi<40 → 40 盏射灯,实测是场景卡顿主因之一。
+//   main.js 的灯光限额在初始化时执行,而画作是异步挂上的(晚于限额),故必须在源头限制。
+//   只给前 SPOT_PER_PAINTING 幅画配射灯,其余画作靠环境光 + 自发光材质表现。
+if (wi < SPOT_PER_PAINTING) {
     const sp = new THREE.SpotLight('#ffe8f0', 3, 5, Math.PI / 4, 0.8, 1);
     sp.position.set(0, 0.7, 0.35);
     sp.target = cM;
