@@ -53,7 +53,7 @@ function addBox(x1, z1, x2, z2, y0, h, mat, th) {
     mnZ: cz - ((cA * len) / 2 + sA * t) - 0.1,
     mxZ: cz + ((cA * len) / 2 + sA * t) + 0.1,
   };
-  bounds.push(b);
+  ctx.scene.addBounds && ctx.scene.addBounds([b]);
   myBounds.push(b);
   return wall;
 }

@@ -637,8 +637,16 @@ function syncNewMedia() {
     })
     .catch(function () {});
 }
-// 每 45s 增量同步一次新媒体墙(晨光/白板/音乐各自有同步)
-setInterval(syncNewMedia, 45000);
+// 每 45s 增量同步一次新媒体墙(晨光/白板/音乐各自有同步);标签页隐藏时暂停(终审 TOP2)
+let syncTimer = setInterval(syncNewMedia, 45000);
+document.addEventListener('visibilitychange', function () {
+  if (document.hidden) {
+    clearInterval(syncTimer);
+  } else {
+    syncNewMedia();
+    syncTimer = setInterval(syncNewMedia, 45000);
+  }
+});
 // 服务端主动推送:后台增删照片/视频 → 立即同步新媒体墙(不等轮询)
 onMediaChanged(function (d) {
   if (!d || d.dir === 'photos' || d.dir === 'videos') syncNewMedia();

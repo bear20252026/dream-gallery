@@ -274,7 +274,7 @@ function genChunk(cx, cz) {
       mxZ: wz + cr * sc,
       _desert: true,
     };
-    ctx.scene.bounds.push(box);
+    if (ctx.scene.addBounds) ctx.scene.addBounds([box]);
     colliders.push(box);
   };
   const d2 = detail === 2,

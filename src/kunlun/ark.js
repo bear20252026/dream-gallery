@@ -15,6 +15,7 @@ import { eventBus } from '../event-bus.js';
 import { expose } from '../debug-hooks.js';
 import { chime as blipChime } from '../shared/audio-blip.js';
 import { createFlightHUD } from './ark-freeflight-hud.js'; // 自由飞 HUD/摇杆/冲刺(B-d 外迁)
+import { stepFlight } from './freeflight-physics.js'; // 自由飞纯物理核(终审 TOP1 可单测)
 const gs = getGameState();
 const bag = hotBegin('ark');
 // 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
@@ -547,93 +548,42 @@ function freeTick() {
   // 输入:W 爬升 / S 俯冲 / A D 转向(摇杆同向);正 pitch=抬首,正 roll=左倾
   let pitchIn = (ks.w ? 1 : 0) - (ks.s ? 1 : 0) - flightHud.joy.y;
   let rollIn = (ks.a ? 1 : 0) - (ks.d ? 1 : 0) + flightHud.joy.x;
-  // 自动导航:朝展厅泊位柔和转向,任何手动输入立即接管
-  if (freeFlight.autoNav) {
-    _v1.set(DOCK.x - freeFlight.pos.x, DOCK.y - freeFlight.pos.y, DOCK.z - freeFlight.pos.z);
-    if (_v1.length() < 10) {
-      dock();
-      return;
-    }
-    _v1.normalize();
-    _v2.set(0, 0, 1).applyQuaternion(freeFlight.quat);
-    const crossY = _v2.z * _v1.x - _v2.x * _v1.z; // >0 目标在右侧
-    if (Math.abs(pitchIn) > 0.15 || Math.abs(rollIn) > 0.15 || freeFlight.boostHold || ks[' ']) {
-      freeFlight.autoNav = false;
-      ctx.ui.modeToast && ctx.ui.modeToast('已接管手动驾驶。');
-    } else {
-      rollIn = -Math.max(-1, Math.min(1, crossY * 3));
-      pitchIn = Math.max(-0.6, Math.min(0.6, (_v1.y - _v2.y) * 4));
-    }
+  // 单步积分抽到 kunlun/freeflight-physics.js(终审 TOP1 纯函数化,可单测);
+  // 自动导航/能量/姿态限幅/疆域钳制全部在内,事件经 flags 回传。
+  const { state: ns, flags } = stepFlight(
+    freeFlight,
+    {
+      pitchIn,
+      rollIn,
+      boostHold: freeFlight.boostHold,
+      boostKey: !!ks[' '],
+      autoNavTarget: DOCK,
+      groundHeightAt: (x, z) => (ctx.media.desert ? ctx.media.desert.getH(x, z) : 0),
+      centerX: KX,
+      centerZ: KZ,
+    },
+    dt
+  );
+  freeFlight.pos = ns.pos;
+  freeFlight.quat = ns.quat;
+  freeFlight.vel = ns.vel;
+  freeFlight.pitchRate = ns.pitchRate;
+  freeFlight.rollRate = ns.rollRate;
+  freeFlight.energy = ns.energy;
+  freeFlight.autoNav = ns.autoNav;
+  if (flags.dock) {
+    dock();
+    return;
   }
-  if (pitchIn > 1) pitchIn = 1;
-  if (pitchIn < -1) pitchIn = -1;
-  if (rollIn > 1) rollIn = 1;
-  if (rollIn < -1) rollIn = -1;
-  // 控制权限随速度(低速不灵活;无失速,不会拍地上)
+  if (flags.groundHit && now - ffToastT > 3000) {
+    ffToastT = now;
+    ctx.ui.modeToast && ctx.ui.modeToast('灵蕴护体，飞舟轻轻掠过地面。');
+  }
+  if (flags.boundaryHit && now - ffToastT > 3000) {
+    ffToastT = now;
+    ctx.ui.modeToast && ctx.ui.modeToast('再远，昆仑就托不住你了。');
+  }
   const spd = freeFlight.vel.length();
-  const auth = Math.max(0.35, Math.min(1, spd / 12));
-  // 姿态角提取(限幅+松杆自动改平:2026-07-27 探针血泪——纯角速度积分,按住 W 2 秒翻 183° 倒扣)
-  _v2.set(0, 0, 1).applyQuaternion(freeFlight.quat);
-  const pitchCur = Math.asin(Math.max(-1, Math.min(1, _v2.y))); // 当前仰角
-  _v3.set(1, 0, 0).applyQuaternion(freeFlight.quat);
-  const rollCur = Math.asin(Math.max(-1, Math.min(1, _v3.y))); // 当前左倾角
-  const P_LIM = 1.05,
-    R_LIM = 1.3; // 俯仰 ±60°、滚转 ±75°:到边不许再转
-  if (pitchCur > P_LIM && pitchIn > 0) pitchIn = 0;
-  if (pitchCur < -P_LIM && pitchIn < 0) pitchIn = 0;
-  if (rollCur > R_LIM && rollIn > 0) rollIn = 0;
-  if (rollCur < -R_LIM && rollIn < 0) rollIn = 0;
-  const k = Math.min(1, dt * 6);
-  let tPitch = pitchIn * 1.6 * auth,
-    tRoll = rollIn * 2.2 * auth;
-  if (Math.abs(pitchIn) < 0.1) tPitch += -pitchCur * 1.2 * auth; // 松杆自动改平(街机手感)
-  if (Math.abs(rollIn) < 0.1) tRoll += -rollCur * 1.5 * auth;
-  freeFlight.pitchRate += (tPitch - freeFlight.pitchRate) * k;
-  freeFlight.rollRate += (tRoll - freeFlight.rollRate) * k;
-  const yawRate = -freeFlight.rollRate * 0.5; // 协调转弯:倾斜自动带转向
-  _eTmp.set(-freeFlight.pitchRate * dt, yawRate * dt, freeFlight.rollRate * dt, 'YXZ');
-  _qTmp.setFromEuler(_eTmp);
-  freeFlight.quat.multiply(_qTmp).normalize();
-  // 灵蕴驱动·自动油门:速度向往巡航值,侧向自然阻尼
-  const boosting = (freeFlight.boostHold || ks[' ']) && freeFlight.energy > 0;
-  if (boosting) freeFlight.energy = Math.max(0, freeFlight.energy - 14 * dt);
-  else freeFlight.energy = Math.min(100, freeFlight.energy + 10 * dt);
-  _v2
-    .set(0, 0, 1)
-    .applyQuaternion(freeFlight.quat)
-    .multiplyScalar(CRUISE * (boosting ? 1.9 : 1));
-  freeFlight.vel.lerp(_v2, Math.min(1, dt * 2.2));
-  freeFlight.pos.addScaledVector(freeFlight.vel, dt);
-  // 实心山铁律:撞地钳制(灵蕴护体,不死)
-  const gh = ctx.media.desert ? ctx.media.desert.getH(freeFlight.pos.x, freeFlight.pos.z) : 0;
-  if (freeFlight.pos.y < gh + GROUND_CLEAR) {
-    freeFlight.pos.y = gh + GROUND_CLEAR;
-    if (freeFlight.vel.y < 0) freeFlight.vel.y = 0;
-    freeFlight.vel.multiplyScalar(0.94);
-    if (now - ffToastT > 3000) {
-      ffToastT = now;
-      ctx.ui.modeToast && ctx.ui.modeToast('灵蕴护体，飞舟轻轻掠过地面。');
-    }
-  }
-  // 天顶与疆域(昆仑托底)
-  if (freeFlight.pos.y > YMAX) {
-    freeFlight.pos.y = YMAX;
-    if (freeFlight.vel.y > 0) freeFlight.vel.y = 0;
-  }
-  {
-    const dx = freeFlight.pos.x - KX,
-      dz = freeFlight.pos.z - KZ,
-      r = Math.hypot(dx, dz);
-    if (r > BOUND_R) {
-      freeFlight.pos.x = KX + (dx / r) * BOUND_R;
-      freeFlight.pos.z = KZ + (dz / r) * BOUND_R;
-      freeFlight.vel.multiplyScalar(0.9);
-      if (now - ffToastT > 3000) {
-        ffToastT = now;
-        ctx.ui.modeToast && ctx.ui.modeToast('再远，昆仑就托不住你了。');
-      }
-    }
-  }
   // 渲染:飞舟姿态(QMODEL 对齐模型船头 +x 与物理船头 +z)
   ark.position.copy(freeFlight.pos);
   ark.quaternion.copy(freeFlight.quat).multiply(QMODEL);
@@ -657,6 +607,7 @@ function freeTick() {
     if (hist.length > 80) hist.shift();
     histLast = now;
   }
+  const boosting = (freeFlight.boostHold || ks[' ']) && freeFlight.energy > 0;
   {
     const arr = pGeo.attributes.position.array,
       n = hist.length;

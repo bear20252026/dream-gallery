@@ -139,46 +139,19 @@ function tickPhysics(dt) {
     jumpPressed = false;
     return;
   } // 飞舟巡礼中(ark.js):重力/跳跃冻结,且吞掉排队跳跃,防落地弹跳
+  // 垂直运动纯物理核(2026-08-30 终审 TOP1:单步积分抽到 scene/player-physics.js 可单测)
   const gy = groundY(pl.p.x, pl.p.z) + EYE_HEIGHT;
-  // 起跳(落地瞬间触发一次)
-  if (pl.onGround && jumpPressed) {
-    pl.vy = 9.5;
-    pl.onGround = false;
-  }
+  const ns = stepVertical(
+    { y: pl.p.y, vy: pl.vy, onGround: pl.onGround, glideEnergy: pl.glideEnergy },
+    { jumpPressed, jumpHold, pitch: pl.pi, updraft: updraft(pl.p.x, pl.p.z), gy },
+    dt
+  );
   jumpPressed = false;
-  // 滑翔判定:空中按住跳跃键且有余量
-  if (!pl.onGround && jumpHold && pl.glideEnergy > 0) {
-    pl.gliding = true;
-    pl.glideEnergy -= dt * 0.35;
-    if (pl.glideEnergy < 0) pl.glideEnergy = 0;
-  } else {
-    pl.gliding = false;
-    if (pl.onGround) pl.glideEnergy = Math.min(5, pl.glideEnergy + dt * 1.2);
-  }
-  // 重力:滑翔时大幅减缓(西域原版手感)
-  pl.vy -= (pl.gliding ? 3.5 : 26) * dt;
-  if (pl.gliding) {
-    // 抬头:乘风速冲,高度换速度;低头:获得升力
-    if (pl.pi > 0.15) pl.vy -= pl.pi * 6 * dt;
-    if (pl.pi < -0.15) pl.vy += 1.5 * dt;
-    // 上升气流托举并回充能量
-    const ud = updraft(pl.p.x, pl.p.z);
-    if (ud > 0) {
-      pl.vy += ud * dt;
-      pl.glideEnergy = Math.min(5, pl.glideEnergy + dt * 0.6);
-    }
-    // 上升/下坠限速(原版 clamp:-12~6)
-    pl.vy = Math.max(-12, Math.min(6, pl.vy));
-  }
-  pl.p.y += pl.vy * dt;
-  if (pl.p.y <= gy) {
-    // 落地/贴地:直接吸附地表(高速落地也不会穿透或卡落)
-    pl.p.y = gy;
-    pl.vy = 0;
-    pl.onGround = true;
-  } else {
-    pl.onGround = false;
-  }
+  pl.p.y = ns.y;
+  pl.vy = ns.vy;
+  pl.onGround = ns.onGround;
+  pl.gliding = ns.gliding;
+  pl.glideEnergy = ns.glideEnergy;
   // 兜底:意外跌出世界时拉回出生点
   if (pl.p.y < -30) {
     pl.p.set(20, groundY(20, 14) + EYE_HEIGHT, 14);
@@ -558,6 +531,7 @@ document.addEventListener('mouseup', () => {
 import { darkTeleport as fadeTeleport } from '../shared/teleport-fx.js';
 import { ORBIT_DEFAULTS } from '../shared/constants.js';
 import { createGlideHUD } from '../ui/glide-hud.js'; // 滑翔 HUD/跳跃按钮(B4 外迁)
+import { stepVertical } from './player-physics.js'; // 垂直运动纯物理核(终审 TOP1 可单测)
 
 mapCanvas.addEventListener('pointerdown', (e) => {
   if (ctx.kunlun.flightLock) {

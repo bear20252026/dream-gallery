@@ -31,13 +31,25 @@ export function createGlideHUD({ onJumpPress, onJumpRelease }) {
     onJumpRelease();
     jumpBtn.style.transform = '';
   });
+  let mouseHeld = false; // 防按住拖出后 window mouseup 与按钮 mouseup 双触发重复回传
   jumpBtn.addEventListener('mousedown', (e) => {
     e.stopPropagation();
+    mouseHeld = true;
     onJumpPress();
     jumpBtn.style.transform = 'scale(0.9)';
   });
+  // 终审修补:按住拖出按钮再松开,按钮自身 mouseup 不触发 → window 级兜底释放
+  window.addEventListener('mouseup', () => {
+    if (mouseHeld) {
+      mouseHeld = false;
+      onJumpRelease();
+    }
+  });
   jumpBtn.addEventListener('mouseup', () => {
-    onJumpRelease();
+    if (mouseHeld) {
+      mouseHeld = false;
+      onJumpRelease();
+    }
   });
   document.body.appendChild(jumpBtn);
 

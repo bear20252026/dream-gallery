@@ -40,7 +40,7 @@ fg.userData={eternalAction:'fireplace'};
 s.add(fg);iG.push(fg);
 // 碰撞(近似 AABB;炉子占墙角,略宽无妨)
 const fb={mnX:796.4,mxX:797.9,mnZ:594.3,mxZ:595.8};
-bounds.push(fb);
+ctx.scene.addBounds && ctx.scene.addBounds([fb]);
 
 // ===================== 火光辉光(两片加色渐变面+地面光池) =====================
 function glowTexture(){
