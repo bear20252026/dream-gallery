@@ -11,6 +11,20 @@ import { eventBus } from './event-bus.js';
  * 所以渲染角色时要减掉这个值才能得到贴地的脚底位置。
  */
 const EYE_HEIGHT = 1.6;
+
+// 射线-AABB slab 求交(解析法,零分配,免 THREE 依赖):
+// 返回沿 (dx,dy,dz) 方向自 (ox,oy,oz) 起到命中 AABB 的距离;
+// 起点在盒内返回 0,未命中返回 Infinity。用于 Spring Arm 相机的遮挡裁决。
+function rayAABB(ox, oy, oz, dx, dy, dz, mnX, mxX, mnY, mxY, mnZ, mxZ) {
+  let tmin = -Infinity, tmax = Infinity;
+  if (dx !== 0) { const t1 = (mnX - ox) / dx, t2 = (mxX - ox) / dx; tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2)); }
+  else if (ox < mnX || ox > mxX) return Infinity;
+  if (dy !== 0) { const t1 = (mnY - oy) / dy, t2 = (mxY - oy) / dy; tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2)); }
+  else if (oy < mnY || oy > mxY) return Infinity;
+  if (dz !== 0) { const t1 = (mnZ - oz) / dz, t2 = (mxZ - oz) / dz; tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2)); }
+  else if (oz < mnZ || oz > mxZ) return Infinity;
+  return tmax >= tmin && tmax >= 0 ? Math.max(tmin, 0) : Infinity;
+}
 // 角色模型朝向(弧度,heading 语义:-sin/-cos 方向)。第三人称下平滑转向移动方向。
 // 用角度插值避免 ±π 边界跳变(如从 179° 转到 -179° 走最短弧而不是绕远路)。
 let _modelYaw = 0;
@@ -320,35 +334,56 @@ export class LoopManager {
       // 旧版相机钉死在角色背后 pl.y 反方向、高度固定 —— 看不到正脸、俯仰被钳死。
       // 现在由 player.js 的 orbit {yaw, pitch, dist} 驱动:拖拽环绕、滚轮/双指缩放。
       if (avatar) avatar.visible = true;
+      // 第三人称 Spring Arm 弹簧臂(2026-08-30 穿地修复,方案经用户审批):
+      // 相机只拥有"臂长 curDist"一个量 —— 碰撞立即收缩,畅通后指数弹回;
+      // 用户缩放意图 ob.dist 永不被污染(收缩量不回写,避开 OrbitControls 回写坑)。
+      // 时序契约:本段在 UPDATE 阶段执行 —— 玩家移动/tickPhysics 之后、渲染之前。
       const ob = ctx._orbit || { yaw: pl.y, pitch: 0.25, dist: 2.8 };
       const cp = Math.cos(ob.pitch), sp = Math.sin(ob.pitch);
       const footY = pl.p.y - EYE_HEIGHT; // 角色脚底世界高度
-      // 相机防穿墙(借鉴 camera-controls 遮挡收缩):理想机位若落进建筑碰撞盒,
-      // 沿视线逐步收近距离直到脱离 —— 花钱少的做法(复用 player.js 的 bounds 盒,
-      // 不做逐 mesh 射线;盒数量有限,每帧几次判断可忽略)
-      let dist = ob.dist;
-      const bounds = ctx.scene.bounds || [];
-      const inWall = (x, z) => {
-        for (let i = 0; i < bounds.length; i++) {
-          const b = bounds[i];
-          if (x > b.mnX && x < b.mxX && z > b.mnZ && z < b.mxZ) return true;
+      const px = pl.p.x, py = footY + 0.9, pz = pl.p.z; // 射线原点 = 角色胸口(与 lookAt 同轴)
+
+      // -- 1) 理想机位(未收缩) --
+      const fx = Math.sin(ob.yaw) * cp, fz = Math.cos(ob.yaw) * cp;
+      const ix = px + fx * ob.dist, iy = py + sp * ob.dist, iz = pz + fz * ob.dist;
+
+      // -- 2) 射线碰撞:胸口 → 理想机位,对建筑碰撞盒求交(解析 slab 法,零分配) --
+      // bounds 盒只有 XZ 脚印(墙体足够高),Y 覆盖 0~8m 全楼层。
+      // 不对 1788 个场景网格做射线(three.js 论坛证实地形网格射线极慢)。
+      const rig = ctx._camRig || (ctx._camRig = { curDist: ob.dist });
+      let safeDist = ob.dist;
+      {
+        const vx = ix - px, vy = iy - py, vz = iz - pz;
+        const len = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
+        const dx = vx / len, dy = vy / len, dz = vz / len;
+        const boxes = ctx.scene.bounds || [];
+        for (let i = 0; i < boxes.length; i++) {
+          const b = boxes[i];
+          const t = rayAABB(px, py, pz, dx, dy, dz, b.mnX, b.mxX, 0, 8, b.mnZ, b.mxZ);
+          if (t < safeDist) safeDist = Math.max(t - 0.25, 0.8); // 安全距离 0.25m,最小臂长 0.8m
         }
-        return false;
-      };
-      while (dist > 0.8 && inWall(pl.p.x + Math.sin(ob.yaw) * cp * dist, pl.p.z + Math.cos(ob.yaw) * cp * dist)) {
-        dist -= 0.25;
       }
-      const bx = pl.p.x + Math.sin(ob.yaw) * cp * dist;
-      const bz = pl.p.z + Math.cos(ob.yaw) * cp * dist;
-      let cy = footY + 0.9 + sp * dist; // pitch>0:相机升高俯视;pitch<0:压低仰视
-      if (desert) {
-        const gy = desert.getH(bx, bz);
-        if (cy < gy + 0.3) cy = gy + 0.3; // 相机防穿地形
-      }
+
+      // -- 3) 非对称平滑:收缩立即生效(安全第一),恢复指数弹回(k=6,约 0.4s) --
+      if (safeDist < rig.curDist) rig.curDist = safeDist;
+      else rig.curDist += (safeDist - rig.curDist) * (1 - Math.exp(-6 * dt));
+      const dist = rig.curDist;
+
+      const bx = px + fx * dist, bz = pz + fz * dist;
+
+      // -- 4) 地面兜底(解析法,不做地形射线):全局地板 y=0 与室外沙丘取高者 --
+      // 展厅室内地板是 y≈0 平板而 desert.getH 返回室外地形(可至 -0.23),
+      // 旧版只钳 getH → 相机钻进室内地板下;取 max 后室内外都不会穿。
+      let floorY = desert ? desert.getH(bx, bz) : 0;
+      if (floorY < 0) floorY = 0;
+      let cy = py + sp * dist; // pitch>0:相机升高俯视;pitch<0:压低仰视
+      if (cy < floorY + 0.3) cy = floorY + 0.3; // 安全距离 0.3m
+
       cam.position.set(bx, cy, bz);
-      // 视线目标:角色胸口(脚底 + 0.85m)—— 旧版沿用第一人称"眼睛"逻辑时
-      // 视线比角色高 2.6m,角色被甩出画面底部(实测屏幕投影 y=2116,画布仅 800 高)。
-      cam.lookAt(pl.p.x, footY + 0.85, pl.p.z);
+      // 视线目标:角色胸口;相机被地面钳制时目标随之抬高 ——
+      // 避免旧 bug"相机贴着地板还朝下看,脚印出现在画面上方"。
+      const ty = Math.max(footY + 0.85, floorY + 0.5);
+      cam.lookAt(px, ty, pz);
       if (avatar) {
         avatar.position.copy(pl.p);
         // 脚底贴地:pl.p.y 是眼睛高度(由 player.js tickPhysics 算出 = groundY + 1.6)

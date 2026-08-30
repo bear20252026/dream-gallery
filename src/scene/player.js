@@ -294,7 +294,7 @@ document.addEventListener('keyup', (e) => {
 // 角色自身朝向由 loop-manager 平滑转向实际移动方向,静止时拖拽只环绕不转身。
 const orbit = { yaw: 0, pitch: 0.25, dist: 2.8 };
 ctx._orbit = orbit; // loop-manager 第三人称相机分支读取;toggleView 时初始化 yaw
-const PITCH_MIN = -1.0, PITCH_MAX = 1.25, DIST_MIN = 1.2, DIST_MAX = 7;
+const PITCH_MIN = -0.6, PITCH_MAX = 1.25, DIST_MIN = 1.2, DIST_MAX = 7;
 
 // ===================== 鼠标（电脑：左键拖拽旋转 + 短按点击放大）=====================
 const cEl = rnd.domElement;

@@ -128,6 +128,25 @@ const { BASE_URL: URL, launch } = require('./browser');
   await page.waitForTimeout(400);
   const s5 = await snap();
   console.log('【正脸】环绕180°后相机位置', JSON.stringify(s5.camPos), '(应绕到角色另一侧)');
+
+  // ---- 5. 仰视穿地回归(2026-08-30 Spring Arm):极低 pitch + 最大距离,相机不得入地 ----
+  await page.evaluate(() => {
+    window.__ctx._orbit.pitch = -1.0; // 强设超过新下限 -0.6 的极端值,考验地面兜底
+    window.__ctx._orbit.dist = 7;
+  });
+  await page.waitForTimeout(900); // 等弹簧臂收缩 + 地面兜底生效
+  const s6 = await snap();
+  console.log('【仰视穿地】pitch 强设 -1.0 + dist 7 → cam.y =', s6.camPos[1],
+    s6.camPos[1] >= 0.25 ? '✓ 在地面之上(兜底生效)' : '✗ 已穿地!');
+  // 俯仰钳制:直接把 pitch 打穿到 -5,拖拽一帧后应被钳回 [-0.6, 1.25]
+  await page.evaluate(() => { window.__ctx._orbit.pitch = -5; });
+  await page.mouse.move(640, 400);
+  await page.mouse.down();
+  for (let i = 1; i <= 4; i++) await page.mouse.move(640, 400 + i * 10, { steps: 2 });
+  await page.mouse.up();
+  const s7 = await snap();
+  console.log('【俯仰钳制】pitch =', s7.obPitch, s7.obPitch >= -0.6 ? '✓ 已钳回下限 -0.6' : '✗ 超限 ' + s7.obPitch);
+
   await page.screenshot({ path: 'orbit-verify.png' });
   await b.close();
 })();
