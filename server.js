@@ -224,7 +224,7 @@ const handler = (req, res) => {
       return;
     }
     // 外层 token 门禁:以上公开/自校验接口之后,以下写操作(上传/删除)需 token
-    if (TOKEN && query.token !== TOKEN && req.headers['x-token'] !== TOKEN) {
+    if (TOKEN && !tokenOk(req, query)) {
       sendJson(res, 401, { error: '未授权:缺少或错误的 token' });
       return;
     }

@@ -454,7 +454,7 @@ async function testQuiz(base) {
     await testQuiz(base5);
   } catch (e) {
     failed++;
-    console.error('\n测试执行异常: ' + e.message);
+    console.error('\n测试执行异常: ' + e.message + ' | cause: ' + ((e.cause && (e.cause.code || e.cause.message)) || '无'));
   } finally {
     children.forEach(c => c.kill());
     try {
