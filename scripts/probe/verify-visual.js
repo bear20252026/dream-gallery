@@ -101,7 +101,7 @@ const URL = 'https://cloudbear.cloud/';
     // 相机到角色的向量(确认角色在相机前方视野内)
     if (c.scene.cam && a) {
       const cam = c.scene.cam;
-      const toAv = av.position.clone().sub(cam.position);
+      const toAv = a.position.clone().sub(cam.position);
       const forward = new c.scene.cam.position.constructor(0, 0, -1).applyQuaternion(cam.quaternion);
       out.avInFront = +(toAv.clone().normalize().dot(forward)).toFixed(2);
       out.avDist = +toAv.length().toFixed(2);

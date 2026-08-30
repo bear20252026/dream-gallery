@@ -33,7 +33,10 @@ export default [
   {
     files: ['server.js', 'lib/**/*.js', 'scripts/**/*.js', 'vite.config.js'],
     languageOptions: {
-      ecmaVersion: 2022, sourceType: 'commonjs',
+      ecmaVersion: 2022,
+      // 2026-08-31:scripts/ 下探针混用 ESM(import)与 CJS(require),统一按 module 解析;
+      // require/module/exports 仍在 globals.node 中,CJS 文件不误报
+      sourceType: 'module',
       globals: { ...globals.node, ...globals.browser },
     },
     rules: {

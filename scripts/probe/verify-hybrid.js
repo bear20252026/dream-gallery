@@ -1,5 +1,5 @@
 // 验证混合设备修复:触屏环境(hasTouch)下用鼠标驱动摇杆 + 拖拽视角
-const { BASE_URL: URL, launch } = require('./browser');
+const { BASE_URL, launch } = require('./browser');
 
 
 (async () => {
