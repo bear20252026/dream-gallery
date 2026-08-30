@@ -1,12 +1,7 @@
-// 线上 GLB 角色验证(2026-08-30):绕过协议门禁后验证 si.glb + 贴图 + 第三人称
-import { chromium } from 'playwright-core';
+// 线上 GLB 角色验证(2026-08-30):绕过协议门禁后验证角色模型 + 贴图 + 第三人称
+import { BASE_URL as URL, launch } from './browser.js';
 
-const URL = 'https://cloudbear.cloud/';
-const browser = await chromium.launch({
-  executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-  headless: true,
-  args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
-});
+const browser = await launch();
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
 
 // 直接放行 3 个协议勾选,跳过 /agreement → /privacy 流程

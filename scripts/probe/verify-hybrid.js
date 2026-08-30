@@ -1,12 +1,9 @@
 // 验证混合设备修复:触屏环境(hasTouch)下用鼠标驱动摇杆 + 拖拽视角
-const { chromium } = require('playwright-core');
-const URL = 'https://cloudbear.cloud/';
+const { BASE_URL: URL, launch } = require('./browser');
+
 
 (async () => {
-  const b = await chromium.launch({
-    executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-    headless: true, args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
-  });
+  const b = await launch();
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: true });
   await ctx.addInitScript(() => {
     try {
@@ -17,7 +14,7 @@ const URL = 'https://cloudbear.cloud/';
     } catch (e) {}
   });
   const page = await ctx.newPage();
-  await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(3500);
   await page.mouse.click(640, 400);
   await page.waitForTimeout(2500);

@@ -1,12 +1,8 @@
 // 验证第三人称轨道相机:环绕/俯仰/缩放/角色转向移动方向/动画无缝裁剪
-const { chromium } = require('playwright-core');
-const URL = process.env.BASE_URL || 'https://cloudbear.cloud/';
+const { BASE_URL: URL, launch } = require('./browser');
 
 (async () => {
-  const b = await chromium.launch({
-    executablePath: process.env.PW_EDGE || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-    headless: true, args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
-  });
+  const b = await launch(['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader']);
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, hasTouch: true });
   await ctx.addInitScript(() => {
     try {

@@ -8,6 +8,8 @@
     "check": "npm run deps && npm run build && node scripts/test/test.js",
     "test": "node scripts/test/test-store.js && node scripts/test/test.js && node scripts/test/test-mobile.js",
     "debug": "node scripts/probe/debug-browser.js",
+    "test:smoke": "node scripts/probe/smoke-gate.js",
+    "test:orbit": "node scripts/probe/verify-orbit.js",
     "dev": "node scripts/gen/dev.js",
     "build": "vite build",
     "preview": "vite preview",

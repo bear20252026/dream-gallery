@@ -1,13 +1,8 @@
 // 验证角色贴地:移动玩家到不同地形高度,检查 avatar.y 是否跟随地面
-const { chromium } = require('playwright-core');
-const URL = 'https://cloudbear.cloud/';
+const { BASE_URL: URL, launch } = require('./browser');
 
 (async () => {
-  const b = await chromium.launch({
-    executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
-    headless: true,
-    args: ['--no-sandbox', '--use-gl=swiftshader', '--enable-unsafe-swiftshader'],
-  });
+  const b = await launch();
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 } });
   await ctx.addInitScript(() => {
     try {
@@ -17,7 +12,7 @@ const URL = 'https://cloudbear.cloud/';
     } catch (e) {}
   });
   const page = await ctx.newPage();
-  await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#viewBtn', { timeout: 40000 });
   console.log('✓ 页面就绪');
 

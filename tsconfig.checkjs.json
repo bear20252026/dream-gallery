@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "declaration": false,
+    "declarationDir": null,
+    "emitDeclarationOnly": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "useUnknownInCatchVariables": false
+  },
+  "include": ["src/core/**/*.js", "src/player/**/*.js", "src/kunlun/avatar.js"],
+  "exclude": ["node_modules", "dist", "vendor", "scripts"]
+}
