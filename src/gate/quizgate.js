@@ -625,10 +625,7 @@ function escH(s) {
 
 // 热更新自定义清理:碰撞体/iG 可交互组/弹层注册/head 样式(s.add 场景对象与 body DOM 由 hot.js 自动捕获)
 bag.custom.push(() => {
-  for (const b of gateBounds) {
-    const i = ctx.scene.bounds.indexOf(b);
-    if (i >= 0) ctx.scene.bounds.splice(i, 1);
-  }
+  ctx.scene.removeBounds && ctx.scene.removeBounds(gateBounds); // B4:经门面移除,不再直改场景内部数组
   for (const m of [panelMesh]) {
     if (!m) continue;
     const i = iG.indexOf(m);

@@ -5,6 +5,7 @@
 
 import { eventBus } from './event-bus.js';
 import { EYE_HEIGHT } from './shared/constants.js';
+import { ORBIT_DEFAULTS } from './shared/constants.js';
 
 /**
  * 玩家眼睛离地高度(米)——与 scene/player.js 的 `groundY(x,z) + 1.6` 保持一致。
@@ -191,7 +192,7 @@ export class LoopManager {
    */
   _executePhases(dt, now) {
     const { ctx } = this;
-    const { jD, ks, pl, mv, drM } = ctx.player;
+    const { jD, ks, pl, mv, drawMap } = ctx.player;
     const { cam, rnd, pls, WH, skyUniforms, groundUniforms } = ctx.scene;
     const { desert, dayHour } = ctx.media;
 
@@ -227,7 +228,7 @@ export class LoopManager {
    */
   _executeUpdatePhase(dt, now) {
     const { ctx } = this;
-    const { jD, ks, pl, mv, drM } = ctx.player;
+    const { jD, ks, pl, mv, drawMap } = ctx.player;
     const { cam, pls, WH, skyUniforms, groundUniforms } = ctx.scene;
     const { desert, dayHour } = ctx.media;
 
@@ -337,7 +338,7 @@ export class LoopManager {
       // 相机只拥有"臂长 curDist"一个量 —— 碰撞立即收缩,畅通后指数弹回;
       // 用户缩放意图 ob.dist 永不被污染(收缩量不回写,避开 OrbitControls 回写坑)。
       // 时序契约:本段在 UPDATE 阶段执行 —— 玩家移动/tickPhysics 之后、渲染之前。
-      const ob = ctx._orbit || { yaw: pl.y, pitch: 0.25, dist: 2.8 };
+      const ob = ctx._orbit || { yaw: pl.y, pitch: ORBIT_DEFAULTS.pitch, dist: ORBIT_DEFAULTS.dist };
       const cp = Math.cos(ob.pitch), sp = Math.sin(ob.pitch);
       const footY = pl.p.y - EYE_HEIGHT; // 角色脚底世界高度
       const px = pl.p.x, py = footY + 0.9, pz = pl.p.z; // 射线原点 = 角色胸口(与 lookAt 同轴)
@@ -428,7 +429,7 @@ export class LoopManager {
    */
   _executeUIPhase(dt, now) {
     const { ctx } = this;
-    const { pl, drM } = ctx.player;
+    const { pl, drawMap } = ctx.player;
 
     // 更新坐标显示（降频到每 200ms）
     if (now - this._lastPosT > 200) {
@@ -441,7 +442,7 @@ export class LoopManager {
     }
     
     // 小地图重绘
-    if (drM) drM();
+    if (drawMap) drawMap();
   }
 
   /**

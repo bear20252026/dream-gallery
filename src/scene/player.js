@@ -5,7 +5,7 @@ import { EYE_HEIGHT } from '../shared/constants.js';
 import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
 const gs = getGameState();
 const { cam, rnd, bounds, jT, jB, onC3D, zoomOut, OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
-import { mC, MSC, MOX, MOZ, isBig, drM } from './minimap.js';
+import { mapCanvas, mapScale, mapOffX, mapOffZ, isBig, drawMap } from './minimap.js';
 
 // ===================== 移动状态机(2026-08-01) =====================
 import { StateMachine } from '../player/StateMachine.js';
@@ -198,53 +198,19 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('keyup', (e) => {
   if (e.code === 'Space') jumpHold = false;
 });
-// 滑翔能量 HUD(顶部中央五格,原版样式:细条+回充脉冲)
-const glideHud = document.createElement('div');
-glideHud.style.cssText =
-  'position:fixed;top:70px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:35;pointer-events:none';
-const glidePips = [];
-for (let i = 0; i < 5; i++) {
-  const pip = document.createElement('div');
-  pip.className = 'glide-pip';
-  glideHud.appendChild(pip);
-  glidePips.push(pip);
-}
-document.body.appendChild(glideHud);
+// 滑翔能量 HUD + 跳跃按钮(B4 外迁 ui/glide-hud.js;输入经回调回写物理状态)
+const glideHudApi = createGlideHUD({
+  onJumpPress() {
+    jumpPressed = true;
+    jumpHold = true;
+  },
+  onJumpRelease() {
+    jumpHold = false;
+  },
+});
 function updateGlideHUD() {
-  const n = Math.ceil(Math.max(0, pl.glideEnergy / 5) * 5);
-  glidePips.forEach((pip, i) => {
-    pip.classList.toggle('active', i < n);
-    pip.classList.toggle('recharge', pl.onGround && i >= n);
-  });
-  jumpBtn.classList.toggle('gliding', pl.gliding);
+  glideHudApi.update(pl);
 }
-const jumpBtn = document.createElement('button');
-jumpBtn.id = 'jumpBtnGlide';
-jumpBtn.textContent = '▲';
-jumpBtn.title = '跳跃(按住滑翔)';
-jumpBtn.style.cssText =
-  'position:fixed;bottom:30px;right:20px;z-index:35;width:110px;height:110px;border-radius:50%;border:1px solid rgba(255,220,150,0.4);background:rgba(40,25,10,0.55);color:#ffe4b5;font-size:34px;cursor:pointer;font-family:inherit';
-jumpBtn.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  jumpPressed = true;
-  jumpHold = true;
-  jumpBtn.style.transform = 'scale(0.9)';
-});
-jumpBtn.addEventListener('touchend', (e) => {
-  jumpHold = false;
-  jumpBtn.style.transform = '';
-});
-jumpBtn.addEventListener('mousedown', (e) => {
-  e.stopPropagation();
-  jumpPressed = true;
-  jumpHold = true;
-  jumpBtn.style.transform = 'scale(0.9)';
-});
-jumpBtn.addEventListener('mouseup', () => {
-  jumpHold = false;
-  jumpBtn.style.transform = '';
-});
-document.body.appendChild(jumpBtn);
 
 // ===================== 键盘 =====================
 // e.key 可能是 undefined(输入法 composition / 合成事件 / 部分移动端键盘 /
@@ -293,7 +259,7 @@ document.addEventListener('keyup', (e) => {
 // 角色又永远背对相机 → 永远看不到正脸,俯仰也被 ±0.5rad 钳死。
 // 现在拖拽=环绕相机(yaw 360° 自由 + pitch 大范围),滚轮/双指=拉远拉近;
 // 角色自身朝向由 loop-manager 平滑转向实际移动方向,静止时拖拽只环绕不转身。
-const orbit = { yaw: 0, pitch: 0.25, dist: 2.8 };
+const orbit = { yaw: 0, pitch: ORBIT_DEFAULTS.pitch, dist: ORBIT_DEFAULTS.dist };
 ctx._orbit = orbit; // loop-manager 第三人称相机分支读取;toggleView 时初始化 yaw
 const PITCH_MIN = -0.6, PITCH_MAX = 1.25, DIST_MIN = 1.2, DIST_MAX = 7;
 
@@ -381,7 +347,7 @@ let jId = null,
   tST = 0,
   pinchId = null, // 双指捏合缩放(第二根触摸的 identifier)
   pinch0 = 1, // 捏合起始两指间距
-  d0 = 2.8, // 捏合起始相机距离
+  d0 = ORBIT_DEFAULTS.dist, // 捏合起始相机距离
   pinchLX = 0,
   pinchLY = 0;
 // 混合设备(触屏笔记本)支持:真实 touch 刚结束后的合成 mouse 事件不当作鼠标输入,
@@ -590,27 +556,29 @@ document.addEventListener('mouseup', () => {
 
 // 传送过渡遮罩:实现下沉 shared/teleport-fx.js(darkTeleport,与 goldenTeleport 并列)
 import { darkTeleport as fadeTeleport } from '../shared/teleport-fx.js';
+import { ORBIT_DEFAULTS } from '../shared/constants.js';
+import { createGlideHUD } from '../ui/glide-hud.js'; // 滑翔 HUD/跳跃按钮(B4 外迁)
 
-mC.addEventListener('pointerdown', (e) => {
+mapCanvas.addEventListener('pointerdown', (e) => {
   if (ctx.kunlun.flightLock) {
     window.quizToast && window.quizToast('飞舟巡礼中，坐稳了');
     return;
   } // ark.js:飞行中禁传送
-  const r = mC.getBoundingClientRect();
+  const r = mapCanvas.getBoundingClientRect();
   const inZone = Math.abs(pl.p.x) < 34 && pl.p.z > -13 && pl.p.z < 60;
   let wx, wz;
   if (inZone) {
     // 建筑区:静态图坐标(放大态先归一化)
-    const sc = mC.width / 150;
-    wx = ((e.clientX - r.left) / sc - MOX) / MSC;
-    wz = ((e.clientY - r.top) / sc - MOZ) / MSC;
+    const sc = mapCanvas.width / 150;
+    wx = ((e.clientX - r.left) / sc - mapOffX) / mapScale;
+    wz = ((e.clientY - r.top) / sc - mapOffZ) / mapScale;
     if (wx < -32 || wx > 32 || wz < OT - 10 + 0.3 || wz > 60) return; // 建筑区:可传送范围外(建筑外空地四向各扩10米)
   } else {
     // 沙漠区:以玩家为中心反算世界坐标,地图视野内任意点可传送
     const R = isBig() ? 150 : 45,
-      k = mC.width / (2 * R);
-    wx = pl.p.x + (e.clientX - r.left - mC.width / 2) / k;
-    wz = pl.p.z + (e.clientY - r.top - mC.height / 2) / k;
+      k = mapCanvas.width / (2 * R);
+    wx = pl.p.x + (e.clientX - r.left - mapCanvas.width / 2) / k;
+    wz = pl.p.z + (e.clientY - r.top - mapCanvas.height / 2) / k;
   }
   // 空中永恒展厅(eternal.js):只能从金门进出,小地图不可直接传入
   if (ctx.kunlun.eternalKeepOut && ctx.kunlun.eternalKeepOut(wx, wz)) {
@@ -659,7 +627,7 @@ homeBtn.addEventListener('click', (e) => {
 });
 document.body.appendChild(homeBtn);
 
-Object.assign(ctx.player, { pl, jD, ks, mv, drM, tickPhysics });
+Object.assign(ctx.player, { pl, jD, ks, mv, drawMap, tickPhysics });
 ctx.kunlun.fadeTeleport = fadeTeleport;
 
 // 昆仑灵鉴:行走氛围——「山记得你的每一步。」(已进展厅后,每 4 分钟至多浮现一次)

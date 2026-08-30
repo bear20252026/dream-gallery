@@ -106,6 +106,13 @@ const OBR=28;                           // 整体最南端 (R=rectangular hall)
 const WH=5; // 天花板高度5m（抬高1/4）
 const IL=-7,IR=7,IRT=11,IRB=23;       // 回字内墙禁区边界
 const bounds=[];
+// 碰撞盒移除门面(B4 整改):gate 等外部模块不再直接 indexOf/splice 本数组
+ctx.scene.removeBounds = function (list) {
+  for (const b of list) {
+    const i = bounds.indexOf(b);
+    if (i >= 0) bounds.splice(i, 1);
+  }
+};
 const wI=[]; // 墙壁信息数组
 // 古典装饰材质（深棕色带光泽）:腰线/门框装饰线 与 踢脚线 分开,房屋换色可独立染色
 const decoM=new THREE.MeshStandardMaterial({color:'#4a2510',roughness:0.4,metalness:0.15});

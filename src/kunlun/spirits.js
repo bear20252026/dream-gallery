@@ -255,7 +255,7 @@ function spiritsState(){
     state:keys.includes(sp.key)?'got':(i===ti&&questActive()?'open':'locked')}));
 }
 function refreshSpiritsPage(){if(window.__refreshSpirits)window.__refreshSpirits();}
-// 小地图灵蕴标记(player.js drM 读取):返回当前目标 {x,z,name,color},无目标返回 null
+// 小地图灵蕴标记(player.js drawMap 读取):返回当前目标 {x,z,name,color},无目标返回 null
 function spiritMark(){
   if(!questActive())return null;
   const ti=nextIdx();if(ti<0)return null;

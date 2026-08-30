@@ -75,7 +75,7 @@
  * @property {{x:number,z:number}} jD 摇杆输入向量
  * @property {Object<string,boolean>} ks 键盘按键状态
  * @property {function(number,number,number):void} mv 玩家移动(含碰撞)
- * @property {function():void} drM  小地图逐帧重绘
+ * @property {function():void} drawMap 小地图逐帧重绘
  * @property {HTMLElement} jT/jB/aB 摇杆容器/手柄/音乐按钮
  *
  * ── 门禁与答题(gate/quizgate.js·quiz.js·prologue.js) ──

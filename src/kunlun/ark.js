@@ -175,7 +175,7 @@ function barTick() {
   const done = ctx.kunlun.isDone && ctx.kunlun.isDone();
   if (done) {
     if (barrier.visible && barDissolve < 0) barDissolve = 0;
-  } else if (!flying && !FF.on) {
+  } else if (!flying && !freeFlight.on) {
     barActive(true);
   }
   if (!barrier.visible) return;
@@ -192,7 +192,7 @@ function barTick() {
     }
     return;
   }
-  if (done || flying || FF.on) return;
+  if (done || flying || freeFlight.on) return;
   // 软推:水平距泊位中心过近→温柔外推到结界边缘(不让踏进沉睡飞舟的泊位)
   const pl = ctx.player.pl;
   if (!pl) return;
@@ -414,7 +414,7 @@ document.body.appendChild(tintOv);
 // ===================== 自由飞(飞机骨·2026-07-27:首飞后再登舟进入;配方来自两套飞机参考码,温和无失速) =====================
 // 物理:四元数姿态;灵蕴自动油门,速度向往巡航值(侧向自然阻尼,轨迹跟机头);
 // 控制权限随速度缩放;倾斜联动转向(协调转弯);撞地钳制不死;疆域/天顶软限制。
-const FF = {
+const freeFlight = {
   on: false,
   pos: new THREE.Vector3(),
   quat: new THREE.Quaternion(),
@@ -426,7 +426,7 @@ const FF = {
   autoNav: false,
   lastT: 0,
 };
-expose('arkFF', FF); // 探针钩子(仿 __vidEl 惯例)
+expose('arkFF', freeFlight); // 探针钩子(仿 __vidEl 惯例)
 const CRUISE = 24,
   YMAX = 480,
   BOUND_R = 720,
@@ -471,21 +471,21 @@ const ffStats = hud.querySelector('#ffStats'),
   ffJoy = hud.querySelector('#ffJoy'),
   ffKnob = hud.querySelector('#ffKnob');
 hud.querySelector('#ffNavBtn').onclick = () => {
-  if (!FF.on) return;
-  FF.autoNav = true;
+  if (!freeFlight.on) return;
+  freeFlight.autoNav = true;
   ctx.ui.modeToast && ctx.ui.modeToast('自动导航：朝永恒展厅飞去——任何手动操作即可接管。');
 };
 hud.querySelector('#ffHomeBtn').onclick = () => {
-  if (FF.on) endFree('ground');
+  if (freeFlight.on) endFree('ground');
 };
 // 冲刺钮(按住)
 function boostOn(e) {
   e.preventDefault();
-  FF.boostHold = true;
+  freeFlight.boostHold = true;
   ffBoost.style.background = 'rgba(120,60,16,.75)';
 }
 function boostOff() {
-  FF.boostHold = false;
+  freeFlight.boostHold = false;
   ffBoost.style.background = 'rgba(60,32,10,.6)';
 }
 ffBoost.addEventListener('touchstart', boostOn, { passive: false });
@@ -547,20 +547,20 @@ ffJoy.addEventListener('touchend', joyEnd);
 ffJoy.addEventListener('touchcancel', joyEnd);
 
 function startFree() {
-  if (FF.on || flying || !ctx.player.pl) return;
-  FF.on = true;
-  FF.autoNav = false;
-  FF.boostHold = false;
-  FF.pos.set(ark.position.x, ark.position.y + 0.6, ark.position.z);
-  FF.quat.setFromEuler(new THREE.Euler(0, Math.PI, 0)); // 机头朝北,背对山巅
-  FF.vel.set(0, 0, 0);
-  FF.pitchRate = 0;
-  FF.rollRate = 0;
-  FF.energy = 100;
+  if (freeFlight.on || flying || !ctx.player.pl) return;
+  freeFlight.on = true;
+  freeFlight.autoNav = false;
+  freeFlight.boostHold = false;
+  freeFlight.pos.set(ark.position.x, ark.position.y + 0.6, ark.position.z);
+  freeFlight.quat.setFromEuler(new THREE.Euler(0, Math.PI, 0)); // 机头朝北,背对山巅
+  freeFlight.vel.set(0, 0, 0);
+  freeFlight.pitchRate = 0;
+  freeFlight.rollRate = 0;
+  freeFlight.energy = 100;
   hist = [];
   histLast = 0;
-  FF.lastT = performance.now();
-  _camPos.copy(FF.pos); // 相机从船上平滑拉出
+  freeFlight.lastT = performance.now();
+  _camPos.copy(freeFlight.pos); // 相机从船上平滑拉出
   gs.set('flightLock', true); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步) // 总锁:player 移动/物理/小地图/回家键全部冻结
   boardBtn.style.display = 'none';
   hud.style.display = 'block';
@@ -587,10 +587,10 @@ function startFree() {
 }
 // mode:'ground'=人舟化光回山巅;'land'=原地降落(人落当前点,舟回山巅);'dock'=静默清理(dock() 接管落位)
 function endFree(mode) {
-  if (!FF.on) return;
-  FF.on = false;
-  FF.autoNav = false;
-  FF.boostHold = false;
+  if (!freeFlight.on) return;
+  freeFlight.on = false;
+  freeFlight.autoNav = false;
+  freeFlight.boostHold = false;
   hud.style.display = 'none';
   flightPts.visible = false;
   // 隐藏荧光路线
@@ -608,7 +608,7 @@ function endFree(mode) {
     ark.visible = spiritCount() >= 1;
     ctx.ui.modeToast && ctx.ui.modeToast('飞舟化作一道光，载你回到山巅。');
   } else if (mode === 'land') {
-    pl.p.copy(FF.pos);
+    pl.p.copy(freeFlight.pos);
     pl.vy = 0;
     pl.onGround = false; // 从当前位置缓缓落下
     ark.position.set(PARK.x, PARK.y, PARK.z);
@@ -623,8 +623,8 @@ function endFree(mode) {
 }
 function freeTick() {
   const now = performance.now();
-  let dt = (now - FF.lastT) / 1000;
-  FF.lastT = now;
+  let dt = (now - freeFlight.lastT) / 1000;
+  freeFlight.lastT = now;
   if (!(dt > 0)) dt = 0.016;
   if (dt > 0.05) dt = 0.05;
   const ks = ctx.player.ks || {};
@@ -632,17 +632,17 @@ function freeTick() {
   let pitchIn = (ks.w ? 1 : 0) - (ks.s ? 1 : 0) - joy.y;
   let rollIn = (ks.a ? 1 : 0) - (ks.d ? 1 : 0) + joy.x;
   // 自动导航:朝展厅泊位柔和转向,任何手动输入立即接管
-  if (FF.autoNav) {
-    _v1.set(DOCK.x - FF.pos.x, DOCK.y - FF.pos.y, DOCK.z - FF.pos.z);
+  if (freeFlight.autoNav) {
+    _v1.set(DOCK.x - freeFlight.pos.x, DOCK.y - freeFlight.pos.y, DOCK.z - freeFlight.pos.z);
     if (_v1.length() < 10) {
       dock();
       return;
     }
     _v1.normalize();
-    _v2.set(0, 0, 1).applyQuaternion(FF.quat);
+    _v2.set(0, 0, 1).applyQuaternion(freeFlight.quat);
     const crossY = _v2.z * _v1.x - _v2.x * _v1.z; // >0 目标在右侧
-    if (Math.abs(pitchIn) > 0.15 || Math.abs(rollIn) > 0.15 || FF.boostHold || ks[' ']) {
-      FF.autoNav = false;
+    if (Math.abs(pitchIn) > 0.15 || Math.abs(rollIn) > 0.15 || freeFlight.boostHold || ks[' ']) {
+      freeFlight.autoNav = false;
       ctx.ui.modeToast && ctx.ui.modeToast('已接管手动驾驶。');
     } else {
       rollIn = -Math.max(-1, Math.min(1, crossY * 3));
@@ -654,12 +654,12 @@ function freeTick() {
   if (rollIn > 1) rollIn = 1;
   if (rollIn < -1) rollIn = -1;
   // 控制权限随速度(低速不灵活;无失速,不会拍地上)
-  const spd = FF.vel.length();
+  const spd = freeFlight.vel.length();
   const auth = Math.max(0.35, Math.min(1, spd / 12));
   // 姿态角提取(限幅+松杆自动改平:2026-07-27 探针血泪——纯角速度积分,按住 W 2 秒翻 183° 倒扣)
-  _v2.set(0, 0, 1).applyQuaternion(FF.quat);
+  _v2.set(0, 0, 1).applyQuaternion(freeFlight.quat);
   const pitchCur = Math.asin(Math.max(-1, Math.min(1, _v2.y))); // 当前仰角
-  _v3.set(1, 0, 0).applyQuaternion(FF.quat);
+  _v3.set(1, 0, 0).applyQuaternion(freeFlight.quat);
   const rollCur = Math.asin(Math.max(-1, Math.min(1, _v3.y))); // 当前左倾角
   const P_LIM = 1.05,
     R_LIM = 1.3; // 俯仰 ±60°、滚转 ±75°:到边不许再转
@@ -672,46 +672,46 @@ function freeTick() {
     tRoll = rollIn * 2.2 * auth;
   if (Math.abs(pitchIn) < 0.1) tPitch += -pitchCur * 1.2 * auth; // 松杆自动改平(街机手感)
   if (Math.abs(rollIn) < 0.1) tRoll += -rollCur * 1.5 * auth;
-  FF.pitchRate += (tPitch - FF.pitchRate) * k;
-  FF.rollRate += (tRoll - FF.rollRate) * k;
-  const yawRate = -FF.rollRate * 0.5; // 协调转弯:倾斜自动带转向
-  _eTmp.set(-FF.pitchRate * dt, yawRate * dt, FF.rollRate * dt, 'YXZ');
+  freeFlight.pitchRate += (tPitch - freeFlight.pitchRate) * k;
+  freeFlight.rollRate += (tRoll - freeFlight.rollRate) * k;
+  const yawRate = -freeFlight.rollRate * 0.5; // 协调转弯:倾斜自动带转向
+  _eTmp.set(-freeFlight.pitchRate * dt, yawRate * dt, freeFlight.rollRate * dt, 'YXZ');
   _qTmp.setFromEuler(_eTmp);
-  FF.quat.multiply(_qTmp).normalize();
+  freeFlight.quat.multiply(_qTmp).normalize();
   // 灵蕴驱动·自动油门:速度向往巡航值,侧向自然阻尼
-  const boosting = (FF.boostHold || ks[' ']) && FF.energy > 0;
-  if (boosting) FF.energy = Math.max(0, FF.energy - 14 * dt);
-  else FF.energy = Math.min(100, FF.energy + 10 * dt);
+  const boosting = (freeFlight.boostHold || ks[' ']) && freeFlight.energy > 0;
+  if (boosting) freeFlight.energy = Math.max(0, freeFlight.energy - 14 * dt);
+  else freeFlight.energy = Math.min(100, freeFlight.energy + 10 * dt);
   _v2
     .set(0, 0, 1)
-    .applyQuaternion(FF.quat)
+    .applyQuaternion(freeFlight.quat)
     .multiplyScalar(CRUISE * (boosting ? 1.9 : 1));
-  FF.vel.lerp(_v2, Math.min(1, dt * 2.2));
-  FF.pos.addScaledVector(FF.vel, dt);
+  freeFlight.vel.lerp(_v2, Math.min(1, dt * 2.2));
+  freeFlight.pos.addScaledVector(freeFlight.vel, dt);
   // 实心山铁律:撞地钳制(灵蕴护体,不死)
-  const gh = ctx.media.desert ? ctx.media.desert.getH(FF.pos.x, FF.pos.z) : 0;
-  if (FF.pos.y < gh + GROUND_CLEAR) {
-    FF.pos.y = gh + GROUND_CLEAR;
-    if (FF.vel.y < 0) FF.vel.y = 0;
-    FF.vel.multiplyScalar(0.94);
+  const gh = ctx.media.desert ? ctx.media.desert.getH(freeFlight.pos.x, freeFlight.pos.z) : 0;
+  if (freeFlight.pos.y < gh + GROUND_CLEAR) {
+    freeFlight.pos.y = gh + GROUND_CLEAR;
+    if (freeFlight.vel.y < 0) freeFlight.vel.y = 0;
+    freeFlight.vel.multiplyScalar(0.94);
     if (now - ffToastT > 3000) {
       ffToastT = now;
       ctx.ui.modeToast && ctx.ui.modeToast('灵蕴护体，飞舟轻轻掠过地面。');
     }
   }
   // 天顶与疆域(昆仑托底)
-  if (FF.pos.y > YMAX) {
-    FF.pos.y = YMAX;
-    if (FF.vel.y > 0) FF.vel.y = 0;
+  if (freeFlight.pos.y > YMAX) {
+    freeFlight.pos.y = YMAX;
+    if (freeFlight.vel.y > 0) freeFlight.vel.y = 0;
   }
   {
-    const dx = FF.pos.x - KX,
-      dz = FF.pos.z - KZ,
+    const dx = freeFlight.pos.x - KX,
+      dz = freeFlight.pos.z - KZ,
       r = Math.hypot(dx, dz);
     if (r > BOUND_R) {
-      FF.pos.x = KX + (dx / r) * BOUND_R;
-      FF.pos.z = KZ + (dz / r) * BOUND_R;
-      FF.vel.multiplyScalar(0.9);
+      freeFlight.pos.x = KX + (dx / r) * BOUND_R;
+      freeFlight.pos.z = KZ + (dz / r) * BOUND_R;
+      freeFlight.vel.multiplyScalar(0.9);
       if (now - ffToastT > 3000) {
         ffToastT = now;
         ctx.ui.modeToast && ctx.ui.modeToast('再远，昆仑就托不住你了。');
@@ -719,25 +719,25 @@ function freeTick() {
     }
   }
   // 渲染:飞舟姿态(QMODEL 对齐模型船头 +x 与物理船头 +z)
-  ark.position.copy(FF.pos);
-  ark.quaternion.copy(FF.quat).multiply(QMODEL);
+  ark.position.copy(freeFlight.pos);
+  ark.quaternion.copy(freeFlight.quat).multiply(QMODEL);
   // 玩家状态同步(小地图/天空/沙漠区块以 pl.p 为准)
   const pl = ctx.player.pl;
-  pl.p.copy(FF.pos);
+  pl.p.copy(freeFlight.pos);
   pl.vy = 0;
   pl.onGround = false;
-  _v2.set(0, 0, 1).applyQuaternion(FF.quat);
+  _v2.set(0, 0, 1).applyQuaternion(freeFlight.quat);
   pl.y = Math.atan2(-_v2.x, -_v2.z);
   pl.pi = 0;
   // 第三人称追尾相机(主循环相机同步在 ticker 之前执行且每帧重置 cam,此处用自存平滑状态覆盖)
-  _v3.set(0, 4.2, -13).applyQuaternion(FF.quat).add(FF.pos);
+  _v3.set(0, 4.2, -13).applyQuaternion(freeFlight.quat).add(freeFlight.pos);
   _camPos.lerp(_v3, Math.min(1, dt * 5));
   ctx.scene.cam.position.copy(_camPos);
-  _v3.set(0, 1.2, 10).applyQuaternion(FF.quat).add(FF.pos);
+  _v3.set(0, 1.2, 10).applyQuaternion(freeFlight.quat).add(freeFlight.pos);
   ctx.scene.cam.lookAt(_v3);
   // 尾迹:沿航迹铺柔光粒子,冲刺变粗
   if (now - histLast > 60 && spd > 5) {
-    hist.push(FF.pos.clone());
+    hist.push(freeFlight.pos.clone());
     if (hist.length > 80) hist.shift();
     histLast = now;
   }
@@ -745,7 +745,7 @@ function freeTick() {
     const arr = pGeo.attributes.position.array,
       n = hist.length;
     for (let i = 0; i < PN; i++) {
-      const h = n ? hist[Math.max(0, n - 1 - Math.floor(i / 4))] : FF.pos;
+      const h = n ? hist[Math.max(0, n - 1 - Math.floor(i / 4))] : freeFlight.pos;
       arr[i * 3] = h.x + (((i * 37) % 10) - 5) * 0.14;
       arr[i * 3 + 1] = h.y + (((i * 23) % 8) - 4) * 0.12;
       arr[i * 3 + 2] = h.z + (((i * 53) % 10) - 5) * 0.14;
@@ -758,12 +758,12 @@ function freeTick() {
     ffStatT = now;
     ffStats.textContent =
       '高度 ' +
-      Math.round(FF.pos.y) +
+      Math.round(freeFlight.pos.y) +
       ' m · 速度 ' +
       Math.round(spd) +
       ' m/s' +
-      (FF.autoNav ? ' · 自动导航中' : '');
-    ffEnergyBar.style.width = Math.round(FF.energy) + '%';
+      (freeFlight.autoNav ? ' · 自动导航中' : '');
+    ffEnergyBar.style.width = Math.round(freeFlight.energy) + '%';
   }
 }
 
@@ -793,10 +793,10 @@ skipBtn.onclick = () => {
 };
 function onKey(e) {
   if (e.key && e.key.toLowerCase() === 'e') {
-    if (FF.on) {
+    if (freeFlight.on) {
       // 自由飞:低空低速原地降落
-      const gh = ctx.media.desert ? ctx.media.desert.getH(FF.pos.x, FF.pos.z) : 0;
-      if (FF.pos.y < gh + 12 && FF.vel.length() < 30) endFree('land');
+      const gh = ctx.media.desert ? ctx.media.desert.getH(freeFlight.pos.x, freeFlight.pos.z) : 0;
+      if (freeFlight.pos.y < gh + 12 && freeFlight.vel.length() < 30) endFree('land');
       else ctx.ui.modeToast && ctx.ui.modeToast('太高或太快——先减速低飞，再按 E 降落。');
       return;
     }
@@ -804,7 +804,7 @@ function onKey(e) {
   }
   if (e.key === 'Escape') {
     if (flying) dock();
-    else if (FF.on) endFree('ground');
+    else if (freeFlight.on) endFree('ground');
   }
 }
 document.addEventListener('keydown', onKey);
@@ -849,8 +849,8 @@ function enterSeg(k) {
   pMat.needsUpdate = true;
 }
 function dock() {
-  if (!(flying || FF.on)) return;
-  if (FF.on) endFree('dock'); // 自由飞飞近泊位:静默清理,下面统一落位
+  if (!(flying || freeFlight.on)) return;
+  if (freeFlight.on) endFree('dock'); // 自由飞飞近泊位:静默清理,下面统一落位
   flying = false;
   skipBtn.style.display = 'none';
   tintOv.style.opacity = '0';
@@ -932,7 +932,7 @@ onTick(function () {
   barTick(); // B3 结界状态机(立起/消融/软推)
   const n = ctx.kunlun.spiritsGot ? ctx.kunlun.spiritsGot() : 0;
   if (n !== appliedN) applyForm(n);
-  ark.visible = FF.on ? true : !flying && n >= 1;
+  ark.visible = freeFlight.on ? true : !flying && n >= 1;
   const t = performance.now() * 0.001;
   // 荧光路线动画(脉动+淡出)
   if (routeGroup.visible) {
@@ -948,7 +948,7 @@ onTick(function () {
       applyRouteOpacity();
     }
     // 飞行中荧光路线微微脉动
-    if (flying || FF.on) {
+    if (flying || freeFlight.on) {
       const pulse = 1 + Math.sin(routePulseT * 3) * 0.08;
       routeSegments.forEach((seg) => {
         seg.tubeMat.opacity = 0.6 * routeOpacity * pulse;
@@ -956,7 +956,7 @@ onTick(function () {
     }
   }
   if (ark.visible) {
-    if (!FF.on) {
+    if (!freeFlight.on) {
       ark.position.y = PARK.y + Math.sin(t * 1.2) * 0.12; // 待机悬浮呼吸
       ark.rotation.y = Math.sin(t * 0.4) * 0.06;
     }
@@ -971,7 +971,7 @@ onTick(function () {
   }
   // 登舟提示(4m,250ms 节流)
   btnT++;
-  if (btnT % 15 === 0 && ctx.player.pl && !flying && !FF.on) {
+  if (btnT % 15 === 0 && ctx.player.pl && !flying && !freeFlight.on) {
     const dx = ctx.player.pl.p.x - PARK.x,
       dz = ctx.player.pl.p.z - PARK.z,
       near = dx * dx + dz * dz < 16;
@@ -1023,7 +1023,7 @@ onTick(function () {
     pGeo.attributes.position.needsUpdate = true;
     if (tt >= 1) dock();
   }
-  if (FF.on) freeTick(); // 自由飞:物理+相机+尾迹+HUD
+  if (freeFlight.on) freeTick(); // 自由飞:物理+相机+尾迹+HUD
 });
 
 bag.custom.push(() => {
@@ -1031,9 +1031,9 @@ bag.custom.push(() => {
     gs.set('flightLock', false); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步)
     flying = false;
   }
-  if (FF.on) {
+  if (freeFlight.on) {
     gs.set('flightLock', false); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步)
-    FF.on = false;
+    freeFlight.on = false;
   }
   boardBtn.remove();
   skipBtn.remove();

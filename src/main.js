@@ -77,7 +77,7 @@ const {
   groundUniforms,
   tickPhysics,
 } = ctx;
-const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别名=活委托,player.js Object.assign 后此处读到真值)
+const { jD, ks, pl, mv, drawMap } = ctx.player; // 玩家簇经命名空间取(别名=活委托,player.js Object.assign 后此处读到真值)
 // 注意:updateFireworks/pG/pC 不在此解构——effects.js 支持热更新,重载后 ctx 上的引用会换新,
 // 主循环必须在调用时从 ctx 读取(见下方粒子循环与烟花调用)
 
@@ -87,7 +87,7 @@ const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别�
 //
 // 2026-08-30 修复(实测场景 87 盏 → 卡顿 FPS 0.8):
 //   1) 原第 98 行 `if (isMobile || o.userData.deco) rm.push(o)` 在电脑端恒为 false
-//      —— `userData.deco` 全项目只在 gallery/links.js 赋值过,而 links 模块未启用,
+//      —— `userData.deco` 全项目只在 gallery/links.js 赋值过(links 经 main.js:14 导入、modules.js 注册在跑),
 //      实测 deco 灯数为 0。结果:电脑端**一盏灯都不移除**,限额形同虚设。
 //   2) 原逻辑只处理 `o.isPointLight`,完全漏掉 40 盏 SpotLight
 //      (每幅画一个射灯,paintings.js `wi < 40`),而 SpotLight 比 PointLight 更贵
@@ -355,7 +355,6 @@ function applyGenderColor(gender) {
         }
       });
       if (ctx.store.setHouseColor) ctx.store.setHouseColor('wall', blueHex);
-      console.log('[gender] 男生配色已应用:墙壁变蓝', mats.length, '块材质');
     } catch (e) {
       console.warn('[gender] 配色应用失败,重试:', e.message);
       setTimeout(tryApply, 2000);

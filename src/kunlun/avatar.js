@@ -22,20 +22,14 @@ const TARGET_HEIGHT = 1.7;
 const IDLE_TIME_SCALE = 0.15; // 静止时慢速播放(呼吸感),避免定格绑定姿势
 
 // ===================== 状态条 + 看自己按钮 =====================
-let statusEl = null;
+// 状态条实现统一在 ui/kit.js statusBar()(B3 整改);调用点语义不变。
+import { statusBar } from '../ui/kit.js';
+const _sb = statusBar();
 function setStatus(msg, color) {
-  if (!statusEl) {
-    statusEl = document.createElement('div');
-    statusEl.style.cssText =
-      'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;padding:8px 16px;border-radius:20px;background:rgba(20,10,30,.85);color:#fff;font:13px/1.4 system-ui;border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:none;transition:opacity .4s;white-space:nowrap';
-    document.body.appendChild(statusEl);
-  }
-  statusEl.textContent = msg;
-  statusEl.style.borderColor = color || 'rgba(255,255,255,.2)';
-  statusEl.style.opacity = '1';
+  _sb.show(msg, color);
 }
 function clearStatus() {
-  if (statusEl) statusEl.style.opacity = '0';
+  _sb.hide();
 }
 
 // ===================== 视角模式监听(唯一入口) =====================

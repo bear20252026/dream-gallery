@@ -5,3 +5,6 @@
 
 /** 玩家眼睛离地高度(米)。角色模型原点在脚底,故模型 y = pl.p.y - EYE_HEIGHT */
 export const EYE_HEIGHT = 1.6;
+
+/** 第三人称轨道相机默认姿态(拖拽/捏合/兜底共用,避免三处字面量漂移) */
+export const ORBIT_DEFAULTS = { pitch: 0.25, dist: 2.8 };

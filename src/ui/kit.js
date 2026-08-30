@@ -26,3 +26,32 @@ export function bigText(text, opts) {
     }, 600);
   }, hold);
 }
+
+// 顶部状态条(单例):avatar.js 等模块的"加载中/就绪"提示统一入口。
+// show 替换文本并重置自动隐藏定时器;hide 立即淡出。
+let _sb = null;
+export function statusBar() {
+  if (_sb) return _sb;
+  let el = null, timer = 0;
+  const ensure = () => {
+    if (el) return;
+    el = document.createElement('div');
+    el.style.cssText =
+      'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;padding:8px 16px;border-radius:20px;background:rgba(20,10,30,.85);color:#fff;font:13px/1.4 system-ui;border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:none;transition:opacity .4s;white-space:nowrap';
+    document.body.appendChild(el);
+  };
+  _sb = {
+    show(msg, color, autoHideMs) {
+      ensure();
+      el.textContent = msg;
+      el.style.borderColor = color || 'rgba(255,255,255,.2)';
+      el.style.opacity = '1';
+      if (timer) clearTimeout(timer);
+      if (autoHideMs) timer = setTimeout(() => { el.style.opacity = '0'; }, autoHideMs);
+    },
+    hide() {
+      if (el) el.style.opacity = '0';
+    },
+  };
+  return _sb;
+}

@@ -13,7 +13,7 @@ import { getGameState } from './core/game-state.js';
  * @returns {Object} 玩家命名空间代理对象
  */
 export function createPlayerNamespace(vault) {
-  const properties = ['pl', 'jD', 'ks', 'mv', 'drM', 'tickPhysics', 'viewMode', 'quizPassed', 'quizPassScore'];
+  const properties = ['pl', 'jD', 'ks', 'mv', 'drawMap', 'tickPhysics', 'viewMode', 'quizPassed', 'quizPassScore'];
   const proxy = {};
   const gs = getGameState();
 

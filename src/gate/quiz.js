@@ -1,6 +1,7 @@
 // quiz.js — 温柔度测试（DOM弹窗逻辑 + 3D墙面测试面板）
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
+import { expose } from '../debug-hooks.js';
 const {s,iG}=ctx;
 
 // ===== 温柔度测试逻辑 =====
@@ -13,19 +14,19 @@ const gentleQ=[
 ];
 let gCur=0,gScore=0,gAns=[];
 
-window.startGentleTest=function(){
+expose('startGentleTest',function(){
   document.getElementById('gtStart').style.display='none';
   document.getElementById('gtQuiz').style.display='block';
   document.getElementById('gtResult').style.display='none';
   gCur=0;gScore=0;gAns=[];
   renderGQ();
-};
-window.nextGentleQ=function(){
+});
+expose('nextGentleQ',function(){
   if(gAns[gCur]===undefined)return;
   gCur++;
   if(gCur>=gentleQ.length){showGentleResult();}
   else{renderGQ();}
-};
+});
 function renderGQ(){
   const qd=document.getElementById('gtQD');
   const q=gentleQ[gCur];
@@ -39,7 +40,7 @@ function renderGQ(){
   document.getElementById('gtProgF').style.width=((gCur/gentleQ.length)*100)+'%';
   document.getElementById('gtNext').style.display=gAns[gCur]!==undefined?'block':'none';
 }
-window.selectGentleO=function(idx,score){
+expose('selectGentleO',function(idx,score){
   gAns[gCur]=idx;gScore+=score;
   renderGQ();
 };
@@ -58,15 +59,15 @@ function showGentleResult(){
   // 动画计数
   let n=0;const t=setInterval(()=>{n+=2;if(n>=pct){n=pct;clearInterval(t);}document.getElementById('gtScore').textContent=n;},30);
 }
-window.restartGentleTest=function(){
+expose('restartGentleTest',function(){
   document.getElementById('gtResult').style.display='none';
   document.getElementById('gtStart').style.display='block';
-};
-window.closeGentleTest=function(){
+});
+expose('closeGentleTest',function(){
   const gtP=document.getElementById('gtP');
   gtP.classList.remove('show');
-  setTimeout(()=>{gtP.style.display='none';window.restartGentleTest();},500);
-};
+  setTimeout(()=>{gtP.style.display='none';expose('restartGentleTest')();},500);
+});
 
 // ===== 3D墙面温柔度测试面板（E厅西墙 x=-8, z=-7.5，面朝东）=====
 (function(){
