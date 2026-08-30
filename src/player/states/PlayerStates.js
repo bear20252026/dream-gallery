@@ -21,8 +21,11 @@ export class IdleState extends PlayerState {
     const ks = ctx.player.ks;
 
     // 检测输入 → 行走
-    const mx = jD.x + (ks.w || ks.arrowup ? 0 : 0) - (ks.s || ks.arrowdown ? 0 : 0);
-    const mz = -jD.z + (ks.a || ks.arrowleft ? 1 : 0) - (ks.d || ks.arrowright ? 1 : 0);
+    // 2026-08-30 修复:原 W/S 权重写成 (ks.w ? 0 : 0) 恒为 0 —— 按前/后走时
+    // 状态机判定"无输入"停留 idle,走路动画不播(loop-manager 却照常位移)。
+    // 轴定义与 loop-manager 对齐:mx=横移(A/D),mz=前后(W/S,摇杆 z 向前为正)。
+    const mx = jD.x + (ks.d || ks.arrowright ? 1 : 0) - (ks.a || ks.arrowleft ? 1 : 0);
+    const mz = -jD.z + (ks.w || ks.arrowup ? 1 : 0) - (ks.s || ks.arrowdown ? 1 : 0);
     if (Math.abs(mx) > 0.05 || Math.abs(mz) > 0.05) {
       return new WalkingState();
     }
@@ -60,9 +63,9 @@ export class WalkingState extends PlayerState {
       return new AirborneState();
     }
 
-    // 检测输入持续 → 继续行走
-    const mx = jD.x + (ks.w || ks.arrowup ? 0 : 0) - (ks.s || ks.arrowdown ? 0 : 0);
-    const mz = -jD.z + (ks.a || ks.arrowleft ? 1 : 0) - (ks.d || ks.arrowright ? 1 : 0);
+    // 检测输入持续 → 继续行走(轴定义与 loop-manager 对齐,同 IdleState 修复)
+    const mx = jD.x + (ks.d || ks.arrowright ? 1 : 0) - (ks.a || ks.arrowleft ? 1 : 0);
+    const mz = -jD.z + (ks.w || ks.arrowup ? 1 : 0) - (ks.s || ks.arrowdown ? 1 : 0);
     if (Math.abs(mx) < 0.05 && Math.abs(mz) < 0.05) {
       return new IdleState();
     }

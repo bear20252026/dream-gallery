@@ -11,6 +11,15 @@ import { eventBus } from './event-bus.js';
  * 所以渲染角色时要减掉这个值才能得到贴地的脚底位置。
  */
 const EYE_HEIGHT = 1.6;
+// 角色模型朝向(弧度,heading 语义:-sin/-cos 方向)。第三人称下平滑转向移动方向。
+// 用角度插值避免 ±π 边界跳变(如从 179° 转到 -179° 走最短弧而不是绕远路)。
+let _modelYaw = 0;
+function lerpAngle(a, b, t) {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
 
 /**
  * 循环管理器
@@ -26,9 +35,10 @@ export class LoopManager {
     this._lastPlsT = 0;
     
     // 自适应画质
-    // 低档位 0.75/0.5:第三人称角色(12 万三角面蒙皮+全场景光照)会把弱 GPU 拖到个位数帧率,
-    // 原 1.0 兜底不够 —— 降分辨率是弱机上最有效的救命档(画面糊但能玩)
-    this.PR_STEPS = [Math.min(devicePixelRatio, 2), 1.5, 1.25, 1, 0.75, 0.5];
+    // 低档位 0.75(2026-08-30 按用户要求撤掉 0.5 档):第三人称角色(12 万三角面蒙皮
+    // +全场景光照)会把弱 GPU 拖到个位数帧率,需要降档兜底;但 0.5 倍渲染分辨率
+    // 画面明显发糊,用户不可接受 —— 0.75 是"略软但可玩"的下限。
+    this.PR_STEPS = [Math.min(devicePixelRatio, 2), 1.5, 1.25, 1, 0.75];
     this.prIdx = 0;
     this.prLastChange = 0;
     this.fpsAcc = 0;
@@ -114,11 +124,13 @@ export class LoopManager {
     this.fpsCnt = 0;
     
     if (now - this.prLastChange < 3000) return;
-    if (avg < 35 && this.prIdx < this.PR_STEPS.length - 1) {
+    // 阈值(2026-08-30 收紧):<25 才降档(此前 35 太激进,流畅时也降糊);
+    // >45 即回升(此前 52 太苛刻,升不回去,长期停留在糊档)。
+    if (avg < 25 && this.prIdx < this.PR_STEPS.length - 1) {
       this.prIdx++;
       this.ctx.scene.rnd.setPixelRatio(this.PR_STEPS[this.prIdx]);
       this.prLastChange = now;
-    } else if (avg > 52 && this.prIdx > 0) {
+    } else if (avg > 45 && this.prIdx > 0) {
       this.prIdx--;
       this.ctx.scene.rnd.setPixelRatio(this.PR_STEPS[this.prIdx]);
       this.prLastChange = now;
@@ -214,9 +226,20 @@ export class LoopManager {
     if (mg > 0.1) {
       mx /= mg;
       mz /= mg;
-      const fx = -Math.sin(pl.y), fz = -Math.cos(pl.y),
-            rx = Math.cos(pl.y), rz = -Math.sin(pl.y);
-      mv(fx * mz + rx * mx, fz * mz + rz * mx, dt);
+      // 移动基准朝向:第一人称=玩家朝向 pl.y;第三人称=轨道相机朝向(所见即所往)
+      const yawSrc = ctx.player.viewMode === 1 && ctx._orbit ? ctx._orbit.yaw : pl.y;
+      const fx = -Math.sin(yawSrc), fz = -Math.cos(yawSrc),
+            rx = Math.cos(yawSrc), rz = -Math.sin(yawSrc);
+      const wx = fx * mz + rx * mx, wz = fz * mz + rz * mx;
+      mv(wx, wz, dt);
+      // 角色平滑转向实际移动方向(最短弧,≈0.7s 转 90°),消除"横移滑步"观感;
+      // 静止时不转向(保持原地朝向,环绕相机可自由看正脸/背影)
+      const target = Math.atan2(-wx, -wz);
+      _modelYaw = lerpAngle(_modelYaw, target, Math.min(dt * 9, 1));
+      // pl.y 跟随角色朝向:切回第一人称视角无缝、滑翔方向计算保持一致
+      if (ctx.player.viewMode === 1) pl.y = _modelYaw;
+    } else if (ctx.player.viewMode !== 1) {
+      _modelYaw = pl.y; // 第一人称:角色朝向即玩家朝向
     }
     
     // 跳跃/滑翔/重力物理(player.js tickPhysics)
@@ -293,32 +316,45 @@ export class LoopManager {
     const { cam, avatar, desert } = ctx.scene;
 
     if (ctx.player.viewMode === 1) {
-      // 第三人称
-      const fx = -Math.sin(pl.y), fz = -Math.cos(pl.y);
-      const back = 1.3;
-      const up = 1.0;
-      const bx = pl.p.x - fx * back;
-      const bz = pl.p.z - fz * back;
+      // 第三人称:轨道相机(2026-08-30 重写)
+      // 旧版相机钉死在角色背后 pl.y 反方向、高度固定 —— 看不到正脸、俯仰被钳死。
+      // 现在由 player.js 的 orbit {yaw, pitch, dist} 驱动:拖拽环绕、滚轮/双指缩放。
       if (avatar) avatar.visible = true;
-      let cy = pl.p.y + up;
+      const ob = ctx._orbit || { yaw: pl.y, pitch: 0.25, dist: 2.8 };
+      const cp = Math.cos(ob.pitch), sp = Math.sin(ob.pitch);
+      const footY = pl.p.y - EYE_HEIGHT; // 角色脚底世界高度
+      // 相机防穿墙(借鉴 camera-controls 遮挡收缩):理想机位若落进建筑碰撞盒,
+      // 沿视线逐步收近距离直到脱离 —— 花钱少的做法(复用 player.js 的 bounds 盒,
+      // 不做逐 mesh 射线;盒数量有限,每帧几次判断可忽略)
+      let dist = ob.dist;
+      const bounds = ctx.scene.bounds || [];
+      const inWall = (x, z) => {
+        for (let i = 0; i < bounds.length; i++) {
+          const b = bounds[i];
+          if (x > b.mnX && x < b.mxX && z > b.mnZ && z < b.mxZ) return true;
+        }
+        return false;
+      };
+      while (dist > 0.8 && inWall(pl.p.x + Math.sin(ob.yaw) * cp * dist, pl.p.z + Math.cos(ob.yaw) * cp * dist)) {
+        dist -= 0.25;
+      }
+      const bx = pl.p.x + Math.sin(ob.yaw) * cp * dist;
+      const bz = pl.p.z + Math.cos(ob.yaw) * cp * dist;
+      let cy = footY + 0.9 + sp * dist; // pitch>0:相机升高俯视;pitch<0:压低仰视
       if (desert) {
         const gy = desert.getH(bx, bz);
-        if (cy < gy + 0.35) cy = gy + 0.35;
+        if (cy < gy + 0.3) cy = gy + 0.3; // 相机防穿地形
       }
       cam.position.set(bx, cy, bz);
-      // 视线目标:角色身体中心(脚底在 pl.p.y - EYE_HEIGHT,胸口≈脚底+0.85m)。
-      // 原先 lookAt(pl.p.y + 1.0) 沿用第一人称"眼睛"逻辑,而角色模型站在脚底 ——
-      // 视线比角色高约 2.6m,角色被甩出画面底部(实测屏幕投影 y=2116,画布仅 800 高)。
-      cam.lookAt(pl.p.x, pl.p.y - EYE_HEIGHT + 0.85, pl.p.z);
-      cam.fov = 50;
-      cam.updateProjectionMatrix();
+      // 视线目标:角色胸口(脚底 + 0.85m)—— 旧版沿用第一人称"眼睛"逻辑时
+      // 视线比角色高 2.6m,角色被甩出画面底部(实测屏幕投影 y=2116,画布仅 800 高)。
+      cam.lookAt(pl.p.x, footY + 0.85, pl.p.z);
       if (avatar) {
         avatar.position.copy(pl.p);
-        // 脚底贴地:pl.p.y 是眼睛高度(由 player.js tickPhysics 算出 = groundY + 1.6),
-        // 减掉眼高即得脚底。原先这里硬编码 0.1,把物理算出的地形高度整个丢掉 ——
-        // 导致角色永远浮在 y=0.1:上坡陷进地里、下坡悬空、跳跃和滑翔都看不出来。
-        avatar.position.y = pl.p.y - EYE_HEIGHT;
-        avatar.rotation.y = pl.y + Math.PI;
+        // 脚底贴地:pl.p.y 是眼睛高度(由 player.js tickPhysics 算出 = groundY + 1.6)
+        avatar.position.y = footY;
+        // 角色朝向 = 模型朝向(移动时平滑转向移动方向,静止保持,环绕看正脸)
+        avatar.rotation.y = _modelYaw + Math.PI;
       }
     } else {
       // 第一人称

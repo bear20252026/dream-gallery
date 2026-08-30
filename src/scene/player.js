@@ -255,6 +255,11 @@ document.addEventListener('keydown', (e) => {
 // V 键切换第一/第三人称
 function toggleView() {
   gs.set('viewMode', ctx.player.viewMode === 1 ? 0 : 1); // 阶段4:经 gameState.set 写回(读者 ctx.player.viewMode 经 vault 同步)
+  // 进第三人称:轨道从当前朝向起步(相机从正后方开始环绕,不跳变)
+  if (ctx.player.viewMode === 1) {
+    orbit.yaw = pl.y;
+    orbit.pitch = 0.25;
+  }
   if (ctx.scene.avatar) ctx.scene.avatar.visible = ctx.player.viewMode === 1;
   window.quizToast &&
     window.quizToast(
@@ -281,6 +286,15 @@ document.addEventListener('keyup', (e) => {
   ks[e.key.toLowerCase()] = false;
 });
 
+// ===================== 第三人称轨道相机状态 =====================
+// 2026-08-30:此前第三人称没有独立轨道 —— 拖拽改 pl.y(角色朝向),相机永远钉在背后,
+// 角色又永远背对相机 → 永远看不到正脸,俯仰也被 ±0.5rad 钳死。
+// 现在拖拽=环绕相机(yaw 360° 自由 + pitch 大范围),滚轮/双指=拉远拉近;
+// 角色自身朝向由 loop-manager 平滑转向实际移动方向,静止时拖拽只环绕不转身。
+const orbit = { yaw: 0, pitch: 0.25, dist: 2.8 };
+ctx._orbit = orbit; // loop-manager 第三人称相机分支读取;toggleView 时初始化 yaw
+const PITCH_MIN = -1.0, PITCH_MAX = 1.25, DIST_MIN = 1.2, DIST_MAX = 7;
+
 // ===================== 鼠标（电脑：左键拖拽旋转 + 短按点击放大）=====================
 const cEl = rnd.domElement;
 let mDg = false,
@@ -292,13 +306,18 @@ let mDg = false,
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && ctx.gallery.zG) zoomOut();
 });
-// 鼠标拖拽旋转视角
+// 鼠标拖拽旋转视角:第一人称转玩家朝向,第三人称环绕角色(不转角色)
 document.addEventListener('mousemove', (e) => {
   if (mDg && mLX !== null) {
     const s = 0.06;
-    pl.y -= (e.clientX - mLX) * s;
-    pl.pi -= (e.clientY - mLY) * s * 0.6;
-    pl.pi = Math.max(-0.5, Math.min(0.5, pl.pi));
+    if (ctx.player.viewMode === 1) {
+      orbit.yaw -= (e.clientX - mLX) * s;
+      orbit.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, orbit.pitch - (e.clientY - mLY) * s * 0.6));
+    } else {
+      pl.y -= (e.clientX - mLX) * s;
+      pl.pi -= (e.clientY - mLY) * s * 0.6;
+      pl.pi = Math.max(-0.5, Math.min(0.5, pl.pi));
+    }
     mLX = e.clientX;
     mLY = e.clientY;
   }
@@ -331,12 +350,17 @@ document.addEventListener('mouseup', (e) => {
   }
 });
 // 鼠标滚轮缩放
+// 鼠标滚轮:第一人称缩放俯仰;第三人称拉近拉远相机
 cEl.addEventListener(
   'wheel',
   (e) => {
     e.preventDefault();
-    pl.pi += e.deltaY * 0.0005;
-    pl.pi = Math.max(-0.8, Math.min(0.8, pl.pi));
+    if (ctx.player.viewMode === 1) {
+      orbit.dist = Math.max(DIST_MIN, Math.min(DIST_MAX, orbit.dist + e.deltaY * 0.0025));
+    } else {
+      pl.pi += e.deltaY * 0.0005;
+      pl.pi = Math.max(-0.8, Math.min(0.8, pl.pi));
+    }
   },
   { passive: false }
 );
@@ -352,7 +376,12 @@ let jId = null,
   ly = 0,
   tSX = 0,
   tSY = 0,
-  tST = 0;
+  tST = 0,
+  pinchId = null, // 双指捏合缩放(第二根触摸的 identifier)
+  pinch0 = 1, // 捏合起始两指间距
+  d0 = 2.8, // 捏合起始相机距离
+  pinchLX = 0,
+  pinchLY = 0;
 // 混合设备(触屏笔记本)支持:真实 touch 刚结束后的合成 mouse 事件不当作鼠标输入,
 // 否则触屏操作后的 click 合成会误触发"短按=3D放大"与视角拖拽。
 let lastTouchT = 0;
@@ -416,6 +445,13 @@ document.addEventListener(
         tSX = t.clientX;
         tSY = t.clientY;
         tST = Date.now();
+      } else if (lId !== null && pinchId === null) {
+        // 第二根触摸:进入双指捏合缩放(第三人称调整相机距离)
+        pinch0 = Math.hypot(t.clientX - lx, t.clientY - ly) || 1;
+        d0 = orbit.dist;
+        pinchId = t.identifier;
+        pinchLX = t.clientX;
+        pinchLY = t.clientY;
       }
     }
   },
@@ -444,11 +480,33 @@ document.addEventListener(
       }
       if (t.identifier === lId) {
         const s = 0.06; // 固定灵敏度 (10*0.006)
-        pl.y -= (t.clientX - lx) * s;
-        pl.pi -= (t.clientY - ly) * s * 0.6;
-        pl.pi = Math.max(-0.5, Math.min(0.5, pl.pi));
+        if (pinchId !== null) {
+          // 双指捏合中:单指拖拽暂停,只更新基准位置供捏合测距
+          lx = t.clientX;
+          ly = t.clientY;
+          continue;
+        }
+        // 增量必须先算再更新基准(否则 dx/dy 恒 0)
+        const dxT = t.clientX - lx,
+          dyT = t.clientY - ly;
+        if (ctx.player.viewMode === 1) {
+          orbit.yaw -= dxT * s;
+          orbit.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, orbit.pitch - dyT * s * 0.6));
+        } else {
+          pl.y -= dxT * s;
+          pl.pi -= dyT * s * 0.6;
+          pl.pi = Math.max(-0.5, Math.min(0.5, pl.pi));
+        }
         lx = t.clientX;
         ly = t.clientY;
+      }
+      if (t.identifier === pinchId) {
+        pinchLX = t.clientX;
+        pinchLY = t.clientY;
+        const cur = Math.hypot(pinchLX - lx, pinchLY - ly) || 1;
+        if (ctx.player.viewMode === 1) {
+          orbit.dist = Math.max(DIST_MIN, Math.min(DIST_MAX, (d0 * pinch0) / cur));
+        }
       }
     }
   },
@@ -464,6 +522,9 @@ document.addEventListener('touchend', (e) => {
       jT.classList.remove('a');
       jT.style.transform = 'translate(-50%,-50%)';
     }
+    if (t.identifier === pinchId) {
+      pinchId = null; // 任一指抬起,捏合结束
+    }
     if (t.identifier === lId) {
       lId = null;
       const dx = t.clientX - tSX,
@@ -475,6 +536,7 @@ document.addEventListener('touchend', (e) => {
 document.addEventListener('touchcancel', () => {
   jId = null;
   lId = null;
+  pinchId = null;
   jD.x = 0;
   jD.z = 0;
   jT.classList.remove('a');
