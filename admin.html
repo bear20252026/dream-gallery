@@ -607,19 +607,18 @@
         <div class="tab chat-tab" data-tab="chat" onclick="switchTab('chat')"> 在线对话</div>
       </div>
 
-      <!-- ========== 审批 ========== -->
+      <!-- ========== 访客管理(2026-08-30 权限精简:唯一管理动作=踢出) ========== -->
       <div id="tab-approve">
         <div class="stats" id="statsCards"></div>
         <div id="alertBox"></div>
-        <div class="section-title">
-           待批准
-          <button class="btn-revoke" style="margin-left: auto" onclick="revokeAll()">
-            一键撤销全部批准
-          </button>
-        </div>
-        <div id="pending"></div>
-        <div class="section-title"> 已批准</div>
+        <div class="section-title"> 重进申请（被踢出设备请求再次进入）</div>
+        <div id="reapply"></div>
+        <div class="section-title"> 已放行</div>
         <div id="approved"></div>
+        <div class="section-title"> 已踢出</div>
+        <div id="kicked"></div>
+        <div class="section-title"> 踢出历史</div>
+        <div id="kickLog"></div>
       </div>
 
       <!-- ========== 统计 ========== -->
@@ -1216,67 +1215,45 @@
         renderStats();
         renderHistory();
       }
-      function levelText(a, now) {
-        if (a.level === 'perm') return '永久';
-        if (a.level === 'day') {
-          const left = a.approveTime + 86400000 - now;
-          return left > 0 ? '24小时(剩' + Math.ceil(left / 3600000) + '时)' : '24小时(已过期)';
-        }
-        if (a.level === 'once') return '仅一次' + (a.firstAccess ? '(已用)' : '(未用)');
-        return a.level || '-';
-      }
       function cardHtml(a, now) {
         let btns = '';
-        if (a.status === 'pending') {
-          btns = `<button class="btn-perm" onclick="decide('${a.id}','perm')">永久</button>
-<button class="btn-day" onclick="decide('${a.id}','day')">24小时</button>
-<button class="btn-once" onclick="decide('${a.id}','once')">仅一次</button>
-<button class="btn-deny" onclick="decide('${a.id}','deny')">拒绝</button>`;
-        } else if (a.status === 'approved') {
-          btns = `<button class="btn-revoke" onclick="decide('${a.id}','revoke')">撤销批准</button>`;
+        if (a.status === 'reapply') {
+          btns = `<button class="btn-perm" onclick="decide('${a.id}','approve')">批准进入</button>`;
+        } else if (a.status === 'kicked' || a.status === 'denied' || a.status === 'history') {
+          btns = `<button class="btn-perm" onclick="decide('${a.id}','approve')">恢复放行</button>`;
         } else {
-          btns = `<button class="btn-perm" onclick="decide('${a.id}','perm')">重新批准</button>
-<button class="btn-day" onclick="decide('${a.id}','day')">批准24小时</button>`;
+          btns = `<button class="btn-deny" onclick="kickAsk('${a.id}','${j(a.answer || '')}')">踢出画廊</button>`;
         }
         const ip = a.ip || '';
-        const isWatch = (DATA.watch || []).includes(ip),
-          isBlocked = (DATA.blocked || []).includes(ip);
+        const isBlocked = (DATA.blocked || []).includes(ip);
+        const statusBadge =
+          a.status === 'approved'
+            ? '<span class="badge approved">已放行</span>'
+            : a.status === 'reapply'
+              ? '<span class="badge pending">重进申请待批</span>'
+              : a.status === 'kicked'
+                ? '<span class="badge denied">已踢出</span>'
+                : a.status === 'denied'
+                  ? '<span class="badge denied">已拒绝(旧)</span>'
+                  : '<span class="badge history">历史档案</span>';
         const badge =
-          (a.status === 'pending'
-            ? '<span class="badge pending">待批准</span>'
-            : a.status === 'approved'
-              ? '<span class="badge approved">' + esc(levelText(a, now)) + '</span>'
-              : a.status === 'denied'
-                ? '<span class="badge denied">已拒绝</span>'
-                : '<span class="badge history">历史' +
-                  (a.historyReason === 'revoked' ? '·撤销' : '') +
-                  '</span>') +
-          (isWatch ? '<span class="badge watch">⚠ 重点关注</span>' : '') +
-          (isBlocked ? '<span class="badge blocked">已拉黑</span>' : '') +
-          (a.vip ? '<span class="badge approved" style="background:#9b59b6">VIP免答</span>' : '') +
-          (a.special
-            ? '<span class="badge approved" style="background:#c98a4b">特殊访问</span>'
-            : '') +
+          statusBadge +
+          (isBlocked ? '<span class="badge blocked">IP已拉黑</span>' : '') +
+          (a.kickReason ? `<span class="badge denied" title="踢出理由">理由:${esc(a.kickReason)}</span>` : '') +
+          (a.matchHint ? `<span class="badge denied" style="background:#7a1f2b">🔁 疑似同一设备:${esc(a.matchHint)}</span>` : '') +
+          (a.reapplyMsg ? `<span class="badge pending" title="申请留言">留言:${esc(a.reapplyMsg)}</span>` : '') +
           (a.suspicious
             ? '<span class="badge denied" title="' +
               esc(a.suspiciousReason || '') +
               '">⚠ 可疑</span>'
-            : '') +
-          (a.quizPassed ? '<span class="badge approved">答题已过</span>' : '');
-        const devBits = [];
-        if (a.dev && a.dev.battery) devBits.push('🔋 ' + esc(a.dev.battery));
-        if (a.dev && a.dev.network) devBits.push('📶 ' + esc(a.dev.network));
+            : '');
         const noteBit = a.note ? `<span class="note-tag"> ${esc(a.note)}</span>` : '';
+        const ipHist = (a.ips || []).length > 1 ? ' · 历史IP ' + a.ips.length + ' 个' : '';
         return `<div class="card">
 <div class="answer">${brandIcon(a.brand)} 「${esc(a.answer)}」${badge}</div>
-<div class="meta">${noteBit}<span class="brand-tag">${brandShow(a.brand)}</span><span class="geo-tag">📍 ${esc(a.geo || '定位中…')}</span>IP ${esc(ip.replace('::ffff:', ''))} · 访问 ${a.visits || 0} 次${devBits.length ? ' · ' + devBits.join(' · ') : ''}<br>申请 ${fmt(a.applyTime)}${a.approveTime ? ' · 批准 ' + fmt(a.approveTime) : ''}${a.lastAccess ? ' · 最近访问 ' + fmt(a.lastAccess) : ''}</div>
+<div class="meta">${noteBit}<span class="brand-tag">${brandShow(a.brand)}</span><span class="geo-tag">📍 ${esc(a.geo || '定位中…')}</span>IP ${esc(ip.replace('::ffff:', ''))}${ipHist} · 访问 ${a.visits || 0} 次<br>首次 ${fmt(a.applyTime)}${a.kickedTime ? ' · 踢出 ' + fmt(a.kickedTime) : ''}${a.reapplyTime ? ' · 申请 ' + fmt(a.reapplyTime) : ''}${a.lastAccess ? ' · 最近访问 ' + fmt(a.lastAccess) : ''}</div>
 <div class="actions">${btns}
-<button class="btn-note" onclick="editNote('${a.id}','${j(a.note || '')}')">备注</button>
-${a.vip ? `<button class="btn-deny" onclick="decide('${a.id}','unvip')">撤销VIP</button>` : `<button class="btn-once" onclick="decide('${a.id}','vip')">授予VIP免答</button>`}
-${a.special ? `<button class="btn-deny" onclick="decide('${a.id}','unspecial')">取消特殊访问</button>` : `<button class="btn-day" onclick="decide('${a.id}','special')">授特殊访问</button>`}
-${a.quizPassed ? `<button class="btn-revoke" onclick="decide('${a.id}','unquiz')">撤销答题权限</button>` : ''}
-${isBlocked ? `<button class="btn-revoke" onclick="bulk('unblock','${ip}')">解除拉黑</button>` : `<button class="btn-deny" onclick="bulk('block','${ip}')">拉黑IP</button>`}
-${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消关注</button>` : `<button class="btn-day" onclick="bulk('watch','${ip}')">设为关注</button>`}</div></div>`;
+<button class="btn-note" onclick="editNote('${a.id}','${j(a.note || '')}')">备注</button></div></div>`;
       }
       async function editNote(id, old) {
         const n = prompt('给这台设备起个备注名（留空清除）:', old || '');
@@ -1302,48 +1279,58 @@ ${isWatch ? `<button class="btn-revoke" onclick="bulk('unwatch','${ip}')">取消
           load();
         } else toast('操作失败', 1);
       }
-      async function revokeAll() {
-        if (!(await confirmAsync('确定撤销所有人的批准？所有访客将立即被踢出！'))) return;
-        const r = await fetch('/api/admin/bulk' + tk(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'revoke_all' }),
-        });
-        if (r.ok) {
-          const d = await r.json();
-          toast('已撤销 ' + d.count + ' 台设备');
-          load();
-        } else toast('操作失败', 1);
+      // 踢出前填理由(可空)
+      async function kickAsk(id, name) {
+        const reason = prompt('踢出「' + name + '」的理由(选填,将记入踢出历史):', '');
+        if (reason === null) return;
+        decide(id, 'kick', reason);
       }
-      async function decide(id, action) {
+      async function decide(id, action, reason) {
         const r = await fetch('/api/admin/decide' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, action }),
+          body: JSON.stringify({ id, action, reason: reason || '' }),
         });
         if (r.ok) {
-          toast('操作成功');
+          toast(action === 'kick' ? '已踢出,该设备将立即弹回申请页' : '操作成功');
           load();
-        } else toast('操作失败', 1);
+        } else {
+          const d = await r.json().catch(() => ({}));
+          toast(d.error || '操作失败', 1);
+        }
       }
-      // ---------- 审批页 ----------
+      // ---------- 访客管理页 ----------
       function renderApprove() {
         const A = DATA.applicants,
-          now = DATA.now,
           s = DATA.stats;
         $('statsCards').innerHTML = statCards([
           [s.total, '总访问'],
           [s.byDay[todayStr()] || 0, '今日访问'],
-          [A.filter((a) => a.status === 'approved').length, '已批准设备'],
-          [A.filter((a) => a.status === 'pending').length, '待批准'],
+          [A.filter((a) => a.status === 'approved').length, '已放行设备'],
+          [A.filter((a) => a.status === 'reapply').length, '重进申请'],
         ]);
         renderAlerts();
-        const render = (st, empty) =>
-          A.filter((a) => a.status === st)
-            .map((a) => cardHtml(a, now))
-            .join('') || `<div class="empty">${empty}</div>`;
-        $('pending').innerHTML = render('pending', '暂无待批准申请');
-        $('approved').innerHTML = render('approved', '暂无已批准设备');
+        const render = (list, empty) =>
+          list.map((a) => cardHtml(a, DATA.now)).join('') || `<div class="empty">${empty}</div>`;
+        $('reapply').innerHTML = render(
+          A.filter((a) => a.status === 'reapply'),
+          '暂无重进申请'
+        );
+        $('approved').innerHTML = render(
+          A.filter((a) => a.status === 'approved'),
+          '暂无已放行设备'
+        );
+        $('kicked').innerHTML = render(
+          A.filter((a) => ['kicked', 'denied', 'history'].includes(a.status)),
+          '暂无已踢出设备'
+        );
+        const log = DATA.kickLog || [];
+        $('kickLog').innerHTML =
+          log
+            .map(
+              (k) => `<div class="file-row"><span class="fname">「${esc(k.name)}」 · IP ${esc((k.ip || '').replace('::ffff:', ''))}${k.reason ? ' · 理由:' + esc(k.reason) : ''}<br><span style="opacity:.7">${fmt(k.t)}</span></span></div>`
+            )
+            .join('') || '<div class="empty">还没有踢出记录</div>';
       }
       // ---------- 反刷存储预警 ----------
       const ALERT_TYPE = {

@@ -161,7 +161,7 @@ async function saveNick(name, onOk) {
     return;
   }
   try {
-    const r = await fetch('/api/gate/rename', {
+    const r = await fetch('/api/entry/rename', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name }),

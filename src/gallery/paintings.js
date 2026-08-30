@@ -217,7 +217,7 @@ iG.push(mpMesh); // 音乐面板加入交互
   let es = null;
   function startWatch() {
     try {
-      es = new EventSource('/api/gate/watch');
+      es = new EventSource('/api/entry/watch');
       es.onmessage = function (ev) {
         if (ev.data && ev.data.indexOf('recheck') >= 0) refreshWall();
       };

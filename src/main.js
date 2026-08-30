@@ -460,48 +460,7 @@ function startPrologueIfNeeded() {
   setTimeout(tick, 1200);
 })();
 
-// 静默补采设备指纹(无邀请函页时代:首次访问服务端已按 IP+UA 建档,这里补稳定指纹)
-// 之后换 App 跳转(如千问转接)也能认出同一个人
-setTimeout(function () {
-  try {
-    var fp = {
-      scr: screen.width + 'x' + screen.height + 'x' + (window.devicePixelRatio || 1),
-      avail: screen.availWidth + 'x' + screen.availHeight,
-      tz: new Date().getTimezoneOffset(),
-      lang: navigator.language || '',
-      langs: (navigator.languages || []).join(','),
-      platform: navigator.platform || '',
-      cores: navigator.hardwareConcurrency || 0,
-      mem: navigator.deviceMemory || 0,
-      touch: 'ontouchstart' in window,
-      maxTouch: navigator.maxTouchPoints || 0,
-    };
-    var cv = document.createElement('canvas');
-    cv.width = 200;
-    cv.height = 30;
-    var cx = cv.getContext('2d');
-    cx.textBaseline = 'top';
-    cx.font = '14px Arial';
-    cx.fillStyle = '#f60';
-    cx.fillRect(0, 0, 100, 30);
-    cx.fillStyle = '#069';
-    cx.fillText('梦幻画廊·fp', 2, 4);
-    cx.strokeStyle = 'rgba(120,60,200,0.7)';
-    cx.arc(150, 15, 10, 0, Math.PI * 2);
-    cx.stroke();
-    var durl = cv.toDataURL(),
-      h = 0;
-    for (var i = 0; i < durl.length; i++) {
-      h = ((h << 5) - h + durl.charCodeAt(i)) | 0;
-    }
-    fp.canvas = (h >>> 0).toString(16);
-    fetch('/api/gate/apply', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answer: '', fp: fp }),
-    }).catch(function () {});
-  } catch (e) {}
-}, 3000);
+import './visitor-fp.js'; // 访客身份采集+踢出通知(2026-08-30 权限精简):持久ID三处冗余+多维指纹+SSE踢出监听
 // 梦幻画廊 展厅+回字大厅 已启动
 
 // C6 退出文案(2026-07-28,设计文档第 19 步):切走/关闭页面时留一句;切回时即见

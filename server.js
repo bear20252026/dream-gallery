@@ -12,10 +12,10 @@ const http = require('http');
 const path = require('path');
 const { URL } = require('url');
 
-const { ROOT, PORT, TOKEN, CORS_ORIGIN, GATE_ANSWER, GATE_QUESTION, GATE_MODE, MEDIA_DIRS } = require('./lib/config');
+const { ROOT, PORT, TOKEN, CORS_ORIGIN, MEDIA_DIRS } = require('./lib/config');
 const { sendJson, readBody, safeJoin, isValidName } = require('./lib/util');
 const { gateData, recordVisit } = require('./lib/store');
-const { serveGatePage, sseRegister, handleApply, handleGateStatus, approvalGate, GATE_HASH, hasGateCookie, handleRename } = require('./lib/gate');
+const { serveGatePage, sseRegister, handleCollect, handleReapply, handleEntryStatus, entryGate, handleRename } = require('./lib/gate');
 const { tokenOk, handleAdminList, handleAdminDecide, handleAdminBulk } = require('./lib/admin');
 const { handleQuizStart, handleQuizSubmit, handleQuizState, handleQuizInvite, handleQuizJudge } = require('./lib/quiz');
 const { serveStatic, handleList, handleUpload, handleUploadChunk, handleDelete, handleMyUploads } = require('./lib/files');
@@ -122,13 +122,12 @@ const handler = (req, res) => {
     return;
   }
 
-  // 审批门:访客接口(不受 TOKEN 限制)
-  if (GATE_MODE === 'approval') {
-    if (pathname === '/api/gate/apply' && req.method === 'POST') { handleApply(req, res); return; }
-    if (pathname === '/api/gate/status' && req.method === 'GET') { handleGateStatus(req, res); return; }
-    if (pathname === '/api/gate/watch' && req.method === 'GET') { sseRegister(req, res); return; }
-    if (pathname === '/api/gate/rename' && req.method === 'POST') { handleRename(req, res); return; }
-  }
+  // 入口守卫访客接口(不受 TOKEN 限制)
+  if (pathname === '/api/entry/collect' && req.method === 'POST') { handleCollect(req, res); return; }
+  if (pathname === '/api/entry/reapply' && req.method === 'POST') { handleReapply(req, res); return; }
+  if (pathname === '/api/entry/status' && req.method === 'GET') { handleEntryStatus(req, res); return; }
+  if (pathname === '/api/entry/watch' && req.method === 'GET') { sseRegister(req, res); return; }
+  if (pathname === '/api/entry/rename' && req.method === 'POST') { handleRename(req, res); return; }
   // 主人后台页面 + 接口(需 TOKEN;不依赖审批门开关,始终可用)
   if (pathname === '/admin' && req.method === 'GET') {
     if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权:需要 token' }); return; }
@@ -155,23 +154,6 @@ const handler = (req, res) => {
     if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权' }); return; }
     if (!MEDIA_DIRS.includes(mMatch[1]) || !isValidName(mMatch[2])) { sendJson(res, 400, { error: '路径不合法' }); return; }
     serveStatic(req, res, path.join(ROOT, mMatch[1], mMatch[2]));
-    return;
-  }
-
-  // 旧问答门答题接口
-  if (pathname === '/api/gate' && req.method === 'POST') {
-    readBody(req, obj => {
-      const ans = String(obj.answer || '').trim();
-      if (GATE_ANSWER && ans === GATE_ANSWER) {
-        res.writeHead(200, {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Set-Cookie': `gate=${GATE_HASH}; Path=/; HttpOnly; SameSite=Lax`,
-        });
-        res.end(JSON.stringify({ ok: true }));
-      } else {
-        sendJson(res, 401, { error: '答错了，再想想' });
-      }
-    });
     return;
   }
 
@@ -239,19 +221,14 @@ const handler = (req, res) => {
     if (delMatch && req.method === 'DELETE') { handleDelete(res, delMatch[1], delMatch[2]); return; }
   }
 
-  // 审批门:启用后,未通过验证的非 API 请求一律先申请
-  if (GATE_MODE === 'approval') {
-    if (!approvalGate(req, res, pathname)) return;
-  } else if (GATE_ANSWER && !hasGateCookie(req)) {
-    // 旧问答门
-    serveGatePage(res, 'apply');
-    return;
-  }
-  // 访问统计(2026-08-30 修复):现网 .env 的 GATE_MODE 为空 → 上方两个门都不触发,
-  //   approvalGate 里的 recordVisit 从不执行 → 8/6 起访问统计一直为 0(用户报告)。
-  //   故在门禁放行后对首页统一补记;approval 模式下 gate 内已记,跳过防双计。
-  //   recordVisit 内部自带:回环跳过 + 60 秒同设备去重。
-  if (pathname === '/' && GATE_MODE !== 'approval') recordVisit(req, null, null);
+  // 入口守卫(2026-08-30 权限精简,无条件启用):自由进画廊,仅拦被踢出设备与拉黑 IP
+  if (!entryGate(req, res, pathname)) return;
+  // 非首页 HTML 页面请求的访问统计补记(首页已在 entryGate 内记录,防双计)
+  // 仅计页面(无扩展名或 .html);静态资源不计数。recordVisit 内部自带:自动化跳过 + 回环跳过 + 60 秒去重
+  if (
+    pathname !== '/' && pathname !== '/index.html' && pathname !== '/favicon.png' &&
+    (/\.(html|htm)$/.test(pathname) || !/\.[a-z0-9]+$/i.test(pathname))
+  ) recordVisit(req, null, null);
 
   // 静态文件:/ → index.html
   let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
@@ -281,12 +258,8 @@ const server = http.createServer(handler);
 server.listen(PORT, () => {
   console.log(`服务器已启动: http://localhost:${PORT}`);
   console.log(TOKEN ? `API 鉴权已启用(TOKEN),请求需带 ?token= 或 x-token 头` : `API 未启用鉴权(设置环境变量 TOKEN 可开启)`);
-  if (GATE_MODE === 'approval') {
-    console.log(`审批门已启用,问题:「${GATE_QUESTION}」后台: /admin?token=<TOKEN>`);
-    if (!TOKEN) console.log('警告:审批门需要 TOKEN 才能保护后台,请设置 TOKEN');
-  } else {
-    console.log(GATE_ANSWER ? `问答门已启用,问题:「${GATE_QUESTION}」` : `问答门/审批门未启用`);
-  }
+  console.log(`入口守卫已启用:自由进画廊;仅拦截被踢出设备(重进需申请)与拉黑 IP。后台: /admin?token=<TOKEN>`);
+  if (!TOKEN) console.log('警告:未设置 TOKEN,后台与写接口不受保护,请设置 TOKEN');
   console.log(`API:`);
   console.log(`  GET    /api/files?dir=photos|videos|music  列出媒体文件`);
   console.log(`  POST   /api/upload?dir=photos&name=x.jpg 上传文件(body 为文件内容)`);
