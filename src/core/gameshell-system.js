@@ -9,6 +9,7 @@
 import { ctx } from '../ctx.js';
 import { eventBus } from './event-bus.js';
 import { defineSystem } from './system.js';
+import { createDialogSystem } from './gameshell-dialog.js'; // 对话框状态机(B5 外迁)
 
 // ---------- 手绘样式(一次性注入,羊皮纸 + 抖边 + 楷体笔触) ----------
 const STYLE = `
@@ -118,119 +119,8 @@ function createGameShellSystem() {
   let prevKunlunSpeak = null;
   let acc = 0; // 任务栏刷新节流
 
-  // ---- 对话框状态机 ----
-  let dlg = null; // {speaker, lines, idx, choices, onDone, typeTimer, hideTimer, typing}
-  function el(id) { return document.getElementById(id); }
-
-  function renderDialog() {
-    if (!dlg) return;
-    const nameEl = dialogEl.querySelector('.gs-name');
-    const textEl = dialogEl.querySelector('.gs-text');
-    const chEl = dialogEl.querySelector('.gs-choices');
-    const hintEl = dialogEl.querySelector('.gs-hint');
-    nameEl.textContent = dlg.speaker || '昆仑';
-    chEl.innerHTML = '';
-    hintEl.style.display = 'none';
-    typeLine(dlg.lines[dlg.idx] || '');
-  }
-  function typeLine(str) {
-    const textEl = dialogEl.querySelector('.gs-text');
-    dlg.typing = true;
-    let i = 0;
-    clearInterval(dlg.typeTimer);
-    textEl.innerHTML = '';
-    const caret = document.createElement('span');
-    caret.className = 'gs-caret';
-    caret.textContent = '✎';
-    textEl.appendChild(caret);
-    dlg.typeTimer = setInterval(() => {
-      if (i >= str.length) {
-        clearInterval(dlg.typeTimer);
-        dlg.typing = false;
-        textEl.textContent = str;
-        onLineDone();
-        return;
-      }
-      textEl.textContent = str.slice(0, ++i);
-      textEl.appendChild(caret);
-    }, 38);
-  }
-  function onLineDone() {
-    clearTimeout(dlg.hideTimer);
-    const last = dlg.idx >= dlg.lines.length - 1;
-    if (last) {
-      if (dlg.choices && dlg.choices.length) {
-        showChoices();
-      } else if (dlg.autoHide) {
-        dlg.hideTimer = setTimeout(closeDialog, dlg.autoHide);
-      }
-    }
-  }
-  function advance() {
-    if (!dlg) return;
-    if (dlg.typing) { // 点击=秒显本行
-      clearInterval(dlg.typeTimer);
-      dlg.typing = false;
-      dialogEl.querySelector('.gs-text').textContent = dlg.lines[dlg.idx] || '';
-      onLineDone();
-      return;
-    }
-    if (dlg.idx < dlg.lines.length - 1) {
-      dlg.idx++;
-      renderDialog();
-    } else if (dlg.choices && dlg.choices.length) {
-      // 已在末行且有选项:不自动关闭
-    } else {
-      closeDialog();
-    }
-  }
-  function showChoices() {
-    const chEl = dialogEl.querySelector('.gs-choices');
-    chEl.innerHTML = '';
-    dlg.choices.forEach((c) => {
-      const b = document.createElement('button');
-      b.className = 'gs-choice';
-      b.textContent = c.label;
-      b.onclick = (e) => {
-        e.stopPropagation();
-        const cb = c.onClick;
-        closeDialog();
-        if (cb) cb(c.value);
-      };
-      chEl.appendChild(b);
-    });
-  }
-  function closeDialog() {
-    if (dlg && dlg.typeTimer) clearInterval(dlg.typeTimer);
-    if (dlg && dlg.hideTimer) clearTimeout(dlg.hideTimer);
-    dlg = null;
-    dialogEl.style.display = 'none';
-  }
-  function openDialog(opts) {
-    if (!opts) return;
-    const lines = Array.isArray(opts.lines) ? opts.lines : [opts.lines != null ? String(opts.lines) : ''];
-    if (!lines.length) lines.push('');
-    closeDialog();
-    dlg = {
-      speaker: opts.speaker || '昆仑',
-      lines,
-      idx: 0,
-      choices: opts.choices || null,
-      autoHide: opts.autoHide != null ? opts.autoHide : (opts.choices && opts.choices.length ? 0 : 9000),
-      onDone: opts.onDone || null,
-      typing: false,
-      typeTimer: null,
-      hideTimer: null,
-    };
-    dialogEl.style.display = 'block';
-    renderDialog();
-  }
-  function speakerFor(voice) {
-    if (voice === 'ark') return '飞舟';
-    if (voice === 'hall') return '展厅';
-    if (voice === 'title') return '昆仑';
-    return '昆仑';
-  }
+  // 对话框状态机已外迁 core/gameshell-dialog.js(B5 整改)
+  const dialogApi = createDialogSystem();
 
   // ---- 任务栏进度 ----
   function readProgress() {
@@ -331,8 +221,9 @@ function createGameShellSystem() {
         <div class="gs-text"></div>
         <div class="gs-choices"></div>
         <div class="gs-hint">▷ 点击继续</div>`;
-      dialogEl.addEventListener('click', advance);
+      dialogEl.addEventListener('click', dialogApi.advance);
       document.body.appendChild(dialogEl);
+      dialogApi.attach(dialogEl);
 
       questEl = document.createElement('div');
       questEl.id = 'questHud';
@@ -352,15 +243,15 @@ function createGameShellSystem() {
       buildMenu();
 
       // 对话事件总线:其他模块可 ctx.events.emit('ui:dialog', {...})
-      unsub = eventBus.on('ui:dialog', (o) => openDialog(o));
+      unsub = eventBus.on('ui:dialog', (o) => dialogApi.open(o));
 
       // 升级昆仑开口:既播 TTS,又落进手绘框(所有现有 kunlunSpeak 调用自动生效)
       prevKunlunSpeak = ctx.ui.kunlunSpeak;
       ctx.ui.kunlunSpeak = (text, voice) => {
         if (prevKunlunSpeak) { try { prevKunlunSpeak(text, voice); } catch (e) {} }
-        openDialog({ speaker: speakerFor(voice), lines: [text], autoHide: 9000 });
+        dialogApi.open({ speaker: dialogApi.speakerFor(voice), lines: [text], autoHide: 9000 });
       };
-      ctx.openDialog = openDialog;
+      ctx.openDialog = dialogApi.open;
     },
     update(dt) {
       acc += dt;

@@ -340,7 +340,9 @@ let lastPX = 0,
   lastPZ = 0,
   lastHudT = 0;
 
-export function updateAtmosphere(dt, time) {
+// ===================== 大气更新(2026-08-30 B5:151 行编排器拆为八特征函数,行为逐行等价) =====================
+// 飞鸟盘旋
+function updateBirds(dt, time) {
   // 飞鸟
   const bp = birdGeo.attributes.position.array;
   for (let i = 0; i < BIRDS; i++) {
@@ -351,6 +353,10 @@ export function updateAtmosphere(dt, time) {
     bp[i * 3 + 2] = Math.sin(d.a) * d.r;
   }
   birdGeo.attributes.position.needsUpdate = true;
+}
+
+// 沙暴(跟随玩家前方循环)
+function updateSandstorm(dt) {
   // 沙暴
   if (ctx.player.pl) {
     const sp = sandGeo.attributes.position.array;
@@ -366,6 +372,10 @@ export function updateAtmosphere(dt, time) {
     sandGeo.attributes.position.needsUpdate = true;
     sandMat.opacity = getH(ctx.player.pl.p.x, ctx.player.pl.p.z) < 8 ? 0.2 : 0.08;
   }
+}
+
+// 漂移云团(30Hz 节流)
+function updateClouds(dt) {
   // 漂移云团(30Hz 节流)
   cloudAcc += dt;
   if (cloudAcc > 0.033) {
@@ -379,6 +389,10 @@ export function updateAtmosphere(dt, time) {
     cloudGeo.attributes.position.needsUpdate = true;
     cloudAcc = 0;
   }
+}
+
+// 风行粒子 + 滑翔迎风粒子 + 昆仑导向变色(尾部记录 lastPX/lastPZ 供下一帧差分)
+function updateWind(dt) {
   // 风行粒子
   if (ctx.player.pl) {
     const mvx = (ctx.player.pl.p.x - lastPX) / Math.max(dt, 1e-4),
@@ -446,6 +460,10 @@ export function updateAtmosphere(dt, time) {
     lastPX = ctx.player.pl.p.x;
     lastPZ = ctx.player.pl.p.z;
   }
+}
+
+// 灯塔脉动 + 环绕光尘
+function updateBeacon(dt, time) {
   // 灯塔脉动
   beaconLight.intensity = 3.5 + Math.sin(time * 2);
   const dp = dustGeo.attributes.position.array;
@@ -457,6 +475,10 @@ export function updateAtmosphere(dt, time) {
   }
   dustGeo.attributes.position.needsUpdate = true;
   dustMat.opacity = 0.5 + Math.sin(time * 2) * 0.2;
+}
+
+// 罗盘指针(指向昆仑)
+function updateCompass() {
   // 罗盘指针
   if (ctx.player.pl) {
     const dx = KX - ctx.player.pl.p.x,
@@ -465,6 +487,10 @@ export function updateAtmosphere(dt, time) {
     const right = dx * Math.cos(ctx.player.pl.y) - dz * Math.sin(ctx.player.pl.y);
     cpNeedle.style.transform = 'rotate(' + (Math.atan2(right, front) + Math.PI) + 'rad)';
   }
+}
+
+// HUD(200ms 降频):昼夜时刻/相位条/海拔地名
+function updateHud(time) {
   // HUD(200ms 降频)
   if (time - lastHudT > 0.2) {
     lastHudT = time;
@@ -490,4 +516,15 @@ export function updateAtmosphere(dt, time) {
       dtName.textContent = terrainType(ev);
     }
   }
+}
+
+// 编排器:保持原执行顺序
+export function updateAtmosphere(dt, time) {
+  updateBirds(dt, time);
+  updateSandstorm(dt);
+  updateClouds(dt);
+  updateWind(dt);
+  updateBeacon(dt, time);
+  updateCompass();
+  updateHud(time);
 }
