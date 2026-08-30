@@ -35,3 +35,4 @@ tools/ffmpeg/
 # 探针截图与临时文件(永不入库)
 debug-final.png
 .audit-tmp-*
+client_errors.json
