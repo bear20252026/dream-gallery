@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
 import { bigText } from '../ui/kit.js';
-import { bell } from '../../shared/audio-blip.js'; // 钟声统一实现(B1 整改)
+import { bell } from '../shared/audio-blip.js'; // 钟声统一实现(B1 整改)
 const bag=hotBegin('finale');
 const {s,onTick,iG}=ctx;
 

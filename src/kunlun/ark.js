@@ -13,7 +13,7 @@ import { getGameState } from '../core/game-state.js'; // 阶段4:flightLock 写�
 import { bigText } from '../ui/kit.js';
 import { eventBus } from '../event-bus.js';
 import { expose } from '../debug-hooks.js';
-import { chime as blipChime } from '../../shared/audio-blip.js';
+import { chime as blipChime } from '../shared/audio-blip.js';
 const gs = getGameState();
 const bag = hotBegin('ark');
 // 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)

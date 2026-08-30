@@ -10,7 +10,8 @@ import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片即刷新晨光(2026-08-29)
 const bag = hotBegin('eternal');
-// 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)const { s, onTick, loadTexCapped, iG, bounds } = ctx;
+// 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
+const { s, onTick, loadTexCapped, iG, bounds } = ctx;
 
 // ===================== 位置与地基 =====================
 // 展厅悬浮在昆仑正上方(800,600),地板步行面 y=400(相机远平面 2000,地面远眺在射程内;
@@ -655,7 +656,7 @@ function welcome() {
 }
 import { goldenTeleport } from '../shared/teleport-fx.js';
 import { bigText } from '../ui/kit.js';
-import { chime as blipChime } from '../../shared/audio-blip.js';
+import { chime as blipChime } from '../shared/audio-blip.js';
 let tpLock = false;
 function teleport(intoHall) {
   if (tpLock || !ctx.player.pl) return;

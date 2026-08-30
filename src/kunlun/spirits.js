@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
 import { bigText } from '../ui/kit.js';
-import { chime as blipChime } from '../../shared/audio-blip.js';
+import { chime as blipChime } from '../shared/audio-blip.js';
 const bag=hotBegin('spirits');
 const {s,onTick}=ctx;
 
