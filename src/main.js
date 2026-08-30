@@ -14,6 +14,7 @@ import './gallery/markers.js'; // YES/奕彤爱心/Adorable标记 + 地板照片
 import './gallery/links.js'; // 超链接图标/卷轴/花园入口/滚动古文
 import './gallery/paintings.js'; // 挂画系统 + 白板作品墙 + 3D放大系统
 import './gallery/mode.js'; // 展示区模式(普通/特殊)+ 链接模型系统
+import './gallery/dome-towers.js'; // Yazd 穹顶塔楼群(6 座围圆环绕画廊,按需异步加载)
 import './gate/settings.js'; // 昵称双渠道(进馆 5 秒弹窗 + ⚙设置)
 import './gate/upload.js'; // 访客上传(照片/我的链接)+ AI 配文 + 悬浮路标
 import './gate/housecolor.js'; // 房屋分组换色(墙壁/天花板/腰线/踢脚线,仅自己可见)
@@ -66,16 +67,7 @@ import { createStateSystem } from './core/state-system.js'; // 阶段3 切片:�
 import { createUiSystem } from './core/ui-system.js'; // 阶段3 切片:UI 域生命周期收口(组合根拥有 overlay 关闭/销毁出口)
 import { getGameState } from './core/game-state.js'; // 单例状态库(阶段3 store 真正化)
 
-const {
-  L,
-  s,
-  cam,
-  rnd,
-  pls,
-  WH,
-  skyUniforms,
-  groundUniforms,
-} = ctx;
+const { L, s, cam, rnd, pls, WH, skyUniforms, groundUniforms } = ctx;
 const { jD, ks, pl, mv, drawMap } = ctx.player; // 玩家簇经命名空间取(别名=活委托,player.js Object.assign 后此处读到真值)
 // 注意:updateFireworks/pG/pC 不在此解构——effects.js 支持热更新,重载后 ctx 上的引用会换新,
 // 主循环必须在调用时从 ctx 读取(见下方粒子循环与烟花调用)
@@ -135,27 +127,42 @@ compositionRoot.register(createPerfMonitorSystem({ renderer: rnd }));
 initSentry(); // Sentry 错误追踪(需配置 DSN)
 // 阶段2 垂直切片:空间音频作为 AudioSystem 接入组合根(经 deps 注入相机,绝不直接写冻结 ctx)
 // 旧 initSpatialAudio()/exposeToCtx() 已移除 —— 这正是首页崩溃补丁的根因,现已用 DI 取代。
-compositionRoot.register(createAudioSystem({
-  scene: ctx.scene,
-  getCamera: () => ctx.scene.cam, // 防腐适配:阶段3 相机迁移后改由 deps 直接提供
-  eventBus: ctx.events,
-}));
+compositionRoot.register(
+  createAudioSystem({
+    scene: ctx.scene,
+    getCamera: () => ctx.scene.cam, // 防腐适配:阶段3 相机迁移后改由 deps 直接提供
+    eventBus: ctx.events,
+  })
+);
 // 阶段3 切片:烟花 + 漂浮粒子作为 EffectsSystem 接入组合根(engine/animate 相位)。
 // 原逻辑嵌在 LoopManager._executeUpdatePhase 里直接读 ctx.media.updateFireworks/pG/pC（上帝渲染器散点读取），
 // 现改为 deps 注入 scene 与场景常量,由唯一单循环驱动;LoopManager 不再持有该逻辑。
-compositionRoot.register(createEffectsSystem({
-  scene: ctx.scene,
-  floorW: ctx.floorW, floorD: ctx.floorD,
-  IL: ctx.IL, IR: ctx.IR, IRT: ctx.IRT, IRB: ctx.IRB,
-  OT: ctx.OT, OBR: ctx.OBR, WH: ctx.WH, bW: ctx.bW, bD: ctx.bD, pyrHeight: ctx.pyrHeight,
-}));
+compositionRoot.register(
+  createEffectsSystem({
+    scene: ctx.scene,
+    floorW: ctx.floorW,
+    floorD: ctx.floorD,
+    IL: ctx.IL,
+    IR: ctx.IR,
+    IRT: ctx.IRT,
+    IRB: ctx.IRB,
+    OT: ctx.OT,
+    OBR: ctx.OBR,
+    WH: ctx.WH,
+    bW: ctx.bW,
+    bD: ctx.bD,
+    pyrHeight: ctx.pyrHeight,
+  })
+);
 // 阶段3 切片:媒体逐帧逻辑(音乐画布 drawMusicCanvas + 视频墙纹理 needsUpdate)作为 MediaSystem 接入组合根(presentation/render 相位)。
 // 原逻辑散落在 LoopManager._executeUpdatePhase / _executeRenderPhase 直接读 ctx.media.*（上帝渲染器散点读取），
 // 现改为 deps 注入 ctx.media,由唯一单循环驱动;LoopManager 不再持有该逻辑。
 compositionRoot.register(createMediaSystem({ media: ctx.media }));
 // 阶段3 切片:单向状态库 StateSystem(platform/bootstrap)订阅事件总线,把命名空间状态镜像进 game-state,
 // 使 game-state 成为系统可读/可订阅的统一状态源(读模型);写者/读者零改动。Stage 4 可把写路径也收归此处,关闭 ctx 直写。
-compositionRoot.register(createStateSystem({ eventBus: ctx.events, gameState: getGameState(), ctx }));
+compositionRoot.register(
+  createStateSystem({ eventBus: ctx.events, gameState: getGameState(), ctx })
+);
 // 阶段3 切片:UI 域生命周期收口 UiSystem(platform/bootstrap):overlay.js 全局 Esc 监听仍在 main.js 最先 import 以保证栈优先级,
 // 但本 System.dispose 正式拥有关闭全部弹层/移除 Esc 监听的出口,使 ui 成为组合根可管理的生命周期单元。
 compositionRoot.register(createUiSystem({ ctx }));

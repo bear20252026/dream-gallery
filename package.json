@@ -41,6 +41,9 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@gltf-transform/core": "^4.4.2",
+    "@gltf-transform/extensions": "^4.4.2",
+    "@gltf-transform/functions": "^4.4.2",
     "@types/three": "^0.185.4",
     "better-sqlite3": "^13.0.3",
     "dependency-cruiser": "^18.1.0",
@@ -51,6 +54,7 @@
     "lint-staged": "^17.3.0",
     "playwright-core": "^1.61.1",
     "prettier": "^3.9.6",
+    "sharp": "^0.35.4",
     "typescript": "^7.0.2",
     "vite": "^8.1.5",
     "vite-plugin-html": "^3.2.2",
