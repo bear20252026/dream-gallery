@@ -12,7 +12,7 @@ const { BASE_URL: URL, launch } = require('./browser');
     } catch (e) {}
   });
   const page = await ctx.newPage();
-  await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#viewBtn', { timeout: 40000 });
   console.log('✓ 页面就绪');
 
