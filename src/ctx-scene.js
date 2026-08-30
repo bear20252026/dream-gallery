@@ -23,6 +23,7 @@ export function createSceneNamespace(vault) {
     'loadTexCapped',
     'bounds',
     'removeBounds',
+    'addBounds',
     'WH',
     'OL',
     'OR',

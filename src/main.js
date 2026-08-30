@@ -75,7 +75,6 @@ const {
   WH,
   skyUniforms,
   groundUniforms,
-  tickPhysics,
 } = ctx;
 const { jD, ks, pl, mv, drawMap } = ctx.player; // 玩家簇经命名空间取(别名=活委托,player.js Object.assign 后此处读到真值)
 // 注意:updateFireworks/pG/pC 不在此解构——effects.js 支持热更新,重载后 ctx 上的引用会换新,

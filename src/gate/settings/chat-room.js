@@ -17,14 +17,25 @@ chatOv.appendChild(chatCard);
 document.body.appendChild(chatOv);
 
 let chatTimer = null;
+function onVis() {
+  // 标签页隐藏时暂停轮询(对齐 paintings.js 模式,B-a 整改)
+  if (document.hidden) {
+    clearInterval(chatTimer);
+  } else {
+    loadChat();
+    chatTimer = setInterval(loadChat, 5000);
+  }
+}
 export const chatApi = ctx.overlay.register(chatOv, {
   x: '#chatX',
   onOpen() {
     loadChat();
     chatTimer = setInterval(loadChat, 5000);
+    document.addEventListener('visibilitychange', onVis);
   },
   onClose() {
     clearInterval(chatTimer);
+    document.removeEventListener('visibilitychange', onVis);
   },
 });
 

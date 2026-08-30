@@ -69,3 +69,26 @@ export function windChime(delay, dest, audioCtx) {
   [523.25, 1046.5, 1569.8].forEach((f, k) =>
     tone({ freq: f, gain: [0.2, 0.09, 0.045][k], delay: delay || 0, decay: 2.5, dest, audioCtx }));
 }
+
+/**
+ * 木窗"咯"声:三角波 160→90Hz 下滑短音。snowwin.js 专用(B-a 整改收敛)。
+ * @param {number} [dur=0.16] 衰减时长 s
+ */
+export function creak(dur = 0.16) {
+  try {
+    const a = ac();
+    const t0 = a.currentTime;
+    const o = a.createOscillator();
+    const g = a.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(160, t0);
+    o.frequency.exponentialRampToValueAtTime(90, t0 + 0.12);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.15, t0 + 0.015);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g);
+    g.connect(a.destination);
+    o.start();
+    o.stop(t0 + dur + 0.02);
+  } catch (e) {}
+}

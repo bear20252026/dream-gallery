@@ -145,7 +145,7 @@ onTick(function(){
 
 bag.custom.push(()=>{
   const gi=iG.indexOf(fg);if(gi>=0)iG.splice(gi,1);
-  const bi=bounds.indexOf(fb);if(bi>=0)bounds.splice(bi,1);
+  ctx.scene.removeBounds && ctx.scene.removeBounds([fb]);
   vign.remove();
   if(ctx.kunlun.eternalHandlers)delete ctx.kunlun.eternalHandlers.fireplace;
 });

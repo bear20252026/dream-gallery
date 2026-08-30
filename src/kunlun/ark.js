@@ -14,6 +14,7 @@ import { bigText } from '../ui/kit.js';
 import { eventBus } from '../event-bus.js';
 import { expose } from '../debug-hooks.js';
 import { chime as blipChime } from '../shared/audio-blip.js';
+import { createFlightHUD } from './ark-freeflight-hud.js'; // 自由飞 HUD/摇杆/冲刺(B-d 外迁)
 const gs = getGameState();
 const bag = hotBegin('ark');
 // 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
@@ -438,113 +439,28 @@ const _qTmp = new THREE.Quaternion(),
   _v2 = new THREE.Vector3(),
   _v3 = new THREE.Vector3();
 const _camPos = new THREE.Vector3(); // 追尾相机平滑状态必须自存:主循环每帧先从 pl.p 重置 cam,不能依赖 cam 上帧值
-const joy = { x: 0, y: 0, id: null };
 let hist = [],
   histLast = 0,
   ffToastT = 0,
   ffStatT = 0;
 
-// ---- HUD(#arkHud:pointer-events none 容器,子控件单独 auto;id 已进 player.js isUiTouch 白名单) ----
-const hud = document.createElement('div');
-hud.id = 'arkHud';
-hud.style.cssText =
-  'position:fixed;inset:0;z-index:60;display:none;pointer-events:none;font-family:inherit';
-hud.innerHTML =
-  '<div id="ffStats" style="position:absolute;top:14px;left:14px;padding:8px 14px;border-radius:12px;border:1px solid rgba(255,214,130,.45);background:rgba(30,20,10,.55);color:#ffe9c4;font-size:13px;letter-spacing:2px;line-height:1.8"></div>' +
-  '<div style="position:absolute;right:16px;bottom:96px;text-align:center">' +
-  '<div id="ffBoost" style="width:64px;height:64px;margin:0 auto;border-radius:50%;border:1px solid rgba(255,190,110,.8);background:rgba(60,32,10,.6);color:#ffd76a;font-size:13px;letter-spacing:2px;display:flex;align-items:center;justify-content:center;pointer-events:auto;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:none">冲刺</div>' +
-  '<div style="margin:8px auto 0;width:110px;height:8px;border-radius:4px;border:1px solid rgba(255,214,130,.5);background:rgba(20,12,6,.6);overflow:hidden"><div id="ffEnergyBar" style="height:100%;width:100%;background:linear-gradient(90deg,#e8a03c,#ffd76a)"></div></div>' +
-  '<div style="margin-top:4px;color:rgba(255,233,196,.7);font-size:11px;letter-spacing:3px">灵蕴</div>' +
-  '</div>' +
-  '<div style="position:absolute;left:50%;bottom:40px;transform:translateX(-50%);display:flex;gap:14px">' +
-  '<button id="ffNavBtn" style="padding:10px 20px;border-radius:20px;border:1px solid rgba(124,200,232,.7);background:rgba(14,26,34,.6);color:#cfe9f5;font-size:14px;letter-spacing:3px;cursor:pointer;font-family:inherit;pointer-events:auto">✦ 去展厅</button>' +
-  '<button id="ffHomeBtn" style="padding:10px 20px;border-radius:20px;border:1px solid rgba(255,214,130,.6);background:rgba(40,26,12,.6);color:#ffe9c4;font-size:14px;letter-spacing:3px;cursor:pointer;font-family:inherit;pointer-events:auto">↓ 返回地面</button>' +
-  '</div>' +
-  '<div id="ffJoy" style="position:absolute;left:26px;bottom:90px;width:108px;height:108px;border-radius:50%;border:1px solid rgba(255,214,130,.4);background:rgba(30,20,10,.35);display:none;pointer-events:auto;touch-action:none">' +
-  '<div id="ffKnob" style="position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:rgba(255,214,130,.35);border:1px solid rgba(255,214,130,.7)"></div>' +
-  '</div>';
-document.body.appendChild(hud);
-const hudOvApi = ctx.overlay.register(hud, { touchOnly: true }); // 飞行 HUD:只进触摸白名单;Esc 是飞行逻辑(返回地面),不是关弹层
-const ffStats = hud.querySelector('#ffStats'),
-  ffEnergyBar = hud.querySelector('#ffEnergyBar'),
-  ffBoost = hud.querySelector('#ffBoost'),
-  ffJoy = hud.querySelector('#ffJoy'),
-  ffKnob = hud.querySelector('#ffKnob');
-hud.querySelector('#ffNavBtn').onclick = () => {
-  if (!freeFlight.on) return;
-  freeFlight.autoNav = true;
-  ctx.ui.modeToast && ctx.ui.modeToast('自动导航：朝永恒展厅飞去——任何手动操作即可接管。');
-};
-hud.querySelector('#ffHomeBtn').onclick = () => {
-  if (freeFlight.on) endFree('ground');
-};
-// 冲刺钮(按住)
-function boostOn(e) {
-  e.preventDefault();
-  freeFlight.boostHold = true;
-  ffBoost.style.background = 'rgba(120,60,16,.75)';
-}
-function boostOff() {
-  freeFlight.boostHold = false;
-  ffBoost.style.background = 'rgba(60,32,10,.6)';
-}
-ffBoost.addEventListener('touchstart', boostOn, { passive: false });
-ffBoost.addEventListener('touchend', boostOff);
-ffBoost.addEventListener('touchcancel', boostOff);
-ffBoost.addEventListener('mousedown', boostOn);
-ffBoost.addEventListener('mouseup', boostOff);
-ffBoost.addEventListener('mouseleave', boostOff);
-// 手机虚拟摇杆(左下:推上=爬升,推下=俯冲,左右=倾斜转向)
-if ('ontouchstart' in window) ffJoy.style.display = 'block';
-function joyMove(t) {
-  const r = ffJoy.getBoundingClientRect(),
-    cx = r.left + r.width / 2,
-    cy = r.top + r.height / 2;
-  let dx = t.clientX - cx,
-    dy = t.clientY - cy;
-  const m = Math.hypot(dx, dy),
-    max = 40;
-  if (m > max) {
-    dx *= max / m;
-    dy *= max / m;
-  }
-  joy.x = dx / max;
-  joy.y = dy / max;
-  ffKnob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
-}
-ffJoy.addEventListener(
-  'touchstart',
-  (e) => {
-    e.preventDefault();
-    const t = e.changedTouches[0];
-    joy.id = t.identifier;
-    joyMove(t);
+// ---- 飞行 HUD(B-d 外迁 kunlun/ark-freeflight-hud.js;输入经回调回写 freeFlight 状态) ----
+const flightHud = createFlightHUD({
+  onNav() {
+    if (!freeFlight.on) return;
+    freeFlight.autoNav = true;
+    ctx.ui.modeToast && ctx.ui.modeToast('自动导航：朝永恒展厅飞去——任何手动操作即可接管。');
   },
-  { passive: false }
-);
-ffJoy.addEventListener(
-  'touchmove',
-  (e) => {
-    e.preventDefault();
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (t.identifier === joy.id) joyMove(t);
-    }
+  onHome() {
+    if (freeFlight.on) endFree('ground');
   },
-  { passive: false }
-);
-function joyEnd(e) {
-  for (let i = 0; i < e.changedTouches.length; i++) {
-    if (e.changedTouches[i].identifier === joy.id) {
-      joy.id = null;
-      joy.x = 0;
-      joy.y = 0;
-      ffKnob.style.transform = '';
-    }
-  }
-}
-ffJoy.addEventListener('touchend', joyEnd);
-ffJoy.addEventListener('touchcancel', joyEnd);
+  onBoostPress() {
+    freeFlight.boostHold = true;
+  },
+  onBoostRelease() {
+    freeFlight.boostHold = false;
+  },
+});
 
 function startFree() {
   if (freeFlight.on || flying || !ctx.player.pl) return;
@@ -563,7 +479,7 @@ function startFree() {
   _camPos.copy(freeFlight.pos); // 相机从船上平滑拉出
   gs.set('flightLock', true); // 阶段4:经 gameState.set 写回(读者 ctx.kunlun.flightLock 经 vault 同步) // 总锁:player 移动/物理/小地图/回家键全部冻结
   boardBtn.style.display = 'none';
-  hud.style.display = 'block';
+  flightHud.show();
   ark.visible = true;
   flightPts.visible = true;
   // 手动飞行时显示荧光路线(半透明,作为路径参考)
@@ -591,7 +507,7 @@ function endFree(mode) {
   freeFlight.on = false;
   freeFlight.autoNav = false;
   freeFlight.boostHold = false;
-  hud.style.display = 'none';
+  flightHud.hide();
   flightPts.visible = false;
   // 隐藏荧光路线
   routeVisible = false;
@@ -629,8 +545,8 @@ function freeTick() {
   if (dt > 0.05) dt = 0.05;
   const ks = ctx.player.ks || {};
   // 输入:W 爬升 / S 俯冲 / A D 转向(摇杆同向);正 pitch=抬首,正 roll=左倾
-  let pitchIn = (ks.w ? 1 : 0) - (ks.s ? 1 : 0) - joy.y;
-  let rollIn = (ks.a ? 1 : 0) - (ks.d ? 1 : 0) + joy.x;
+  let pitchIn = (ks.w ? 1 : 0) - (ks.s ? 1 : 0) - flightHud.joy.y;
+  let rollIn = (ks.a ? 1 : 0) - (ks.d ? 1 : 0) + flightHud.joy.x;
   // 自动导航:朝展厅泊位柔和转向,任何手动输入立即接管
   if (freeFlight.autoNav) {
     _v1.set(DOCK.x - freeFlight.pos.x, DOCK.y - freeFlight.pos.y, DOCK.z - freeFlight.pos.z);
@@ -756,14 +672,14 @@ function freeTick() {
   // HUD 刷新(120ms 节流)
   if (now - ffStatT > 120) {
     ffStatT = now;
-    ffStats.textContent =
+    flightHud.stats.textContent =
       '高度 ' +
       Math.round(freeFlight.pos.y) +
       ' m · 速度 ' +
       Math.round(spd) +
       ' m/s' +
       (freeFlight.autoNav ? ' · 自动导航中' : '');
-    ffEnergyBar.style.width = Math.round(freeFlight.energy) + '%';
+    flightHud.energyBar.style.width = Math.round(freeFlight.energy) + '%';
   }
 }
 
@@ -1038,9 +954,9 @@ bag.custom.push(() => {
   boardBtn.remove();
   skipBtn.remove();
   tintOv.remove();
-  hud.remove();
+  flightHud.el.remove();
   routeGroup.remove(); // 清理荧光路线
-  hudOvApi.unregister();
+  flightHud.overlayApi.unregister();
   document.removeEventListener('keydown', onKey);
   ctx.kunlun.arkTeleportToPeak = null;
   offPeakTpEvt();

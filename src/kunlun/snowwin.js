@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
+import { creak as blipCreak } from '../shared/audio-blip.js';
 const bag=hotBegin('snowwin');
 const {s,onTick,iG}=ctx;
 
@@ -81,18 +82,8 @@ function ensureVeils(){
 
 // ===================== 声音:木窗"咯" + 风声循环(-35dB) =====================
 let windAC=null,windSrc=null,windGain=null;
-function creak(){
-  try{
-    const ac=creak.ac||(creak.ac=new (window.AudioContext||window.webkitAudioContext)());
-    const o=ac.createOscillator(),g=ac.createGain();
-    o.type='triangle';o.frequency.setValueAtTime(160,ac.currentTime);
-    o.frequency.exponentialRampToValueAtTime(90,ac.currentTime+0.12);
-    g.gain.setValueAtTime(0.0001,ac.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.15,ac.currentTime+0.015);
-    g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.16);
-    o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+0.18);
-  }catch(e){}
-}
+// 木窗咯声实现统一在 shared/audio-blip.js(B-a 整改)
+const creak = () => blipCreak();
 function wind(on){
   try{
     if(on){

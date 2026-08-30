@@ -113,6 +113,9 @@ ctx.scene.removeBounds = function (list) {
     if (i >= 0) bounds.splice(i, 1);
   }
 };
+ctx.scene.addBounds = function (list) {
+  for (const b of list) bounds.push(b);
+};
 const wI=[]; // 墙壁信息数组
 // 古典装饰材质（深棕色带光泽）:腰线/门框装饰线 与 踢脚线 分开,房屋换色可独立染色
 const decoM=new THREE.MeshStandardMaterial({color:'#4a2510',roughness:0.4,metalness:0.15});

@@ -82,7 +82,7 @@ const wbLabel=new THREE.Mesh(new THREE.PlaneGeometry(5.8,2.8),new THREE.MeshBasi
 wbLabel.rotation.x=-Math.PI/2;wbLabel.position.set(0,1.21,42);
 s.add(wbLabel);
 // 玩家碰撞:立方体不可穿行
-if(ctx.scene.bounds)ctx.scene.bounds.push({mnX:-3,mxX:3,mnZ:40.5,mxZ:43.5});
+if(ctx.scene.addBounds)ctx.scene.addBounds([{mnX:-3,mxX:3,mnZ:40.5,mxZ:43.5}]);
 // 使用说明牌(立在立方体旁,面向玩家来向)
 const guideC=document.createElement('canvas');guideC.width=512;guideC.height=384;
 const gx=guideC.getContext('2d');

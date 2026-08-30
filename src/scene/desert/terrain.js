@@ -472,11 +472,7 @@ export function updateChunks() {
         )
           o.material.dispose();
       });
-      if (ctx.scene.bounds)
-        for (const box of c.colliders) {
-          const i = ctx.scene.bounds.indexOf(box);
-          if (i >= 0) ctx.scene.bounds.splice(i, 1);
-        }
+      if (ctx.scene.removeBounds) ctx.scene.removeBounds(c.colliders);
       chunks.delete(k);
     }
   }

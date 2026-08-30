@@ -760,10 +760,7 @@ bag.custom.push(() => {
     const i = iG.indexOf(g);
     if (i >= 0) iG.splice(i, 1);
   }
-  for (const b of myBounds) {
-    const i = bounds.indexOf(b);
-    if (i >= 0) bounds.splice(i, 1);
-  }
+  ctx.scene.removeBounds && ctx.scene.removeBounds(myBounds);
   ctx.kunlun.eternalClick = null;
   ctx.kunlun.eternalKeepOut = null;
   ctx.kunlun.groundOverride = null;
