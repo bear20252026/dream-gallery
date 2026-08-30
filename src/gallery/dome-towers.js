@@ -14,19 +14,20 @@ const sc = ctx.scene;
 const { s, OT, OBR, addBounds } = sc;
 
 const MODEL_URL = '/models/yazd/dome.glb';
-const TARGET_H = 8.5; // 塔目标高度(m)
+const TARGET_H = 8.5 * 15; // 塔目标高度:8.5m 同比放大 15 倍 = 127.5m 巨型地标
 const CX = 0;
 const CZ = (OT + OBR) / 2; // 画廊几何中心 z = 8
-const RADIUS = 30; // 圆环半径
+const RADIUS = 30 * 10; // 圆环半径:30m 拉远 10 倍 = 300m
 const COUNT = 6;
 
 new GLTFLoader().load(
   MODEL_URL,
   function (gltf) {
     const proto = gltf.scene;
-    // 轴向修正:该 GLB 为 Z-up 躺倒导出(穹顶尖朝 -Z,祖先链无旋转节点),
-    // 绕 X 轴 +90° 将 -Z(尖顶)转至 +Y(上方),否则塔会横躺在地上
-    proto.rotation.x = Math.PI / 2;
+    // 轴向修正:该 GLB 为 Z-up 躺倒导出,穹顶尖朝 +Z,祖先链无旋转节点。
+    // 绕 X 轴 -90°((x,y,z)→(x,z,-y))将 +Z(尖顶)转至 +Y 上方;
+    // 上一版 +90° 方向反了(截图证实尖顶朝下)
+    proto.rotation.x = -Math.PI / 2;
     proto.updateMatrixWorld(true);
 
     // 实测包围盒(以节点变换后的真实朝向为准),统一缩放到目标高度

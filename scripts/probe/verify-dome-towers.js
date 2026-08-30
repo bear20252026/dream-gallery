@@ -11,11 +11,11 @@ const { BASE_URL, launch } = require('./browser.js');
     const expected = [];
     for (let i = 0; i < 6; i++) {
       const ang = (i / 6) * Math.PI * 2 + Math.PI / 6;
-      expected.push([Math.sin(ang) * 30, 8 + Math.cos(ang) * 30]);
+      expected.push([Math.sin(ang) * 300, 8 + Math.cos(ang) * 300]);
     }
     const hits = expected.map(([ex, ez]) => {
       const o = s.children.find(
-        (c) => Math.abs(c.position.x - ex) < 2 && Math.abs(c.position.z - ez) < 2
+        (c) => Math.abs(c.position.x - ex) < 5 && Math.abs(c.position.z - ez) < 5
       );
       if (!o) return null;
       // 立起验证:用递归世界包围盒算 Y 高度(立起≈8.5m,躺倒只有≈3.5m)
@@ -45,7 +45,7 @@ const { BASE_URL, launch } = require('./browser.js');
         baseY: +minY.toFixed(2),
       };
     });
-    const up = hits.filter(Boolean).filter((h) => h.worldH > 7 && Math.abs(h.baseY) < 1).length;
+    const up = hits.filter(Boolean).filter((h) => h.worldH > 100 && Math.abs(h.baseY) < 1).length;
     return { towers: hits.filter(Boolean).length, standing: up, detail: hits };
   });
   console.log(JSON.stringify(r, null, 1));
