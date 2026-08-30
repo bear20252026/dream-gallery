@@ -649,6 +649,11 @@
         >
           刷新
         </button>
+        <span
+          id="dataStamp"
+          style="margin-left: 10px; font-size: 11px; opacity: 0.65; vertical-align: middle"
+          >数据加载中…</span
+        >
       </h1>
       <div class="sub">审批 · 统计 · 文件 · 对话</div>
 
@@ -1283,16 +1288,38 @@
       };
       // ---------- 数据 ----------
       async function load() {
-        const r = await fetch('/api/admin/list' + tk());
-        if (!r.ok) {
+        let r, d;
+        try {
+          r = await fetch('/api/admin/list' + tk());
+          if (r.status === 401) {
+            document.querySelector('.wrap').innerHTML =
+              '<h1>401 未授权：网址后请加 ?token=你的密码</h1>';
+            return;
+          }
+          if (!r.ok) throw new Error('服务返回 ' + r.status);
+          d = await r.json();
+        } catch (e) {
+          // 部署重启窗口/瞬时网络问题:明确提示并自动重试,避免误以为数据丢失
           document.querySelector('.wrap').innerHTML =
-            '<h1>401 未授权：网址后请加 ?token=你的密码</h1>';
+            '<h1>⏳ 数据加载失败(' +
+            esc(e.message) +
+            ')，3 秒后自动重试…</h1><p>若服务器正在更新，稍候即可恢复；已有访问记录不会丢失。</p>';
+          setTimeout(load, 3000);
           return;
         }
-        DATA = await r.json();
+        DATA = d;
         renderApprove();
         renderStats();
         renderHistory();
+        // 数据快照时间:区分"暂时没刷出来"与"数据丢了"
+        const el = document.getElementById('dataStamp');
+        if (el)
+          el.textContent =
+            '数据时间 ' +
+            new Date().toLocaleTimeString('zh-CN', { hour12: false }) +
+            ' · 访问明细共 ' +
+            (DATA.visits || []).length +
+            ' 条';
       }
       function cardHtml(a, now) {
         let btns = '';
@@ -1793,11 +1820,11 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
                       : `<button class="btn-day" onclick="toggleDemo('${j(f.name)}',true)">设为演示</button>`
                     : '';
                 return `<div class="file-row" style="align-items:flex-start">
-        ${isImg ? `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="pv('${dir}','${encodeURIComponent(f.name)}')">` : ''}
-        <span class="fname" onclick="pv('${dir}','${encodeURIComponent(f.name)}')" title="点击预览">${esc(f.name)}<br>${who}${cap}</span>
+        ${isImg ? `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="pv('${dir}','${j(f.name)}')">` : ''}
+        <span class="fname" onclick="pv('${dir}','${j(f.name)}')" title="点击预览">${esc(f.name)}<br>${who}${cap}</span>
         <span class="fsize">${(f.size / 1024 / 1024).toFixed(2)}MB</span>
         <button class="btn-day" onclick="dl('/admin-media/${dir}/${encodeURIComponent(f.name)}','${j(f.name)}')">下载</button>
-        <button class="btn-day" onclick="copyTxt(location.origin+'/admin-media/${dir}/${encodeURIComponent(f.name)}${tkq()}')">复制链接</button>
+        <button class="btn-day" onclick="copyTxt(location.origin+'/admin-media/${dir}/' + encodeURIComponent('${j(f.name)}') + '${tkq()}')">复制链接</button>
         ${dir === 'photos' ? `<button class="btn-day" onclick="editCaption('${j(f.name)}','${j(caps[f.name] || '')}')">编辑配文</button>` : ''}
         ${demoBtn}
         <button class="btn-del" onclick="delFile('${dir}','${encodeURIComponent(f.name)}')">删除</button></div>`;
