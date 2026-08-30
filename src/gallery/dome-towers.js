@@ -24,6 +24,9 @@ new GLTFLoader().load(
   MODEL_URL,
   function (gltf) {
     const proto = gltf.scene;
+    // 轴向修正:该 GLB 为 Z-up 躺倒导出(穹顶尖朝 -Z,祖先链无旋转节点),
+    // 绕 X 轴 +90° 将 -Z(尖顶)转至 +Y(上方),否则塔会横躺在地上
+    proto.rotation.x = Math.PI / 2;
     proto.updateMatrixWorld(true);
 
     // 实测包围盒(以节点变换后的真实朝向为准),统一缩放到目标高度
@@ -34,23 +37,26 @@ new GLTFLoader().load(
     proto.updateMatrixWorld(true);
 
     for (let i = 0; i < COUNT; i++) {
-      const t = proto.clone(true); // clone 共享几何与材质,6 座仅 1 份显存
+      // 结构:holder(Group)负责圆周定位+朝向;内层模型自带轴向修正(x=π/2)。
+      // 不能对模型本身 lookAt——lookAt 会重置整个四元数,覆盖掉轴向修正让塔重新躺倒
+      const holder = new THREE.Group();
+      holder.add(proto.clone(true)); // clone 共享几何与材质,6 座仅 1 份显存
       const ang = (i / COUNT) * Math.PI * 2 + Math.PI / 6; // 均匀 60°,避开正北
       const x = CX + Math.sin(ang) * RADIUS;
       const z = CZ + Math.cos(ang) * RADIUS;
 
-      t.position.set(x, 0, z);
-      t.lookAt(CX, t.position.y, CZ); // 塔身朝向圆心(水平旋转)
-      t.updateMatrixWorld(true);
+      holder.position.set(x, 0, z);
+      holder.lookAt(CX, 0, CZ); // 朝向圆心(水平旋转,不碰内层轴向)
+      holder.updateMatrixWorld(true);
 
-      // 落地:实测缩放+旋转后的世界包围盒,minY 对齐地面
-      const b3 = new THREE.Box3().setFromObject(t);
-      t.position.y = -b3.min.y;
-      t.updateMatrixWorld(true);
-      s.add(t);
-      bag.objs.push(t);
+      // 落地:实测世界包围盒,minY 对齐地面
+      const b3 = new THREE.Box3().setFromObject(holder);
+      holder.position.y = -b3.min.y;
+      holder.updateMatrixWorld(true);
+      s.add(holder);
+      bag.objs.push(holder);
 
-      // 碰撞盒(世界坐标 AABB,直径近似正方形 + 0.3m 余量)
+      // 碰撞盒(世界坐标 AABB,直径近似正方形 + 0.3m 余量;Y 修正不影响 XZ)
       const half = Math.max(b3.max.x - b3.min.x, b3.max.z - b3.min.z) / 2 + 0.3;
       addBounds([{ mnX: x - half, mxX: x + half, mnZ: z - half, mxZ: z + half }]);
     }
