@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
 import { bigText } from '../ui/kit.js';
+import { bell } from '../../shared/audio-blip.js'; // 钟声统一实现(B1 整改)
 const bag=hotBegin('finale');
 const {s,onTick,iG}=ctx;
 
@@ -14,20 +15,6 @@ const HX=800,HZ=600,FLOOR=400;
 const SPIRIT_COLORS=['#7ddb7a','#ff5a4a','#e8a03c','#dfeaf5','#7cc8e8','#f0a860'];
 const SPIRIT_NAMES=['春生之芽','夏炽之焰','秋思之叶','冬藏之雪','朝露之珠','暮光之尘'];
 function inHall(){return !!(ctx.player.pl&&ctx.kunlun.eternalKeepOut&&ctx.kunlun.eternalKeepOut(ctx.player.pl.p.x,ctx.player.pl.p.z));}
-function bell(f,g,dur){
-  try{
-    const ac=bell.ac||(bell.ac=new (window.AudioContext||window.webkitAudioContext)());
-    [f,f*1.5].forEach((ff,k)=>{
-      const o=ac.createOscillator(),gg=ac.createGain();
-      o.type='sine';o.frequency.value=ff;
-      gg.gain.setValueAtTime(0.0001,ac.currentTime);
-      gg.gain.exponentialRampToValueAtTime(g*(k?0.5:1),ac.currentTime+0.02);
-      gg.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+dur);
-      o.connect(gg);gg.connect(ac.destination);o.start();o.stop(ac.currentTime+dur+0.1);
-    });
-  }catch(e){}
-}
-
 // ===================== ① 俯瞰天穹(南平台边缘) =====================
 // 平台区:门洞中点 (803.03,594.75),外向 (0.5,-0.866),纵深 0.5~2.8,横宽 ±1.9
 let skyOn=false,skyY0=0,fogSave=0,skyCd=0,windSrc=null,windAC=null,windGain=null;

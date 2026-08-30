@@ -2,15 +2,14 @@
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
+import { canvasTexture } from '../shared/canvas-texture.js';
 hotBegin('markers');
 const {s,iG,tL,loadTexCapped,OR,OT,OBR,onTick}=ctx;
 
 // ===== 用户指定墙 - YES标记（回字内北墙z=11）=====
 function addYesMarker(x, z) {
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 128;
-  const ctx = canvas.getContext('2d');
+  // 画布样板统一在 shared/canvas-texture.js(B1 整改)
+  const texture = canvasTexture(256, 128, (ctx) => {
   ctx.fillStyle = 'rgba(255, 100, 150, 0.8)';
   ctx.fillRect(0, 0, 256, 128);
   ctx.fillStyle = '#ffffff';
@@ -18,7 +17,7 @@ function addYesMarker(x, z) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('YES', 128, 64);
-  const texture = new THREE.CanvasTexture(canvas);
+  });
   const mat = new THREE.MeshStandardMaterial({ map: texture, transparent: true, emissive: '#ff80a0', emissiveIntensity: 0.3, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(1, 0.5), mat);
   mesh.position.set(x, 2.5, z + 0.2);
@@ -33,11 +32,8 @@ addYesMarker(5.75, 11);
 
 // ===== 奕彤爱心标记（半透明闪烁）=====
 function addYiTongHeart() {
-  // 创建爱心形状Canvas
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
+  // 画布样板统一在 shared/canvas-texture.js(B1 整改)
+  const texture = canvasTexture(512, 512, (ctx) => {
   // 绘制爱心轮廓（正爱心，尖端朝上）
   ctx.save();
   ctx.translate(256, 256);
@@ -60,7 +56,7 @@ function addYiTongHeart() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('奕彤', 256, 240);
-  const texture = new THREE.CanvasTexture(canvas);
+  });
   const mat = new THREE.MeshStandardMaterial({ map: texture, transparent: true, emissive: '#ff6090', emissiveIntensity: 0.5, side: THREE.DoubleSide, depthWrite: false });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), mat);
   mesh.position.set(0, 2.5, 13); // 回字中央偏走廊方向
@@ -79,10 +75,8 @@ addYiTongHeart();
 
 // ===== Adorable（E厅南墙z=6，用户正前方）=====
 function addAdorable() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 512;
-  const ctx = canvas.getContext('2d');
+  // 画布样板统一在 shared/canvas-texture.js(B1 整改)
+  const texture = canvasTexture(512, 512, (ctx) => {
   // 爱心轮廓（正爱心，同奕彤）
   ctx.save();
   ctx.translate(256, 256);
@@ -105,7 +99,7 @@ function addAdorable() {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('Adorable', 256, 250);
-  const texture = new THREE.CanvasTexture(canvas);
+  });
   const mat = new THREE.MeshStandardMaterial({ map: texture, transparent: true, emissive: '#ff70a0', emissiveIntensity: 0.45, side: THREE.DoubleSide, depthWrite: false });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.5), mat);
   mesh.position.set(0, 2.5, 5.7); // E厅南墙z=6内侧，微微凸出

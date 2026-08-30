@@ -36,6 +36,7 @@ import {P,V,LINKS} from '../../data.js';
 import {hotBegin,hotEnd} from '../hot.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
 import {getGameState} from '../core/game-state.js'; // 阶段4:mode 运行期状态写路径收归 gameState.set(写回经 set 陷阱发事件)
+import { canvasTexture } from '../shared/canvas-texture.js';
 hotBegin('mode');
 const LIB=new Set(P.concat(V));
 // 内容面显隐(hangOn 固定子序:0框 1碰撞 2白卡 3内容 4镜纹);empty 标记供点击路由跳过空框
@@ -147,15 +148,15 @@ ctx.mode.LINK_MODEL_TYPES=MODEL_TYPES;
 
 // 文字牌(名称 + 点击可跳转)
 function makeLabel(text,sub,color){
-  const cv=document.createElement('canvas');cv.width=256;cv.height=96;
-  const cx=cv.getContext('2d');
+  // 画布样板统一在 shared/canvas-texture.js(B1 整改)
+  const tex=canvasTexture(256,96,(cx)=>{
   cx.fillStyle='rgba(18,18,30,0.6)';
   if(cx.roundRect){cx.beginPath();cx.roundRect(8,8,240,80,16);cx.fill();}else cx.fillRect(8,8,240,80,16);
   cx.fillStyle=color||'#ffffff';cx.font='bold 28px Arial';cx.textAlign='center';
   cx.fillText(text,128,44);
   cx.font='20px Arial';cx.fillStyle='rgba(255,233,168,0.85)';
   cx.fillText(sub||'🔗 点击可跳转',128,74);
-  const tex=new THREE.CanvasTexture(cv);
+  });
   const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));
   sp.scale.set(1.1,0.41,1);
   return sp;

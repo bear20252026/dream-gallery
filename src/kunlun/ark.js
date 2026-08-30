@@ -13,6 +13,7 @@ import { getGameState } from '../core/game-state.js'; // 阶段4:flightLock 写�
 import { bigText } from '../ui/kit.js';
 import { eventBus } from '../event-bus.js';
 import { expose } from '../debug-hooks.js';
+import { chime as blipChime } from '../../shared/audio-blip.js';
 const gs = getGameState();
 const bag = hotBegin('ark');
 // 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
@@ -403,25 +404,8 @@ flightPts.frustumCulled = false;
 s.add(flightPts);
 
 // ===================== 反馈组件(叮声/大字/着色罩) =====================
-function chime(i) {
-  try {
-    const ac = chime.ac || (chime.ac = new (window.AudioContext || window.webkitAudioContext)());
-    const base = [659, 698, 784, 880, 988, 1047][i] || 880;
-    [0, 0.12].forEach((d, k) => {
-      const o = ac.createOscillator(),
-        g = ac.createGain();
-      o.type = 'sine';
-      o.frequency.value = base * (k ? 2 : 1);
-      g.gain.setValueAtTime(0.0001, ac.currentTime + d);
-      g.gain.exponentialRampToValueAtTime(0.2, ac.currentTime + d + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + d + 1.4);
-      o.connect(g);
-      g.connect(ac.destination);
-      o.start(ac.currentTime + d);
-      o.stop(ac.currentTime + d + 1.5);
-    });
-  } catch (e) {}
-}
+// 叮声实现统一在 shared/audio-blip.js(B1 整改);此处仅保留六声音阶表。
+const chime = (i) => blipChime([659, 698, 784, 880, 988, 1047][i] || 880);
 const tintOv = document.createElement('div');
 tintOv.style.cssText =
   'position:fixed;inset:0;z-index:385;pointer-events:none;opacity:0;transition:opacity 1.2s';

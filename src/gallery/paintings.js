@@ -4,6 +4,7 @@ import { ctx } from '../ctx.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片/视频即同步新媒体墙(2026-08-29)
 import { P, V, AI_DESC, LINKS, VIDEO_WALL_SOURCES } from '../../data.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
+import { canvasTexture } from '../shared/canvas-texture.js';
 const {
   s,
   cam,
@@ -87,10 +88,8 @@ iG.push(mpMesh); // 音乐面板加入交互
   s.add(wallMesh);
   // 标题:浅蓝色半透明玻璃牌,双面正字(建筑方向与白板方向看都是正的,科技感)
   function makeTitleTex() {
-    const tC = document.createElement('canvas');
-    tC.width = 512;
-    tC.height = 80;
-    const tX = tC.getContext('2d');
+    // 画布样板统一在 shared/canvas-texture.js(B1 整改)
+    const tT = canvasTexture(512, 80, (tX) => {
     tX.fillStyle = 'rgba(90,190,255,0.35)';
     tX.fillRect(0, 0, 512, 80);
     tX.strokeStyle = 'rgba(140,220,255,0.9)';
@@ -102,7 +101,7 @@ iG.push(mpMesh); // 音乐面板加入交互
     tX.shadowColor = '#4fc3ff';
     tX.shadowBlur = 14;
     tX.fillText('白板作品展', 256, 55);
-    const tT = new THREE.CanvasTexture(tC);
+    });
     tT.colorSpace = THREE.SRGBColorSpace;
     return tT;
   }

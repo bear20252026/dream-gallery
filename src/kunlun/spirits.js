@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
 import { bigText } from '../ui/kit.js';
+import { chime as blipChime } from '../../shared/audio-blip.js';
 const bag=hotBegin('spirits');
 const {s,onTick}=ctx;
 
@@ -134,20 +135,8 @@ function edgeFlash(color){
   document.body.appendChild(d);
   requestAnimationFrame(()=>{d.style.opacity='0.9';setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),500);},900);});
 }
-function chime(i){
-  try{
-    const ac=chime.ac||(chime.ac=new (window.AudioContext||window.webkitAudioContext)());
-    const base=[659,698,784,880,988,1047][i]||880; // E4 F4 G4 A4 B4 C5 上行
-    [0,0.12].forEach((d,k)=>{
-      const o=ac.createOscillator(),g=ac.createGain();
-      o.type='sine';o.frequency.value=base*(k?2:1);
-      g.gain.setValueAtTime(0.0001,ac.currentTime+d);
-      g.gain.exponentialRampToValueAtTime(0.25,ac.currentTime+d+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+d+1.6);
-      o.connect(g);g.connect(ac.destination);o.start(ac.currentTime+d);o.stop(ac.currentTime+d+1.7);
-    });
-  }catch(e){}
-}
+// 叮声实现统一在 shared/audio-blip.js(B1 整改);音阶 E4 F4 G4 A4 B4 C5 上行
+const chime = (i) => blipChime([659, 698, 784, 880, 988, 1047][i] || 880, { peak: 0.25, decay: 1.6 });
 
 // ===================== 收集流程 =====================
 let collecting=false,pickIdx=-1; // pickIdx:主循环判定的"脚下这颗"(含未揭示的乱序拾取)

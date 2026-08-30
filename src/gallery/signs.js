@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
+import { canvasTexture } from '../shared/canvas-texture.js';
 hotBegin('signs');
 const {s,iG,tL,OR,OT,OBR,onTick}=ctx;
 
@@ -14,8 +15,8 @@ function upright2(mesh){
   mesh.add(back);
 }
 function makeSign(title,sub,footer,accent){
-  const cv=document.createElement('canvas');cv.width=512;cv.height=768;
-  const cx=cv.getContext('2d');
+  // 画布样板统一在 shared/canvas-texture.js(B1 整改):只保留绘制逻辑
+  const tex=canvasTexture(512,768,(cx)=>{
   const g=cx.createLinearGradient(0,0,0,768);
   g.addColorStop(0,'#2a1030');g.addColorStop(1,'#1a0a20');
   cx.fillStyle=g;cx.fillRect(0,0,512,768);
@@ -34,7 +35,7 @@ function makeSign(title,sub,footer,accent){
   // 下半部留装饰纹,柱位无重要内容
   cx.strokeStyle='rgba(255,150,200,0.18)';cx.lineWidth=2;
   for(let i=0;i<3;i++){cx.beginPath();cx.arc(256,590,40+i*28,0,Math.PI*2);cx.stroke();}
-  const tex=new THREE.CanvasTexture(cv);
+  });
   const mat=new THREE.MeshStandardMaterial({map:tex,emissive:'#ff6699',emissiveIntensity:0.15,roughness:0.4,metalness:0.1,side:THREE.DoubleSide});
   const mesh=new THREE.Mesh(new THREE.PlaneGeometry(2.8,4.2),mat);
   const post=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.1,2.8),new THREE.MeshStandardMaterial({color:'#5a3a2a',roughness:0.8,metalness:0.2}));

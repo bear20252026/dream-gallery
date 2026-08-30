@@ -10,11 +10,7 @@ import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片即刷新晨光(2026-08-29)
 const bag = hotBegin('eternal');
-// 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
-// ⚠️ 2026-08-29 修:此处曾被误写成 `() => spiritCount()`(无限自递归 → Maximum call stack
-//    size exceeded)。正确语义取自本文件 658 行既有用法。
-const spiritCount = () => (ctx.kunlun.spiritsGot ? ctx.kunlun.spiritsGot() : 0);
-const { s, onTick, loadTexCapped, iG, bounds } = ctx;
+// 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)const { s, onTick, loadTexCapped, iG, bounds } = ctx;
 
 // ===================== 位置与地基 =====================
 // 展厅悬浮在昆仑正上方(800,600),地板步行面 y=400(相机远平面 2000,地面远眺在射程内;
@@ -642,24 +638,8 @@ doorGlow.visible = false;
 s.add(doorGlow);
 
 // ===================== 反馈:水晶叮 + 金渐隐转场 + 中央大字 =====================
-function chime() {
-  try {
-    const ac = chime.ac || (chime.ac = new (window.AudioContext || window.webkitAudioContext)());
-    [0, 0.1].forEach((d, k) => {
-      const o = ac.createOscillator(),
-        g = ac.createGain();
-      o.type = 'sine';
-      o.frequency.value = 1047 * (k ? 2 : 1);
-      g.gain.setValueAtTime(0.0001, ac.currentTime + d);
-      g.gain.exponentialRampToValueAtTime(0.18, ac.currentTime + d + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + d + 1.2);
-      o.connect(g);
-      g.connect(ac.destination);
-      o.start(ac.currentTime + d);
-      o.stop(ac.currentTime + d + 1.3);
-    });
-  } catch (e) {}
-}
+// 叮声实现统一在 shared/audio-blip.js(B1 整改)。
+const chime = () => blipChime(1047, { peak: 0.18, decay: 1.2, delay2: 0.1 });
 
 // ===================== 金门/拱门点击 → 传送(paintings.js 经 eternalAction 钩子调来) =====================
 // 首到欢迎(ark.js 飞舟停靠后也要调用;localStorage 幂等,只迎一次)
@@ -675,6 +655,7 @@ function welcome() {
 }
 import { goldenTeleport } from '../shared/teleport-fx.js';
 import { bigText } from '../ui/kit.js';
+import { chime as blipChime } from '../../shared/audio-blip.js';
 let tpLock = false;
 function teleport(intoHall) {
   if (tpLock || !ctx.player.pl) return;

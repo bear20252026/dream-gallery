@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
 import {getAudioSystem} from '../core/audio-system.js'; // 阶段2:空间音频桥接(替代 ctx.media.spatialAudio)
+import { windChime } from '../shared/audio-blip.js';
 const bag=hotBegin('windchime');
 const {s,onTick,iG}=ctx;
 
@@ -46,20 +47,10 @@ function ensureSpatialNode(){
   spatialNode = sa.createSpatialWebAudioNode(cg, {refDistance:8, maxDistance:30});
 }
 function chimeSound(delay){
-  try{
-    ensureSpatialNode();
-    const ac = spatialNode ? spatialNode.context : (chimeSound.ac||(chimeSound.ac=new (window.AudioContext||window.webkitAudioContext)()));
-    const dest = spatialNode ? spatialNode.panner : ac.destination;
-    const d=delay||0;
-    [523.25,1046.5,1569.8].forEach((f,k)=>{
-      const o=ac.createOscillator(),g=ac.createGain();
-      o.type='sine';o.frequency.value=f;
-      g.gain.setValueAtTime(0.0001,ac.currentTime+d);
-      g.gain.exponentialRampToValueAtTime([0.2,0.09,0.045][k],ac.currentTime+d+0.015);
-      g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+d+2.5);
-      o.connect(g);g.connect(dest);o.start(ac.currentTime+d);o.stop(ac.currentTime+d+2.6);
-    });
-  }catch(e){}
+  // 三泛音叮声实现统一在 shared/audio-blip.js(B1 整改);保留空间音频旁路
+  ensureSpatialNode();
+  const sp = !!spatialNode;
+  windChime(delay || 0, sp ? spatialNode.panner : null, sp ? spatialNode.context : null);
 }
 
 // ===================== 响铃(声+摇摆 3s;首次 TTS) =====================
