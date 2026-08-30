@@ -454,11 +454,17 @@ if (inviteBtn) {
 }
 
 // ---------- 输入 ----------
+// e.key 可能是 undefined(输入法 composition / 合成事件 / 部分移动端键盘),
+// 直接 .toLowerCase() 会抛 TypeError —— 先判空。
 addEventListener('keydown', (e) => {
   if (document.activeElement === chatInput) return;
+  if (!e.key) return;
   keys[e.key.toLowerCase()] = true;
 });
-addEventListener('keyup', (e) => { keys[e.key.toLowerCase()] = false; });
+addEventListener('keyup', (e) => {
+  if (!e.key) return;
+  keys[e.key.toLowerCase()] = false;
+});
 
 // 鼠标/触摸拖拽看视角(在画布上)
 let dragging = false, lx = 0, ly = 0;

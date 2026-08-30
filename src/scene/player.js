@@ -245,8 +245,11 @@ jumpBtn.addEventListener('mouseup', () => {
 document.body.appendChild(jumpBtn);
 
 // ===================== 键盘 =====================
+// e.key 可能是 undefined(输入法 composition / 合成事件 / 部分移动端键盘 /
+// autofill 触发的 keydown),直接 .toLowerCase() 会抛 TypeError —— 先判空。
 const ks = {};
 document.addEventListener('keydown', (e) => {
+  if (!e.key) return;
   ks[e.key.toLowerCase()] = true;
 });
 // V 键切换第一/第三人称
@@ -260,7 +263,7 @@ function toggleView() {
     );
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key.toLowerCase() === 'v') toggleView();
+  if (e.key && e.key.toLowerCase() === 'v') toggleView();
 });
 // 视角切换独立按钮(手机/电脑通用)
 const viewBtn = document.createElement('button');
@@ -274,6 +277,7 @@ viewBtn.addEventListener('click', (e) => {
 });
 document.body.appendChild(viewBtn);
 document.addEventListener('keyup', (e) => {
+  if (!e.key) return;
   ks[e.key.toLowerCase()] = false;
 });
 

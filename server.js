@@ -25,6 +25,7 @@ const { handleTrackClick, handleClicksClear, handleExportXlsx, handleTrackError 
 const { handleDocsGet, handleDocsPost } = require('./lib/docs');
 const { handleChatList, handleChatPost } = require('./lib/chat');
 const { handleAdminAlerts } = require('./lib/abuse');
+const { handleReport, handleAdminErrors, handleAdminErrorsClear } = require('./lib/client-errors'); // 客户端报错反馈(2026-08-30)
 const { handleTts } = require('./lib/tts');
 const { mediaSseRegister } = require('./lib/media-push'); // 媒体变更 SSE 推送(2026-08-29)
 const { handleBigscreenGet, handleBigscreenUpload, handleBigscreenDelete } = require('./lib/bigscreen'); // 户外大屏软编码+后台管理(2026-08-29)
@@ -130,6 +131,10 @@ const handler = (req, res) => {
     serveStatic(req, res, path.join(ROOT, 'admin.html'));
     return;
   }
+  // 客户端报错反馈:上报公开(任何访客都可能报错),后台查看/清空需 token
+  if (pathname === '/api/client-errors' && req.method === 'POST') { handleReport(req, res); return; }
+  if (pathname === '/api/admin/client-errors' && req.method === 'GET') { handleAdminErrors(req, res, query); return; }
+  if (pathname === '/api/admin/client-errors/clear' && req.method === 'POST') { handleAdminErrorsClear(req, res, query); return; }
   if (pathname === '/api/admin/list' && req.method === 'GET') { handleAdminList(req, res, query); return; }
   if (pathname === '/api/admin/decide' && req.method === 'POST') { handleAdminDecide(req, res, query); return; }
   if (pathname === '/api/admin/bulk' && req.method === 'POST') { handleAdminBulk(req, res, query); return; }

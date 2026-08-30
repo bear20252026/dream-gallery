@@ -475,6 +475,8 @@ function renderQuiz(d) {
     ta.addEventListener(ev, (e) => e.preventDefault())
   );
   ta.addEventListener('keydown', (e) => {
+    // e.key 可能是 undefined(输入法 composition / 合成事件),先判空
+    if (!e.key) return;
     if ((e.ctrlKey || e.metaKey) && ['v', 'x', 'c'].includes(e.key.toLowerCase()))
       e.preventDefault();
   });

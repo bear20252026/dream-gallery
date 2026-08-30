@@ -200,10 +200,14 @@ export class InputManager {
     this.bindAction('right', ['d', 'arrowright']);
     this.bindAction('jump', [' ']);
 
+    // e.key 可能是 undefined:输入法 composition / 合成事件 / 部分移动端键盘 /
+    // autofill 触发的 keydown 都没有 key,直接 .toLowerCase() 会抛 TypeError。
     document.addEventListener('keydown', (e) => {
+      if (!e.key) return;
       this._keys[e.key.toLowerCase()] = true;
     });
     document.addEventListener('keyup', (e) => {
+      if (!e.key) return;
       this._keys[e.key.toLowerCase()] = false;
     });
     document.addEventListener('mousemove', (e) => {

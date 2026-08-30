@@ -603,6 +603,7 @@
         <div class="tab" data-tab="display" onclick="switchTab('display')">展示区</div>
         <div class="tab" data-tab="files" onclick="switchTab('files')">文件管理</div>
         <div class="tab" data-tab="docs" onclick="switchTab('docs')">协议文档</div>
+        <div class="tab" data-tab="errors" onclick="switchTab('errors')">报错反馈</div>
         <div class="tab chat-tab" data-tab="chat" onclick="switchTab('chat')"> 在线对话</div>
       </div>
 
@@ -910,6 +911,26 @@
     ></div>
     <div class="cfm" id="cfm"><div class="cfm-box"><div class="cfm-msg" id="cfmMsg"></div><div class="cfm-btns"><button class="btn-day" id="cfmOk">确定</button><button class="btn-revoke" id="cfmCancel">取消</button></div></div></div>
 
+    <!-- ========== 报错反馈 ========== -->
+    <div id="tab-errors" style="display: none">
+      <div class="section-title"> 🐞 报错反馈(访客端运行时错误自动上报,覆盖 JS 异常/Promise 拒绝/资源加载/WebGL/网络)</div>
+      <div class="stats" id="errStats"></div>
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 6px 0">
+        <select id="errType" style="padding: 7px">
+          <option value="">全部类型</option>
+          <option value="js">JS 异常</option>
+          <option value="promise">Promise 拒绝</option>
+          <option value="resource">资源加载</option>
+          <option value="webgl">WebGL</option>
+          <option value="network">网络请求</option>
+        </select>
+        <input id="errQ" placeholder="搜索消息/来源/页面…" style="padding: 7px; width: 260px" />
+        <button class="btn-day" id="errRefresh" style="padding: 7px 12px">刷新</button>
+        <button class="btn-revoke" id="errClear" style="padding: 7px 12px">清空全部</button>
+      </div>
+      <div id="errList"></div>
+    </div>
+
     <script>
       const TOKEN = new URLSearchParams(location.search).get('token') || '';
       const tk = () => '?token=' + encodeURIComponent(TOKEN);
@@ -963,6 +984,70 @@
         t.style.display = 'block';
         setTimeout(() => (t.style.display = 'none'), 2200);
       }
+      // ===================== 报错反馈(2026-08-30) =====================
+      const TYPE_ICON = { js: '⚡', promise: '⏳', resource: '📦', webgl: '🖥', network: '🌐' };
+      const TYPE_NAME = { js: 'JS 异常', promise: 'Promise', resource: '资源', webgl: 'WebGL', network: '网络' };
+      async function loadErrors() {
+        try {
+          const type = $('errType').value;
+          const q = $('errQ').value.trim();
+          const r = await fetch('/api/admin/client-errors' + tk() + '&type=' + encodeURIComponent(type) + '&q=' + encodeURIComponent(q));
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || '加载失败');
+          // 统计卡
+          const cards = [
+            ['总次数', d.total],
+            ['独立错误', d.unique],
+            ['近 24h', d.recent24],
+          ];
+          for (const [k, v] of Object.entries(d.byType || {})) cards.push([TYPE_NAME[k] || k, v]);
+          $('errStats').innerHTML = cards
+            .map(([k, v]) => `<div class="stat"><div class="stat-num">${v}</div><div class="stat-lab">${esc(k)}</div></div>`)
+            .join('');
+          // 列表
+          if (!d.list.length) {
+            $('errList').innerHTML = '<div class="card" style="color:var(--muted)">暂无报错 —— 访客端一切正常 🎉</div>';
+            return;
+          }
+          $('errList').innerHTML = d.list
+            .map((e) => {
+              const ctxBits = [];
+              if (e.viewMode !== undefined && e.viewMode !== null) ctxBits.push(e.viewMode === 1 ? '第三人称' : '第一人称');
+              if (e.playerPos) ctxBits.push('位置(' + e.playerPos + ')');
+              if (e.count > 1) ctxBits.push('×' + e.count + ' 次');
+              return `<div class="card" style="padding:10px 14px">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <span style="font-size:16px">${TYPE_ICON[e.type] || '•'}</span>
+                  <b>${TYPE_NAME[e.type] || esc(e.type)}</b>
+                  <span style="color:var(--muted);font-size:12px">${fmt(e.lastT)}</span>
+                  ${ctxBits.map((x) => `<span style="font-size:11px;background:var(--surface-2,#eee);padding:2px 8px;border-radius:10px">${esc(x)}</span>`).join('')}
+                </div>
+                <div style="margin-top:6px;font-family:monospace;font-size:12px;word-break:break-all">${esc(e.message)}</div>
+                ${e.source ? `<div style="color:var(--muted);font-size:11px;margin-top:4px;font-family:monospace">${esc(e.source)}${e.lineno ? ':' + e.lineno + ':' + e.colno : ''}</div>` : ''}
+                ${e.stack ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">堆栈</summary><pre style="font-size:11px;white-space:pre-wrap;word-break:break-all;background:var(--surface-2,#f4f4f4);padding:8px;border-radius:6px;margin:4px 0 0">${esc(e.stack)}</pre></details>` : ''}
+                ${e.ua ? `<div style="color:var(--muted);font-size:11px;margin-top:4px">${esc(e.ua)}</div>` : ''}
+              </div>`;
+            })
+            .join('');
+        } catch (e) {
+          $('errList').innerHTML = '<div class="card" style="color:#c64545">加载失败: ' + esc(e.message) + '</div>';
+        }
+      }
+      $('errRefresh').addEventListener('click', loadErrors);
+      $('errType').addEventListener('change', loadErrors);
+      $('errClear').addEventListener('click', async function () {
+        if (!(await confirmAsync('确定清空全部报错记录?此操作不可恢复'))) return;
+        try {
+          await fetch('/api/admin/client-errors/clear' + tk(), { method: 'POST' });
+          toast('已清空');
+          loadErrors();
+        } catch (e) {
+          toast('清空失败: ' + e.message, true);
+        }
+      });
+      $('errQ').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') loadErrors();
+      });
       function brandIcon(b) {
         var s = typeof b === 'object' ? b.brand || '' : b || '';
         if (/iPhone|iPad/.test(s)) return '🍎';
@@ -974,7 +1059,7 @@
         return String(b || '未知');
       }
       function switchTab(t) {
-        var panels = ['approve', 'stats', 'history', 'quiz', 'display', 'files', 'docs', 'chat'];
+        var panels = ['approve', 'stats', 'history', 'quiz', 'display', 'files', 'docs', 'errors', 'chat'];
         for (var i = 0; i < panels.length; i++) {
           var p = $('tab-' + panels[i]);
           if (p) p.style.display = panels[i] === t ? '' : 'none';
@@ -998,6 +1083,7 @@
         else if (t === 'display') loadFn = loadDisplay;
         else if (t === 'docs') loadFn = loadDocs;
         else if (t === 'chat') loadFn = startChat;
+        else if (t === 'errors') loadFn = loadErrors;
         if (loadFn) setTimeout(loadFn, 200);
       }
       // ---------- 协议文档编辑(designMode 原页直改;不进自动刷新) ----------
