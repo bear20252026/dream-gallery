@@ -4,13 +4,14 @@
 // ============================================================
 
 import { eventBus } from './event-bus.js';
+import { EYE_HEIGHT } from './shared/constants.js';
 
 /**
  * 玩家眼睛离地高度(米)——与 scene/player.js 的 `groundY(x,z) + 1.6` 保持一致。
  * pl.p.y 存的是**眼睛**高度,而第三人称角色模型的原点在**脚底**,
  * 所以渲染角色时要减掉这个值才能得到贴地的脚底位置。
  */
-const EYE_HEIGHT = 1.6;
+// EYE_HEIGHT 已迁至 shared/constants.js(B2 整改,物理眼高单一来源)
 
 // 射线-AABB slab 求交(解析法,零分配,免 THREE 依赖):
 // 返回沿 (dx,dy,dz) 方向自 (ox,oy,oz) 起到命中 AABB 的距离;
@@ -256,13 +257,11 @@ export class LoopManager {
       _modelYaw = pl.y; // 第一人称:角色朝向即玩家朝向
     }
     
-    // 跳跃/滑翔/重力物理(player.js tickPhysics)
-    // ⚠️ 2026-08-30 修复:player.js:881 把函数挂到 **ctx.tickPhysics**(扁平,
-    //   注释写"未映射属性,保持扁平"),而这里一直在读 **ctx.player.tickPhysics**
-    //   —— 该属性从未被赋值,导致重力/跳跃/滑翔/贴地**完全没有运行过**。
-    //   表现为:玩家 y 恒定在初始 1.6,不会落地、不会跳、不会滑翔,角色"贴地飞行"。
-    //   现改为两者都试(扁平优先,命名空间回退),并显式 warn 便于日后发现同类断链。
-    const tickPhysics = ctx.tickPhysics || ctx.player.tickPhysics;
+    // 跳跃/滑翔/重力物理(player.js tickPhysics,经 Object.assign 挂 ctx.player)
+    // ⚠️ 2026-08-30 B2 收敛:历史上函数被挂到扁平 ctx.tickPhysics 而此处读
+    //   ctx.player.tickPhysics,断链导致物理从未运行(角色"贴地飞行")。
+    //   现单一入口 ctx.player.tickPhysics;保留 warn 作断链金丝雀。
+    const tickPhysics = ctx.player.tickPhysics;
     if (tickPhysics) {
       tickPhysics(dt);
     } else if (!this._warnedNoPhysics) {

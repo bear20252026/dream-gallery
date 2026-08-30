@@ -1,6 +1,7 @@
 // player.js — 玩家移动/碰撞 + 键盘 + 鼠标 + 触摸(摇杆) + 小地图 + 状态机
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
+import { EYE_HEIGHT } from '../shared/constants.js';
 import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
 const gs = getGameState();
 const { cam, rnd, bounds, jT, jB, onC3D, zoomOut, OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
@@ -15,7 +16,7 @@ ctx._playerSM = playerSM; // 供外部查询当前状态
 // ===================== 玩家 =====================
 // 出生在建筑外(z=45),面朝南方大视频墙,背后是建筑;心象共鸣≥95分前由实体门禁墙封挡建筑
 const pl = {
-  p: new THREE.Vector3(20, 1.6, 14),
+  p: new THREE.Vector3(20, EYE_HEIGHT, 14), // 出生眼高(首帧 tickPhysics 会按地形校正)
   y: -Math.PI / 2,
   pi: 0.5,
   r: 0.35,
@@ -102,7 +103,7 @@ function mv(wx, wz, dt) {
   pl.p.z = r.z;
   // 地面跟随(沙漠地形):着地时贴近地表
   if (pl.onGround) {
-    const gy = groundY(r.x, r.z) + 1.6;
+    const gy = groundY(r.x, r.z) + EYE_HEIGHT;
     pl.p.y += (gy - pl.p.y) * Math.min(dt * 12, 1);
   }
   // 相机位置/朝向统一由 main.js 主循环(an)接管(第一/第三人称都在那里处理),
@@ -138,7 +139,7 @@ function tickPhysics(dt) {
     jumpPressed = false;
     return;
   } // 飞舟巡礼中(ark.js):重力/跳跃冻结,且吞掉排队跳跃,防落地弹跳
-  const gy = groundY(pl.p.x, pl.p.z) + 1.6;
+  const gy = groundY(pl.p.x, pl.p.z) + EYE_HEIGHT;
   // 起跳(落地瞬间触发一次)
   if (pl.onGround && jumpPressed) {
     pl.vy = 9.5;
@@ -180,7 +181,7 @@ function tickPhysics(dt) {
   }
   // 兜底:意外跌出世界时拉回出生点
   if (pl.p.y < -30) {
-    pl.p.set(20, groundY(20, 14) + 1.6, 14);
+    pl.p.set(20, groundY(20, 14) + EYE_HEIGHT, 14);
     pl.vy = 0;
     pl.onGround = true;
   }
@@ -623,7 +624,7 @@ mC.addEventListener('pointerdown', (e) => {
   fadeTeleport(() => {
     pl.p.x = wx;
     pl.p.z = wz;
-    pl.p.y = groundY(wx, wz) + 1.6;
+    pl.p.y = groundY(wx, wz) + EYE_HEIGHT;
     pl.vy = 0;
     pl.onGround = true; // 传送到地形表面
     cam.position.copy(pl.p); // 传送后立即同步相机(mv 只在移动时同步)
@@ -643,7 +644,7 @@ homeBtn.addEventListener('click', (e) => {
     return;
   } // ark.js:飞行中禁回家
   fadeTeleport(() => {
-    pl.p.set(20, groundY(20, 14) + 1.6, 14);
+    pl.p.set(20, groundY(20, 14) + EYE_HEIGHT, 14);
     pl.vy = 0;
     pl.onGround = true;
     pl.gliding = false;
@@ -658,9 +659,8 @@ homeBtn.addEventListener('click', (e) => {
 });
 document.body.appendChild(homeBtn);
 
-Object.assign(ctx.player, { pl, jD, ks, mv, drM });
+Object.assign(ctx.player, { pl, jD, ks, mv, drM, tickPhysics });
 ctx.kunlun.fadeTeleport = fadeTeleport;
-ctx.tickPhysics = tickPhysics; // 未映射属性,保持扁平
 
 // 昆仑灵鉴:行走氛围——「山记得你的每一步。」(已进展厅后,每 4 分钟至多浮现一次)
 setInterval(() => {
