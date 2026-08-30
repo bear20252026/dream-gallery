@@ -26,7 +26,9 @@ export class LoopManager {
     this._lastPlsT = 0;
     
     // 自适应画质
-    this.PR_STEPS = [Math.min(devicePixelRatio, 2), 1.5, 1.25, 1];
+    // 低档位 0.75/0.5:第三人称角色(12 万三角面蒙皮+全场景光照)会把弱 GPU 拖到个位数帧率,
+    // 原 1.0 兜底不够 —— 降分辨率是弱机上最有效的救命档(画面糊但能玩)
+    this.PR_STEPS = [Math.min(devicePixelRatio, 2), 1.5, 1.25, 1, 0.75, 0.5];
     this.prIdx = 0;
     this.prLastChange = 0;
     this.fpsAcc = 0;

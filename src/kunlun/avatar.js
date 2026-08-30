@@ -12,18 +12,13 @@ import { ctx } from '../ctx.js';
 let avatarHolder = null; // Group:loop-manager 每帧写入 position/rotation
 let avatarModel = null; // gltf.scene(内层:贴地偏移与动画)
 let mixer = null;       // AnimationMixer
-let clips = null;       // { start, loop, end } AnimationClip
-let lastMoving = false; // 上一帧是否在走,用于检测状态切换
-let stateAnim = null;   // 当前播放的 Action
-let stateName = 'idle'; // idle | start | loop | end
-let endStartT = 0;      // end 动画起始时间(用于播完后切回 idle)
-let initScale = 1;      // 模型当前缩放(供 position 调整时复用)
-
+let clips = null;       // { loop, start?, end? } AnimationClip
+let stateAnim = null;   // 当前 loop Action
 const CDN = 'https://cdn.cloudbear.cloud/models/avatar/';
 // 单 GLB 含走路循环;start/end 留接口,后续按需加
 const MODEL_URL = CDN + 'catwalk/catwalk-loop-378982.glb';
 const TARGET_HEIGHT = 1.7;
-const FADE = 0.25; // 动画切换淡入淡出时长(秒)
+const IDLE_TIME_SCALE = 0.15; // 静止时慢速播放(呼吸感),避免定格绑定姿势
 
 // ===================== 状态条 + 看自己按钮 =====================
 let statusEl = null;
@@ -106,8 +101,7 @@ function setupModel(gltf) {
   const box = new THREE.Box3().setFromObject(obj);
   const size = new THREE.Vector3(); box.getSize(size);
   if (size.y > 0.001) {
-    initScale = TARGET_HEIGHT / size.y;
-    obj.scale.setScalar(initScale);
+    obj.scale.setScalar(TARGET_HEIGHT / size.y);
   }
   obj.updateMatrixWorld(true);
 
@@ -149,27 +143,29 @@ function setupModel(gltf) {
   ctx.scene.s.add(holder);
   ctx.scene.avatar = holder;
 
-  // AnimationMixer:目前只用了走路循环(loop),start/end 留接口后续扩展
+  // AnimationMixer:走路循环一个 clip 搞定两态 ——
+  //   移动中: timeScale=1   正常步频
+  //   静止时: timeScale≈0.15 慢速"呼吸"摆动(避免淡出到绑定姿势 = A-pose 定格,
+  //           用户看到的"没有走动动画/卡住"就是静止时 fadeOut 后骨架回到 bind pose)
+  // 之前还设计了 start/end 状态机,但 CDN 只上传了 loop 一套 GLB,
+  // clips.end 不存在 → setState('idle') 淡出所有动作 → 定格绑定姿势。
   mixer = new THREE.AnimationMixer(obj);
   // Blender 导出的 GLB 有 2 个 animation: [0]=Armature|* 主动画 [1]=Key|* morph 噪声
-  // 取第一个有意义的(morph 时长 0 会被 mixer 报 empty)
   const usable = gltf.animations.filter((c) => c.tracks.length > 1 && c.duration > 0.1);
   clips = { loop: usable[0] };
   if (usable.length > 1) clips.start = usable[1];
-  // 标记走为默认播放
   const act = mixer.clipAction(clips.loop);
   act.loop = THREE.LoopRepeat;
+  act.timeScale = IDLE_TIME_SCALE; // 出生时多半静止:先慢速
   act.play();
   stateAnim = act;
-  stateName = 'loop';
-  lastMoving = true; // 强制进入下一帧的"state change"分支
 
   window.__avatarLoaded = true;
   window.__avatarClips = clips;
-  setStatus('角色就绪 · 点右下角按钮切换第三人称', '#66ff99');
+  setStatus('角色就绪 · 按 V 或点「人称」切换视角', '#66ff99');
   setTimeout(clearStatus, 5000);
 
-  // 注册帧 tick:推进 mixer 并按移动状态切换动作
+  // 注册帧 tick:推进 mixer 并按移动状态调速
   ctx._avatarTick = avatarTick;
   ctx.onTick(ctx._avatarTick);
 }
@@ -180,55 +176,21 @@ function isMovingNow() {
   return !!(sm && sm.current && sm.current.name === 'walking');
 }
 
-// 切到目标 clip(start / loop / end / idle)
-function setState(next) {
-  if (!mixer || !clips || next === stateName) return;
-  // idle: 全部淡出
-  if (next === 'idle') {
-    if (stateAnim) stateAnim.fadeOut(FADE);
-    stateAnim = null;
-    stateName = 'idle';
-    return;
-  }
-  const clip = clips[next];
-  if (!clip) return;
-  const act = mixer.clipAction(clip);
-  act.reset();
-  act.setLoop(next === 'loop' ? THREE.LoopRepeat : THREE.LoopOnce, Infinity);
-  act.clampWhenFinished = (next === 'end' || next === 'start');
-  act.fadeIn(FADE);
-  if (stateAnim) stateAnim.fadeOut(FADE);
-  stateAnim = act;
-  stateName = next;
-  if (next === 'end') endStartT = performance.now() / 1000;
-}
-
-// 动画 tick:推 mixer + 切换状态
+// ===================== 动画 tick =====================
+// 只有一个 loop clip,用 timeScale 平滑表达"走路 / 静止呼吸"两态:
+//   timeScale 逐帧向目标插值(走路 1,静止 0.15),切换无跳变。
+// 第一人称(holder 不可见)直接跳过,省掉每帧 101 骨骼的蒙皮矩阵计算。
 function avatarTick(dt) {
-  if (!mixer) return;
-  const d = Math.min(dt || 0, 0.1);
-  mixer.update(d);
-
+  if (!mixer || !avatarHolder) return;
+  if (!avatarHolder.visible) return; // 第一人称:模型不渲染也不算动画
   const moving = isMovingNow();
-  // 状态机:基于 moving 变化 + end 动画播完
-  if (moving) {
-    // 静止→开始:start(有则用,否则 loop)
-    if (stateName === 'idle' || stateName === 'end') {
-      setState(clips.start ? 'start' : 'loop');
-    } else if (stateName === 'start' && stateAnim && stateAnim.isRunning() === false) {
-      // start 播完 → loop
-      setState('loop');
-    }
-  } else {
-    // 移动→停止:end(有则用,否则 idle)
-    if (stateName === 'loop' || stateName === 'start') {
-      setState(clips.end ? 'end' : 'idle');
-    } else if (stateName === 'end' && stateAnim && stateAnim.isRunning() === false) {
-      // end 播完 → idle
-      setState('idle');
-    }
+  const target = moving ? 1 : IDLE_TIME_SCALE;
+  if (stateAnim) {
+    // 低帧率下 dt 被钳到 0.1,插值系数用固定比例即可,肉眼平滑
+    const t = stateAnim.timeScale + (target - stateAnim.timeScale) * 0.12;
+    stateAnim.timeScale = Math.abs(t - target) < 0.01 ? target : t;
   }
-  lastMoving = moving;
+  mixer.update(Math.min(dt || 0, 0.1));
 }
 
 // ===================== 按需加载 =====================

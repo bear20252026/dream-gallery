@@ -14,7 +14,7 @@ const { URL } = require('url');
 
 const { ROOT, PORT, TOKEN, CORS_ORIGIN, GATE_ANSWER, GATE_QUESTION, GATE_MODE, MEDIA_DIRS } = require('./lib/config');
 const { sendJson, readBody, safeJoin, isValidName } = require('./lib/util');
-const { gateData } = require('./lib/store');
+const { gateData, recordVisit } = require('./lib/store');
 const { serveGatePage, sseRegister, handleApply, handleGateStatus, approvalGate, GATE_HASH, hasGateCookie, handleRename } = require('./lib/gate');
 const { tokenOk, handleAdminList, handleAdminDecide, handleAdminBulk } = require('./lib/admin');
 const { handleQuizStart, handleQuizSubmit, handleQuizState, handleQuizInvite, handleQuizJudge } = require('./lib/quiz');
@@ -243,6 +243,11 @@ const handler = (req, res) => {
     serveGatePage(res, 'apply');
     return;
   }
+  // 访问统计(2026-08-30 修复):现网 .env 的 GATE_MODE 为空 → 上方两个门都不触发,
+  //   approvalGate 里的 recordVisit 从不执行 → 8/6 起访问统计一直为 0(用户报告)。
+  //   故在门禁放行后对首页统一补记;approval 模式下 gate 内已记,跳过防双计。
+  //   recordVisit 内部自带:回环跳过 + 60 秒同设备去重。
+  if (pathname === '/' && GATE_MODE !== 'approval') recordVisit(req, null, null);
 
   // 静态文件:/ → index.html
   let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');

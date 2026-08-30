@@ -304,7 +304,10 @@ document.addEventListener('mousemove', (e) => {
   }
 });
 cEl.addEventListener('mousedown', (e) => {
-  if (!('ontouchstart' in window) && e.button === 0) {
+  // 混合设备:触屏笔记本上 'ontouchstart' in window === true,原判据把鼠标拖拽整个禁用
+  // → 第三人称"视野无法四处切换"。现在任何设备都允许左键拖拽,
+  //   仅用 isFreshTouch() 拦掉真实触屏操作后的合成 mouse 事件(防误触发短按放大)。
+  if (e.button === 0 && !isFreshTouch()) {
     mDg = true;
     mLX = e.clientX;
     mLY = e.clientY;
@@ -350,6 +353,12 @@ let jId = null,
   tSX = 0,
   tSY = 0,
   tST = 0;
+// 混合设备(触屏笔记本)支持:真实 touch 刚结束后的合成 mouse 事件不当作鼠标输入,
+// 否则触屏操作后的 click 合成会误触发"短按=3D放大"与视角拖拽。
+let lastTouchT = 0;
+function isFreshTouch() {
+  return Date.now() - lastTouchT < 800;
+}
 function uj() {
   const rect = jB.getBoundingClientRect();
   jCX = rect.left + rect.width / 2;
@@ -391,6 +400,7 @@ function isUiTouch(e) {
 document.addEventListener(
   'touchstart',
   (e) => {
+    lastTouchT = Date.now();
     if (!isUiTouch(e)) e.preventDefault();
     uj();
     if (isUiTouch(e)) return; // 面板/控件上的触摸不启动摇杆和视角拖拽
@@ -465,6 +475,44 @@ document.addEventListener('touchend', (e) => {
 document.addEventListener('touchcancel', () => {
   jId = null;
   lId = null;
+  jD.x = 0;
+  jD.z = 0;
+  jT.classList.remove('a');
+  jT.style.transform = 'translate(-50%,-50%)';
+});
+
+// ---- 摇杆的鼠标驱动(混合设备) ----
+// 摇杆原本只监听 touch:触屏笔记本上用鼠标点摇杆毫无反应 →"走动不起来"。
+// ⚠️ 监听必须挂在容器 #j 上:HTML 里 #jb(底盘)和 #jt(摇杆头)是**兄弟节点**,
+//    摇杆头视觉上盖在底盘正中,点中心时事件冒泡路径是 #jt→#j,不经过 #jb。
+let jMouse = false;
+const jWrap = jB.parentElement || jB;
+jWrap.addEventListener('mousedown', (e) => {
+  if (e.button !== 0 || isFreshTouch()) return;
+  e.stopPropagation();
+  jMouse = true;
+  jId = 'mouse'; // 占位,防止真实 touch 同时接管
+  uj();
+  jT.classList.add('a');
+  jD.x = 0;
+  jD.z = 0;
+});
+document.addEventListener('mousemove', (e) => {
+  if (!jMouse) return;
+  const rect = jB.getBoundingClientRect();
+  const dx = e.clientX - (rect.left + rect.width / 2);
+  const dy = e.clientY - (rect.top + rect.height / 2);
+  const d = Math.min(Math.sqrt(dx * dx + dy * dy), jR);
+  const a = Math.atan2(dy, dx);
+  jD.x = (Math.cos(a) * d) / jR;
+  jD.z = (-Math.sin(a) * d) / jR;
+  jT.style.transform =
+    'translate(calc(-50% + ' + Math.cos(a) * d + 'px), calc(-50% + ' + Math.sin(a) * d + 'px))';
+});
+document.addEventListener('mouseup', () => {
+  if (!jMouse) return;
+  jMouse = false;
+  jId = null;
   jD.x = 0;
   jD.z = 0;
   jT.classList.remove('a');

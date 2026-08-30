@@ -182,6 +182,10 @@ async function saveNick(name, onOk) {
 let popShown = false;
 function maybePop() {
   if (popShown || myName || panelOpen) return;
+  // 用户本次浏览器会话里已关过/保存过昵称 → 不再重复弹。
+  // (之前 nickPopOff 只写不读:每次刷新都弹窗 + 10s 关闭锁,盖住画布中央,
+  //  也挡住画布点击,加重"卡住"的体感)
+  if (sessionStorage.getItem('nickPopOff') === '1') return;
   if (
     !sessionStorage.getItem('agreementConsented') ||
     !sessionStorage.getItem('privacyConsented') ||
