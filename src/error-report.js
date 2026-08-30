@@ -10,6 +10,8 @@
 //
 // 设计要点:
 //   - 缓冲 + 节流:同类错误在窗口内合并,最多每 FLUSH_MS 发一次,避免刷屏拖垮页面
+
+import { expose } from './debug-hooks.js';
 //   - 尽力而为:上报本身绝不再抛错、不阻塞游戏(全部 try/catch 包裹)
 //   - 去重视后的计数在服务端完成,这里只做轻量节流
 //   - 页面隐藏/关闭前用 sendBeacon 兜底发送未上报的缓冲
@@ -152,7 +154,7 @@ try {
 try {
   const origErr = console.error;
   let captureConsole = false;
-  window.__errCaptureConsole = (on) => { captureConsole = !!on; };
+  expose('errCaptureConsole', (on) => { captureConsole = !!on; });
   console.error = function (...a) {
     if (captureConsole) {
       try {
@@ -170,6 +172,6 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // 供手动上报(业务代码可主动记录,比如"模型加载三次都失败")
-window.__reportError = (type, message, extra) => push(Object.assign({ type, message }, extra || {}));
+expose('reportError', (type, message, extra) => push(Object.assign({ type, message }, extra || {})));
 
 export { push as reportError, flush };

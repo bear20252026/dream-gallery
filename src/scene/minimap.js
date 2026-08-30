@@ -55,6 +55,12 @@ mStatic.width = 150;
 mStatic.height = 140;
 const mSt = mStatic.getContext('2d');
 (function drawStaticMap() {
+  // 防御断言(2026-08-30 复查建议):本模块依赖 main.js 的导入顺序(scene.js 先于
+  // player.js→minimap.js);若未来有人重排为动态/先行导入,这里会拿到 undefined。
+  if (typeof OL !== 'number' || typeof OBR !== 'number') {
+    console.error('[minimap] 场馆常量未就绪(OL=' + OL + ',OBR=' + OBR + ')—— 导入顺序被重排?静态底图绘制中止');
+    return;
+  }
   const mX = mSt; // 以下静态绘制代码与原逐帧版本一致,只是画到离屏层
   const w = 150,
     h = 140,

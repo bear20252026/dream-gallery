@@ -431,7 +431,12 @@ document.addEventListener(
   'touchstart',
   (e) => {
     lastTouchT = Date.now();
-    if (!isUiTouch(e)) e.preventDefault();
+    // ⚠️ 2026-08-30 移动端卡死修复:不再对非 UI 触摸 blanket preventDefault!
+    // preventDefault 会杀掉 click 合成 → 全站所有依赖 click 的元素(开屏"轻触启程"、
+    // 序章、弹窗遮罩等非 button 元素)在手机上永久失效。滚动/双击缩放的禁用改由
+    // index.html 的 CSS `html,body{touch-action:none;overscroll-behavior:none}` 承担;
+    // 拖拽期间的滚动抑制仍由 touchmove 的 preventDefault 兜底。
+    // isUiTouch 豁免保留:面板/控件触摸不启动摇杆与视角拖拽。
     uj();
     if (isUiTouch(e)) return; // 面板/控件上的触摸不启动摇杆和视角拖拽
     for (let i = 0; i < e.changedTouches.length; i++) {
@@ -582,23 +587,8 @@ document.addEventListener('mouseup', () => {
   jT.style.transform = 'translate(-50%,-50%)';
 });
 
-// ===================== 传送过渡遮罩(2026-07-27 主人反馈"没有过渡":消除跳切感) =====================
-// 全屏深色遮罩:180ms 淡入 → 执行位移 → 220ms 淡出。小地图传送/回家键共用;其他模块经 ctx.kunlun.fadeTeleport 复用
-const tpVeil = document.createElement('div');
-tpVeil.style.cssText =
-  'position:fixed;inset:0;z-index:400;background:#0a0510;opacity:0;pointer-events:none;transition:opacity .18s ease';
-document.body.appendChild(tpVeil);
-function fadeTeleport(cb) {
-  tpVeil.style.opacity = '1';
-  setTimeout(() => {
-    cb();
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        tpVeil.style.opacity = '0';
-      });
-    });
-  }, 180);
-}
+// 传送过渡遮罩:实现下沉 shared/teleport-fx.js(darkTeleport,与 goldenTeleport 并列)
+import { darkTeleport as fadeTeleport } from '../shared/teleport-fx.js';
 
 mC.addEventListener('pointerdown', (e) => {
   if (ctx.kunlun.flightLock) {

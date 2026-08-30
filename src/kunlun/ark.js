@@ -11,6 +11,8 @@ import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
 import { getGameState } from '../core/game-state.js'; // 阶段4:flightLock 写路径收归 gameState.set(写回经 set 陷阱发事件)
 import { bigText } from '../ui/kit.js';
+import { eventBus } from '../event-bus.js';
+import { expose } from '../debug-hooks.js';
 const gs = getGameState();
 const bag = hotBegin('ark');
 // 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
@@ -440,7 +442,7 @@ const FF = {
   autoNav: false,
   lastT: 0,
 };
-window.__arkFF = FF; // 探针钩子(仿 __vidEl 惯例)
+expose('arkFF', FF); // 探针钩子(仿 __vidEl 惯例)
 const CRUISE = 24,
   YMAX = 480,
   BOUND_R = 720,
@@ -895,6 +897,10 @@ function dock() {
   }, 2500);
 }
 // 罗盘传送:回到山巅登舟点
+// gate 层经意图事件解耦传送(2026-08-30 架构复查②)
+const offPeakTpEvt = eventBus.on('kunlun:teleport', ({ kind }) => {
+  if (kind === 'peak') ctx.kunlun.arkTeleportToPeak && ctx.kunlun.arkTeleportToPeak();
+});
 ctx.kunlun.arkTeleportToPeak = function () {
   if (flying) return;
   const pl = ctx.player.pl;
@@ -1053,7 +1059,8 @@ bag.custom.push(() => {
   hudOvApi.unregister();
   document.removeEventListener('keydown', onKey);
   ctx.kunlun.arkTeleportToPeak = null;
-  window.__arkFF = null;
+  offPeakTpEvt();
+  expose('arkFF', null);
 });
 hotEnd('ark');
 if (import.meta.hot) import.meta.hot.accept();

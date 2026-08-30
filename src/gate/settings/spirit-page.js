@@ -1,5 +1,7 @@
 // spirit-page.js — 六灵蕴收集页(独立三级页,展示收集进度、召回、传送、前缀)
 import { ctx } from '../../ctx.js';
+import { eventBus } from '../../event-bus.js';
+import { expose } from '../../debug-hooks.js';
 
 const spOv = document.createElement('div');
 spOv.id = 'spOv';
@@ -104,13 +106,13 @@ function renderSpirits() {
   if (gh)
     gh.onclick = () => {
       spApi.close();
-      ctx.kunlun.eternalTeleport && ctx.kunlun.eternalTeleport(true);
+      eventBus.emit('kunlun:teleport', { kind: 'eternal' });
     };
   const gp = document.getElementById('spGoPeak');
   if (gp)
     gp.onclick = () => {
       spApi.close();
-      ctx.kunlun.arkTeleportToPeak && ctx.kunlun.arkTeleportToPeak();
+      eventBus.emit('kunlun:teleport', { kind: 'peak' });
     };
   spCard.querySelectorAll('button[data-lg]').forEach((b) => {
     b.onclick = () => {
@@ -127,6 +129,6 @@ setTimeout(function () {
     spApi.open();
   };
 }, 0);
-window.__refreshSpirits = function () {
+expose('refreshSpirits', function () {
   if (spApi.isOpen()) renderSpirits();
-};
+});

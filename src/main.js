@@ -1,5 +1,5 @@
 // main.js — 入口模块：按原始执行顺序导入各副作用模块，最后启动动画循环
-window.__BUILD__ = '2026-07-28-r9'; // 部署序号(诊断+刷新产物哈希,绕开边缘节点缓存的 404)
+expose('BUILD', '2026-07-28-r9'); // 部署序号(诊断+刷新产物哈希,绕开边缘节点缓存的 404)
 import { ctx } from './ctx.js';
 import './error-report.js'; // 客户端报错反馈(2026-08-30):尽早挂载才能捕获启动期错误
 
@@ -121,7 +121,7 @@ const { jD, ks, pl, mv, drM } = ctx.player; // 玩家簇经命名空间取(别�
   // 保留的吊顶灯同步削弱 pls 闪烁列表,避免对已移除灯的无效更新
   for (let i = pls.length - 1; i >= 0; i--) if (!ceil.has(pls[i].l)) pls.splice(i, 1);
   if (typeof window !== 'undefined') {
-    window.__lightBudget = { removed: rm.length, keepEvery, spotKeep: SPOT_KEEP };
+    expose('lightBudget', { removed: rm.length, keepEvery, spotKeep: SPOT_KEEP });
   }
 }
 
@@ -171,6 +171,7 @@ window.addEventListener('resize', () => {
 
 // ===================== 动画（使用统一循环管理器）=====================
 import { LoopManager } from './loop-manager.js';
+import { expose } from './debug-hooks.js';
 const loopManager = new LoopManager(ctx);
 ctx.loopManager = loopManager;
 setLoop(loopManager); // 注入唯一主循环到 core/loop facade(新积木经 deps.loop 获取)
@@ -191,9 +192,9 @@ compositionRoot.register(createLoopSystem());
 compositionRoot.register(createInputSystem(ctx.input));
 compositionRoot.init();
 // 可观测:浏览器控制台 / 验证脚本可打印确定性装配顺序(window.__compositionRoot.list())
-window.__compositionRoot = compositionRoot;
+expose('compositionRoot', compositionRoot);
 // 可观测:单向状态库实例(配合 __compositionRoot,验证 store 真正化)
-window.__gameState = getGameState();
+expose('gameState', getGameState());
 // 把组合根每帧 update 注册进唯一主循环(经 core/loop facade,不再散点 ctx.onTick / 自起 rAF)
 register((dt) => compositionRoot.update(dt));
 

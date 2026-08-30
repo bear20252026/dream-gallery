@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
+import { expose } from '../debug-hooks.js';
 hotBegin('upload');
 const { s } = ctx;
 
@@ -183,7 +184,7 @@ const HINT_SOUNDS = ['music/VID_20260725_51.mp3', 'music/VID_20260725_52.mp3'];
 function playUploadHint(onEnd) {
   try {
     const snd = new Audio(HINT_SOUNDS[Math.floor(Math.random() * HINT_SOUNDS.length)]);
-    window.__upHint = snd; // 诊断钩子:探针验证提示音/暂停恢复用
+    expose('upHint', snd); // 诊断钩子:探针验证提示音/暂停恢复用
     // 使用音频管理器播放,自动排队
     if (ctx.media.audioManager) {
       ctx.media.audioManager.playHint(snd, onEnd);

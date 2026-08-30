@@ -6,6 +6,7 @@
 // 手机灯光账户:不新增任何 PointLight——窗/光柱/光束/光池全部 MeshBasicMaterial,画框背光用 emissiveMap
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
+import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片即刷新晨光(2026-08-29)
 const bag = hotBegin('eternal');
@@ -704,6 +705,10 @@ function teleport(intoHall) {
   );
 }
 ctx.kunlun.eternalTeleport = teleport; // 罗盘「返回永恒展厅」/ark.js 复用
+// gate 层经意图事件解耦传送(2026-08-30 架构复查②:消除 gate→kunlun 反向渗透)
+const offTeleportEvt = eventBus.on('kunlun:teleport', ({ kind }) => {
+  if (kind === 'eternal') teleport(true);
+});
 ctx.kunlun.eternalWelcome = welcome; // 飞舟停靠后的首到欢迎(幂等)
 ctx.kunlun.eternalClick = function (cg) {
   const act = cg.userData.eternalAction;
@@ -781,6 +786,7 @@ bag.custom.push(() => {
   ctx.kunlun.eternalKeepOut = null;
   ctx.kunlun.groundOverride = null;
   ctx.kunlun.eternalTeleport = null;
+  offTeleportEvt();
   ctx.kunlun.eternalWelcome = null;
 });
 hotEnd('eternal');

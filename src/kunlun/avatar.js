@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
+import { expose } from '../debug-hooks.js';
 
 let avatarHolder = null; // Group:loop-manager 每帧写入 position/rotation
 let avatarModel = null; // gltf.scene(内层:贴地偏移与动画)
@@ -223,8 +224,8 @@ function setupModel(gltf) {
   act.play();
   stateAnim = act;
 
-  window.__avatarLoaded = true;
-  window.__avatarClips = clips;
+  expose('avatarLoaded', true);
+  expose('avatarClips', clips);
   setStatus('角色就绪 · 按 V 或点「人称」切换视角', '#66ff99');
   setTimeout(clearStatus, 5000);
 
@@ -272,7 +273,7 @@ function ensureAvatar(cb) {
       for (const w of ws) w();
     },
     function () {
-      window.__avatarFailed = true;
+      expose('avatarFailed', true);
       avatarRequested = false;
       setStatus('角色加载失败(网络/CDN)。可点击重试', '#ff6666');
     }

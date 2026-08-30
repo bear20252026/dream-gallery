@@ -182,6 +182,7 @@ function build() {
   // ===== 阶段A:开屏仪式(chartogne 式逐字浮现 + 轻触启程) =====
   phase = 'intro';
   introEl = document.createElement('div');
+  introEl.id = 'obIntro';
   introEl.style.cssText =
     'position:absolute;inset:0;z-index:3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;background:#040206;cursor:pointer;transition:opacity 1.4s ease';
   const line = document.createElement('div');
@@ -311,7 +312,13 @@ export function showOpening(onEnter) {
   window.addEventListener('resize', resize);
   window.addEventListener('pointermove', onMove);
   window.addEventListener('keydown', onKey);
-  if (introEl) introEl.onclick = toMain; // 轻触启程
+  if (introEl) {
+    // 轻触启程:双通道触发(2026-08-30 移动端卡死修复)
+    // onclick 依赖 touchstart 合成 click,而 player.js 的 document 级 preventDefault
+    // 会杀掉合成 → 手机端点"轻触启程"永远无效。pointerup 不受 preventDefault 影响。
+    introEl.onclick = toMain;
+    introEl.addEventListener('pointerup', toMain);
+  }
   if (renderer) loop();
   requestAnimationFrame(() => {
     if (ov) ov.style.opacity = '1';
