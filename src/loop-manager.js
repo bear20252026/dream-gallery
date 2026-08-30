@@ -304,7 +304,10 @@ export class LoopManager {
         if (cy < gy + 0.35) cy = gy + 0.35;
       }
       cam.position.set(bx, cy, bz);
-      cam.lookAt(pl.p.x, pl.p.y + 1.0, pl.p.z);
+      // 视线目标:角色身体中心(脚底在 pl.p.y - EYE_HEIGHT,胸口≈脚底+0.85m)。
+      // 原先 lookAt(pl.p.y + 1.0) 沿用第一人称"眼睛"逻辑,而角色模型站在脚底 ——
+      // 视线比角色高约 2.6m,角色被甩出画面底部(实测屏幕投影 y=2116,画布仅 800 高)。
+      cam.lookAt(pl.p.x, pl.p.y - EYE_HEIGHT + 0.85, pl.p.z);
       cam.fov = 50;
       cam.updateProjectionMatrix();
       if (avatar) {
