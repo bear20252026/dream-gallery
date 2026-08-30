@@ -43,7 +43,7 @@ function renderGQ(){
 expose('selectGentleO',function(idx,score){
   gAns[gCur]=idx;gScore+=score;
   renderGQ();
-};
+});
 function showGentleResult(){
   document.getElementById('gtQuiz').style.display='none';
   const rE=document.getElementById('gtResult');
