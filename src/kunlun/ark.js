@@ -10,6 +10,7 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
 import { getGameState } from '../core/game-state.js'; // 阶段4:flightLock 写路径收归 gameState.set(写回经 set 陷阱发事件)
+import { bigText } from '../ui/kit.js';
 const gs = getGameState();
 const bag = hotBegin('ark');
 // 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
@@ -419,24 +420,6 @@ function chime(i) {
     });
   } catch (e) {}
 }
-function bigText(text, hold) {
-  const d = document.createElement('div');
-  d.style.cssText =
-    'position:fixed;inset:0;z-index:389;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
-  const inner = document.createElement('div');
-  inner.style.cssText =
-    'max-width:86vw;text-align:center;font-size:clamp(19px,4.6vw,30px);letter-spacing:3px;color:#ffe9c4;text-shadow:0 0 30px rgba(255,200,100,.6),0 2px 12px rgba(0,0,0,.8);line-height:1.9';
-  inner.textContent = text;
-  d.appendChild(inner);
-  document.body.appendChild(d);
-  requestAnimationFrame(() => {
-    d.style.opacity = '1';
-  });
-  setTimeout(() => {
-    d.style.opacity = '0';
-    setTimeout(() => d.remove(), 600);
-  }, hold || 2200);
-}
 const tintOv = document.createElement('div');
 tintOv.style.cssText =
   'position:fixed;inset:0;z-index:385;pointer-events:none;opacity:0;transition:opacity 1.2s';
@@ -607,7 +590,7 @@ function startFree() {
   pMat.needsUpdate = true;
   if (!ctx.store.flag('arkFFSeen')) {
     ctx.store.mark('arkFFSeen');
-    bigText('从现在起，风向由你决定。', 3000);
+    bigText('从现在起，风向由你决定。', { hold: 3000, small: true });
     ctx.ui.kunlunSpeak &&
       ctx.ui.kunlunSpeak(
         '从现在起，风向由你决定。W 爬升，S 俯冲，A D 转向，空格冲刺。点去展厅可以自动导航。',
@@ -860,7 +843,7 @@ function startFlight() {
   routeVisible = true;
   routeOpacity = 1;
   applyRouteOpacity();
-  bigText('灵蕴飞舟 · 六航路巡礼', 2600);
+  bigText('灵蕴飞舟 · 六航路巡礼', { hold: 2600, small: true });
   ctx.ui.modeToast && ctx.ui.modeToast('坐稳了——昆仑的风在为你让路。');
 }
 function enterSeg(k) {
@@ -868,7 +851,7 @@ function enterSeg(k) {
   const r = ROUTES[k];
   tintOv.style.background = `radial-gradient(circle at 50% 42%, rgba(${r.tint[0]},${r.tint[1]},${r.tint[2]},0.16), rgba(${r.tint[0]},${r.tint[1]},${r.tint[2]},0.05) 55%, rgba(0,0,0,0) 78%)`;
   tintOv.style.opacity = '1';
-  bigText(r.spirit + ' · ' + r.name);
+  bigText(r.spirit + ' · ' + r.name, { hold: 2200, small: true });
   ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak(r.poem, 'ark'); // B6 航路音色
   chime(k);
   if (k === 5) {

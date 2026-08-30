@@ -659,31 +659,13 @@ function chime() {
     });
   } catch (e) {}
 }
-function bigText(text) {
-  const d = document.createElement('div');
-  d.style.cssText =
-    'position:fixed;inset:0;z-index:389;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
-  const inner = document.createElement('div');
-  inner.style.cssText =
-    'max-width:86vw;text-align:center;font-size:clamp(20px,5vw,32px);letter-spacing:3px;color:#ffe9c4;text-shadow:0 0 30px rgba(255,200,100,.6),0 2px 12px rgba(0,0,0,.8);line-height:1.9';
-  inner.textContent = text;
-  d.appendChild(inner);
-  document.body.appendChild(d);
-  requestAnimationFrame(() => {
-    d.style.opacity = '1';
-  });
-  setTimeout(() => {
-    d.style.opacity = '0';
-    setTimeout(() => d.remove(), 600);
-  }, 2600);
-}
 
 // ===================== 金门/拱门点击 → 传送(paintings.js 经 eternalAction 钩子调来) =====================
 // 首到欢迎(ark.js 飞舟停靠后也要调用;localStorage 幂等,只迎一次)
 function welcome() {
   if (ctx.store.flag('eternalWelcomed')) return;
   ctx.store.mark('eternalWelcomed');
-  bigText('永恒展厅。你终于到了。');
+  bigText('永恒展厅。你终于到了。', { hold: 2600 });
   ctx.ui.kunlunSpeak &&
     ctx.ui.kunlunSpeak(
       '你终于到了。这里不在大地上，也不在天穹上。它在你与天空之间——那个只有完整的人才能抵达的位置。从前，这里是西王母存放心象碎片的地方。现在，它是你的了。',
@@ -691,6 +673,7 @@ function welcome() {
     ); // B6 展厅音色
 }
 import { goldenTeleport } from '../shared/teleport-fx.js';
+import { bigText } from '../ui/kit.js';
 let tpLock = false;
 function teleport(intoHall) {
   if (tpLock || !ctx.player.pl) return;

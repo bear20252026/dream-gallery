@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
+import { bigText } from '../ui/kit.js';
 const bag=hotBegin('spirits');
 const {s,onTick}=ctx;
 
@@ -148,18 +149,6 @@ function chime(i){
   }catch(e){}
 }
 
-// ===================== 中央大字弹窗(复用天穹里程碑样式) =====================
-function bigText(text,after){
-  const d=document.createElement('div');
-  d.style.cssText='position:fixed;inset:0;z-index:389;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
-  const inner=document.createElement('div');
-  inner.style.cssText='max-width:86vw;text-align:center;font-size:clamp(20px,5vw,32px);letter-spacing:3px;color:#ffe9c4;text-shadow:0 0 30px rgba(255,200,100,.6),0 2px 12px rgba(0,0,0,.8);line-height:1.9';
-  inner.textContent=text;
-  d.appendChild(inner);document.body.appendChild(d);
-  requestAnimationFrame(()=>{d.style.opacity='1';});
-  setTimeout(()=>{d.style.opacity='0';setTimeout(()=>{d.remove();if(after)after();},600);},2600);
-}
-
 // ===================== 收集流程 =====================
 let collecting=false,pickIdx=-1; // pickIdx:主循环判定的"脚下这颗"(含未揭示的乱序拾取)
 function collect(){
@@ -174,7 +163,7 @@ function collect(){
   const keys=ctx.store.addSpirit(sp.key); // 写入库存数组+同步兼容数量键
   const n=keys.length;
   chime(n-1);edgeFlash(sp.color);
-  bigText(sp.popup);
+  bigText(sp.popup, { hold: 2600 });
   ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(sp.tts,'spirits'); // B6 收集音色
   ctx.ui.modeToast&&ctx.ui.modeToast(sp.name+' · '+sp.emotion+' · 已收入罗盘（'+n+'/6）');
   setTimeout(()=>{
@@ -197,7 +186,7 @@ function finale(){
   const t0=performance.now();
   (function fade(){const p=Math.min((performance.now()-t0)/3000,1);beams.forEach(b=>b.material.opacity=0.9*(1-p));
     if(p<1)requestAnimationFrame(fade);else beams.forEach(b=>{s.remove(b);b.geometry.dispose();b.material.dispose();});})();
-  bigText(FINAL_POPUP);
+  bigText(FINAL_POPUP, { hold: 2600 });
   ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(FINAL_TTS);
   refreshSpiritsPage();
 }
@@ -212,7 +201,7 @@ onTick(function(){
       placePillar(nextIdx());
       if(!ctx.store.flag('spiritsIntro')){
         ctx.store.mark('spiritsIntro');
-        bigText('残镜之上，浮现出第二卷文字——');
+        bigText('残镜之上，浮现出第二卷文字——', { hold: 2600 });
         ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak(INTRO_TTS);
       }
     }

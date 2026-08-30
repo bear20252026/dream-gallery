@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
+import { bigText } from '../ui/kit.js';
 const bag=hotBegin('finale');
 const {s,onTick,iG}=ctx;
 
@@ -13,16 +14,6 @@ const HX=800,HZ=600,FLOOR=400;
 const SPIRIT_COLORS=['#7ddb7a','#ff5a4a','#e8a03c','#dfeaf5','#7cc8e8','#f0a860'];
 const SPIRIT_NAMES=['春生之芽','夏炽之焰','秋思之叶','冬藏之雪','朝露之珠','暮光之尘'];
 function inHall(){return !!(ctx.player.pl&&ctx.kunlun.eternalKeepOut&&ctx.kunlun.eternalKeepOut(ctx.player.pl.p.x,ctx.player.pl.p.z));}
-function bigText(text,hold){
-  const d=document.createElement('div');
-  d.style.cssText='position:fixed;inset:0;z-index:389;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
-  const inner=document.createElement('div');
-  inner.style.cssText='max-width:86vw;text-align:center;font-size:clamp(20px,5vw,32px);letter-spacing:3px;color:#ffe9c4;text-shadow:0 0 30px rgba(255,200,100,.6),0 2px 12px rgba(0,0,0,.8);line-height:1.9';
-  inner.textContent=text;
-  d.appendChild(inner);document.body.appendChild(d);
-  requestAnimationFrame(()=>{d.style.opacity='1';});
-  setTimeout(()=>{d.style.opacity='0';setTimeout(()=>d.remove(),600);},hold||1800);
-}
 function bell(f,g,dur){
   try{
     const ac=bell.ac||(bell.ac=new (window.AudioContext||window.webkitAudioContext)());
@@ -57,7 +48,7 @@ function wind(on){
 }
 function skyEnter(){
   skyOn=true;skyY0=ctx.player.pl.y;fogSave=s.fog.density;
-  bigText('这就是你补完的天。',1500);
+  bigText('这就是你补完的天。', { hold: 1500 });
   bell(98,0.18,3);wind(true); // 远处编钟+风声
   if(!ctx.store.flag('skyviewTts')){
     ctx.store.mark('skyviewTts');
