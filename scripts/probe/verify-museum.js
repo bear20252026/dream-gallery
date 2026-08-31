@@ -24,20 +24,20 @@ const { launch } = require('./browser.js');
   const inHall = p2 && p2.x < -1100;
   console.log(inHall ? '✓ 已进入大堂世界' : '✗ 未进入大堂');
   // 传送到陈列馆门框旁(HALL.X-6, HALL.Z-7 = -1206,-907;玩家在 -1198,-896 附近)
-  await page.evaluate(() => { const p = window.__ctx.player.pl; p.p.set(-1206, p.p.y, -906.5); });
+  await page.evaluate(() => { const p = window.__ctx.player.pl; p.p.set(-146, p.p.y, -196.5); });
   await page.waitForTimeout(6000); // 加载 22MB 房间
   const p3 = await pos();
   console.log('房间内位置:', JSON.stringify(p3));
-  const inRoom = p3 && Math.abs(p3.x - (-1200)) < 15 && Math.abs(p3.z - (-300)) < 15 && p3.y > 0;
+  const inRoom = p3 && Math.abs(p3.x - (-95)) < 12 && Math.abs(p3.z - (-300)) < 14 && p3.y > 0;
   console.log(inRoom ? '✓ 已进入图片陈列馆' : '✗ 未进入房间');
-  await page.screenshot({ path: 'scripts/artifacts/museum-room.png' });
+  await page.evaluate(() => { document.getElementById('panelOv').style.display='none'; }); await page.screenshot({ path: 'scripts/artifacts/museum-room.png' });
   // 走到返回门(HALL? 不——返回门在房间内 Z-WALK.hz+1.5 = -304.5,X=-1200)
-  await page.evaluate(() => { const p = window.__ctx.player.pl; p.p.set(-1200, p.p.y, -308.5); });
+  await page.evaluate(() => { const p = window.__ctx.player.pl; p.p.set(-95, p.p.y, -309.5); });
   await page.waitForTimeout(4000);
   const p4 = await pos();
   console.log('返回大堂后:', JSON.stringify(p4));
   console.log('JS 错误:', errs.length ? errs : '无');
-  await page.screenshot({ path: 'scripts/artifacts/museum-hall-back.png' });
+  await page.evaluate(() => { document.getElementById('panelOv').style.display='none'; }); await page.screenshot({ path: 'scripts/artifacts/museum-hall-back.png' });
   await b.close();
   process.exit(errs.length ? 1 : 0);
 })().catch((e) => { console.error('ERR', e.message); process.exit(1); });

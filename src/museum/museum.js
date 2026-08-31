@@ -14,6 +14,7 @@ import { bigText } from '../ui/kit.js';
 import { HALL, ROOMS, ROOM_BY_ID } from './rooms-config.js';
 
 const bag = hotBegin('museum');
+
 const { s, bounds, addBounds, removeBounds } = ctx.scene;
 
 const loader = new GLTFLoader();
@@ -53,9 +54,27 @@ function loadWorld(url, name) {
     loader.load(
       url,
       (gltf) => {
+        console.log('[museum] glb 下载完成,开始解析', url);
         const obj = gltf.scene;
+        // 2026-08-31 手机实测修复:大堂在远处被沙漠雾完全吞没(unlit 房间也受雾)。
+        // 扫描资产贴图自带烘焙光照 → 全部转 MeshBasicMaterial(unlit)+关闭雾影响,
+        // 呈现 VR Tour 原貌且不受场景灯光/雾/昼夜干扰
+        obj.traverse((o) => {
+          if (o.material) {
+            const fix = (m0) => {
+              const basic = new THREE.MeshBasicMaterial({ fog: false });
+              if (m0.map) basic.map = m0.map;
+              if (m0.color) basic.color = m0.color;
+              basic.side = THREE.DoubleSide; // 从建筑内部观看,必须双面渲染(否则看到的是外面)
+              return basic;
+            };
+            o.material = Array.isArray(o.material) ? o.material.map(fix) : fix(o.material);
+          }
+        });
+        console.log('[museum] 解析步2:traverse 完成,准备 add');
         obj.visible = false;
         s.add(obj);
+        console.log('[museum] s.add 完成,caching');
         cache.set(url, obj);
         hideMask();
         resolve(obj);
@@ -328,5 +347,13 @@ bag.custom.push(function () {
   restoreGalleryBounds();
 });
 
+if (typeof window !== 'undefined')
+  window.__museum = {
+    get current() {
+      return current;
+    },
+    cache,
+    portals,
+  };
 hotEnd('museum');
 if (import.meta.hot) import.meta.hot.accept();
