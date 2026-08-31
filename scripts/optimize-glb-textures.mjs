@@ -5,14 +5,14 @@
 //       故先用 sharp 归一化为 8-bit sRGB 再编码 WEBP。
 import fs from 'fs';
 import { NodeIO } from '@gltf-transform/core';
-import { EXTTextureWebP } from '@gltf-transform/extensions';
+import { EXTTextureWebP, KHRMaterialsPBRSpecularGlossiness } from '@gltf-transform/extensions';
 import sharp from 'sharp';
 
 const [,, inPath, outPath, sizeArg, qualityArg] = process.argv;
 const MAX = Number(sizeArg || 2048);
 const Q = Number(qualityArg || 82);
 
-const io = new NodeIO().registerExtensions([EXTTextureWebP]);
+const io = new NodeIO().registerExtensions([EXTTextureWebP, KHRMaterialsPBRSpecularGlossiness]);
 const doc = await io.read(inPath);
 
 const ext = doc.createExtension(EXTTextureWebP);

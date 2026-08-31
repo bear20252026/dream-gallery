@@ -15,6 +15,7 @@ import './gallery/links.js'; // 超链接图标/卷轴/花园入口/滚动古文
 import './gallery/paintings.js'; // 挂画系统 + 白板作品墙 + 3D放大系统
 import './gallery/mode.js'; // 展示区模式(普通/特殊)+ 链接模型系统
 import './gallery/dome-towers.js'; // Yazd 穹顶塔楼群(6 座围圆环绕画廊,按需异步加载)
+import './museum/museum.js'; // 万镜博物馆:大堂+贵族房间世界(方案A试点,按需加载)
 import './gate/settings.js'; // 昵称双渠道(进馆 5 秒弹窗 + ⚙设置)
 import './gate/upload.js'; // 访客上传(照片/我的链接)+ AI 配文 + 悬浮路标
 import './gate/housecolor.js'; // 房屋分组换色(墙壁/天花板/腰线/踢脚线,仅自己可见)
