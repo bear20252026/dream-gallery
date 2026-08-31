@@ -167,9 +167,15 @@ function buildBounds(cfg) {
   for (const [x1, z1, x2, z2] of walls) {
     const cx = (x1 + x2) / 2,
       cz = (z1 + z2) / 2;
-    const len = Math.hypot(x2 - x1, z2 - z1);
-    const sA = Math.abs(Math.sin(0)) + 0, // 轴对齐
-      cA = 1;
+    const dx = x2 - x1,
+      dz = z2 - z1;
+    const len = Math.hypot(dx, dz);
+    // 2026-08-31 修复:之前硬编码 sA=0, cA=1,导致南/北墙(X 长 2*hx 的横条)被算成
+    // 中央 0.6m × Z 120m 的竖条 → 直接挡在中央主楼梯(HX)前后,玩家走不到中央楼梯。
+    // 改用 atan2(dx, dz) 算真实角度,sA/cA 反映墙的法线方向分量。
+    const ang = Math.atan2(dx, dz);
+    const sA = Math.abs(Math.sin(ang));
+    const cA = Math.abs(Math.cos(ang));
     list.push({
       mnX: cx - ((sA * len) / 2 + cA * 0.2) - 0.1,
       mxX: cx + ((sA * len) / 2 + cA * 0.2) + 0.1,
