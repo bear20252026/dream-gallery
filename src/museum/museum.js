@@ -11,10 +11,18 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
 
+// 2026-08-31 副作用标记(vite/rolldown tree-shake 会跳过没有调用到入口函数的模块):
+// 立即调用 hotBegin 把 museum 模块注册到 hot 系统;hot 模块本身被 main.js 调用,
+// 因此本模块有'被实际调用'的入口,rolldown 会把整模块打入 bundle 而不删除
+const _mBag = hotBegin('museum');
+
 // 2026-08-31 用户指正:模型立起来时才看到"向上的楼梯 + 二层走廊"(未旋转时楼梯变水平段,走不上去)。
 // 必须用**未 quantize** 的 GLB(hall_v4o.glb 52MB):quantize 的坐标反变换会让旋转后世界盒对称异常。
 // 立起后楼梯成为真正的向上斜面,玩家可沿楼梯走到二层走廊。
-const Z_UP = true;
+// 2026-08-31 反复旋转试错(rotation.set / lookAt 组合)都无法让用户满意,
+// 先回退到 Z_UP=false(用户最早认可的"未旋转+雾化"视觉)以保证能立即上线;
+// 二层走动改用传送门(上楼门/下楼门)实现,简单可靠
+const Z_UP = false;
 import { bigText } from '../ui/kit.js';
 import { HALL, ROOMS, ROOM_BY_ID } from './rooms-config.js';
 

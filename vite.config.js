@@ -63,6 +63,14 @@ export default defineConfig({
           if (id.includes('node_modules/three')) return 'three';
         },
       },
+      // 2026-08-31 修复:默认 tree-shake 把仅有副作用导入的模块(如 museum.js)删除,
+      // 显式标记所有 src/* 模块为有副作用,确保 hotBegin/portals.push 等一定被打包
+      treeshake: {
+        moduleSideEffects(id) {
+          if (id.includes('/src/')) return true;
+          return false;
+        },
+      },
     },
     // JS 强混淆:顶层变量名随机化、2 轮压缩、剥离所有注释和 console.log
     terserOptions: {
