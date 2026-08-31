@@ -214,6 +214,118 @@
         background: #efe9de;
         color: #6c6a64;
       }
+      /* ===== 2026-08-31 访客管理 UI 重构(新权限体系) ===== */
+      .summary-bar {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 10px;
+        margin: 4px 0 18px;
+      }
+      .sum-item {
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        border-radius: 14px;
+        padding: 14px 16px;
+        text-align: center;
+      }
+      .sum-item.clickable {
+        cursor: pointer;
+      }
+      .sum-item .sum-n {
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1.1;
+      }
+      .sum-item .sum-l {
+        font-size: 12px;
+        opacity: 0.65;
+        margin-top: 2px;
+      }
+      .sum-item.amber .sum-n {
+        color: #b45309;
+      }
+      .sum-item.green .sum-n {
+        color: #15803d;
+      }
+      .sum-item.blue .sum-n {
+        color: #1d4ed8;
+      }
+      .sum-item.grey .sum-n {
+        color: #6c6a64;
+      }
+      .sum-item.amber {
+        border-color: rgba(180, 83, 9, 0.4);
+        background: #fef7ed;
+      }
+      #pendingBadge {
+        background: #d97706;
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 1px 7px;
+        vertical-align: middle;
+        margin-left: 2px;
+      }
+      .pending-section .card {
+        border-left: 4px solid #d97706;
+      }
+      .card .btn-kick {
+        background: #b3261e;
+        color: #fff;
+        border: none;
+        font-weight: 700;
+      }
+      .card .btn-kick:hover {
+        background: #8c1d18;
+      }
+      .timeline {
+        position: relative;
+        padding-left: 18px;
+      }
+      .timeline::before {
+        content: '';
+        position: absolute;
+        left: 5px;
+        top: 6px;
+        bottom: 6px;
+        width: 2px;
+        background: rgba(0, 0, 0, 0.1);
+      }
+      .tl-item {
+        position: relative;
+        padding: 6px 0 10px;
+      }
+      .tl-dot {
+        position: absolute;
+        left: -18px;
+        top: 12px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #b3261e;
+        border: 2px solid #fff;
+        box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.12);
+      }
+      .tl-head {
+        font-weight: 700;
+      }
+      .tl-ip {
+        font-weight: 400;
+        opacity: 0.6;
+        font-size: 12px;
+        margin-left: 8px;
+      }
+      .tl-reason {
+        font-size: 12px;
+        color: #8c2f2f;
+        margin-top: 2px;
+      }
+      .tl-time {
+        font-size: 11px;
+        opacity: 0.55;
+        margin-top: 2px;
+      }
       .badge.watch {
         background: #fae7c8;
         color: #7a5a1e;
@@ -655,10 +767,12 @@
           >数据加载中…</span
         >
       </h1>
-      <div class="sub">审批 · 统计 · 文件 · 对话</div>
+      <div class="sub">访客管理（唯一管理动作 = 踢出 · 被踢设备重进须批准）· 统计 · 文件</div>
 
       <div class="tabs">
-        <div class="tab active" data-tab="approve" onclick="switchTab('approve')">审批</div>
+        <div class="tab active" data-tab="approve" onclick="switchTab('approve')">
+          访客<span id="pendingBadge" style="display: none"></span>
+        </div>
         <div class="tab" data-tab="stats" onclick="switchTab('stats')">访问统计</div>
         <div class="tab" data-tab="history" onclick="switchTab('history')">历史</div>
         <div class="tab" data-tab="quiz" onclick="switchTab('quiz')">答题记录</div>
@@ -666,21 +780,38 @@
         <div class="tab" data-tab="files" onclick="switchTab('files')">文件管理</div>
         <div class="tab" data-tab="docs" onclick="switchTab('docs')">协议文档</div>
         <div class="tab" data-tab="errors" onclick="switchTab('errors')">报错反馈</div>
-        <div class="tab chat-tab" data-tab="chat" onclick="switchTab('chat')">在线对话</div>
       </div>
 
-      <!-- ========== 访客管理(2026-08-30 权限精简:唯一管理动作=踢出) ========== -->
+      <!-- ========== 访客管理(2026-08-31 UI 重构:待办优先,唯一管理动作=踢出) ========== -->
       <div id="tab-approve">
-        <div class="stats" id="statsCards"></div>
         <div id="alertBox"></div>
-        <div class="section-title">重进申请（被踢出设备请求再次进入）</div>
-        <div id="reapply"></div>
-        <div class="section-title">已放行</div>
+        <div class="summary-bar" id="summaryBar"></div>
+
+        <div class="section-title" id="reapplyTitle">🔔 重进申请（被踢出设备请求再次进入）</div>
+        <div id="reapply" class="pending-section"></div>
+
+        <div class="section-title" id="approvedTitle">已放行设备（点卡片可踢出）</div>
+        <div style="margin: -4px 0 8px">
+          <input
+            id="appSearch"
+            placeholder="搜索昵称 / IP / 备注…"
+            oninput="renderApproved()"
+            style="
+              width: 100%;
+              max-width: 380px;
+              padding: 8px 12px;
+              border-radius: 10px;
+              border: 1px solid rgba(0, 0, 0, 0.14);
+              background: #fff;
+              font-size: 13px;
+              outline: none;
+            "
+          />
+        </div>
         <div id="approved"></div>
-        <div class="section-title">已踢出</div>
-        <div id="kicked"></div>
-        <div class="section-title">踢出历史</div>
-        <div id="kickLog"></div>
+
+        <div class="section-title">踢出历史（时间线）</div>
+        <div id="kickLog" class="timeline"></div>
       </div>
 
       <!-- ========== 统计 ========== -->
@@ -1328,7 +1459,7 @@
         } else if (a.status === 'kicked' || a.status === 'denied' || a.status === 'history') {
           btns = `<button class="btn-perm" onclick="decide('${a.id}','approve')">恢复放行</button>`;
         } else {
-          btns = `<button class="btn-deny" onclick="kickAsk('${a.id}','${j(a.answer || '')}')">踢出画廊</button>`;
+          btns = `<button class="btn-kick" onclick="kickAsk('${a.id}','${j(a.answer || '')}')">踢出画廊</button>`;
         }
         const ip = a.ip || '';
         const isBlocked = (DATA.blocked || []).includes(ip);
@@ -1405,35 +1536,70 @@
       function renderApprove() {
         const A = DATA.applicants,
           s = DATA.stats;
-        $('statsCards').innerHTML = statCards([
-          [s.total, '总访问'],
-          [s.byDay[todayStr()] || 0, '今日访问'],
-          [A.filter((a) => a.status === 'approved').length, '已放行设备'],
-          [A.filter((a) => a.status === 'reapply').length, '重进申请'],
-        ]);
         renderAlerts();
-        const render = (list, empty) =>
-          list.map((a) => cardHtml(a, DATA.now)).join('') || `<div class="empty">${empty}</div>`;
-        $('reapply').innerHTML = render(
-          A.filter((a) => a.status === 'reapply'),
-          '暂无重进申请'
-        );
-        $('approved').innerHTML = render(
-          A.filter((a) => a.status === 'approved'),
-          '暂无已放行设备'
-        );
-        $('kicked').innerHTML = render(
-          A.filter((a) => ['kicked', 'denied', 'history'].includes(a.status)),
-          '暂无已踢出设备'
-        );
+        const reapply = A.filter((a) => a.status === 'reapply');
+        const approved = A.filter((a) => a.status === 'approved');
+        const kicked = A.filter((a) => ['kicked', 'denied', 'history'].includes(a.status));
+
+        // 顶部摘要条:新权限体系下最关键的三个数字
+        $('summaryBar').innerHTML = [
+          { n: reapply.length, label: '待批重进申请', cls: 'amber', tab: 'reapply' },
+          { n: approved.length, label: '已放行设备', cls: 'green' },
+          { n: s.byDay[todayStr()] || 0, label: '今日访问', cls: 'blue' },
+          { n: s.total, label: '累计访问', cls: 'grey' },
+        ]
+          .map(
+            (x) =>
+              `<div class="sum-item ${x.cls}${x.tab ? ' clickable' : ''}"${x.tab ? ` onclick="document.getElementById('reapplyTitle').scrollIntoView({behavior:'smooth'})"` : ''}><div class="sum-n">${x.n}</div><div class="sum-l">${x.label}</div></div>`
+          )
+          .join('');
+
+        // 待批徽标:tab 上提醒有待办
+        const badge = document.getElementById('pendingBadge');
+        badge.style.display = reapply.length ? 'inline-block' : 'none';
+        badge.textContent = ' ' + reapply.length;
+
+        // 重进申请(待办区,琥珀高亮)
+        $('reapplyTitle').textContent = reapply.length
+          ? `🔔 重进申请（${reapply.length} 台设备等待批准）`
+          : '🔔 重进申请（暂无待办）';
+        $('reapply').innerHTML =
+          reapply.map((a) => cardHtml(a, DATA.now)).join('') ||
+          '<div class="empty">暂无重进申请——被踢出的设备重新进入画廊时会出现在这里</div>';
+
+        renderApproved(approved);
+
+        // 踢出历史时间线(新→旧)
         const log = DATA.kickLog || [];
         $('kickLog').innerHTML =
           log
             .map(
-              (k) =>
-                `<div class="file-row"><span class="fname">「${esc(k.name)}」 · IP ${esc((k.ip || '').replace('::ffff:', ''))}${k.reason ? ' · 理由:' + esc(k.reason) : ''}<br><span style="opacity:.7">${fmt(k.t)}</span></span></div>`
+              (k, i) =>
+                `<div class="tl-item"><div class="tl-dot"></div><div class="tl-body"><div class="tl-head">「${esc(k.name)}」<span class="tl-ip">IP ${esc((k.ip || '').replace('::ffff:', ''))}</span></div>${k.reason ? `<div class="tl-reason">理由:${esc(k.reason)}</div>` : ''}<div class="tl-time">${fmt(k.t)}</div></div></div>`
             )
             .join('') || '<div class="empty">还没有踢出记录</div>';
+      }
+      // 已放行列表:支持搜索,按最近访问倒序,默认只渲染前 60(全量渲染 600+ 卡片会卡)
+      function renderApproved(pre) {
+        const A = DATA.applicants || [];
+        const approved = pre || A.filter((a) => a.status === 'approved');
+        const q = (($('appSearch') || {}).value || '').trim().toLowerCase();
+        let list = approved;
+        if (q)
+          list = approved.filter(
+            (a) =>
+              (a.answer || '').toLowerCase().includes(q) ||
+              (a.ip || '').toLowerCase().includes(q) ||
+              (a.note || '').toLowerCase().includes(q)
+          );
+        list = list.slice().sort((a, b) => (b.lastAccess || 0) - (a.lastAccess || 0));
+        const shown = list.slice(0, 60);
+        $('approved').innerHTML =
+          shown.map((a) => cardHtml(a, DATA.now)).join('') ||
+          `<div class="empty">${q ? '没有匹配的设备' : '暂无已放行设备'}</div>`;
+        if (list.length > 60)
+          $('approved').innerHTML +=
+            `<div class="empty">仅显示最近活跃的 60 台（共 ${list.length} 台${q ? '命中' : ''}，可用搜索缩小范围）</div>`;
       }
       // ---------- 反刷存储预警 ----------
       const ALERT_TYPE = {
