@@ -90,17 +90,17 @@ iG.push(mpMesh); // 音乐面板加入交互
   function makeTitleTex() {
     // 画布样板统一在 shared/canvas-texture.js(B1 整改)
     const tT = canvasTexture(512, 80, (tX) => {
-    tX.fillStyle = 'rgba(90,190,255,0.35)';
-    tX.fillRect(0, 0, 512, 80);
-    tX.strokeStyle = 'rgba(140,220,255,0.9)';
-    tX.lineWidth = 3;
-    tX.strokeRect(4, 4, 504, 72);
-    tX.fillStyle = '#bfeaff';
-    tX.font = 'bold 44px sans-serif';
-    tX.textAlign = 'center';
-    tX.shadowColor = '#4fc3ff';
-    tX.shadowBlur = 14;
-    tX.fillText('白板作品展', 256, 55);
+      tX.fillStyle = 'rgba(90,190,255,0.35)';
+      tX.fillRect(0, 0, 512, 80);
+      tX.strokeStyle = 'rgba(140,220,255,0.9)';
+      tX.lineWidth = 3;
+      tX.strokeRect(4, 4, 504, 72);
+      tX.fillStyle = '#bfeaff';
+      tX.font = 'bold 44px sans-serif';
+      tX.textAlign = 'center';
+      tX.shadowColor = '#4fc3ff';
+      tX.shadowBlur = 14;
+      tX.fillText('白板作品展', 256, 55);
     });
     tT.colorSpace = THREE.SRGBColorSpace;
     return tT;
@@ -346,10 +346,10 @@ function hangOn(wall, wi, am, off) {
   ghost.position.z = fd / 2 + 0.02;
   g.add(ghost);
   // 画框射灯限额:每个 SpotLight 都会进入所有材质的着色器循环(比 PointLight 更贵,
-//   多方向/角度/penumbra 计算)。原为 wi<40 → 40 盏射灯,实测是场景卡顿主因之一。
-//   main.js 的灯光限额在初始化时执行,而画作是异步挂上的(晚于限额),故必须在源头限制。
-//   只给前 SPOT_PER_PAINTING 幅画配射灯,其余画作靠环境光 + 自发光材质表现。
-if (wi < SPOT_PER_PAINTING) {
+  //   多方向/角度/penumbra 计算)。原为 wi<40 → 40 盏射灯,实测是场景卡顿主因之一。
+  //   main.js 的灯光限额在初始化时执行,而画作是异步挂上的(晚于限额),故必须在源头限制。
+  //   只给前 SPOT_PER_PAINTING 幅画配射灯,其余画作靠环境光 + 自发光材质表现。
+  if (wi < SPOT_PER_PAINTING) {
     const sp = new THREE.SpotLight('#ffe8f0', 3, 5, Math.PI / 4, 0.8, 1);
     sp.position.set(0, 0.7, 0.35);
     sp.target = cM;
@@ -360,7 +360,12 @@ if (wi < SPOT_PER_PAINTING) {
 }
 
 function hangPaintings() {
-  hW.sort(() => Math.random() - 0.5).forEach((wall, wi) => {
+  // Fisher-Yates 均匀洗牌(2026-08-31 审计低危:sort(()=>random-0.5) 分布有偏)
+  for (let si = hW.length - 1; si > 0; si--) {
+    const sj = Math.floor(Math.random() * (si + 1));
+    [hW[si], hW[sj]] = [hW[sj], hW[si]];
+  }
+  hW.forEach((wall, wi) => {
     if (mi >= aM.length) mi = 0;
     hangOn(wall, wi, aM[mi++]);
   });
@@ -576,6 +581,8 @@ function removePaintByUrl(url) {
     if (obj.material) {
       const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
       for (const m of mats) {
+        // 2026-08-31 审计 M7:跳过画框/内衬共享材质(fW/mM),否则删一张画全场景材质失效闪黑
+        if (m === fW || m === mM) continue;
         if (m.map) {
           m.map.dispose();
           m.map = null;
@@ -714,7 +721,8 @@ function onC3D(e) {
     }
     // ===== AI牌子点击:内嵌面板打开 =====
     if (cg.userData && cg.userData.isSign) {
-      window.openPanel('https://page.goose.cc.cd/s/Hi-AI-2-0', '外部链接');
+      // 2026-08-31 审计 M12:外链 iframe 被自家 CSP frame-src 拦死,属死功能——已禁用
+      if (false) window.openPanel('https://page.goose.cc.cd/s/Hi-AI-2-0', '外部链接');
       signMat.emissiveIntensity = 0.5;
       setTimeout(function () {
         signMat.emissiveIntensity = 0.15;

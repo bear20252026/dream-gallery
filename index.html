@@ -53,7 +53,9 @@
     <div id="panelOv" role="dialog" aria-modal="true" aria-label="内嵌面板">
       <div id="panelBar">
         <span id="panelTitle"></span
-        ><button id="panelClose" onclick="closePanel()" aria-label="关闭面板，返回画廊">✕ 返回画廊</button>
+        ><button id="panelClose" onclick="closePanel()" aria-label="关闭面板，返回画廊">
+          ✕ 返回画廊
+        </button>
       </div>
       <iframe id="panelFrame" src="about:blank" title="面板内容"></iframe>
     </div>
@@ -227,14 +229,8 @@
         window.onerror = function (msg, url, line, col, err) {
           beacon(msg, url, line);
           console.error('ERR:', msg, err);
-          document.getElementById('l').innerHTML =
-            '<div style=color:#ff6b6b;font-size:16px;>加载出错: ' +
-            msg +
-            '</div><div style=color:#888;font-size:12px;margin-top:8px;>行:' +
-            line +
-            ' 列:' +
-            col +
-            '</div>';
+          // 2026-08-31 审计 H4:错误细节只走 beacon 上报;页面仅通用文案且用 textContent 防 DOM XSS
+          document.getElementById('l').textContent = '加载出错,请刷新重试;问题已自动上报';
         };
         window.addEventListener('unhandledrejection', function (e) {
           beacon(
@@ -243,8 +239,7 @@
             0
           );
           console.error('PROMISE ERR:', e.reason);
-          document.getElementById('l').innerHTML =
-            '<div style=color:#ff6b6b;font-size:16px;>加载出错: ' + e.reason + '</div>';
+          document.getElementById('l').textContent = '加载出错,请刷新重试;问题已自动上报';
         });
       })();
     </script>
@@ -260,7 +255,7 @@
           } catch (e) {}
         }
         try {
-          const es = new EventSource('/api/gate/watch');
+          const es = new EventSource('/api/entry/watch');
           es.onmessage = function (e) {
             if (e.data === 'recheck') recheck();
           };
@@ -372,125 +367,6 @@
     </script>
     <script type="module" src="/src/main.js"></script>
 
-    <!-- 设备注册 + 管理员消息 -->
-    <script>
-      (function () {
-        // 心跳注册设备信息
-        var dk = '';
-        function reg() {
-          try {
-            var info = { ua: navigator.userAgent, screen: screen.width + 'x' + screen.height };
-            // 现代浏览器:用 userAgentData high-entropy API 拿精确型号
-            if (navigator.userAgentData) {
-              navigator.userAgentData
-                .getHighEntropyValues(['model', 'platformVersion', 'fullVersionList'])
-                .then(function (h) {
-                  info.model = h.model;
-                  info.platform = h.platform;
-                  info.platformVer = h.platformVersion;
-                })
-                .catch(function () {})
-                .finally(function () {
-                  doReg(info);
-                });
-            } else {
-              doReg(info);
-            }
-          } catch (e) {
-            setTimeout(reg, 25000);
-          }
-        }
-        function doReg(info) {
-          fetch('/api/device/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(info),
-          })
-            .then(function (r) {
-              return r.json();
-            })
-            .then(function (d) {
-              if (d && d.dk) {
-                dk = d.dk;
-                localStorage.setItem('_devDk', dk);
-              }
-              setTimeout(reg, 25000);
-            })
-            .catch(function () {
-              setTimeout(reg, 25000);
-            });
-        }
-
-        // 轮询管理员消息
-        function poll() {
-          try {
-            fetch('/api/device/messages')
-              .then(function (r) {
-                return r.json();
-              })
-              .then(function (d) {
-                if (d && d.msgs && d.msgs.length > 0) {
-                  d.msgs.forEach(function (m) {
-                    showAdminMsg(m.text);
-                  });
-                }
-                setTimeout(poll, 3000);
-              })
-              .catch(function () {
-                setTimeout(poll, 5000);
-              });
-          } catch (e) {
-            setTimeout(poll, 5000);
-          }
-        }
-        setTimeout(poll, 8000);
-
-        // 显示管理员消息弹窗
-        function showAdminMsg(text) {
-          var ov = document.createElement('div');
-          ov.style.cssText =
-            'position:fixed;top:12px;right:12px;z-index:600;max-width:300px;background:rgba(30,18,28,0.96);border:1px solid rgba(255,154,158,0.5);border-radius:14px;padding:14px 16px;color:#ffe2c4;font-size:13px;letter-spacing:1px;box-shadow:0 8px 30px rgba(0,0,0,.4)';
-          ov.innerHTML =
-            '<div style="font-size:10px;color:rgba(255,154,158,0.7);margin-bottom:6px">管理员消息</div>' +
-            '<div style="line-height:1.6">' +
-            text.replace(/</g, '&lt;').replace(/>/g, '&gt;') +
-            '</div>' +
-            '<div style="margin-top:8px;display:flex;gap:6px">' +
-            '<input class="_admRplInput" style="flex:1;min-width:0;padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:12px;outline:none" placeholder="回复管理员...">' +
-            '<button class="_admRplBtn" style="padding:6px 12px;border:none;border-radius:8px;background:linear-gradient(135deg,#ff9a9e,#fecfef);color:#fff;font-size:12px;cursor:pointer">发送</button>' +
-            '</div>' +
-            '<span class="_admClose" style="position:absolute;top:4px;right:8px;cursor:pointer;font-size:14px;color:rgba(255,255,255,.4)">✕</span>';
-          document.body.appendChild(ov);
-          // 关闭按钮
-          ov.querySelector('._admClose').onclick = function () {
-            ov.remove();
-          };
-          // 发送按钮
-          ov.querySelector('._admRplBtn').onclick = function () {
-            var t = ov.querySelector('._admRplInput').value.trim();
-            if (t) {
-              fetch('/api/device/reply', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: t }),
-              });
-              ov.querySelector('._admRplInput').value = '';
-            }
-          };
-          // 8秒后自动消失
-          setTimeout(function () {
-            if (ov.parentNode) ov.style.opacity = '0';
-            setTimeout(function () {
-              if (ov.parentNode) ov.remove();
-            }, 300);
-          }, 8000);
-        }
-
-        var s = document.createElement('style');
-        s.textContent =
-          '@keyframes slideIn{from{opacity:0;transform:translateX(30px)}to{opacity:1;transform:translateX(0)}}';
-        document.head.appendChild(s);
-      })();
-    </script>
+    <!-- [2026-08-31 审计 H6/M6] 设备注册+管理员消息块已移除:后端 admin-chat 模块未接线(全 404),前端此前的 25s/3s 永久重试循环属于死请求噪音。启用时须先补后端鉴权 -->
   </body>
 </html>

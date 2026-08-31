@@ -71,6 +71,8 @@ const handler = (req, res) => {
   let pathname;
   try { pathname = decodeURIComponent(u.pathname); }
   catch { sendJson(res, 400, { error: 'URL 不合法' }); return; }
+  // 反斜杠路径一律 404(2026-08-31 审计 M8:防 Windows 部署下 %5C 绕过媒体门禁;Linux 下也无合法反斜杠路径)
+  if (pathname.includes('\\')) { sendJson(res, 404, { error: 'Not Found' }); return; }
   const query = Object.fromEntries(u.searchParams);
 
   // ===================== 全局安全头(2026-08-22 大厂标准) =====================

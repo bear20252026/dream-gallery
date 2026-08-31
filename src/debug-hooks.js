@@ -4,8 +4,9 @@
 //   - 生产构建可整体禁用(置 DISABLE=true 后 expose 变 no-op)
 //   - 控制台 window.__debugHooks.list() 盘点当前钩子
 // 内部跨模块通信(prologueStarted/HMR/ytHeart 等)不属诊断钩子,不经此处。
-export const DISABLE = false;
-const REG = (typeof window !== 'undefined' && (window.__debugHooksReg = window.__debugHooksReg || {})) || {};
+export const DISABLE = true; // 2026-08-31 审计 H7:生产禁用诊断钩子暴露;本地需要时临时改回 false
+const REG =
+  (typeof window !== 'undefined' && (window.__debugHooksReg = window.__debugHooksReg || {})) || {};
 
 export function expose(key, val) {
   if (typeof window === 'undefined') return val;

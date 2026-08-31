@@ -1380,17 +1380,7 @@
           load();
         } else toast('保存失败', 1);
       }
-      async function bulk(action, ip) {
-        const r = await fetch('/api/admin/bulk' + tk(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, ip }),
-        });
-        if (r.ok) {
-          toast('操作成功');
-          load();
-        } else toast('操作失败', 1);
-      }
+
       // 踢出前填理由(可空)
       async function kickAsk(id, name) {
         const reason = prompt('踢出「' + name + '」的理由(选填,将记入踢出历史):', '');
@@ -1752,7 +1742,11 @@
           .map((a, i) => {
             const dev = a.device || {};
             const who = dev.answer ? `「${esc(dev.answer)}」` : '(未申请门禁的设备)';
-            const meta = [dev.brand, dev.geo].filter(Boolean).join(' · ');
+            // 2026-08-31 审计 M3:geo 来自第三方 ip-api 响应,必须转义后入 innerHTML
+            const meta = [dev.brand, dev.geo]
+              .filter(Boolean)
+              .map((x) => esc(x))
+              .join(' · ');
             const trackName = a.track === 'li' ? '理科卷' : a.track === 'wen' ? '文科卷' : '未知卷';
             const badge = a.passed
               ? '<span class="badge approved">通过 ' + a.total + '分</span>'
