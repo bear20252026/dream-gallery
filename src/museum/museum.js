@@ -11,12 +11,11 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
 
-// 2026-08-31:hintze-hall 实测是 Z-up(地板 mesh Z 范围 -9~1,X 跨 123m),但按 Z-up 旋转 -90° 后
-// 大堂世界盒混乱(外墙地下 27m 主导 box.min,玩家被甩到模型外)。权衡:
-//   不旋转 → 模型"侧躺"但大堂从用户视角能正常看到拱廊/钢架(用户实测认可)
-//   旋转 + 修 Y 偏移 → 工作量大且视觉差异不大
-// 当前保持不旋转,Z-up 的代价:模型地板/楼梯/装饰的 Z 方向元素会显示为"水平面横向延伸",
-// 玩家看到的"石头坡度"主要是模型原始几何——通过 floor plane + 大堂外圈隐形墙减少穿透感
+// 2026-08-31:hintze-hall 是 Z-up(地板 mesh Z 范围 -9~1,X 跨 123m → Z 是高度)。
+// 但 quantize 后坐标反变换改了 Z 范围,旋转后世界盒 ±28.8m(对称)而非 0~38.5m,玩家被定位在中腰。
+// 权衡:保持不旋转 + 远端石块用场景雾融掉(让 Z-up 几何延伸看起来像"沙地中的石阵");
+//       vs 旋转 + 修偏移(玩家站 Y=28m 顶楼、踩不到地板、看不到一楼大厅)。
+// 选前者:用户认可的拱廊/钢架主楼梯视角保留,"漂浮石块"在沙漠雾中虚化容忍。
 const Z_UP = false;
 import { bigText } from '../ui/kit.js';
 import { HALL, ROOMS, ROOM_BY_ID } from './rooms-config.js';
@@ -72,7 +71,8 @@ function loadWorld(url, name) {
         obj.traverse((o) => {
           if (o.material) {
             const fix = (m0) => {
-              const basic = new THREE.MeshBasicMaterial({ fog: false });
+              // 2026-08-31 Z-up 妥协:开雾让远处 Z-up 几何延伸融进沙漠
+              const basic = new THREE.MeshBasicMaterial({ fog: true });
               if (m0.map) basic.map = m0.map;
               if (m0.color) basic.color = m0.color;
               basic.side = THREE.DoubleSide; // 从建筑内部观看,必须双面渲染(否则看到的是外面)
