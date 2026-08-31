@@ -63,7 +63,9 @@ function loadWorld(url, name) {
         // 2026-08-31 轴向修正:hintze-hall 是 Z-up 导出(实测地板 mesh "sol" 的 Z 范围仅 -9~1、
         // X 跨 123m、Y 跨 53m → Z 才是高度方向)。three 按 Y-up 加载会让整栋楼躺倒,
         // 玩家看到的是"建筑侧面"而非室内,且地板穿透成坡。绕 X 轴 -90°:(x,y,z)→(x,z,-y)
-        if (Z_UP) obj.rotation.x = -Math.PI / 2;
+        // 2026-08-31 实测修正:Z-up 立起后"南北深度方向反了"——用户感觉建筑倒在地上
+        // 解法:rotation.set(x, y, z) 一次性设;绕 X -π/2(让 Z 高度→Y 高度)+ 绕 Y π(让南北镜像翻转回来)
+        if (Z_UP) obj.rotation.set(-Math.PI / 2, Math.PI, 0);
         // 扫描资产贴图自带烘焙光照 → 全部转 MeshBasicMaterial(unlit)+关闭雾影响,
         // 呈现 VR Tour 原貌且不受场景灯光/雾/昼夜干扰
         obj.traverse((o) => {
