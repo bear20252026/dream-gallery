@@ -118,6 +118,23 @@ function place(obj, cfg) {
   );
   obj.scale.setScalar(cfg.SCALE);
   obj.updateMatrixWorld(true);
+  // 2026-08-31 手机实测:大堂外沙漠地形 Y=0~5 穿入室内 → 在大堂底部加一个略大于模型的 plane
+  // 遮住底部沙漠,使玩家看到的是"博物馆地板"而不是"外面的沙漠岩石"
+  if (cfg.floor === true) {
+    const pad = 4; // 四周外扩 4m
+    const floorGeom = new THREE.PlaneGeometry(size.x + pad * 2, size.z + pad * 2);
+    const floorMat = new THREE.MeshBasicMaterial({
+      color: cfg.floorColor || 0xc4a880, // 黄褐色石材,贴近大堂主色调
+      fog: false,
+      side: THREE.DoubleSide,
+    });
+    const floorMesh = new THREE.Mesh(floorGeom, floorMat);
+    floorMesh.rotation.x = -Math.PI / 2;
+    // 略低于模型 minY,贴在模型底部下
+    floorMesh.position.set(cfg.X, (box.min.y + 0.02) * cfg.SCALE + obj.position.y, cfg.Z);
+    floorMesh.renderOrder = -1; // 防止与地面 z-fighting
+    s.add(floorMesh);
+  }
   return size;
 }
 

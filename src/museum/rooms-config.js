@@ -10,7 +10,9 @@ export const HALL = {
   SCALE: 1, // 2026-08-31 实测:源模型已是米制(130m 大楼),勿再缩放
   FLOOR: 0, // 大堂地面步行高度
   // 第一版可走区(相对大堂中心的半宽,进游戏实测后修正)
-  WALK: { hx: 12, hz: 8 },
+  WALK: { hx: 18, hz: 12 }, // 大堂约 130m 宽 × 40m 深,内圈保守可走区
+  floor: true, // 2026-08-31:大堂外沙漠地形 Y=0~5 穿入室内,加 plane 盖住
+  floorColor: 0xb8a07a, // 黄褐色石材地板,贴近大堂主色调
 };
 
 export const ROOMS = [
