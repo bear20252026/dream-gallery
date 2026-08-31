@@ -3,12 +3,21 @@ const fs = require('fs');
 const path = require('path');
 const { S3Client, PutObjectCommand, HeadObjectCommand } = require('@aws-sdk/client-s3');
 
+// ⚠️ 2026-08-31 安全修正:原先写死在此处的 R2 密钥曾随 PUBLIC 仓库泄露,已改为环境变量读取。
+//    必须去 Cloudflare 后台吊销并轮换那对密钥——删文件无效,提交历史已被公开克隆。
+const R2_ENDPOINT = process.env.R2_ENDPOINT;
+const R2_ACCESS_KEY = process.env.R2_ACCESS_KEY;
+const R2_SECRET_KEY = process.env.R2_SECRET_KEY;
+if (!R2_ENDPOINT || !R2_ACCESS_KEY || !R2_SECRET_KEY) {
+  console.error('缺少 R2 凭据:请先设置环境变量 R2_ENDPOINT / R2_ACCESS_KEY / R2_SECRET_KEY');
+  process.exit(1);
+}
 const R2 = new S3Client({
   region: 'auto',
-  endpoint: 'https://52eab2ceafe4c07d54bdea60443ad115.r2.cloudflarestorage.com',
+  endpoint: R2_ENDPOINT,
   credentials: {
-    accessKeyId: 'e486f9216a06e21e4f06aa74d5ee366e',
-    secretAccessKey: '47fb5b8e41fedc061ce88814a3e8289843fe224edacb47ed116ec29ee1dc7fbc',
+    accessKeyId: R2_ACCESS_KEY,
+    secretAccessKey: R2_SECRET_KEY,
   },
   forcePathStyle: true,
 });

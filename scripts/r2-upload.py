@@ -5,9 +5,16 @@ import os
 import sys
 
 # R2 credentials
-R2_ENDPOINT = "https://52eab2ceafe4c07d54bdea60443ad115.r2.cloudflarestorage.com"
-R2_ACCESS_KEY = "e486f9216a06e21e4f06aa74d5ee366e"
-R2_SECRET_KEY = "47fb5b8e41fedc061ce88814a3e8289843fe224edacb47ed116ec29ee1dc7fbc"
+# ⚠️ 2026-08-31 安全修正:此处原先写死的密钥曾随 PUBLIC 仓库(commit 146a721)泄露,已移除。
+#    请改从环境变量读取,不要把任何密钥再写进仓库:
+#       R2_ENDPOINT / R2_ACCESS_KEY / R2_SECRET_KEY
+#    注意:仅删除文件无效——提交历史已被公开克隆,必须在 Cloudflare 后台吊销并轮换那对密钥。
+R2_ENDPOINT = os.environ.get("R2_ENDPOINT", "")
+R2_ACCESS_KEY = os.environ.get("R2_ACCESS_KEY", "")
+R2_SECRET_KEY = os.environ.get("R2_SECRET_KEY", "")
+if not (R2_ENDPOINT and R2_ACCESS_KEY and R2_SECRET_KEY):
+    print("缺少 R2 凭据:请先设置环境变量 R2_ENDPOINT / R2_ACCESS_KEY / R2_SECRET_KEY")
+    sys.exit(1)
 
 s3 = boto3.client(
     "s3",
