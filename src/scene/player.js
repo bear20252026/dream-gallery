@@ -10,6 +10,7 @@ import { mapCanvas, mapScale, mapOffX, mapOffZ, isBig, drawMap } from './minimap
 // ===================== 移动状态机(2026-08-01) =====================
 import { StateMachine } from '../player/StateMachine.js';
 import { IdleState } from '../player/states/PlayerStates.js';
+import { resolveMove } from './collision-resolve.js'; // 2026-08-31 水平碰撞解析(子步进+滑行,纯函数)
 const playerSM = new StateMachine();
 ctx._playerSM = playerSM; // 供外部查询当前状态
 
@@ -61,25 +62,9 @@ else
   })();
 ctx.scene.avatar = avatar;
 
-function hT(x, z) {
-  for (const b of bounds) {
-    const cx = Math.max(b.mnX, Math.min(x, b.mxX)),
-      cz = Math.max(b.mnZ, Math.min(z, b.mxZ));
-    if ((x - cx) ** 2 + (z - cz) ** 2 < pl.r ** 2) return true;
-  }
-  return false;
-}
-function rs(dx, dz) {
-  const cx = pl.p.x,
-    cz = pl.p.z;
-  if (!hT(dx, dz)) return { x: dx, z: dz };
-  const mx = !hT(dx, cz),
-    mz = !hT(cx, dz);
-  if (mx && mz) return Math.abs(dx - cx) > Math.abs(dz - cz) ? { x: dx, z: cz } : { x: cx, z: dz };
-  if (mx) return { x: dx, z: cz };
-  if (mz) return { x: cx, z: dz };
-  return { x: cx, z: cz };
-}
+// 2026-08-31 碰撞修复:水平碰撞解析抽到 scene/collision-resolve.js(纯函数,可单测)。
+// 原 hT/rs 单步检测只查终点 → 低帧率/滑翔加速时单步位移超过碰撞体厚度 → 穿模。
+// 现在 resolveMove 内部做子步进(每步 ≤0.12m)+ 逐轴滑行。
 function mv(wx, wz, dt) {
   if (ctx.kunlun.flightLock) return; // 飞舟巡礼中(ark.js):移动冻结,航线接管
   let spd = 3.2 * dt; // 固定速度
@@ -96,16 +81,12 @@ function mv(wx, wz, dt) {
     spd *= boost;
     if (pl.pi > 0.2) spd *= 1 + pl.pi * 0.5;
   }
-  const nx = pl.p.x + wx * spd,
-    nz = pl.p.z + wz * spd;
-  const r = rs(nx, nz);
+  const r = resolveMove(pl.p.x, pl.p.z, wx * spd, wz * spd, pl.r, bounds);
   pl.p.x = r.x;
   pl.p.z = r.z;
-  // 地面跟随(沙漠地形):着地时贴近地表
-  if (pl.onGround) {
-    const gy = groundY(r.x, r.z) + EYE_HEIGHT;
-    pl.p.y += (gy - pl.p.y) * Math.min(dt * 12, 1);
-  }
+  // 地面高度统一由 tickPhysics → stepVertical 吸附处理(不再在此处平滑跟随)。
+  // 2026-08-31:原先此处 lerp 跟随与 stepVertical 硬吸附并存,在斜坡/门槛处两套逻辑
+  // 互相追赶 → 玩家抖动、陷入坡道。现在只保留物理核一条路径。
   // 相机位置/朝向统一由 main.js 主循环(an)接管(第一/第三人称都在那里处理),
   // 此处只负责位移+碰撞。删去原先的相机 lerp/lookAt/Euler 覆盖,消除与 main.js 的相机打架
   // (此前两处都写 cam.position/rotation,导致第三人称抖动、朝向被 Euler 覆盖而错乱)。
@@ -234,7 +215,10 @@ document.addEventListener('keyup', (e) => {
 // 角色自身朝向由 loop-manager 平滑转向实际移动方向,静止时拖拽只环绕不转身。
 const orbit = { yaw: 0, pitch: ORBIT_DEFAULTS.pitch, dist: ORBIT_DEFAULTS.dist };
 ctx._orbit = orbit; // loop-manager 第三人称相机分支读取;toggleView 时初始化 yaw
-const PITCH_MIN = -0.6, PITCH_MAX = 1.25, DIST_MIN = 1.2, DIST_MAX = 7;
+const PITCH_MIN = -0.6,
+  PITCH_MAX = 1.25,
+  DIST_MIN = 1.2,
+  DIST_MAX = 7;
 
 // ===================== 鼠标（电脑：左键拖拽旋转 + 短按点击放大）=====================
 const cEl = rnd.domElement;
@@ -253,7 +237,10 @@ document.addEventListener('mousemove', (e) => {
     const s = 0.06;
     if (ctx.player.viewMode === 1) {
       orbit.yaw -= (e.clientX - mLX) * s;
-      orbit.pitch = Math.max(PITCH_MIN, Math.min(PITCH_MAX, orbit.pitch - (e.clientY - mLY) * s * 0.6));
+      orbit.pitch = Math.max(
+        PITCH_MIN,
+        Math.min(PITCH_MAX, orbit.pitch - (e.clientY - mLY) * s * 0.6)
+      );
     } else {
       pl.y -= (e.clientX - mLX) * s;
       pl.pi -= (e.clientY - mLY) * s * 0.6;

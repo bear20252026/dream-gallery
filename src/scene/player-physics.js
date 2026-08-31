@@ -18,6 +18,8 @@ export const VERTICAL_PARAMS = {
 };
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+// 下坡/下台阶吸附容差(m):大于此高度差视为真的踩空(该掉落就掉落)
+const STEP_DOWN = 0.45;
 
 /**
  * 垂直运动单步积分(纯函数)。
@@ -65,7 +67,15 @@ export function stepVertical(state, input, dt) {
     s.vy = clamp(s.vy, P.VY_MIN, P.VY_MAX);
   }
   s.y += s.vy * dt;
-  if (s.y <= input.gy) {
+  // 落地/贴地判定(2026-08-31 修复抖动与下坡悬空):
+  //   ① 常规落地:s.y <= gy → 硬吸附地表(高速落地也不穿透)
+  //   ② 下坡容差(STEP_DOWN):原先下坡/下台阶时 gy 突降,s.y > gy 会判为离地 →
+  //      玩家短暂"飘"起、无法起跳(因为 onGround=false)。
+  //      现在:前一帧在地面 + 正在下落(vy<=0) + 离地高度 ≤ 容差 → 主动吸附下去,
+  //      保持贴地连续(下坡/下台阶不再弹跳,也不卡在台阶边缘)
+  const landed = s.y <= input.gy;
+  const stepDown = state.onGround && s.vy <= 0 && s.y - input.gy <= STEP_DOWN;
+  if (landed || stepDown) {
     // 落地/贴地:直接吸附地表(高速落地也不会穿透或卡落)
     s.y = input.gy;
     s.vy = 0;

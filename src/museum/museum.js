@@ -200,19 +200,25 @@ function restoreGalleryBounds() {
 //   一楼地板(sol 顶面)      Y = 20.8
 //   二层楼板(Deco001 水平板) Y = 31.9~33.6(顶面 33.6)
 //   穹顶装饰                Y = 48.8~65.6
-// 楼梯区:二层楼板南缘 Z[-186,-180] X[-179,-122] → 做成坡道,玩家走过去自然升到二层
+// 楼梯区:二层楼板南缘 → 做成坡道,玩家走过去自然升到二层
 const HALL_1F = 20.8; // 一楼脚底高度
 const HALL_2F = 33.6; // 二层脚底高度(楼板顶面)
-const STAIR = { xMin: -179, xMax: -122, zFrom: -186, zTo: -180 };
+// 坡道:X 跨 -179~-122;Z 从 -192 到 -180(12m 长),高度 20.8→33.6。
+// 2026-08-31 修复:原 6m 长坡(坡度 65°)太陡,玩家高速走会陷入坡道/抖动 → 拉长到 12m(坡度 46°)
+const STAIR = { xMin: -179, xMax: -122, zFrom: -192, zTo: -180 };
 function museumGround(x, z) {
   const cfg = current === 'hall' ? HALL : ROOM_BY_ID[current.slice(5)];
   if (!cfg) return undefined;
   if (current !== 'hall') {
-    if (Math.abs(x - cfg.X) < cfg.WALK.hx + 2 && Math.abs(z - cfg.Z) < cfg.WALK.hz + 2)
-      return cfg.FLOOR;
-    return undefined;
+    // 房间:范围内返回房间地板;范围外 clamp(不返回 undefined,防掉出世界)
+    const rx = Math.max(cfg.X - cfg.WALK.hx - 2, Math.min(x, cfg.X + cfg.WALK.hx + 2));
+    const rz = Math.max(cfg.Z - cfg.WALK.hz - 2, Math.min(z, cfg.Z + cfg.WALK.hz + 2));
+    return cfg.FLOOR;
   }
-  // 大堂:一楼 + 坡道 + 二层,三层高度场
+  // ===== 大堂:一楼 + 坡道 + 二层 三层高度场 =====
+  // 关键(2026-08-31 修复穿地):大堂内**任意位置**都必须返回有效地板高度。
+  // 之前范围外返回 undefined → groundY 回退沙漠地形(约 0m),玩家从 20.8m 地板
+  // 突然掉到 0m,表现为"穿透地板掉到下方"。
   // 坡道区:沿 Z 从 zFrom→zTo,高度 1F→2F 线性插值
   if (x >= STAIR.xMin && x <= STAIR.xMax && z >= STAIR.zFrom && z <= STAIR.zTo) {
     const t = (z - STAIR.zFrom) / (STAIR.zTo - STAIR.zFrom);
@@ -220,10 +226,8 @@ function museumGround(x, z) {
   }
   // 二层区:坡道顶端以北(Z > zTo)且在二层楼板范围内 → 站二层
   if (z > STAIR.zTo && x >= -191 && x <= -86 && z >= -206 && z <= -172) return HALL_2F;
-  // 一层
-  if (Math.abs(x - cfg.X) < cfg.WALK.hx + 2 && Math.abs(z - cfg.Z) < cfg.WALK.hz + 2)
-    return HALL_1F;
-  return undefined;
+  // 其他所有位置 = 一楼地板(不再返回 undefined)
+  return HALL_1F;
 }
 let prevOverride = null;
 

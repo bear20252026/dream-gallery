@@ -37,7 +37,11 @@ describe('player-physics.stepVertical', () => {
   });
 
   it('能量耗尽:不再滑翔,回到全重力', () => {
-    const s = stepVertical(mkState({ vy: -2, glideEnergy: 0 }), { ...baseInput, jumpHold: true }, dt);
+    const s = stepVertical(
+      mkState({ vy: -2, glideEnergy: 0 }),
+      { ...baseInput, jumpHold: true },
+      dt
+    );
     expect(s.gliding).toBe(false);
     expect(s.vy).toBeCloseTo(-2 - P.FULL_GRAVITY * dt, 5);
   });
@@ -49,7 +53,11 @@ describe('player-physics.stepVertical', () => {
   });
 
   it('滑翔限速:滑翔中 vy 越过 -12 被钳住(非滑翔不受此钳)', () => {
-    const g = stepVertical(mkState({ vy: -11.99, glideEnergy: 5 }), { ...baseInput, jumpHold: true }, dt);
+    const g = stepVertical(
+      mkState({ vy: -11.99, glideEnergy: 5 }),
+      { ...baseInput, jumpHold: true },
+      dt
+    );
     expect(g.vy).toBe(P.VY_MIN);
     // 非滑翔:不受 -12 钳制(原版钳制只在滑翔分支内)
     const f = stepVertical(mkState({ vy: -11.99 }), baseInput, dt);
@@ -75,5 +83,78 @@ describe('player-physics.stepVertical', () => {
     const st0 = mkState({ y: 10, vy: -1 });
     stepVertical(st0, baseInput, dt);
     expect(st0).toEqual({ y: 10, vy: -1, onGround: false, glideEnergy: 5 });
+  });
+
+  // ============ 2026-08-31 碰撞修复回归测试 ============
+  describe('下坡/下台阶吸附容差(STEP_DOWN=0.45)', () => {
+    it('缓下坡:前一帧在地面且下落中,离地 ≤0.45 时吸附下去(保持 onGround)', () => {
+      // 玩家在 30m 地板,走到 29.7m 地板(降 0.3m)——坡道/台阶常见场景
+      const s = stepVertical(
+        mkState({ y: 30, vy: -0.5, onGround: true }),
+        { ...baseInput, gy: 29.7 },
+        dt
+      );
+      expect(s.y).toBe(29.7);
+      expect(s.vy).toBe(0);
+      expect(s.onGround).toBe(true); // 关键:不悬空,可以马上跳
+    });
+
+    it('容差外:离地 >0.45 视为踩空,正常掉落', () => {
+      const s = stepVertical(
+        mkState({ y: 30, vy: -0.5, onGround: true }),
+        { ...baseInput, gy: 29.0 }, // 降 1.0m > 0.45
+        dt
+      );
+      expect(s.onGround).toBe(false); // 真的踩空,该掉落就掉落
+      expect(s.y).toBeLessThan(30);
+    });
+
+    it('上升中不被误吸:vy>0 时不触发容差吸附', () => {
+      const s = stepVertical(
+        mkState({ y: 29.7, vy: 5, onGround: true }),
+        { ...baseInput, gy: 29.7 },
+        dt
+      );
+      expect(s.y).toBeGreaterThan(29.7); // 起跳上升,不应被拉回地面
+      expect(s.onGround).toBe(false);
+    });
+
+    it('空中(原本 onGround=false)不触发容差吸附', () => {
+      const s = stepVertical(
+        mkState({ y: 30, vy: -0.5, onGround: false }),
+        { ...baseInput, gy: 29.7 },
+        dt
+      );
+      expect(s.onGround).toBe(false); // 空中就是空中
+    });
+  });
+
+  describe('高速落地不穿透', () => {
+    it('极速下坠(单帧位移远大于离地高度)仍吸附地表,不穿到地板下方', () => {
+      // 模拟从高处落下 + 大 dt(低帧率):单帧位移 -12*0.5=-6m,远超过离地 0.8m
+      const s = stepVertical(
+        mkState({ y: 21.6, vy: -12, onGround: false }),
+        { ...baseInput, gy: 20.8 },
+        0.5 // 极低帧率
+      );
+      expect(s.y).toBeGreaterThanOrEqual(20.8); // 绝不穿到地板下方
+      expect(s.y).toBe(20.8); // 精确吸附
+      expect(s.vy).toBe(0);
+      expect(s.onGround).toBe(true);
+    });
+
+    it('连续长时间自由落体后仍稳定吸附,不下沉(200 帧 ≈ 3.3s)', () => {
+      let st = mkState({ y: 60, vy: 0, onGround: false });
+      const gy = 20.8;
+      // 落差 39.2m,全重力 26 → 约 1.74s(≈104 帧)落地,200 帧确保已落地并持续验证
+      for (let i = 0; i < 200; i++) {
+        st = stepVertical(st, { ...baseInput, gy }, dt);
+        // 任何一帧都不允许穿到地板下方
+        expect(st.y).toBeGreaterThanOrEqual(gy - 1e-9);
+      }
+      expect(st.y).toBe(gy);
+      expect(st.onGround).toBe(true);
+      expect(st.vy).toBe(0);
+    });
   });
 });
