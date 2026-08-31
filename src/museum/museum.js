@@ -11,13 +11,10 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
 
-// 2026-08-31:hintze-hall 是 Z-up(地板 mesh Z 范围 -9~1,X 跨 123m → Z 是高度)。
-// 绕 X 轴 -90°:(x,y,z)→(x,z,-y) → 新 Y=原 Z(高度),新 Z=-原 Y(深度)
-// 关键:必须用**未 quantize** 的 GLB(hall_v4o.glb 52MB)。quantize 会给 node 加 scale 反变换
-// (meshScale≈6179)打乱 Z 范围,旋转后世界盒变 ±28.8m 对称,玩家被甩到中腰。
-// 未 quantize 时旋转后:宽 ±61.8m × 深 ±27.4m × 高 38.5m,box.min.y≈-0.09(地板 sol),
-// place() 把地板对齐 Y=0,玩家站 FLOOR+1.6 即一楼大厅
-const Z_UP = true;
+// 2026-08-31:hintze-hall 是 Z-up,顶层旋转在 quantize 后世界盒异常;
+// 两次尝试都让玩家被定位到装饰柱之间挡住视野,看不到标志性远景。
+// 回退到未旋转 + 雾化版本(用户认可的视觉),52MB 大堂版本保留供未来重新校准用。
+const Z_UP = false;
 import { bigText } from '../ui/kit.js';
 import { HALL, ROOMS, ROOM_BY_ID } from './rooms-config.js';
 
@@ -292,7 +289,9 @@ async function enterHall() {
     prevOverride = ctx.kunlun.groundOverride; // 保存 eternal 的接管
     ctx.kunlun.groundOverride = museumGround; // 运行时接管(此时 eternal 已加载完)
     current = 'hall';
-    await teleportTo(HALL.X + 2, HALL.Z + 4, Math.PI / 2);
+    // 2026-08-31:大堂 X 是长轴(±61.8m 宽 130m),Z 是深度(±27.4m);玩家默认传送站 Z 边缘(yaw 朝 -X),
+    // 第一眼沿长轴看到远端拱廊/钢架天窗(用户认可的标志性视角)
+    await teleportTo(HALL.X + 30, HALL.Z, -Math.PI / 2); // 东端朝西(-X)看穿大堂
     bigText('万镜博物馆');
     // 大堂内三扇房间门框(试点:陈列馆/晨光门厅;第三扇为预告位)
     makePortal(HALL.X - 6, HALL.Z - 7, HALL.FLOOR, '#7ec8ff', '图片陈列馆', () =>
