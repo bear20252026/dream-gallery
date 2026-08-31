@@ -1962,7 +1962,23 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           const r = await fetch('/api/files?dir=' + dir + tk2());
           const d = await r.json();
           const files = (d[dir] || []).sort((a, b) => b.mtime.localeCompare(a.mtime));
-          html += `<div class="section-title">${label} (${files.length})</div>
+          // 大屏 1~5 号:与「户外大屏」管理页同一套编号/同一批文件(videos/户外大屏/ 子目录,列表 API 不递归故单独拉配置)
+          let bsHtml = '';
+          if (dir === 'videos') {
+            try {
+              const bd = await (await fetch('/api/bigscreen')).json();
+              bsHtml = (bd.slots || [])
+                .map(
+                  (s) => `<div class="file-row" style="align-items:center">
+        <span class="fname"><b>${esc(s.label)}</b>　${s.file ? esc(s.file) : '<span style="opacity:.45">空</span>'}</span>
+        ${s.file && !s.hls ? `<button class="btn-day" onclick="pvUrl('${s.src}','${(s.file || '').split('.').pop().toLowerCase()}')">预览播放</button>` : ''}
+        ${s.file && s.hls ? `<span style="opacity:.5">HLS 流,不支持在线预览</span>` : ''}
+      </div>`
+                )
+                .join('');
+            } catch (e) {}
+          }
+          html += `${bsHtml ? `<div class="section-title">🎬 户外大屏 1~5 号(画廊内循环播放;与「户外大屏」页编号一致)</div>${bsHtml}` : ''}<div class="section-title">${dir === 'videos' ? '🎬 其他视频(不在大屏循环内)' : label} (${files.length})</div>
 <div class="upload-box"><input type="file" id="up-${dir}"><button class="btn-day" onclick="upload('${dir}')">上传到 ${dir}</button></div>
 <div>${
             files
@@ -1995,8 +2011,13 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         $('fileSections').innerHTML = html;
       }
       function pv(dir, name) {
-        const url = `/admin-media/${dir}/${name}` + tkq();
-        const ext = decodeURIComponent(name).split('.').pop().toLowerCase();
+        pvUrl(
+          `/admin-media/${dir}/${name}` + tkq(),
+          decodeURIComponent(name).split('.').pop().toLowerCase()
+        );
+      }
+      // 支持任意 URL 的媒体预览(文件页用 /admin-media 相对路径,大屏页用 CDN 绝对地址)
+      function pvUrl(url, ext) {
         const m = $('pvMask');
         if (
           [
@@ -2178,6 +2199,8 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
               ) => `<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 12px">
         <b style="width:64px">${s.label}</b>
         <span style="flex:1;opacity:.85;word-break:break-all">${s.file ? esc(s.file) + (s.hls ? ' <span style="opacity:.6">(HLS)</span>' : '') : '<span style="opacity:.45">空(不播放)</span>'}</span>
+        ${s.file && !s.hls ? `<button class="btn-day" onclick="pvUrl('${s.src}','${(s.file || '').split('.').pop().toLowerCase()}')">预览</button>` : ''}
+        ${s.file && s.hls ? `<span style="opacity:.5">HLS 流,不支持在线预览</span>` : ''}
         <button class="btn-day" onclick="uploadBigscreen('${s.slot}','${s.label}')">上传替换</button>
         ${s.file ? `<button class="btn-del" onclick="delBigscreen('${s.slot}','${s.label}')">清空</button>` : ''}
       </div>`
