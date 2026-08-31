@@ -9,6 +9,7 @@
 // 配置文件: 以上均可在 .env 中设置(真实环境变量优先)
 
 const http = require('http');
+const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 
@@ -28,6 +29,7 @@ const { serveGatePage, sseRegister, handleCollect, handleReapply, handleEntrySta
 const { tokenOk, handleAdminList, handleAdminDecide, handleAdminBulk } = require('./lib/admin');
 const { handleQuizStart, handleQuizSubmit, handleQuizState, handleQuizInvite, handleQuizJudge } = require('./lib/quiz');
 const { serveStatic, handleList, handleUpload, handleUploadChunk, handleDelete, handleMyUploads } = require('./lib/files');
+const cacheBust = require('./lib/cache-bust'); // 一次性强制刷新(2026-08-31)
 const { handlePublicConfig, handleAdminMode, handleAdminLinks, handleAdminDemo, handleAdminCaption, handleMyLinks, canServeMedia } = require('./lib/siteconfig');
 const { handleVisionAnalyze } = require('./lib/vision');
 const { handleTrackClick, handleClicksClear, handleExportXlsx, handleTrackError } = require('./lib/track');
@@ -267,6 +269,28 @@ const handler = (req, res) => {
   if (!filePath) {
     sendJson(res, 403, { error: '禁止访问' });
     return;
+  }
+  // 一次性强制刷新(2026-08-31 主人定:只刷一遍,以现在为时间起点):
+  //   入口 HTML 读盘后在 </head> 前注入一次性脚本 → 每个浏览器首次进入清 Cache Storage + 强制 reload。
+  //   HTML 本身 no-store,避免 Cloudflare/浏览器把带脚本的页面缓存成"永久刷新循环"。
+  //   注入窗口过后(cached-bust.js 的 INJECT_UNTIL)自动停止,代码留着无害。
+  if ((rel === 'index.html' || rel === 'landing/index.html') && cacheBust.shouldInject()) {
+    try {
+      let html = fs.readFileSync(filePath, 'utf8');
+      html = html.includes('</head>')
+        ? html.replace('</head>', cacheBust.injectScript() + '</head>')
+        : cacheBust.injectScript() + html;
+      res.writeHead(200, {
+        'Content-Type': 'text/html; charset=utf-8',
+        'Cache-Control': 'no-store, must-revalidate',
+        'X-Content-Type-Options': 'nosniff',
+        'Referrer-Policy': 'no-referrer',
+      });
+      res.end(html);
+      return;
+    } catch (e) {
+      console.error('[cache-bust] 注入失败,回落常规静态服务:', e && (e.message || e));
+    }
   }
   serveStatic(req, res, filePath);
 };

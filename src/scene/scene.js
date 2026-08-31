@@ -253,9 +253,7 @@ w(18, -4.5, 18, -2);
 w(18, -2, 18, 0.5);
 w(18, 0.5, 18, 3);
 w(18, 3, 18, 5.5);
-w(18, 5.5, 18, 6.75);
-// ↑ 新门洞 z∈[6.75,9.25](中轴 Z=8)—— 此处不画墙
-w(18, 9.25, 18, 10.5);
+// ↑ 新门洞 z∈[5.5,10.5](中轴 Z=8,宽 5m)—— 此处不画墙(2.5m 太窄,2026-08-31 加宽一倍)
 w(18, 10.5, 18, 13);
 w(18, 13, 18, 15.5);
 w(18, 15.5, 18, 18);
@@ -263,17 +261,16 @@ w(18, 18, 18, 20.5);
 w(18, 20.5, 18, 23);
 w(18, 23, 18, 25.5);
 w(18, 25.5, 18, 28);
-//门洞装饰(2026-08-31:从旧门洞 z∈[-4.5,-2] 移到中轴线新门洞 x=18, z∈[6.75,9.25])
+//门洞装饰(2026-08-31:旧门洞 z∈[-4.5,-2] → 中轴线新门洞 x=18, z∈[5.5,10.5])
+//   门框立柱 df1/df2 + 门楣横梁 df4;原 df3(门洞上方那块 0.15×(WH-2.5)×2.5 的深棕木板)
+//   按用户要求 2026-08-31 直接删除,且不以任何材质补回——门洞通高到屋顶。
 const df1 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.5, 0.12), decoM);
-df1.position.set(18, 1.25, 6.75);
+df1.position.set(18, 1.25, 5.5);
 s.add(df1);
 const df2 = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.5, 0.12), decoM);
-df2.position.set(18, 1.25, 9.25);
+df2.position.set(18, 1.25, 10.5);
 s.add(df2);
-const df3 = new THREE.Mesh(new THREE.BoxGeometry(0.15, WH - 2.5, 2.5), decoM);
-df3.position.set(18, (WH + 2.5) / 2, 8);
-s.add(df3);
-const df4 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 2.5), decoM);
+const df4 = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.1, 5), decoM);
 df4.position.set(18, 2.5, 8);
 s.add(df4);
 // 南墙 z=28, x=-18~18 (36m) → 14段

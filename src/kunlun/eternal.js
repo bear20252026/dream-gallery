@@ -455,7 +455,7 @@ function disposeMorn() {
   mornFrames = [];
 }
 function refreshMorning() {
-  fetch('/api/files?dir=photos')
+  fetch('/api/files?dir=photos', { cache: 'no-store' })
     .then((r) => r.json())
     .then((d) => {
       const pool = (d.photos || []).filter((f) => !/^whiteboard-/i.test(f.name)); // 白板作品有专属墙,不进晨光
@@ -472,21 +472,23 @@ function refreshMorning() {
       if (key === mornPicks) return; // 集合没变,不重建(避免纹理反复重载)
       mornPicks = key;
       disposeMorn();
-      picks.slice(0, 3).forEach((p, i) =>
-        mornFrames.push(
-          buildFrame(
-            EX - 0.1,
-            FRAME_Z[i],
-            -Math.PI / 2,
-            -1,
-            0,
-            'photos/' + encodeURIComponent(p.name),
-            p.name,
-            p.mtime,
-            '晨光留影'
+      picks
+        .slice(0, 3)
+        .forEach((p, i) =>
+          mornFrames.push(
+            buildFrame(
+              EX - 0.1,
+              FRAME_Z[i],
+              -Math.PI / 2,
+              -1,
+              0,
+              'photos/' + encodeURIComponent(p.name),
+              p.name,
+              p.mtime,
+              '晨光留影'
+            )
           )
-        )
-      );
+        );
     })
     .catch(() => {
       const key = DEMO_FILL.slice(0, 3).join('|');
@@ -495,17 +497,7 @@ function refreshMorning() {
       disposeMorn();
       DEMO_FILL.slice(0, 3).forEach((n, i) =>
         mornFrames.push(
-          buildFrame(
-            EX - 0.1,
-            FRAME_Z[i],
-            -Math.PI / 2,
-            -1,
-            0,
-            'photos/' + n,
-            n,
-            null,
-            '晨光留影'
-          )
+          buildFrame(EX - 0.1, FRAME_Z[i], -Math.PI / 2, -1, 0, 'photos/' + n, n, null, '晨光留影')
         )
       );
     });

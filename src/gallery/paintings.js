@@ -166,7 +166,7 @@ iG.push(mpMesh); // 音乐面板加入交互
   }
   // 拉取白板作品，按修改时间从新到旧上墙；每 5 秒自动刷新，无需重进页面
   function refreshWall() {
-    fetch('/api/files?dir=photos')
+    fetch('/api/files?dir=photos', { cache: 'no-store' })
       .then(function (r) {
         return r.json();
       })
@@ -523,7 +523,7 @@ ctx.gallery.hangOne = hangOne;
 // dynAdded:本机制动态上墙的 URL 集合,用于增量同步(新增挂上/删除移除,不重排已有挂画)
 const dynAdded = new Set();
 const knownStatic = new Set(P.concat(V, VIDEO_WALL_SOURCES));
-fetch('/api/files')
+fetch('/api/files', { cache: 'no-store' })
   .then(function (r) {
     return r.json();
   })
@@ -599,7 +599,7 @@ function removePaintByUrl(url) {
 }
 // 新媒体墙增量同步(2026-08-29):后台增删照片/视频后,游戏内实时跟随;只增删对应挂画,不重排已有
 function syncNewMedia() {
-  fetch('/api/files')
+  fetch('/api/files', { cache: 'no-store' })
     .then(function (r) {
       return r.json();
     })
