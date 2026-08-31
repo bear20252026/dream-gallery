@@ -11,10 +11,10 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
 
-// 2026-08-31:hintze-hall 是 Z-up,顶层旋转在 quantize 后世界盒异常;
-// 两次尝试都让玩家被定位到装饰柱之间挡住视野,看不到标志性远景。
-// 回退到未旋转 + 雾化版本(用户认可的视觉),52MB 大堂版本保留供未来重新校准用。
-const Z_UP = false;
+// 2026-08-31 用户指正:模型立起来时才看到"向上的楼梯 + 二层走廊"(未旋转时楼梯变水平段,走不上去)。
+// 必须用**未 quantize** 的 GLB(hall_v4o.glb 52MB):quantize 的坐标反变换会让旋转后世界盒对称异常。
+// 立起后楼梯成为真正的向上斜面,玩家可沿楼梯走到二层走廊。
+const Z_UP = true;
 import { bigText } from '../ui/kit.js';
 import { HALL, ROOMS, ROOM_BY_ID } from './rooms-config.js';
 
@@ -186,11 +186,33 @@ function restoreGalleryBounds() {
 // ---------- 地面接管 ----------
 // 注意:eternal.js 在本模块之后加载,会覆盖 ctx.kunlun.groundOverride。
 // 因此接管动作在 enterHall/enterRoom 运行时执行(此时 eternal 已就绪),退出画廊时恢复。
+// 2026-08-31 立起后实测楼层(见 scan-hall-floors 输出):
+//   一楼地板(sol 顶面)      Y = 20.8
+//   二层楼板(Deco001 水平板) Y = 31.9~33.6(顶面 33.6)
+//   穹顶装饰                Y = 48.8~65.6
+// 楼梯区:二层楼板南缘 Z[-186,-180] X[-179,-122] → 做成坡道,玩家走过去自然升到二层
+const HALL_1F = 20.8; // 一楼脚底高度
+const HALL_2F = 33.6; // 二层脚底高度(楼板顶面)
+const STAIR = { xMin: -179, xMax: -122, zFrom: -186, zTo: -180 };
 function museumGround(x, z) {
   const cfg = current === 'hall' ? HALL : ROOM_BY_ID[current.slice(5)];
   if (!cfg) return undefined;
+  if (current !== 'hall') {
+    if (Math.abs(x - cfg.X) < cfg.WALK.hx + 2 && Math.abs(z - cfg.Z) < cfg.WALK.hz + 2)
+      return cfg.FLOOR;
+    return undefined;
+  }
+  // 大堂:一楼 + 坡道 + 二层,三层高度场
+  // 坡道区:沿 Z 从 zFrom→zTo,高度 1F→2F 线性插值
+  if (x >= STAIR.xMin && x <= STAIR.xMax && z >= STAIR.zFrom && z <= STAIR.zTo) {
+    const t = (z - STAIR.zFrom) / (STAIR.zTo - STAIR.zFrom);
+    return HALL_1F + t * (HALL_2F - HALL_1F);
+  }
+  // 二层区:坡道顶端以北(Z > zTo)且在二层楼板范围内 → 站二层
+  if (z > STAIR.zTo && x >= -191 && x <= -86 && z >= -206 && z <= -172) return HALL_2F;
+  // 一层
   if (Math.abs(x - cfg.X) < cfg.WALK.hx + 2 && Math.abs(z - cfg.Z) < cfg.WALK.hz + 2)
-    return cfg.FLOOR;
+    return HALL_1F;
   return undefined;
 }
 let prevOverride = null;
@@ -264,7 +286,9 @@ function teleportTo(x, z, yFace) {
     goldenTeleport(
       () => {
         const pl = ctx.player.pl;
-        pl.p.set(x, (current === 'hall' ? HALL.FLOOR : 0) + 1.6, z);
+        // 2026-08-31:眼高 = 脚底 + 1.6;大堂一楼脚底 20.8(实测 sol 顶面)
+        const footY = current === 'hall' ? HALL_1F : 0;
+        pl.p.set(x, footY + 1.6, z);
         pl.y = yFace;
         pl.vy = 0;
         pl.onGround = true;
