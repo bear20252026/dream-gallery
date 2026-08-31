@@ -10,6 +10,14 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
+
+// 2026-08-31:hintze-hall 实测是 Z-up(地板 mesh Z 范围 -9~1,X 跨 123m),但按 Z-up 旋转 -90° 后
+// 大堂世界盒混乱(外墙地下 27m 主导 box.min,玩家被甩到模型外)。权衡:
+//   不旋转 → 模型"侧躺"但大堂从用户视角能正常看到拱廊/钢架(用户实测认可)
+//   旋转 + 修 Y 偏移 → 工作量大且视觉差异不大
+// 当前保持不旋转,Z-up 的代价:模型地板/楼梯/装饰的 Z 方向元素会显示为"水平面横向延伸",
+// 玩家看到的"石头坡度"主要是模型原始几何——通过 floor plane + 大堂外圈隐形墙减少穿透感
+const Z_UP = false;
 import { bigText } from '../ui/kit.js';
 import { HALL, ROOMS, ROOM_BY_ID } from './rooms-config.js';
 
@@ -54,9 +62,11 @@ function loadWorld(url, name) {
     loader.load(
       url,
       (gltf) => {
-        console.log('[museum] glb 下载完成,开始解析', url);
         const obj = gltf.scene;
-        // 2026-08-31 手机实测修复:大堂在远处被沙漠雾完全吞没(unlit 房间也受雾)。
+        // 2026-08-31 轴向修正:hintze-hall 是 Z-up 导出(实测地板 mesh "sol" 的 Z 范围仅 -9~1、
+        // X 跨 123m、Y 跨 53m → Z 才是高度方向)。three 按 Y-up 加载会让整栋楼躺倒,
+        // 玩家看到的是"建筑侧面"而非室内,且地板穿透成坡。绕 X 轴 -90°:(x,y,z)→(x,z,-y)
+        if (Z_UP) obj.rotation.x = -Math.PI / 2;
         // 扫描资产贴图自带烘焙光照 → 全部转 MeshBasicMaterial(unlit)+关闭雾影响,
         // 呈现 VR Tour 原貌且不受场景灯光/雾/昼夜干扰
         obj.traverse((o) => {
@@ -71,10 +81,7 @@ function loadWorld(url, name) {
             o.material = Array.isArray(o.material) ? o.material.map(fix) : fix(o.material);
           }
         });
-        console.log('[museum] 解析步2:traverse 完成,准备 add');
-        obj.visible = false;
         s.add(obj);
-        console.log('[museum] s.add 完成,caching');
         cache.set(url, obj);
         hideMask();
         resolve(obj);
@@ -130,8 +137,9 @@ function place(obj, cfg) {
     });
     const floorMesh = new THREE.Mesh(floorGeom, floorMat);
     floorMesh.rotation.x = -Math.PI / 2;
-    // 略低于模型 minY,贴在模型底部下
-    floorMesh.position.set(cfg.X, (box.min.y + 0.02) * cfg.SCALE + obj.position.y, cfg.Z);
+    // 2026-08-31:Z-up 旋转后 box.min.y=-27(外墙地下延伸),用 cfg.floorOffsetY 调地板 plane 高度覆盖外墙地下
+    const floorY = cfg.FLOOR + (cfg.floorOffsetY || 0);
+    floorMesh.position.set(cfg.X, floorY, cfg.Z);
     floorMesh.renderOrder = -1; // 防止与地面 z-fighting
     s.add(floorMesh);
   }
