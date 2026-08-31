@@ -12,11 +12,12 @@ import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
 
 // 2026-08-31:hintze-hall 是 Z-up(地板 mesh Z 范围 -9~1,X 跨 123m → Z 是高度)。
-// 但 quantize 后坐标反变换改了 Z 范围,旋转后世界盒 ±28.8m(对称)而非 0~38.5m,玩家被定位在中腰。
-// 权衡:保持不旋转 + 远端石块用场景雾融掉(让 Z-up 几何延伸看起来像"沙地中的石阵");
-//       vs 旋转 + 修偏移(玩家站 Y=28m 顶楼、踩不到地板、看不到一楼大厅)。
-// 选前者:用户认可的拱廊/钢架主楼梯视角保留,"漂浮石块"在沙漠雾中虚化容忍。
-const Z_UP = false;
+// 绕 X 轴 -90°:(x,y,z)→(x,z,-y) → 新 Y=原 Z(高度),新 Z=-原 Y(深度)
+// 关键:必须用**未 quantize** 的 GLB(hall_v4o.glb 52MB)。quantize 会给 node 加 scale 反变换
+// (meshScale≈6179)打乱 Z 范围,旋转后世界盒变 ±28.8m 对称,玩家被甩到中腰。
+// 未 quantize 时旋转后:宽 ±61.8m × 深 ±27.4m × 高 38.5m,box.min.y≈-0.09(地板 sol),
+// place() 把地板对齐 Y=0,玩家站 FLOOR+1.6 即一楼大厅
+const Z_UP = true;
 import { bigText } from '../ui/kit.js';
 import { HALL, ROOMS, ROOM_BY_ID } from './rooms-config.js';
 
