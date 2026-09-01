@@ -21,6 +21,9 @@ import('./museum/museum.js'); // 万镜博物馆:大堂+贵族房间世界(方�
 // 花瓣画廊 v2(2026-09-02):东侧空地 (60,8) 按验收模板 1:1 建造。
 // 必须动态 import:主线程灯光预算清扫在 main.js 同步执行,静态 import 的点光源会被清掉
 import('./gallery/gallery-v2.js');
+// 玫瑰花瓣展馆(2026-09-02):东南空地 (144,-60),参考 Tripo 玫瑰模型等高线描摹建造。
+// 同样必须动态 import(灯光预算清扫)
+import('./gallery/rose-gallery.js');
 import './gate/settings.js'; // 昵称双渠道(进馆 5 秒弹窗 + ⚙设置)
 import './gate/upload.js'; // 访客上传(照片/我的链接)+ AI 配文 + 悬浮路标
 import './gate/housecolor.js'; // 房屋分组换色(墙壁/天花板/腰线/踢脚线,仅自己可见)

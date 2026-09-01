@@ -86,6 +86,8 @@ export function protectMask(x, z) {
   m = Math.min(m, padF(rectDist(x, z, -398, -382, -306, -294), 0, 5));
   // 花瓣画廊 v2(2026-09-02):中心 (60,8) 直径 40m,保护区 50×50(拍平+抗锯齿过渡)
   m = Math.min(m, padF(rectDist(x, z, 35, 85, -17, 33), 10, 25));
+  // 玫瑰花瓣展馆(2026-09-02):中心 (144,-60) 直径 42m,保护区 50×50(同 v2 规格)
+  m = Math.min(m, padF(rectDist(x, z, 119, 169, -85, -35), 10, 25));
   return m;
 }
 export const getH = function (x, z) {
