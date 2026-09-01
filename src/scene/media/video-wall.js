@@ -9,8 +9,9 @@
 //   ctx.media.vidMesh   — 1号大屏网格
 //   ctx.media.v45Mesh   — 4/5号小屏网格
 //
-// 序列流程（async/await 线性）：
-//   playMusic(0,0) → playVideo(V1) → playMusic(1,2) → playVideo(V2) → playVideo(V3) → for V45 playVideo → loop
+// 序列流程（async/await 线性,只含视频）：
+//   playMainSlot(0) → playMainSlot(1) → playMainSlot(2) → playV45Slots() → loop
+//   音频轨(00010.aac→0009.aac→0008.aac,循环2轮)见 gallery-audio.js,二者并行
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
 import { onMediaChanged } from '../../media-push.js'; // 后台改大屏 → 重新拉配置(2026-08-29)
@@ -28,11 +29,17 @@ let BIG = { main: [], v45: [] };
 
 function reloadBigscreen() {
   return fetch('/api/bigscreen')
-    .then(function (r) { return r.json(); })
+    .then(function (r) {
+      return r.json();
+    })
     .then(function (d) {
       if (d && d.ok && Array.isArray(d.slots)) {
-        BIG.main = d.slots.filter(function (s) { return s.group === 'main'; });
-        BIG.v45 = d.slots.filter(function (s) { return s.group === 'v45'; });
+        BIG.main = d.slots.filter(function (s) {
+          return s.group === 'main';
+        });
+        BIG.v45 = d.slots.filter(function (s) {
+          return s.group === 'v45';
+        });
       }
     })
     .catch(function () {});
@@ -147,89 +154,10 @@ vidMesh.userData = { isVideoWall: true };
 v45Mesh.userData = { isVideo45: true };
 
 // ===================== 播放序列控制器 =====================
-let mi = 0; // 音乐索引（playMusic 内部使用）
-let mAud = null; // 懒创建
+// 注意:音频轨(00010.aac→0009.aac→0008.aac,循环2轮)已迁至 gallery-audio.js,
+// 与本文件的「视频轨」在进画廊后并行。本文件只负责视频墙轮播(大屏1~5 无限循环)。
 let sequenceStarted = false;
 let sequenceTriggered = false;
-
-const MQ = [CDN + 'music/00002.m4a', CDN + 'music/00003.m4a', CDN + 'music/00004.m4a'];
-
-function _getMAud() {
-  if (!mAud) {
-    mAud = new Audio();
-    mAud.volume = 0.5;
-  }
-  return mAud;
-}
-
-/**
- * 播放指定区间的音频曲目。返回 Promise 在全部播完后 resolve。
- * 用 currentTime 500ms 轮询检测真实播放，10s 超时自动跳过。
- * @param {number} startIdx - MQ 起始索引
- * @param {number} endIdx - MQ 结束索引（含）
- * @returns {Promise<void>}
- */
-function playMusic(startIdx, endIdx) {
-  return new Promise(function (resolve) {
-    var a = _getMAud();
-    if (a._mEndedFn) {
-      a.removeEventListener('ended', a._mEndedFn);
-      a._mEndedFn = null;
-    }
-    if (a._mPollId) {
-      clearInterval(a._mPollId);
-      a._mPollId = null;
-    }
-    mi = startIdx;
-    var segEnd = endIdx + 1;
-    var playing = false;
-
-    function nextTrack() {
-      if (a._mPollId) {
-        clearInterval(a._mPollId);
-        a._mPollId = null;
-      }
-      a.pause();
-      mi++;
-      if (mi >= segEnd) {
-        a.removeEventListener('ended', a._mEndedFn);
-        a._mEndedFn = null;
-        resolve(); // ← 所有曲目播完，Promise resolve
-        return;
-      }
-      startPlayback();
-    }
-
-    function startPlayback() {
-      a.pause();
-      a.src = MQ[mi];
-      playing = false;
-      var deadline = Date.now() + 10000;
-      if (a._mPollId) clearInterval(a._mPollId);
-      a._mPollId = setInterval(function () {
-        if (a.currentTime > 0.1) {
-          playing = true;
-          clearInterval(a._mPollId);
-          a._mPollId = null;
-        } else if (Date.now() > deadline && !playing) {
-          clearInterval(a._mPollId);
-          a._mPollId = null;
-          console.warn('[music] 超时跳过:', a.src);
-          nextTrack();
-        }
-      }, 500);
-      a.play().catch(function (e) {
-        console.warn('[music] play():', e.name);
-      });
-    }
-
-    a._mEndedFn = nextTrack;
-    a.addEventListener('ended', nextTrack);
-    startPlayback();
-  }).then(function () {
-    ctx.events.emit('music:ended', { startIdx, endIdx });
-  });
-}
 
 /**
  * 播放单个视频，返回 Promise 在视频结束后 resolve。
@@ -294,8 +222,7 @@ function playVideo(el, src) {
 }
 
 // ===================== 主序列(扁平 async/await,大屏槽位软编码) =====================
-// 播放顺序: music(0,0) → main槽0 → music(1,2) → main槽1 → main槽2 → v45槽们 → loop
-// 空槽(后台已清空)自动跳过;音乐穿插节奏保持原样。
+// 仅视频轮播:大屏1→2→3→4→5,无限循环;空槽自动跳过
 function slotSrc(arr, i) {
   return arr[i] && arr[i].src ? arr[i] : null;
 }
@@ -326,28 +253,20 @@ async function startSequence() {
   sequenceStarted = true;
   await reloadBigscreen();
 
+  // 启动并行「音频轨」(00010.aac→0009.aac→0008.aac,循环2轮后停)
+  if (typeof ctx.startGalleryAudio === 'function') ctx.startGalleryAudio();
+
+  // 视频轨:大屏1→2→3→4→5,无限循环(空槽自动跳过)
   while (true) {
-    // 步骤1: 00002.m4a
-    await playMusic(0, 0);
-    // 步骤2: main 槽0(大屏1号)
-    await playMainSlot(0);
-    // 步骤3: 00003+00004
-    await playMusic(1, 2);
-    // 步骤4: main 槽1(大屏2号)
-    await playMainSlot(1);
-    // 步骤5: main 槽2(大屏3号 HLS)
-    await playMainSlot(2);
-    // 步骤6: v45 槽们(大屏4/5号)
-    await playV45Slots();
+    await playMainSlot(0); // 大屏1号
+    await playMainSlot(1); // 大屏2号
+    await playMainSlot(2); // 大屏3号(HLS)
+    await playV45Slots(); // 大屏4/5号
   }
 }
 
 // ===================== 导出：等待用户首次交互启动序列 =====================
 function retryMedia() {
-  // 音频:初始状态未播 → 重试
-  if (mAud && mAud.paused && mAud.currentTime === 0) {
-    mAud.play().catch(function () {});
-  }
   // 主视频:静音播放中但被浏览器静音 → 用户手势后开声
   if (vidEl.src && vidEl.muted && !vidEl.paused) {
     vidEl.muted = false;
