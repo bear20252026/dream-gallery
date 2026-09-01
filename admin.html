@@ -1459,7 +1459,7 @@
         } else if (a.status === 'kicked' || a.status === 'denied' || a.status === 'history') {
           btns = `<button class="btn-perm" onclick="decide('${a.id}','approve')">恢复放行</button>`;
         } else {
-          btns = `<button class="btn-kick" onclick="kickAsk('${a.id}','${j(a.answer || '')}')">踢出画廊</button>`;
+          btns = `<button class="btn-kick" onclick="kickAsk('${a.id}','${j(a.answer || '')}')">踢出画廊</button><button class="btn-note" onclick="revokeSessAsk('${a.id}','${j(a.answer || '')}')">吊销会话</button>`;
         }
         const ip = a.ip || '';
         const isBlocked = (DATA.blocked || []).includes(ip);
@@ -1518,6 +1518,18 @@
         if (reason === null) return;
         decide(id, 'kick', reason);
       }
+      // 吊销会话:该设备 Cookie 立即失效,下次访问重新识别身份并自动换发(不等于踢出)
+      async function revokeSessAsk(id, name) {
+        if (
+          !confirm(
+            '吊销「' +
+              name +
+              '」的会话 Token?\n其 Cookie 立即失效,下次访问将自动重新识别身份(不会被挡在门外,区别于踢出)。'
+          )
+        )
+          return;
+        decide(id, 'revoke-session');
+      }
       async function decide(id, action, reason) {
         const r = await fetch('/api/admin/decide' + tk(), {
           method: 'POST',
@@ -1525,7 +1537,13 @@
           body: JSON.stringify({ id, action, reason: reason || '' }),
         });
         if (r.ok) {
-          toast(action === 'kick' ? '已踢出,该设备将立即弹回申请页' : '操作成功');
+          toast(
+            action === 'kick'
+              ? '已踢出,该设备将立即弹回申请页'
+              : action === 'revoke-session'
+                ? '已吊销会话,该设备下次访问将重新识别'
+                : '操作成功'
+          );
           load();
         } else {
           const d = await r.json().catch(() => ({}));
