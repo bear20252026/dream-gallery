@@ -81,7 +81,18 @@ function mv(wx, wz, dt) {
     spd *= boost;
     if (pl.pi > 0.2) spd *= 1 + pl.pi * 0.5;
   }
-  const r = resolveMove(pl.p.x, pl.p.z, wx * spd, wz * spd, pl.r, bounds);
+  // 2026-09-01 高度感知护栏:传入脚底高度,带 mnY/mxY 的墙(如二层回廊护栏)
+  // 只对垂直区间重叠的玩家生效——一楼玩家可从二楼护栏下方自由通行
+  const r = resolveMove(
+    pl.p.x,
+    pl.p.z,
+    wx * spd,
+    wz * spd,
+    pl.r,
+    bounds,
+    undefined,
+    pl.p.y - EYE_HEIGHT
+  );
   pl.p.x = r.x;
   pl.p.z = r.z;
   // 地面高度统一由 tickPhysics → stepVertical 吸附处理(不再在此处平滑跟随)。

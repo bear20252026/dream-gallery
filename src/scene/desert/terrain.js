@@ -77,12 +77,13 @@ export function protectMask(x, z) {
   // 会在 (-132,-194) 等大堂内部生成岩石(1.3×1.3 AABB),玩家朝中央楼梯走时被
   // 这些"误生成岩石"挡住。补登记大堂 + 两个房间为保护区,与 HALL/ROOMS 配置
   // 保持一致(留 5m 抗锯齿过渡)。
-  // 大堂 HALL.X=-140 HALL.Z=-190 WALK hx=60 hz=17 → 内圈 X∈[-200,-80] Z∈[-207,-173]
-  m = Math.min(m, padF(rectDist(x, z, -200, -80, -207, -173), 0, 5));
-  // picture_gallery: X=-95 Z=-300 hx=5.5 hz=11
-  m = Math.min(m, padF(rectDist(x, z, -101, -89, -311, -289), 0, 5));
-  // upper_vestibule: X=-230 Z=-300 hx=8 hz=6
-  m = Math.min(m, padF(rectDist(x, z, -238, -222, -306, -294), 0, 5));
+  // 2026-09-01 大堂整体西移 160m(X=-300,挪离 Yazd 穹顶塔),保护区同步平移:
+  // 大堂 HALL.X=-300 HALL.Z=-190 WALK hx=60 hz=17 → 内圈 X∈[-360,-240] Z∈[-207,-173]
+  m = Math.min(m, padF(rectDist(x, z, -360, -240, -207, -173), 0, 5));
+  // picture_gallery: X=-255 Z=-300 hx=5.5 hz=11
+  m = Math.min(m, padF(rectDist(x, z, -261, -249, -311, -289), 0, 5));
+  // upper_vestibule: X=-390 Z=-300 hx=8 hz=6
+  m = Math.min(m, padF(rectDist(x, z, -398, -382, -306, -294), 0, 5));
   return m;
 }
 export const getH = function (x, z) {

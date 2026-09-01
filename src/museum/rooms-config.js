@@ -5,7 +5,10 @@ export const HALL = {
   id: 'hall',
   name: '万镜博物馆 · 中央大堂',
   url: '/models/hall/hall.glb',
-  X: -140,
+  // 2026-09-01 整体西移 160m(原 X=-140):西北 Yazd 穹顶塔(-150,-251.8)脚印半径≈44m,
+  // 足迹 z∈[-296,-208] 与大堂 z∈[-210,-170] 重叠约 2m,且 127.5m 塔身紧贴博物馆北缘。
+  // 移至 X=-300 后与最近塔 (-300,8) 间距 198m、(-150,-251.8) 间距 162m,均留足余量。
+  X: -300,
   Z: -190,
   SCALE: 1, // 源模型已是米制
   // 2026-08-31 用户要求:建筑距离地面的高度再上调(沙漠地形峰顶 Y≈10)。
@@ -24,7 +27,7 @@ export const ROOMS = [
     id: 'picture_gallery',
     name: '图片陈列馆',
     url: '/models/rooms/picture_gallery.glb',
-    X: -95,
+    X: -255, // 2026-09-01 随大堂西移 160m(原 -95)
     Z: -300, // 房间在大堂旁(北侧)
     FLOOR: 0,
     WALK: { hx: 5.5, hz: 11 }, // 12.2×26.2 长廊,取内圈
@@ -33,7 +36,7 @@ export const ROOMS = [
     id: 'upper_vestibule',
     name: '晨光门厅',
     url: '/models/rooms/upper_vestibule.glb',
-    X: -230,
+    X: -390, // 2026-09-01 随大堂西移 160m(原 -230)
     Z: -300,
     FLOOR: 0,
     WALK: { hx: 8, hz: 6 },

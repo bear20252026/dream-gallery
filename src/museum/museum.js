@@ -154,6 +154,34 @@ function place(obj, cfg) {
   return size;
 }
 
+// ---------- 护栏(高度感知隐形墙,2026-09-01 楼梯掉落修复) ----------
+// 楼梯两侧 + 二层回廊内外缘的防坠护栏。带 mnY/mxY 的墙只对"脚底高度落在区间内"
+// 的玩家生效(collision-resolve.hitsAny):一楼玩家(20.8)可从回廊护栏(mnY=30.4)
+// 下方自由通行;回廊上的人(30.45)则被挡住——一套墙体同时服务上下两层。
+// 坐标为大堂本地偏移(相对 HALL.X/HALL.Z),与 museumGround 共用同一几何事实来源。
+function railWall(list, lx1, lz1, lx2, lz2, mnY, mxY) {
+  const x1 = HALL.X + lx1,
+    z1 = HALL.Z + lz1,
+    x2 = HALL.X + lx2,
+    z2 = HALL.Z + lz2;
+  const cx = (x1 + x2) / 2,
+    cz = (z1 + z2) / 2;
+  const dx = x2 - x1,
+    dz = z2 - z1;
+  const len = Math.hypot(dx, dz);
+  const ang = Math.atan2(dx, dz);
+  const sA = Math.abs(Math.sin(ang)),
+    cA = Math.abs(Math.cos(ang));
+  list.push({
+    mnX: cx - ((sA * len) / 2 + cA * 0.25) - 0.1,
+    mxX: cx + ((sA * len) / 2 + cA * 0.25) + 0.1,
+    mnZ: cz - ((cA * len) / 2 + sA * 0.25) - 0.1,
+    mxZ: cz + ((cA * len) / 2 + sA * 0.25) + 0.1,
+    mnY,
+    mxY,
+  });
+}
+
 // ---------- 世界碰撞:生成可走区外圈隐形墙 ----------
 function buildBounds(cfg) {
   const list = [];
@@ -183,6 +211,33 @@ function buildBounds(cfg) {
       mxZ: cz + ((cA * len) / 2 + sA * 0.2) + 0.1,
     });
   }
+  if (cfg.id === 'hall') {
+    // 大堂外围墙降为"只挡一楼"(0~30.3):二层回廊(30.45)从墙上自由越过,
+    // 回廊周边由下方外缘护栏封闭,防止越墙后从楼顶坠落
+    for (const w of list) {
+      w.mnY = 0;
+      w.mxY = 30.3;
+    }
+    const R1 = [20.5, 30.3]; // 楼梯护栏区间(保护楼梯表面;顶端 30.45 与回廊齐平处放行)
+    const R2 = [30.4, 38]; // 回廊护栏区间(只挡二楼的人)
+    // --- 楼梯防坠护栏(楼梯几何见 STAIR:平台 x∈[-51,-41],两翼 z 到 ±17,东翼 x 到 -27) ---
+    railWall(list, -51.3, -17, -51.3, 17, ...R1); // 西缘(平台+南北两翼西边,视觉无栏杆的高危侧)
+    railWall(list, -40.7, -17, -40.7, -5, ...R1); // 北翼东缘
+    railWall(list, -40.7, 5, -40.7, 17, ...R1); // 南翼东缘
+    railWall(list, -41, -5.3, -27, -5.3, ...R1); // 东翼南缘(降到 1F 的长楼梯两边)
+    railWall(list, -41, 5.3, -27, 5.3, ...R1); // 东翼北缘
+    // --- 回廊内缘护栏(北/南带在楼梯豁口 x∈[-51,-41] 断开,供楼梯到达回廊) ---
+    railWall(list, -56.5, -16.3, -51.3, -16.3, ...R2); // 北带内缘·西段
+    railWall(list, -40.7, -16.3, 43.5, -16.3, ...R2); // 北带内缘·东段
+    railWall(list, 43.8, -16.3, 43.8, 16.3, ...R2); // 东带内缘
+    railWall(list, 43.5, 16.3, -40.7, 16.3, ...R2); // 南带内缘·东段
+    railWall(list, -51.3, 16.3, -56.5, 16.3, ...R2); // 南带内缘·西段
+    // --- 回廊外缘护栏(U 形闭环,防从楼顶越出) ---
+    railWall(list, -56.5, -19.2, 55.5, -19.2, ...R2); // 北带外缘
+    railWall(list, 55.5, 19.2, -56.5, 19.2, ...R2); // 南带外缘
+    railWall(list, 55.3, -19.2, 55.3, 19.2, ...R2); // 东带外缘
+    railWall(list, -56.3, -19.2, -56.3, 19.2, ...R2); // 西端封口
+  }
   return list;
 }
 
@@ -202,16 +257,31 @@ function restoreGalleryBounds() {
 // ---------- 地面接管 ----------
 // 注意:eternal.js 在本模块之后加载,会覆盖 ctx.kunlun.groundOverride。
 // 因此接管动作在 enterHall/enterRoom 运行时执行(此时 eternal 已就绪),退出画廊时恢复。
-// 2026-08-31 立起后实测楼层(见 scan-hall-floors 输出):
-//   一楼地板(sol 顶面)      Y = 20.8
-//   二层楼板(Deco001 水平板) Y = 31.9~33.6(顶面 33.6)
-//   穹顶装饰                Y = 48.8~65.6
-// 楼梯区:二层楼板南缘 → 做成坡道,玩家走过去自然升到二层
+//
+// 2026-09-01 大修(楼梯掉落根因修复):旧高度场是"假坡道(x -179~-122 沿 Z 插值 20.8→33.6)
+// + 假二层(33.6)"——射线实测证明假坡道下方视觉全是 1F 平地(玩家悬空/穿模),
+// 假二层区域上方根本没有楼板(纯虚构),真实二层回廊高度是 30.45。
+// 新高度场按 hintze-hall 真实几何重建(1m 网格射线实测):
+//   1F 地板 20.8 | 西端双分大楼梯:中央平台 25.4,东翼沿 X 降回 1F,
+//   南北两翼沿 Z 升至 30.45 | U 形二层回廊 30.45(北/南/东三条边带)
+// 所有坐标用"大堂本地坐标"(相对 HALL.X/HALL.Z 的偏移),随配置移位自动跟随——单一事实来源。
 const HALL_1F = 20.8; // 一楼脚底高度
-const HALL_2F = 33.6; // 二层脚底高度(楼板顶面)
-// 坡道:X 跨 -179~-122;Z 从 -192 到 -180(12m 长),高度 20.8→33.6。
-// 2026-08-31 修复:原 6m 长坡(坡度 65°)太陡,玩家高速走会陷入坡道/抖动 → 拉长到 12m(坡度 46°)
-const STAIR = { xMin: -179, xMax: -122, zFrom: -192, zTo: -180 };
+const BALC_H = 30.45; // 二层回廊脚底高度(射线实测 30.44~30.45)
+
+// 楼梯几何(本地坐标,X 相对 HALL.X,Z 相对 HALL.Z,高度为脚底值)
+const STAIR = {
+  land: { x0: -51, x1: -41, z0: -5, z1: 5, h: 25.4 }, // 中央平台
+  east: { x1: -27, hEnd: 20.6 }, // 东翼:平台东缘(x=-41)→x=-27 降到 1F
+  wing: { x0: -51, x1: -41, zNorth: -17, zSouth: 17, hTop: 30.45 }, // 南北两翼沿 Z 升至回廊
+};
+
+// U 形二层回廊可行走带(本地坐标,留 0.5m 安全边距防止踩出视觉楼板)
+const BALC = {
+  n: { z0: -19, z1: -16.5, x0: -56, x1: 54 }, // 北带(实心楼板 z=-208 一线)
+  s: { z0: 16.5, z1: 19, x0: -56, x1: 54 }, // 南带(镜像)
+  e: { x0: 44, x1: 55, z0: -19, z1: 19 }, // 东带(x∈[-96,-85] 连片回廊)
+};
+
 function museumGround(x, z) {
   const cfg = current === 'hall' ? HALL : ROOM_BY_ID[current.slice(5)];
   if (!cfg) return undefined;
@@ -221,19 +291,41 @@ function museumGround(x, z) {
     const rz = Math.max(cfg.Z - cfg.WALK.hz - 2, Math.min(z, cfg.Z + cfg.WALK.hz + 2));
     return cfg.FLOOR;
   }
-  // ===== 大堂:一楼 + 坡道 + 二层 三层高度场 =====
+  // ===== 大堂:1F + 双分大楼梯 + U 形二层回廊 =====
   // 关键(2026-08-31 修复穿地):大堂内**任意位置**都必须返回有效地板高度。
-  // 之前范围外返回 undefined → groundY 回退沙漠地形(约 0m),玩家从 20.8m 地板
-  // 突然掉到 0m,表现为"穿透地板掉到下方"。
-  // 坡道区:沿 Z 从 zFrom→zTo,高度 1F→2F 线性插值
-  if (x >= STAIR.xMin && x <= STAIR.xMax && z >= STAIR.zFrom && z <= STAIR.zTo) {
-    const t = (z - STAIR.zFrom) / (STAIR.zTo - STAIR.zFrom);
-    return HALL_1F + t * (HALL_2F - HALL_1F);
+  const lx = x - HALL.X; // 本地坐标
+  const lz = z - HALL.Z;
+  let h = HALL_1F;
+  // 中央平台(25.4)
+  const L = STAIR.land;
+  if (lx >= L.x0 && lx <= L.x1 && lz >= L.z0 && lz <= L.z1) {
+    h = Math.max(h, L.h);
+  } else if (lx > L.x1 && lx <= STAIR.east.x1 && lz >= L.z0 && lz <= L.z1) {
+    // 东翼楼梯:沿 X 从平台(25.4)线性降到 1F;x=-27 以东已是 1F
+    const t = (lx - L.x1) / (STAIR.east.x1 - L.x1);
+    h = Math.max(h, L.h + t * (STAIR.east.hEnd - L.h));
   }
-  // 二层区:坡道顶端以北(Z > zTo)且在二层楼板范围内 → 站二层
-  if (z > STAIR.zTo && x >= -191 && x <= -86 && z >= -206 && z <= -172) return HALL_2F;
-  // 其他所有位置 = 一楼地板(不再返回 undefined)
-  return HALL_1F;
+  // 南北两翼:沿 Z 从平台(25.4)升到回廊(30.45);只覆盖楼梯宽度 x∈[x0,x1]
+  const W = STAIR.wing;
+  if (lx >= W.x0 && lx <= W.x1) {
+    if (lz < L.z0 && lz >= W.zNorth) {
+      const t = (L.z0 - lz) / (L.z0 - W.zNorth);
+      h = Math.max(h, L.h + t * (W.hTop - L.h));
+    } else if (lz > L.z1 && lz <= W.zSouth) {
+      const t = (lz - L.z1) / (W.zSouth - L.z1);
+      h = Math.max(h, L.h + t * (W.hTop - L.h));
+    }
+  }
+  // U 形二层回廊(30.45):北带/南带/东带任一命中即站二楼
+  const N = BALC.n,
+    S = BALC.s,
+    E = BALC.e;
+  const onBalc =
+    (lz >= N.z0 && lz <= N.z1 && lx >= N.x0 && lx <= N.x1) ||
+    (lz >= S.z0 && lz <= S.z1 && lx >= S.x0 && lx <= S.x1) ||
+    (lx >= E.x0 && lx <= E.x1 && lz >= E.z0 && lz <= E.z1);
+  if (onBalc) h = Math.max(h, BALC_H);
+  return h;
 }
 let prevOverride = null;
 

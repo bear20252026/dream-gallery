@@ -24,11 +24,11 @@ function protectMask(x, z) {
   m = Math.min(m, padF(Math.hypot(x - 39, z - 14), 8, 10));
   m = Math.min(m, padF(rectDist(x, z, -86, 86, 97, 103), 0, 10));
   m = Math.min(m, padF(rectDist(x, z, -32, 33, -103, -97), 0, 10));
-  // 2026-08-31:大堂/房间保护区(与主线程 terrain.js 保持一致,否则 worker 计算
-  // 的高度图与主线程不同步,玩家脚底高度跳变)。
-  m = Math.min(m, padF(rectDist(x, z, -200, -80, -207, -173), 0, 5));
-  m = Math.min(m, padF(rectDist(x, z, -101, -89, -311, -289), 0, 5));
-  m = Math.min(m, padF(rectDist(x, z, -238, -222, -306, -294), 0, 5));
+  // 2026-09-01:大堂/房间保护区(与主线程 terrain.js 保持一致,否则 worker 计算
+  // 的高度图与主线程不同步,玩家脚底高度跳变)。大堂已西移 160m → X=-300。
+  m = Math.min(m, padF(rectDist(x, z, -360, -240, -207, -173), 0, 5));
+  m = Math.min(m, padF(rectDist(x, z, -261, -249, -311, -289), 0, 5));
+  m = Math.min(m, padF(rectDist(x, z, -398, -382, -306, -294), 0, 5));
   return m;
 }
 

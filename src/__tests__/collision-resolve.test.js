@@ -28,6 +28,46 @@ describe('collision-resolve.hitsAny', () => {
   });
 });
 
+// 高度感知护栏(2026-09-01 楼梯掉落修复):墙可带可选垂直区间 [mnY,mxY](脚底坐标系),
+// 玩家身体 [footY, footY+1.8] 与墙区间不重叠时该墙"不存在"——
+// 典型场景:二层回廊护栏只挡二楼的人,一楼的人从护栏下方自由通行
+describe('collision-resolve 高度感知护栏(mnY/mxY)', () => {
+  // 模拟二层回廊内缘护栏:XY 上横在 z=0,垂直区间 30.4~38
+  const RAIL = [{ mnX: -10, mxX: 10, mnZ: -0.3, mxZ: 0.3, mnY: 30.4, mxY: 38 }];
+
+  it('二楼的人(footY=30.45)撞护栏 → 被挡', () => {
+    expect(hitsAny(0, 0, R, RAIL, 30.45)).toBe(true);
+    const r = resolveMove(0, 2, 0, -1, R, RAIL, undefined, 30.45);
+    expect(r.z).toBeGreaterThan(0.6); // 到不了护栏另一侧
+  });
+  it('一楼的人(footY=20.8)从护栏下方通过 → 不挡', () => {
+    expect(hitsAny(0, 0, R, RAIL, 20.8)).toBe(false);
+    const r = resolveMove(0, 2, 0, -4, R, RAIL, undefined, 20.8);
+    expect(r.z).toBeLessThan(-1); // 穿行无阻
+  });
+  it('不传 footY(旧行为)→ 护栏当作全高墙挡住所有人(兼容旧世界)', () => {
+    expect(hitsAny(0, 0, R, RAIL)).toBe(true);
+  });
+  it('无 mnY/mxY 的普通墙 + footY → 行为不变(全高墙)', () => {
+    expect(hitsAny(0, 0, R, WALL, 30.45)).toBe(true);
+    expect(hitsAny(0, 0, R, WALL, 20.8)).toBe(true);
+  });
+  it('footY 高于墙顶(footY>=mxY)→ 不碰撞(可从墙上越过)', () => {
+    expect(hitsAny(0, 0, R, [{ mnX: -1, mxX: 1, mnZ: -1, mxZ: 1, mnY: 0, mxY: 30.3 }], 30.45)).toBe(
+      false
+    );
+  });
+  it('脚底恰在墙顶 → 不碰撞(站上墙顶不被墙卡住)', () => {
+    expect(
+      hitsAny(0, 0, R, [{ mnX: -1, mxX: 1, mnZ: -1, mxZ: 1, mnY: 20.5, mxY: 30.3 }], 30.3)
+    ).toBe(false);
+  });
+  it('滑行行为:二楼沿护栏滑行不会被弹飞', () => {
+    const r = resolveMove(-3, 0.5, 5, -1, R, RAIL, undefined, 30.45);
+    expect(r.blocked || r.z >= 0.6 - 1e-9 || r.x > -3).toBe(true);
+  });
+});
+
 describe('collision-resolve 隧穿防护(子步进)', () => {
   it('单帧高速冲刺(远超墙厚)不穿墙', () => {
     // 从 x=-3 以单帧位移 +5 冲向墙(墙在 x=0,半厚 0.3 + r 0.35)
