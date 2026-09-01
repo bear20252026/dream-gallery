@@ -1,26 +1,18 @@
-// gallery-audio.js — 进画廊后的「音频轨」(2026-09-01 主人定)
+// gallery-audio.js — 进画廊后的「音频轨」播放器(2026-09-01 主人定·串行交错版)
 //
-// 播放规则(与视频墙 video-wall.js 的「视频轨」并行,共同构成进入画廊后的媒体序列):
-//   · 阶段1(三连读规则页): 00001.m4a 循环 —— 由 main.js 的 agreementMusic 负责
-//   · 阶段2(画廊场景实际加载完成后):
-//       音频轨 00010.aac → 0009.aac → 0008.aac,整套循环 2 轮,第 3 轮起永久停止
-//   互斥: 单 Audio 元素串行播放,天然满足「两个音频不能同时播」
-//
-// 触发: 画廊场景加载完成(gallery:ready 事件)即启动;video-wall.js 的
-//   triggerSequence 也会显式调用 ctx.startGalleryAudio(在用户手势链内,利于自动播放)。
+// 播放规则(2026-09-01 二次确认):
+//   · 阶段2 序列由 video-wall.js 统一驱动(严格串行,同一时刻只播一个):
+//       音1→屏1→音2→屏2→音3→屏3→屏4→屏5,整套跑 2 轮
+//   · 第 3 轮起音频永久停止,仅视频轨(大屏1~5)无限循环
+//   · 本模块只提供「播指定曲目并等播完」的能力,不再自行启动/循环
 import { ctx } from '../../ctx.js';
 
 const CDN = 'https://cdn.cloudbear.cloud/';
 
-// 音频轨曲目(顺序即播放顺序)
+// 音频轨曲目(索引即播放顺序: 0=00010, 1=0009, 2=0008)
 const AUDIO_TRACK = [CDN + 'music/00010.aac', CDN + 'music/0009.aac', CDN + 'music/0008.aac'];
 
-// 整套循环轮数;跑完即永久停止(第 3 轮起不播)
-const ROUNDS = 2;
-
-let gAud = null; // 懒创建,整段序列共用同一个 Audio 元素
-let started = false; // 已开始,防止 gallery:ready + startVidSeq 重复触发
-let finished = false; // 2 轮跑完,标记永久停止
+let gAud = null; // 懒创建,整段序列共用同一个 Audio 元素(天然「最多一个音频」)
 
 function getAud() {
   if (!gAud) {
@@ -30,22 +22,7 @@ function getAud() {
   return gAud;
 }
 
-// 阶段1的协议配乐应在此刻停掉(防御性,prologue.js 也会在进馆时调一次)
-function stopAgreementDefensive() {
-  try {
-    if (typeof ctx.stopAgreementMusic === 'function') ctx.stopAgreementMusic();
-  } catch (e) {}
-}
-
-// 「最多1个音频」: 进画廊序列启动时,若背景音乐正在播则暂停(不自动恢复,留待用户手动)
-function pauseBackgroundMusic() {
-  try {
-    const mA = ctx.media && ctx.media.mA;
-    if (mA && !mA.paused) mA.pause();
-  } catch (e) {}
-}
-
-// 播放单首,返回 Promise 在该曲 ended 或超时(10s)后 resolve
+// 播放单首,返回 Promise 在该曲 ended 或超时(10s 起播失败)后 resolve
 function playOne(url) {
   return new Promise(function (resolve) {
     const a = getAud();
@@ -90,33 +67,19 @@ function playOne(url) {
   });
 }
 
-async function runSequence() {
-  for (let r = 0; r < ROUNDS; r++) {
-    if (finished) return;
-    for (const url of AUDIO_TRACK) {
-      if (finished) return;
-      await playOne(url);
-    }
-  }
-  // 2 轮跑完,永久停止(第 3 轮起不再启动)
-  finished = true;
-  console.log('[gallery-audio] 2 轮播放完毕,已停止(此后仅视频轨继续)');
+/**
+ * 播放音频轨第 i 首(i: 0=00010, 1=0009, 2=0008),播完 resolve。
+ * 由 video-wall.js 的串行序列调用;外部不自行启动。
+ * @param {number} i - 曲目索引
+ * @returns {Promise<void>}
+ */
+async function playGalleryAudio(i) {
+  const url = AUDIO_TRACK[i];
+  if (!url) return;
+  await playOne(url);
 }
 
-function startGalleryAudio() {
-  if (started) return;
-  started = true;
-  if (finished) return; // 已跑完则不再重启
-  stopAgreementDefensive();
-  pauseBackgroundMusic();
-  runSequence().catch(function () {});
-}
+// 导出:供 video-wall.js 串行序列调用
+ctx.playGalleryAudio = playGalleryAudio;
 
-// 导出:供 video-wall.js 在用户手势链内显式调用
-ctx.startGalleryAudio = startGalleryAudio;
-// 兜底:画廊场景加载完成事件也启动(防 startVidSeq 漏调)
-ctx.events.on('gallery:ready', function () {
-  startGalleryAudio();
-});
-
-export { startGalleryAudio };
+export { playGalleryAudio };

@@ -40,17 +40,27 @@ function kunlunSpeak(text, voice, onEnd) {
   }
 }
 
-// 开场欢迎语(每会话一次) — 用 click 而非 pointerdown,避免消费手势导致画廊音乐 play() 被拦截
-if (!sessionStorage.getItem('kunlunWelcomed')) {
-  document.addEventListener(
-    'click',
-    function () {
-      sessionStorage.setItem('kunlunWelcomed', '1');
-      ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('凡人一念，可扑天缺。欢迎来到梦幻画廊·���仑灵鉴。');
-    },
-    { once: true }
-  );
-}
+// 开场欢迎语(2026-09-01 重做防重复):
+//   旧实现 sessionStorage + once:true 有两个洞:
+//   ① 源文本「昆」字节损坏(乱码),TTS 一直读残缺文案;② 用户浏览器 sessionStorage
+//      被清(严格隐私设置/无痕分区)时标记丢失,欢迎语反复重播
+//   新实现:页面内内存幂等 + localStorage 24h 窗口双保险,常驻监听但早期返回,不会重复
+let welcomeSpokenThisPage = false;
+document.addEventListener('click', function () {
+  if (welcomeSpokenThisPage) return;
+  welcomeSpokenThisPage = true;
+  let last = 0;
+  try {
+    last = parseInt(localStorage.getItem('kunlunWelcomed') || '0', 10) || 0;
+  } catch (e) {}
+  const now = Date.now();
+  if (now - last < 24 * 3600 * 1000) return; // 24 小时内已欢迎过,不再播
+  try {
+    localStorage.setItem('kunlunWelcomed', String(now));
+  } catch (e) {}
+  // 用 click 而非 pointerdown,避免消费手势导致画廊音乐 play() 被拦截
+  ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('凡人一念，可扑天缺。欢迎来到梦幻画廊·昆仑灵鉴。');
+});
 
 ctx.ui.kunlunSpeak = kunlunSpeak;
 

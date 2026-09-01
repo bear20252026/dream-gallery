@@ -9,9 +9,10 @@
 //   ctx.media.vidMesh   — 1号大屏网格
 //   ctx.media.v45Mesh   — 4/5号小屏网格
 //
-// 序列流程（async/await 线性,只含视频）：
-//   playMainSlot(0) → playMainSlot(1) → playMainSlot(2) → playV45Slots() → loop
-//   音频轨(00010.aac→0009.aac→0008.aac,循环2轮)见 gallery-audio.js,二者并行
+// 序列流程（2026-09-01 主人定·串行交错版,async/await 线性,同一时刻只播一个）：
+//   前 2 轮: 音1→屏1→音2→屏2→音3→屏3→屏4→屏5
+//   第 3 轮起: 屏1→屏2→屏3→屏4→屏5 无限循环(音频永久停止)
+//   音频播放能力见 gallery-audio.js(ctx.playGalleryAudio)
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
 import { onMediaChanged } from '../../media-push.js'; // 后台改大屏 → 重新拉配置(2026-08-29)
@@ -154,8 +155,8 @@ vidMesh.userData = { isVideoWall: true };
 v45Mesh.userData = { isVideo45: true };
 
 // ===================== 播放序列控制器 =====================
-// 注意:音频轨(00010.aac→0009.aac→0008.aac,循环2轮)已迁至 gallery-audio.js,
-// 与本文件的「视频轨」在进画廊后并行。本文件只负责视频墙轮播(大屏1~5 无限循环)。
+// 2026-09-01 串行交错版:音频由本序列统一调度(gallery-audio.js 提供播放能力),
+// 音频/视频严格交替,同一时刻只播一个;不再并行双轨。
 let sequenceStarted = false;
 let sequenceTriggered = false;
 
@@ -253,10 +254,34 @@ async function startSequence() {
   sequenceStarted = true;
   await reloadBigscreen();
 
-  // 启动并行「音频轨」(00010.aac→0009.aac→0008.aac,循环2轮后停)
-  if (typeof ctx.startGalleryAudio === 'function') ctx.startGalleryAudio();
+  // 阶段1协议配乐停掉 + 背景音乐暂停(进入串行序列,同一时刻只播一个)
+  try {
+    if (typeof ctx.stopAgreementMusic === 'function') ctx.stopAgreementMusic();
+  } catch (e) {}
+  try {
+    const mA = ctx.media && ctx.media.mA;
+    if (mA && !mA.paused) mA.pause();
+  } catch (e) {}
 
-  // 视频轨:大屏1→2→3→4→5,无限循环(空槽自动跳过)
+  const audio =
+    typeof ctx.playGalleryAudio === 'function'
+      ? ctx.playGalleryAudio
+      : function () {
+          return Promise.resolve();
+        };
+
+  // 前 2 轮:音1→屏1→音2→屏2→音3→屏3→屏4→屏5(空槽自动跳过)
+  for (let round = 0; round < 2; round++) {
+    await audio(0); // 00010.aac
+    await playMainSlot(0); // 大屏1号
+    await audio(1); // 0009.aac
+    await playMainSlot(1); // 大屏2号
+    await audio(2); // 0008.aac
+    await playMainSlot(2); // 大屏3号(HLS)
+    await playV45Slots(); // 大屏4/5号
+  }
+
+  // 第 3 轮起:音频永久停止,仅视频 1→2→3→4→5 无限循环
   while (true) {
     await playMainSlot(0); // 大屏1号
     await playMainSlot(1); // 大屏2号
