@@ -29,6 +29,8 @@ function protectMask(x, z) {
   m = Math.min(m, padF(rectDist(x, z, -360, -240, -207, -173), 0, 5));
   m = Math.min(m, padF(rectDist(x, z, -261, -249, -311, -289), 0, 5));
   m = Math.min(m, padF(rectDist(x, z, -398, -382, -306, -294), 0, 5));
+  // 花瓣画廊 v2(2026-09-02):与主线程 terrain.js 保持一致
+  m = Math.min(m, padF(rectDist(x, z, 35, 85, -17, 33), 10, 25));
   return m;
 }
 

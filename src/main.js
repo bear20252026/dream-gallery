@@ -18,6 +18,9 @@ import './gallery/dome-towers.js'; // Yazd 穹顶塔楼群(6 座围圆环绕画�
 // 2026-08-31:动态 import 强制 vite/rolldown 把 museum 模块打进 bundle,
 // 否则静态 import 会被 tree-shake 当 dead code 完全删掉(museum.js 无顶层副作用调用)
 import('./museum/museum.js'); // 万镜博物馆:大堂+贵族房间世界(方案A试点)
+// 花瓣画廊 v2(2026-09-02):东侧空地 (60,8) 按验收模板 1:1 建造。
+// 必须动态 import:主线程灯光预算清扫在 main.js 同步执行,静态 import 的点光源会被清掉
+import('./gallery/gallery-v2.js');
 import './gate/settings.js'; // 昵称双渠道(进馆 5 秒弹窗 + ⚙设置)
 import './gate/upload.js'; // 访客上传(照片/我的链接)+ AI 配文 + 悬浮路标
 import './gate/housecolor.js'; // 房屋分组换色(墙壁/天花板/腰线/踢脚线,仅自己可见)

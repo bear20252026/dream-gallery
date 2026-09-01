@@ -37,3 +37,8 @@ tools/ffmpeg/
 debug-final.png
 .audit-tmp-*
 client_errors.json
+
+# 本地开发运行时数据库(服务器自有,不入库)
+gate_data.db
+gate_data.db-shm
+gate_data.db-wal
