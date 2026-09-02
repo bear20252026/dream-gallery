@@ -114,11 +114,14 @@ function addWallSeg(x1, z1, x2, z2, h) {
   const sA = Math.abs(Math.sin(ang)),
     cA = Math.abs(Math.cos(ang)),
     t = WALL_TH / 2 + 0.1;
+  // ⚠️ 碰撞盒必须加 GX/GZ:mesh 靠 group 偏移(g.position=GX,GZ)视觉正确,
+  // 但 bounds 是世界坐标数组(resolveMove 直接读),本地坐标会把 1337 个盒
+  // 全部注册到世界原点(压住出生点/旧画廊 → 人物无法移动)。2026-09-02 修复。
   bounds.push({
-    mnX: cx - ((sA * len) / 2 + cA * t) - 0.1,
-    mxX: cx + ((sA * len) / 2 + cA * t) + 0.1,
-    mnZ: cz - ((cA * len) / 2 + sA * t) - 0.1,
-    mxZ: cz + ((cA * len) / 2 + sA * t) + 0.1,
+    mnX: GX + cx - ((sA * len) / 2 + cA * t) - 0.1,
+    mxX: GX + cx + ((sA * len) / 2 + cA * t) + 0.1,
+    mnZ: GZ + cz - ((cA * len) / 2 + sA * t) - 0.1,
+    mxZ: GZ + cz + ((cA * len) / 2 + sA * t) + 0.1,
   });
 }
 // 缺口判定:段中点或任一端点在迎宾大道(门洞→中心连线)半宽内则开缺口
