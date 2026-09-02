@@ -7,6 +7,9 @@
 //   审批级别: 永久 / 24小时 / 仅一次(首次进入起30分钟)
 //   数据存 gate_data.json(申请记录/批准名单/访问统计),重启不丢
 // 配置文件: 以上均可在 .env 中设置(真实环境变量优先)
+//
+// 路由(2026-09-02 拆分):所有 API 端点集中声明在 lib/routes.js(带 auth 标注),
+// 本文件只负责:安全头 → 路由分发 → 入口守卫 → 访问统计 → 静态服务。
 
 const http = require('http');
 const fs = require('fs');
@@ -22,24 +25,14 @@ process.on('unhandledRejection', (e) => {
   console.error('[unhandledRejection]', e && ((e.stack || e.message) || e));
 });
 
-const { ROOT, PORT, TOKEN, CORS_ORIGIN, MEDIA_DIRS } = require('./lib/config');
-const { sendJson, readBody, safeJoin, isValidName } = require('./lib/util');
-const { gateData, recordVisit } = require('./lib/store');
-const { serveGatePage, sseRegister, handleCollect, handleReapply, handleEntryStatus, entryGate, handleRename } = require('./lib/gate');
-const { tokenOk, handleAdminList, handleAdminDecide, handleAdminBulk } = require('./lib/admin');
-const { handleQuizStart, handleQuizSubmit, handleQuizState, handleQuizInvite, handleQuizJudge } = require('./lib/quiz');
-const { serveStatic, handleList, handleUpload, handleUploadChunk, handleDelete, handleMyUploads } = require('./lib/files');
+const { ROOT, PORT, TOKEN, CORS_ORIGIN } = require('./lib/config');
+const { sendJson, safeJoin } = require('./lib/util');
+const { recordVisit } = require('./lib/store');
+const { entryGate } = require('./lib/gate');
+const { serveStatic } = require('./lib/files');
+const { dispatch } = require('./lib/routes');
+const { canServeMedia } = require('./lib/siteconfig');
 const cacheBust = require('./lib/cache-bust'); // 一次性强制刷新(2026-08-31)
-const { handlePublicConfig, handleAdminMode, handleAdminLinks, handleAdminDemo, handleAdminCaption, handleMyLinks, canServeMedia } = require('./lib/siteconfig');
-const { handleVisionAnalyze } = require('./lib/vision');
-const { handleTrackClick, handleClicksClear, handleExportXlsx, handleTrackError } = require('./lib/track');
-const { handleDocsGet, handleDocsPost } = require('./lib/docs');
-const { handleChatList, handleChatPost } = require('./lib/chat');
-const { handleAdminAlerts } = require('./lib/abuse');
-const { handleReport, handleAdminErrors, handleAdminErrorsClear } = require('./lib/client-errors'); // 客户端报错反馈(2026-08-30)
-const { handleTts } = require('./lib/tts');
-const { mediaSseRegister } = require('./lib/media-push'); // 媒体变更 SSE 推送(2026-08-29)
-const { handleBigscreenGet, handleBigscreenUpload, handleBigscreenDelete } = require('./lib/bigscreen'); // 户外大屏软编码+后台管理(2026-08-29)
 
 // 公开静态黑名单:点文件、后端目录、私钥/脚本/文档、数据库与清单文件
 // 根目录 .js 仅放行 data.js/sw.js(前端 ESM 需要),其余根级 js 均为后端/工具脚本
@@ -114,21 +107,6 @@ const handler = (req, res) => {
     ].join('; ')
   );
 
-  // 协议文档在线编辑器(token):/admin/docs 页面 + /api/admin/docs 读写接口
-  if (pathname === '/admin/docs' && req.method === 'GET') {
-    if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权:需要 token' }); return; }
-    serveStatic(req, res, path.join(ROOT, 'docs.html'));
-    return;
-  }
-  if (pathname === '/api/admin/docs' && req.method === 'GET') {
-    if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权' }); return; }
-    handleDocsGet(req, res, query); return;
-  }
-  if (pathname === '/api/admin/docs' && req.method === 'POST') {
-    if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权' }); return; }
-    handleDocsPost(req, res); return;
-  }
-
   // CORS 预检(CORS_ORIGIN 可配,默认 *;收紧后台跨域时设环境变量即可,不硬编码)
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -140,105 +118,8 @@ const handler = (req, res) => {
     return;
   }
 
-  // 入口守卫访客接口(不受 TOKEN 限制)
-  if (pathname === '/api/entry/collect' && req.method === 'POST') { handleCollect(req, res); return; }
-  if (pathname === '/api/entry/reapply' && req.method === 'POST') { handleReapply(req, res); return; }
-  if (pathname === '/api/entry/status' && req.method === 'GET') { handleEntryStatus(req, res); return; }
-  if (pathname === '/api/entry/watch' && req.method === 'GET') { sseRegister(req, res); return; }
-  if (pathname === '/api/entry/rename' && req.method === 'POST') { handleRename(req, res); return; }
-  // 主人后台页面 + 接口(需 TOKEN;不依赖审批门开关,始终可用)
-  if (pathname === '/admin' && req.method === 'GET') {
-    if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权:需要 token' }); return; }
-    serveStatic(req, res, path.join(ROOT, 'admin.html'));
-    return;
-  }
-  // 客户端报错反馈:上报公开(任何访客都可能报错),后台查看/清空需 token
-  if (pathname === '/api/client-errors' && req.method === 'POST') { handleReport(req, res); return; }
-  if (pathname === '/api/admin/client-errors' && req.method === 'GET') { handleAdminErrors(req, res, query); return; }
-  if (pathname === '/api/admin/client-errors/clear' && req.method === 'POST') { handleAdminErrorsClear(req, res, query); return; }
-  if (pathname === '/api/admin/list' && req.method === 'GET') { handleAdminList(req, res, query); return; }
-  if (pathname === '/api/admin/decide' && req.method === 'POST') { handleAdminDecide(req, res, query); return; }
-  if (pathname === '/api/admin/bulk' && req.method === 'POST') { handleAdminBulk(req, res, query); return; }
-  // 站点配置:公开读 + 后台写(不依赖审批门开关,始终可用)
-  if (pathname === '/api/siteconfig' && req.method === 'GET') { handlePublicConfig(req, res); return; }
-  if (pathname === '/api/admin/mode' && req.method === 'POST') { handleAdminMode(req, res, query); return; }
-  if (pathname === '/api/admin/links' && req.method === 'POST') { handleAdminLinks(req, res, query); return; }
-  if (pathname === '/api/admin/demo' && req.method === 'POST') { handleAdminDemo(req, res, query); return; }
-  if (pathname === '/api/admin/caption' && req.method === 'POST') { handleAdminCaption(req, res, query); return; }
-  if (pathname === '/api/mylinks' && req.method === 'POST') { handleMyLinks(req, res); return; }
-  // 后台文件预览:/admin-media/<dir>/<name>?token=xxx
-  const mMatch = pathname.match(/^\/admin-media\/([^/]+)\/(.+)$/);
-  if (mMatch && req.method === 'GET') {
-    if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权' }); return; }
-    if (!MEDIA_DIRS.includes(mMatch[1]) || !isValidName(mMatch[2])) { sendJson(res, 400, { error: '路径不合法' }); return; }
-    serveStatic(req, res, path.join(ROOT, mMatch[1], mMatch[2]));
-    return;
-  }
-
-  // ===================== API 路由(路由表:顺序即优先级) =====================
-  if (pathname.startsWith('/api/')) {
-    // 路由表项:{ method, match, fn }。match 为精确字符串或正则;fn 已绑定 req/res/query。
-    // tokenGate 之前的为公开/自校验接口;之后为需外层 token 的写操作(上传/删除)。
-    const routes = [
-      { method: 'GET',  match: '/api/chat',               fn: () => handleChatList(req, res) },
-      { method: 'POST', match: '/api/chat',               fn: () => handleChatPost(req, res) },
-      { method: 'GET',  match: '/api/quiz/start',         fn: () => handleQuizStart(req, res, query) },
-      { method: 'POST', match: '/api/quiz/submit',        fn: () => handleQuizSubmit(req, res) },
-      { method: 'POST', match: '/api/quiz/judge',         fn: () => handleQuizJudge(req, res) },
-      { method: 'GET',  match: '/api/quiz/state',         fn: () => handleQuizState(req, res) },
-      { method: 'POST', match: '/api/quiz/invite',        fn: () => handleQuizInvite(req, res) },
-      { method: 'POST', match: '/api/vision/analyze',     fn: () => handleVisionAnalyze(req, res) },
-      { method: 'POST', match: '/api/track/click',        fn: () => handleTrackClick(req, res) },
-      { method: 'POST', match: '/api/track/error',        fn: () => handleTrackError(req, res) },
-      { method: 'GET',  match: '/api/tts',                fn: () => handleTts(req, res, query) },
-      // 媒体变更即时推送:游戏页长连接,文件增删后服务端主动广播(2026-08-29)
-      { method: 'GET',  match: '/api/media/sse',          fn: () => mediaSseRegister(req, res) },
-      // 户外大屏配置(软编码):游戏端拉取,后台管理后可即时生效(2026-08-29)
-      { method: 'GET',  match: '/api/bigscreen',          fn: () => handleBigscreenGet(req, res) },
-      { method: 'POST', match: '/api/admin/clicks/clear', fn: () => handleClicksClear(req, res, query) },
-      { method: 'GET',  match: '/api/admin/export.xlsx',  fn: () => handleExportXlsx(req, res, query) },
-      { method: 'POST', match: '/api/admin/alerts',       fn: () => handleAdminAlerts(req, res, query) },
-      { method: 'GET',  match: '/api/admin/quiz',         fn: () => {
-        if (!tokenOk(req, query)) { sendJson(res, 401, { error: '未授权' }); return; }
-        const devMap = {};
-        for (const a of Object.values(gateData.applicants)) {
-          if (a.dk) devMap[a.dk] = { answer: a.answer, brand: a.brand || '', geo: (gateData.geo && gateData.geo[a.ip]) || '' };
-        }
-        const attempts = (gateData.quizAttempts || []).slice(-100).reverse()
-          .map(at => ({ ...at, device: devMap[at.dk] || null }));
-        sendJson(res, 200, { attempts });
-      } },
-      // 白板作品保存对所有用户开放(仅限 whiteboard- 前缀 + 图片扩展名白名单:
-      // 2026-08-31 审计 H2——原先不限扩展名,可传 whiteboard-x.html 得到主域公网 HTML=存储型 XSS)
-      { method: 'POST', match: '/api/upload', guard: () => /^whiteboard-[\w-]+\.(png|jpe?g|webp)$/i.test(String(query.name || '')), fn: () => handleUpload(req, res, query) },
-      // 访客公开上传照片/视频(图≤50MB/视频≤700MB、全格式)
-      { method: 'POST', match: '/api/upload', guard: () => query.dir === 'photos' || query.dir === 'videos', fn: () => handleUpload(req, res, query, true) },
-      // 分片上传(绕开 CF 回源限流的 524)
-      { method: 'POST', match: '/api/upload/chunk',       fn: () => handleUploadChunk(req, res, query) },
-      // 文件列表公开只读
-      { method: 'GET',  match: '/api/files',              fn: () => handleList(req, res, query) },
-      { method: 'GET',  match: '/api/myuploads',          fn: () => handleMyUploads(req, res, query) },
-    ];
-    for (const r of routes) {
-      if (req.method !== r.method) continue;
-      const matched = typeof r.match === 'string' ? pathname === r.match : r.match.test(pathname);
-      if (!matched) continue;
-      if (r.guard && !r.guard()) continue;
-      r.fn();
-      return;
-    }
-    // 外层 token 门禁:以上公开/自校验接口之后,以下写操作(上传/删除)需 token
-    if (TOKEN && !tokenOk(req, query)) {
-      sendJson(res, 401, { error: '未授权:缺少或错误的 token' });
-      return;
-    }
-    if (pathname === '/api/upload' && req.method === 'POST') { handleUpload(req, res, query); return; }
-    // 户外大屏后台管理:上传替换/清空槽位(2026-08-29)
-    if (pathname === '/api/admin/bigscreen/upload' && req.method === 'POST') { handleBigscreenUpload(req, res, query); return; }
-    if (pathname === '/api/admin/bigscreen/delete' && req.method === 'POST') { handleBigscreenDelete(req, res, query); return; }
-    const delMatch = pathname.match(/^\/api\/files\/([^/]+)\/(.+)$/);
-    if (delMatch && req.method === 'DELETE') { handleDelete(res, delMatch[1], delMatch[2]); return; }
-  }
+  // ===================== 路由分发(声明式路由表,见 lib/routes.js) =====================
+  if (dispatch(req, res, pathname, query)) return;
 
   // 入口守卫(2026-08-30 权限精简,无条件启用):自由进画廊,仅拦被踢出设备与拉黑 IP
   if (!entryGate(req, res, pathname)) return;
@@ -255,9 +136,11 @@ const handler = (req, res) => {
   if (rel === 'landing' || rel === 'landing/') rel = 'landing/index.html';
   // 媒体文件级门禁(2026-07-26):普通用户仅演示照片/白板/户外大屏/本人上传,其余 403
   const mediaMatch = rel.match(/^(photos|videos)\/(.+)$/);
-  if (mediaMatch && !canServeMedia(req, mediaMatch[1], mediaMatch[2])) {
-    sendJson(res, 403, { error: '无权访问该文件' });
-    return;
+  if (mediaMatch) {
+    if (!canServeMedia(req, mediaMatch[1], mediaMatch[2])) {
+      sendJson(res, 403, { error: '无权访问该文件' });
+      return;
+    }
   }
   // 敏感文件黑名单(2026-07-26):.env/gate_data.json/origin 私钥/题库/后端源码等一律 404
   // 注意:/admin 与 /admin-media 走独立 token 通道,不经过这里,不受影响
@@ -297,14 +180,12 @@ const handler = (req, res) => {
 
 const server = http.createServer(handler);
 server.listen(PORT, () => {
+  const { ROUTES } = require('./lib/routes');
   console.log(`服务器已启动: http://localhost:${PORT}`);
   console.log(TOKEN ? `API 鉴权已启用(TOKEN),请求需带 ?token= 或 x-token 头` : `API 未启用鉴权(设置环境变量 TOKEN 可开启)`);
   console.log(`入口守卫已启用:自由进画廊;仅拦截被踢出设备(重进需申请)与拉黑 IP。后台: /admin?token=<TOKEN>`);
   if (!TOKEN) console.log('警告:未设置 TOKEN,后台与写接口不受保护,请设置 TOKEN');
-  console.log(`API:`);
-  console.log(`  GET    /api/files?dir=photos|videos|music  列出媒体文件`);
-  console.log(`  POST   /api/upload?dir=photos&name=x.jpg 上传文件(body 为文件内容)`);
-  console.log(`  DELETE /api/files/<dir>/<name>          删除文件`);
+  console.log(`路由: ${ROUTES.length} 个端点已注册(明细见 lib/routes.js)`);
 });
 
 // 多人房间(ws):大厅+房间,3-4 人实时同步。单人大地图不受影响。

@@ -47,6 +47,15 @@ export default [
       'no-useless-escape': 'off',
     },
   },
+  // 单元测试(src/__tests__):vitest + Node 环境,需要 process/setImmediate/require 等
+  {
+    files: ['src/__tests__/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2022, sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser },
+    },
+    rules: { ...js.configs.recommended.rules },
+  },
   // vite.config.js 是 ESM
   {
     files: ['vite.config.js'],
