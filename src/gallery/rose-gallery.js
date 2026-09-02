@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { expose } from '../debug-hooks.js';
+import { makeWallBuilder, resampleRing } from '../shared/wall-builder.js';
 import DATA from './rose-gallery-data.json';
 
 const { s } = ctx.scene;
@@ -60,16 +61,8 @@ function flatMesh(shape, y, mat) {
   m.position.y = y;
   return m;
 }
-// 弧长重采样(段长 step)
-function resample(ring, step) {
-  const out = [ring[0]];
-  for (let i = 1; i <= ring.length; i++) {
-    const p = ring[i % ring.length];
-    const q = out[out.length - 1];
-    if (Math.hypot(p[0] - q[0], p[1] - q[1]) >= step) out.push(p);
-  }
-  return out;
-}
+// 弧长重采样(共享工厂)
+const resample = resampleRing;
 // 点到线段距离
 function distToSeg(px, pz, a, b) {
   const dx = b[0] - a[0],
@@ -99,31 +92,17 @@ for (let i = 0; i < sil.length; i++) {
   }
 }
 const doorC = sil[doorIdx];
-function addWallSeg(x1, z1, x2, z2, h) {
-  const dx = x2 - x1,
-    dz = z2 - z1,
-    len = Math.hypot(dx, dz);
-  if (len < 0.25) return;
-  const cx = (x1 + x2) / 2,
-    cz = (z1 + z2) / 2,
-    ang = Math.atan2(dx, dz);
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(WALL_TH, h, len), wallMat);
-  wall.position.set(cx, h / 2, cz);
-  wall.rotation.y = ang;
-  g.add(wall);
-  const sA = Math.abs(Math.sin(ang)),
-    cA = Math.abs(Math.cos(ang)),
-    t = WALL_TH / 2 + 0.1;
-  // ⚠️ 碰撞盒必须加 GX/GZ:mesh 靠 group 偏移(g.position=GX,GZ)视觉正确,
-  // 但 bounds 是世界坐标数组(resolveMove 直接读),本地坐标会把 1337 个盒
-  // 全部注册到世界原点(压住出生点/旧画廊 → 人物无法移动)。2026-09-02 修复。
-  bounds.push({
-    mnX: GX + cx - ((sA * len) / 2 + cA * t) - 0.1,
-    mxX: GX + cx + ((sA * len) / 2 + cA * t) + 0.1,
-    mnZ: GZ + cz - ((cA * len) / 2 + sA * t) - 0.1,
-    mxZ: GZ + cz + ((cA * len) / 2 + sA * t) + 0.1,
-  });
-}
+// 墙段建造(共享工厂;ox/oz 保证碰撞盒世界坐标——2026-09-02 原点压死事故的修复,
+// 现收口进 wall-builder,新模块不再可能漏偏移)
+const addWallSeg = makeWallBuilder({
+  parent: g,
+  mat: wallMat,
+  th: WALL_TH,
+  defaultH: WALL_H,
+  ox: GX,
+  oz: GZ,
+  bounds,
+});
 // 缺口判定:段中点或任一端点在迎宾大道(门洞→中心连线)半宽内则开缺口
 function isGap(mx, mz, a, b) {
   return (

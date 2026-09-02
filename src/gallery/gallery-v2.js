@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { expose } from '../debug-hooks.js';
+import { makeWallBuilder, resampleRing } from '../shared/wall-builder.js';
 import DATA from './gallery-v2-data.json';
 
 const { s } = ctx.scene;
@@ -82,42 +83,19 @@ const sil = DATA.silhouette;
 let doorIdx = 0;
 for (let i = 1; i < sil.length; i++) if (sil[i][0] < sil[doorIdx][0]) doorIdx = i;
 const doorC = sil[doorIdx];
-// 弧长重采样
+// 弧长重采样(共享工厂 resampleRing)
 const step = 1.3;
-const ring = [];
-let acc = 0;
-ring.push(sil[0]);
-for (let i = 1; i <= sil.length; i++) {
-  const p = sil[i % sil.length];
-  const q = ring[ring.length - 1];
-  const d = Math.hypot(p[0] - q[0], p[1] - q[1]);
-  acc += d;
-  if (d >= step) {
-    ring.push(p);
-  }
-}
-function addWallSeg(x1, z1, x2, z2) {
-  const dx = x2 - x1,
-    dz = z2 - z1,
-    len = Math.hypot(dx, dz);
-  if (len < 0.25) return;
-  const cx = (x1 + x2) / 2,
-    cz = (z1 + z2) / 2,
-    ang = Math.atan2(dx, dz);
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(WALL_TH, WALL_H, len), wallMat);
-  wall.position.set(cx, WALL_H / 2, cz);
-  wall.rotation.y = ang;
-  g.add(wall);
-  const sA = Math.abs(Math.sin(ang)),
-    cA = Math.abs(Math.cos(ang)),
-    t = WALL_TH / 2 + 0.1;
-  bounds.push({
-    mnX: cx - ((sA * len) / 2 + cA * t) - 0.1,
-    mxX: cx + ((sA * len) / 2 + cA * t) + 0.1,
-    mnZ: cz - ((cA * len) / 2 + sA * t) - 0.1,
-    mxZ: cz + ((cA * len) / 2 + sA * t) + 0.1,
-  });
-}
+const ring = resampleRing(sil, step);
+// 墙段建造(共享工厂;ox/oz 修正碰撞盒世界坐标——旧版漏偏移,墙盒错位原点)
+const addWallSeg = makeWallBuilder({
+  parent: g,
+  mat: wallMat,
+  th: WALL_TH,
+  defaultH: WALL_H,
+  ox: GX,
+  oz: GZ,
+  bounds,
+});
 let segCount = 0,
   doorSegs = 0;
 for (let i = 0; i < ring.length; i++) {
