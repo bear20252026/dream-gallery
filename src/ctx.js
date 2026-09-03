@@ -53,7 +53,7 @@
  * @property {Object} desert        沙漠地形接口(getH 等,desert.js 写入)
  *
  * ── 户外交互(gallery/signs.js·markers.js·links.js 写入) ──
- * @property {THREE.Mesh} signMesh/wb/mpMesh/guideMesh 牌子/白板入口/音乐入口/准则卷轴
+ * @property {THREE.Mesh} signMesh/mpMesh/guideMesh 牌子/音乐入口/准则卷轴
  * @property {THREE.Material} signMat/mpMat 点击闪烁材质
  * @property {THREE.Mesh} ytHeart   奕彤爱心(普通模式隐藏)
  * @property {Object} scrollLink    卷轴链接(redraw 改写为《元素共鸣准则》)

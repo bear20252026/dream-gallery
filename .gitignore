@@ -42,3 +42,11 @@ client_errors.json
 gate_data.db
 gate_data.db-shm
 gate_data.db-wal
+
+# 一次性审查/评估产物(可重跑重建,体积大)
+review_results.json
+# 候选模型下载原件(models/showcase/ 里是凯旋门、m3 平面图等尚未拍板集成的原件,
+#   9.5MB;拍板后再移入 models/hall/ 入库。models/ 其余目录**必须入库**,别误伤)
+models/showcase/
+# Windows 下脚本 `> /dev/null` 被当成相对路径,在项目里生成的垃圾文件 dev/null
+dev/

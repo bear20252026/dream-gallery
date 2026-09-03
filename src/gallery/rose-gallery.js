@@ -1,8 +1,8 @@
 // rose-gallery.js — 玫瑰花瓣展馆(旁侧空地 144,-60) — 参考 Tripo 模型3(20260902053436)几何等高线描摹建造
 // 数据源: ./rose-gallery-data.json(米制, 原点=建筑中心, 直径 42m, 由 scripts/trace_rose.py 生成)
-// 技术路线: 与花瓣画廊 v2 同源(描摹矢量 → 分段挤出 → AABB 碰撞注册)
-// 结构: 六瓣花形外墙环(西门洞) + 三档阶梯内墙(t0 3.8m/t1 7.2m/t2 10m,螺旋花瓣迷宫)
-//       + 中央圆厅(穹顶灯) + 天花 + 迎宾大道(门→中心每圈墙自动开缺口)
+// 技术路线(2026-09-02 用户拍板"所见即所得+直挤出"): 描摹矢量 → 全部轮廓统一高度直挤出(挤牙膏式,3D 打印思路)
+//   —— 不再按模型高度分三档阶梯(旧 t0 3.8/t1 7.2/t2 10 已废弃),花纹=墙,全部拉到 WALL_H
+// 结构: 六瓣花形外墙环(西门洞) + 全高内墙(螺旋花瓣迷宫,统一墙高) + 平板天花(中央采光圆洞) + 迎宾大道
 // ⚠️ 本阶段只搭壳体;内部展陈待用户验收后另行施工
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
@@ -15,11 +15,13 @@ const { s } = ctx.scene;
 // ===================== 常量 =====================
 const GX = 144; // 建筑中心(v2 东南 108m,地形扫描 std=5.6cm 全场最平,terrain.js protectMask 已拍平)
 const GZ = -60;
-const WALL_H = 10; // t2 主墙高(与 v2 一致,自定值可调)
+const WALL_H = 50; // 统一墙高(2026-09-02 用户拍板 50m 直挤出,可调)
 const WALL_TH = 0.5; // 墙厚
 const DOOR_HALF = 2.4; // 门洞半宽
 const AVENUE_HALF = 1.7; // 迎宾大道半宽(每圈墙在门→中心连线上开缺口)
 const CEIL_BASE = WALL_H - 0.32;
+const OCULUS_R = 3.0; // 中央采光圆洞半径(对应参考模型中心的玻璃圆窗)
+const PETAL_LIGHT_Y = 6.4; // 花瓣灯挂高(贴近人的活动层,不随墙高走)
 const COLORS = {
   groove: 0x6f6b68,
   ceiling: 0xd9d3d0,
@@ -40,11 +42,16 @@ const ceilDark = new THREE.MeshStandardMaterial({
   color: COLORS.groove,
   roughness: 0.95,
   side: THREE.DoubleSide,
+  // 50m 层高:中央吊灯照不匀整片天花,自发光兜底防远处发黑(2026-09-02 探针定位)
+  emissive: 0x55504c,
+  emissiveIntensity: 0.55,
 });
 const ceilMat = new THREE.MeshStandardMaterial({
   color: COLORS.ceiling,
   roughness: 0.85,
   side: THREE.DoubleSide,
+  emissive: 0x6b655f,
+  emissiveIntensity: 0.45,
 });
 const lightMat = new THREE.MeshBasicMaterial({ color: COLORS.lights, side: THREE.DoubleSide });
 const floorMat = new THREE.MeshStandardMaterial({ color: '#ded6c9', roughness: 0.92 });
@@ -137,13 +144,12 @@ if (doorSegs > 0) {
   g.add(lintel);
 }
 
-// ===================== 三档阶梯内墙(螺旋花瓣迷宫 + 迎宾大道缺口) =====================
-const tierHeights = { t0: 3.8, t1: 7.2, t2: WALL_H };
+// ===================== 全高内墙(螺旋花瓣迷宫 + 迎宾大道缺口,统一墙高直挤出) =====================
 let innerSegs = 0,
   avenueGaps = 0;
 const ringStats = [];
 for (const ring of DATA.rings) {
-  const h = tierHeights[ring.level] ?? WALL_H;
+  const h = WALL_H; // 所见即所得:所有轮廓一律拉到顶,不再分档
   let cnt = 0;
   for (const contour of ring.contours) {
     // 过滤微小碎片(噪声/装饰屑)
@@ -177,12 +183,8 @@ for (const ring of DATA.rings) {
 }
 ctx.scene.addBounds && ctx.scene.addBounds(bounds);
 
-// ===================== 天花(暗缝底板 + 亮面板) =====================
-g.add(flatMesh(toShape(DATA.silhouette), CEIL_BASE, ceilDark));
-g.add(flatMesh(toShape(DATA.silhouette), WALL_H, ceilMat));
-
-// ===================== 灯光(中央圆厅穹灯 + 4 盏花瓣灯) =====================
-// 中央灯位:取 t2 轮廓中形心最靠近原点(建筑中心)的一个 = 中央圆厅
+// ===================== 中央圆厅形心(采光洞/主灯位) =====================
+// 取 t2 轮廓中形心最靠近原点(建筑中心)的一个 = 中央圆厅
 let coreC = [0, 0],
   coreBest = Infinity;
 for (const contour of DATA.rings[DATA.rings.length - 1].contours) {
@@ -208,12 +210,36 @@ for (const contour of DATA.rings[DATA.rings.length - 1].contours) {
     coreC = [px, pz];
   }
 }
-const domeGeo = new THREE.CircleGeometry(2.2, 32);
+
+// ===================== 天花(暗缝底板 + 亮面板,中央开采光圆洞) =====================
+function flatMeshOculus(shape, y, mat) {
+  const s2 = shape.clone();
+  // shape 坐标系是 (x, -z):洞心 = (coreC.x, -coreC.z)
+  const holePts = [];
+  for (let i = 0; i <= 40; i++) {
+    const a = (i / 40) * Math.PI * 2;
+    holePts.push(
+      new THREE.Vector2(coreC[0] + Math.cos(a) * OCULUS_R, -coreC[1] + Math.sin(a) * OCULUS_R)
+    );
+  }
+  s2.holes.push(new THREE.Path(holePts));
+  const geo = new THREE.ShapeGeometry(s2);
+  const m = new THREE.Mesh(geo, mat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = y;
+  return m;
+}
+g.add(flatMeshOculus(toShape(DATA.silhouette), CEIL_BASE, ceilDark));
+g.add(flatMeshOculus(toShape(DATA.silhouette), WALL_H, ceilMat));
+
+// ===================== 灯光(中央圆厅穹灯 + 4 盏花瓣灯) =====================
+const domeGeo = new THREE.CircleGeometry(OCULUS_R, 40);
 const dome = new THREE.Mesh(domeGeo, lightMat);
 dome.rotation.x = Math.PI / 2;
 dome.position.set(coreC[0], WALL_H - 0.05, coreC[1]);
 g.add(dome);
-const mainLight = new THREE.PointLight('#fff5e8', 5.5, 30, 1.6);
+// 50m 净高:主灯吊在穹顶下,强度/距离按层高放大(decay 1.4,地面照度≈0.2~0.4)
+const mainLight = new THREE.PointLight('#fff5e8', 40, 130, 1.4);
 mainLight.position.set(coreC[0], WALL_H - 1.0, coreC[1]);
 g.add(mainLight);
 // 花瓣灯:4 盏,t1 轮廓中面积最大的 4 个形心
@@ -236,7 +262,7 @@ for (const contour of DATA.rings[1].contours) {
 petalLights.sort((a, b) => b.area - a.area);
 petalLights.slice(0, 4).forEach((L) => {
   const pl = new THREE.PointLight('#fff5e8', 4, 22, 1.6);
-  pl.position.set(L.x, tierHeights.t1 - 0.8, L.z);
+  pl.position.set(L.x, PETAL_LIGHT_Y, L.z);
   g.add(pl);
 });
 g.userData.lights = { core: coreC, petals: petalLights.slice(0, 4) };

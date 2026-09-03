@@ -58,7 +58,9 @@ const mapBaseCtx = mapBaseCanvas.getContext('2d');
   // 防御断言(2026-08-30 复查建议):本模块依赖 main.js 的导入顺序(scene.js 先于
   // player.js→minimap.js);若未来有人重排为动态/先行导入,这里会拿到 undefined。
   if (typeof OL !== 'number' || typeof OBR !== 'number') {
-    console.error('[minimap] 场馆常量未就绪(OL=' + OL + ',OBR=' + OBR + ')—— 导入顺序被重排?静态底图绘制中止');
+    console.error(
+      '[minimap] 场馆常量未就绪(OL=' + OL + ',OBR=' + OBR + ')—— 导入顺序被重排?静态底图绘制中止'
+    );
     return;
   }
   const mapCtx = mapBaseCtx; // 以下静态绘制代码与原逐帧版本一致,只是画到离屏层
@@ -158,18 +160,25 @@ const mapBaseCtx = mapBaseCanvas.getContext('2d');
   mapCtx.font = '5px sans-serif';
   mapCtx.fillText('门', ox, oz + (IRT - 0.4) * sc);
   mapCtx.fillText('门', ox, oz + (IRB + 0.6) * sc);
-  // --- 室外白板区标记(z=42 白板 / z=47 展示墙) ---
-  mapCtx.strokeStyle = 'rgba(255,200,150,0.5)';
-  mapCtx.lineWidth = 1.2;
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox - 3 * sc, oz + 42 * sc);
-  mapCtx.lineTo(ox + 3 * sc, oz + 42 * sc);
-  mapCtx.stroke();
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox - 6.5 * sc, oz + 47 * sc);
-  mapCtx.lineTo(ox + 6.5 * sc, oz + 47 * sc);
-  mapCtx.stroke();
-  mapCtx.fillText('白板', ox, oz + 44.5 * sc);
+  // --- 四座喷泉标记(2026-09-03 取代原「白板区」标记;与 fountains.js SPOTS 同源) ---
+  // 南(0,42)=原画板址 / 北(0,-26) / 东(32,8) / 西(-32,8),各距建筑边缘 14m
+  const FOUNTAIN_SPOTS = [
+    [0, 42],
+    [0, -26],
+    [32, 8],
+    [-32, 8],
+  ];
+  mapCtx.strokeStyle = 'rgba(150,220,255,0.75)';
+  mapCtx.fillStyle = 'rgba(120,200,255,0.28)';
+  mapCtx.lineWidth = 1;
+  for (const [fx, fz] of FOUNTAIN_SPOTS) {
+    mapCtx.beginPath();
+    mapCtx.arc(ox + fx * sc, oz + fz * sc, 1.6 * sc, 0, Math.PI * 2);
+    mapCtx.fill();
+    mapCtx.stroke();
+  }
+  mapCtx.fillStyle = 'rgba(150,220,255,0.7)';
+  mapCtx.fillText('泉', ox + 1.2 * sc, oz + 43.6 * sc);
 })();
 
 // 地形色(与 desert.js getColor 同阈值,但去掉随机噪点,避免地图闪烁)

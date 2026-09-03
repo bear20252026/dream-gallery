@@ -15,11 +15,14 @@ const playerSM = new StateMachine();
 ctx._playerSM = playerSM; // 供外部查询当前状态
 
 // ===================== 玩家 =====================
-// 出生在建筑外(z=45),面朝南方大视频墙,背后是建筑;心象共鸣≥95分前由实体门禁墙封挡建筑
+// 出生点(2026-09-03 用户指定:X -0.1 / Y 1.6(=地面0+眼高) / Z 27.0,朝南 182°)
+// 该点位于拱廊南沿(z≈21.9)之外的沙地,视线朝 +Z,正对南侧白板(z=42)与大视频墙。
+// 改这一个常量即同时生效:①首次出生 ②跌出世界兜底 ③⌂ 一键回家
+const SPAWN = { x: -0.1, z: 27.0, yaw: (182 * Math.PI) / 180, pitch: 0 };
 const pl = {
-  p: new THREE.Vector3(20, EYE_HEIGHT, 14), // 出生眼高(首帧 tickPhysics 会按地形校正)
-  y: -Math.PI / 2,
-  pi: 0.5,
+  p: new THREE.Vector3(SPAWN.x, EYE_HEIGHT, SPAWN.z), // 出生眼高(首帧 tickPhysics 会按地形校正)
+  y: SPAWN.yaw,
+  pi: SPAWN.pitch,
   r: 0.35,
   vy: 0,
   onGround: true,
@@ -146,7 +149,7 @@ function tickPhysics(dt) {
   pl.glideEnergy = ns.glideEnergy;
   // 兜底:意外跌出世界时拉回出生点
   if (pl.p.y < -30) {
-    pl.p.set(20, groundY(20, 14) + EYE_HEIGHT, 14);
+    pl.p.set(SPAWN.x, groundY(SPAWN.x, SPAWN.z) + EYE_HEIGHT, SPAWN.z);
     pl.vy = 0;
     pl.onGround = true;
   }
@@ -584,13 +587,13 @@ homeBtn.addEventListener('click', (e) => {
     return;
   } // ark.js:飞行中禁回家
   fadeTeleport(() => {
-    pl.p.set(20, groundY(20, 14) + EYE_HEIGHT, 14);
+    pl.p.set(SPAWN.x, groundY(SPAWN.x, SPAWN.z) + EYE_HEIGHT, SPAWN.z);
     pl.vy = 0;
     pl.onGround = true;
     pl.gliding = false;
     pl.glideEnergy = 5;
-    pl.y = -Math.PI / 2;
-    pl.pi = 0.5; // 恢复出生朝向(面朝大视频墙)
+    pl.y = SPAWN.yaw;
+    pl.pi = SPAWN.pitch; // 恢复出生朝向(面朝南·大视频墙)
     cam.position.copy(pl.p);
     cam.rotation.y = pl.y;
     cam.rotation.x = pl.pi;

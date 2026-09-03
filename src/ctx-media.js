@@ -28,7 +28,6 @@ export function createMediaNamespace(vault) {
     'pC',
     'signMesh',
     'signMat',
-    'wb',
     'mpMesh',
     'mpMat',
     'guideMesh',
@@ -37,9 +36,9 @@ export function createMediaNamespace(vault) {
     'mA',
     'audioManager',
   ];
-  
+
   const proxy = {};
-  
+
   for (const prop of properties) {
     Object.defineProperty(proxy, prop, {
       get() {
@@ -56,7 +55,7 @@ export function createMediaNamespace(vault) {
       configurable: true,
     });
   }
-  
+
   return Object.freeze(proxy);
 }
 

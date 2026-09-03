@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>建筑模型预览厅 · 梦幻画廊</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #1a1d29;
+        font-family: 'Microsoft YaHei', sans-serif;
+      }
+      #app {
+        width: 100%;
+        height: 100%;
+      }
+      canvas {
+        display: block;
+        touch-action: none;
+      }
+      .topbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        padding: 12px 16px;
+        background: linear-gradient(to bottom, rgba(10, 12, 20, 0.85), rgba(10, 12, 20, 0));
+        pointer-events: none;
+      }
+      .topbar > * {
+        pointer-events: auto;
+      }
+      .title {
+        color: #e8e6f0;
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: 1px;
+        margin-right: 8px;
+      }
+      .mbtn {
+        padding: 8px 16px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        background: rgba(255, 255, 255, 0.08);
+        color: #cfcde0;
+        font-size: 13px;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .mbtn:hover {
+        background: rgba(255, 255, 255, 0.16);
+      }
+      .mbtn.active {
+        background: #7c6cf0;
+        border-color: #7c6cf0;
+        color: #fff;
+      }
+      .hint {
+        position: fixed;
+        bottom: 14px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        color: rgba(255, 255, 255, 0.45);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .loading {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        background: #1a1d29;
+        color: #9a96c0;
+        font-size: 14px;
+        transition: opacity 0.4s;
+      }
+      .loading.hide {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .spin {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 3px solid rgba(124, 108, 240, 0.25);
+        border-top-color: #7c6cf0;
+        animation: sp 1s linear infinite;
+      }
+      @keyframes sp {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .info {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        z-index: 10;
+        color: rgba(255, 255, 255, 0.35);
+        font-size: 11px;
+        text-align: right;
+        line-height: 1.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div class="topbar">
+      <span class="title">模型预览厅</span>
+      <button class="mbtn" data-model="0">户型模型</button>
+      <button class="mbtn" data-model="1">君士坦丁凯旋门</button>
+    </div>
+    <div class="hint">拖拽旋转 · 滚轮/双指缩放 · 双击复位</div>
+    <div class="info" id="info"></div>
+    <div class="loading" id="loading">
+      <div class="spin"></div>
+      <div id="loadtxt">正在加载模型…</div>
+    </div>
+    <script type="module">
+      const MODELS = [
+        { name: '户型模型', url: '/models/showcase/m3-floorplan.glb' },
+        { name: '君士坦丁凯旋门', url: '/models/showcase/ArchOfConstantine.glb' },
+      ];
+      import * as THREE from '/vendor/three.module.js';
+      import { GLTFLoader } from '/vendor/examples/jsm/loaders/GLTFLoader.js';
+
+      const app = document.getElementById('app');
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      app.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1d29);
+      scene.fog = new THREE.Fog(0x1a1d29, 80, 400);
+
+      const hemi = new THREE.HemisphereLight(0xdfe8ff, 0x40384f, 1.1);
+      scene.add(hemi);
+      const sun = new THREE.DirectionalLight(0xfff2e0, 2.2);
+      sun.position.set(30, 50, 20);
+      scene.add(sun);
+      const fill = new THREE.DirectionalLight(0x9fb4ff, 0.6);
+      fill.position.set(-25, 20, -30);
+      scene.add(fill);
+
+      const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 0.1, 2000);
+
+      // 地面接收影子的参考网格(淡)
+      const grid = new THREE.GridHelper(200, 40, 0x353a52, 0x252a3e);
+      grid.position.y = -0.01;
+      scene.add(grid);
+
+      // ---- 轻量轨道控制: 鼠标+触屏 ----
+      const orbit = {
+        yaw: Math.PI * 0.25,
+        pitch: Math.PI * 0.35,
+        dist: 30,
+        target: new THREE.Vector3(),
+      };
+      function applyCamera() {
+        const { yaw, pitch, dist, target } = orbit;
+        camera.position.set(
+          target.x + dist * Math.sin(pitch) * Math.sin(yaw),
+          target.y + dist * Math.cos(pitch),
+          target.z + dist * Math.sin(pitch) * Math.cos(yaw)
+        );
+        camera.lookAt(target);
+      }
+      let dragging = false,
+        lx = 0,
+        ly = 0,
+        pinchD = 0;
+      const cv = renderer.domElement;
+      cv.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        lx = e.clientX;
+        ly = e.clientY;
+        cv.setPointerCapture(e.pointerId);
+      });
+      cv.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        orbit.yaw -= (e.clientX - lx) * 0.005;
+        orbit.pitch = Math.min(
+          Math.PI - 0.05,
+          Math.max(0.05, orbit.pitch + (e.clientY - ly) * 0.005)
+        );
+        lx = e.clientX;
+        ly = e.clientY;
+      });
+      cv.addEventListener('pointerup', () => (dragging = false));
+      cv.addEventListener('pointercancel', () => (dragging = false));
+      cv.addEventListener(
+        'wheel',
+        (e) => {
+          e.preventDefault();
+          orbit.dist = Math.min(500, Math.max(1, orbit.dist * (1 + Math.sign(e.deltaY) * 0.1)));
+        },
+        { passive: false }
+      );
+      cv.addEventListener(
+        'touchstart',
+        (e) => {
+          if (e.touches.length === 2)
+            pinchD = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+        },
+        { passive: true }
+      );
+      cv.addEventListener(
+        'touchmove',
+        (e) => {
+          if (e.touches.length === 2) {
+            const d = Math.hypot(
+              e.touches[0].clientX - e.touches[1].clientX,
+              e.touches[0].clientY - e.touches[1].clientY
+            );
+            if (pinchD > 0) orbit.dist = Math.min(500, Math.max(1, (orbit.dist * pinchD) / d));
+            pinchD = d;
+          }
+        },
+        { passive: true }
+      );
+
+      // ---- 加载模型 ----
+      const loader = new GLTFLoader();
+      const loaded = [];
+      const infoEl = document.getElementById('info');
+      const loadtxt = document.getElementById('loadtxt');
+      let cur = -1;
+
+      function frameModel(gltf, index) {
+        const root = gltf.scene;
+        // 归一化: 平移到底、按包围盒自动取景
+        const box = new THREE.Box3().setFromObject(root);
+        const size = box.getSize(new THREE.Vector3());
+        const ctr = box.getCenter(new THREE.Vector3());
+        // 缩放到统一视觉大小(约 20 单位宽)
+        const s = 20 / Math.max(size.x, size.y, size.z, 0.001);
+        root.scale.setScalar(s);
+        const box2 = new THREE.Box3().setFromObject(root);
+        const ctr2 = box2.getCenter(new THREE.Vector3());
+        root.position.x -= ctr2.x;
+        root.position.z -= ctr2.z;
+        root.position.y -= box2.min.y;
+        const sz2 = box2.getSize(new THREE.Vector3());
+        orbit.dist = Math.max(sz2.x, sz2.z) * 1.6 + 5;
+        orbit.pitch = Math.PI * 0.32;
+        orbit.yaw = Math.PI * 0.25;
+        orbit.target.set(0, sz2.y * 0.35, 0);
+        const tris = (() => {
+          let t = 0;
+          root.traverse((o) => {
+            if (o.isMesh)
+              t += o.geometry.index
+                ? o.geometry.index.count / 3
+                : o.geometry.attributes.position.count / 3;
+          });
+          return Math.round(t);
+        })();
+        infoEl.innerHTML =
+          '原始尺寸: ' +
+          size.x.toFixed(1) +
+          ' × ' +
+          size.y.toFixed(1) +
+          ' × ' +
+          size.z.toFixed(1) +
+          ' m<br>面数: ' +
+          tris.toLocaleString();
+      }
+
+      async function showModel(i) {
+        if (cur === i) return;
+        cur = i;
+        document.querySelectorAll('.mbtn').forEach((b, j) => b.classList.toggle('active', j === i));
+        loaded.forEach((g) => {
+          if (g) g.scene.visible = false;
+        });
+        if (!loaded[i]) {
+          loadtxt.textContent = '正在加载: ' + MODELS[i].name;
+          document.getElementById('loading').classList.remove('hide');
+          const gltf = await loader.loadAsync(MODELS[i].url);
+          loaded[i] = gltf;
+          scene.add(gltf.scene);
+          frameModel(gltf, i);
+        } else {
+          loaded[i].scene.visible = true;
+          frameModel(loaded[i], i);
+        }
+        document.getElementById('loading').classList.add('hide');
+      }
+
+      document
+        .querySelectorAll('.mbtn')
+        .forEach((b) => b.addEventListener('click', () => showModel(+b.dataset.model)));
+
+      addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      });
+      cv.addEventListener('dblclick', () => {
+        if (cur >= 0) frameModel(loaded[cur], cur);
+      });
+
+      let auto = true;
+      setInterval(() => {
+        if (auto && cur >= 0 && !dragging) orbit.yaw += 0.003;
+      }, 16);
+      cv.addEventListener('pointerdown', () => (auto = false));
+
+      function loop() {
+        applyCamera();
+        renderer.render(scene, camera);
+        requestAnimationFrame(loop);
+      }
+      loop();
+      showModel(0);
+    </script>
+  </body>
+</html>

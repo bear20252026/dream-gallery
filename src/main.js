@@ -9,7 +9,8 @@ import './scene/scene.js'; // 场景/相机/渲染器 + 墙壁/地板/屋顶 + �
 // 烟花 + 漂浮粒子:原 scene/effects.js 改为 core/effects-system.js(阶段3 切片),
 // 不再副作用挂 ctx.media,改经组合根注入 deps 注册(见下方 createEffectsSystem 注册处)
 import './scene/media.js'; // 2D音乐演奏器 + 视频墙 + HTML5音乐
-import './gallery/signs.js'; // 户外牌子/白板入口/音乐入口
+import './gallery/signs.js'; // 户外牌子/音乐入口(白板入口 2026-09-03 已移除)
+import './gallery/fountains.js'; // 户外四座 Zsolnay 喷泉(取代已移除的白板区)
 import './gallery/markers.js'; // YES/奕彤爱心/Adorable标记 + 地板照片
 import './gallery/links.js'; // 超链接图标/卷轴/花园入口/滚动古文
 import './gallery/paintings.js'; // 挂画系统 + 白板作品墙 + 3D放大系统
@@ -225,6 +226,11 @@ ctx._playerSM.change(new IdleState());
 ctx.onTick(function (dt) {
   ctx._playerSM.tick(dt);
 });
+
+// 世界坐标读数栏(2026-09-03):左上角实时显示 X/Y/Z + 朝向 + FPS,F3 开关,
+// 一键复制坐标 —— 远程沟通"我在哪 / 哪里被挡住"时直接用它报点。
+import { mountCoordHUD } from './ui/coord-hud.js';
+mountCoordHUD(ctx);
 
 // 启动时预编译全部着色器(异步):把编译成本集中到加载屏期间,消灭运行时的编译卡顿
 function fadeLoad() {

@@ -1,10 +1,11 @@
-// paintings.js — 挂画系统 + 白板作品固定展示区 + 3D原位放大系统(onC3D/zoomIn/zoomOut)
+// paintings.js — 挂画系统 + 3D原位放大系统(onC3D/zoomIn/zoomOut)
+// 2026-09-03:原「白板作品固定展示区」(户外 z=47 玻璃墙 + 6 画位 + SSE 刷新)整套移除,
+//   白板 3D 入口已下线;whiteboard-*.png 的排除过滤仍保留,避免旧作品串挂到其他墙。
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片/视频即同步新媒体墙(2026-08-29)
 import { P, V, AI_DESC, LINKS, VIDEO_WALL_SOURCES } from '../../data.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
-import { canvasTexture } from '../shared/canvas-texture.js';
 const {
   s,
   cam,
@@ -16,7 +17,6 @@ const {
   vidMesh,
   v45Mesh,
   signMesh,
-  wb,
   mpMesh,
   vidEl,
   v45El,
@@ -47,8 +47,14 @@ const aM = P.map((u, i) => ({ u: u, d: AI_DESC[i] })).concat(
 
 const hW = [];
 // 修复1：排除踢脚线（userData.isBaseboard），只选真正的墙壁
+// 婚礼拱廊装修(2026-09-03)：排除已隐藏的外围墙(visible=false)，挂画自动重分配到内墙
 s.traverse((o) => {
-  if (o.isMesh && o.geometry.type === 'BoxGeometry' && !o.userData.isBaseboard) {
+  if (
+    o.isMesh &&
+    o.geometry.type === 'BoxGeometry' &&
+    !o.userData.isBaseboard &&
+    o.visible !== false
+  ) {
     const p = o.geometry.parameters;
     if (p.width < 0.5 && p.width > 0.15 && p.depth > 1.5) hW.push(o);
   }
@@ -59,184 +65,7 @@ iG.push(vidMesh); // 视频墙加入交互
 iG.push(v45Mesh); // 视频4/5加入交互
 iG.push(signMesh); // 户外牌子加入交互
 iG.push(ctx.media.guideMesh); // 元素共鸣准则牌子加入交互
-iG.push(wb); // 户外白板加入交互
 iG.push(mpMesh); // 音乐面板加入交互
-
-// ============ 白板作品固定展示区（户外白板旁 z=47） ============
-// 动态加载 photos/ 里的 whiteboard-*.png，固定 6 个画位，最新的作品自动上墙
-(function () {
-  const SLOT_N = 6,
-    SLOT_W = 1.6,
-    SLOT_H = 1.2,
-    GAP = 0.5;
-  const WALL_W = SLOT_N * SLOT_W + (SLOT_N + 1) * GAP,
-    WALL_H = 2.6,
-    WALL_Z = 47;
-  // 展示墙:浅绿色半透明玻璃
-  const wallMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(WALL_W, WALL_H, 0.15),
-    new THREE.MeshPhysicalMaterial({
-      color: '#8fe0b8',
-      transparent: true,
-      opacity: 0.32,
-      roughness: 0.08,
-      metalness: 0.1,
-      side: THREE.DoubleSide,
-    })
-  );
-  wallMesh.position.set(0, WALL_H / 2, WALL_Z);
-  s.add(wallMesh);
-  // 标题:浅蓝色半透明玻璃牌,双面正字(建筑方向与白板方向看都是正的,科技感)
-  function makeTitleTex() {
-    // 画布样板统一在 shared/canvas-texture.js(B1 整改)
-    const tT = canvasTexture(512, 80, (tX) => {
-      tX.fillStyle = 'rgba(90,190,255,0.35)';
-      tX.fillRect(0, 0, 512, 80);
-      tX.strokeStyle = 'rgba(140,220,255,0.9)';
-      tX.lineWidth = 3;
-      tX.strokeRect(4, 4, 504, 72);
-      tX.fillStyle = '#bfeaff';
-      tX.font = 'bold 44px sans-serif';
-      tX.textAlign = 'center';
-      tX.shadowColor = '#4fc3ff';
-      tX.shadowBlur = 14;
-      tX.fillText('白板作品展', 256, 55);
-    });
-    tT.colorSpace = THREE.SRGBColorSpace;
-    return tT;
-  }
-  const tT = makeTitleTex();
-  const titleGlassMat = function () {
-    return new THREE.MeshBasicMaterial({
-      map: tT,
-      transparent: true,
-      opacity: 0.75,
-      side: THREE.FrontSide,
-      toneMapped: false,
-    });
-  };
-  // 北面(朝向建筑 -z)正字
-  const titleN = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.625), titleGlassMat());
-  titleN.rotation.y = Math.PI;
-  titleN.position.set(0, WALL_H + 0.55, WALL_Z);
-  s.add(titleN);
-  // 南面(朝向白板 +z)正字
-  const titleS = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.625), titleGlassMat());
-  titleS.position.set(0, WALL_H + 0.55, WALL_Z);
-  s.add(titleS);
-  // 6 个固定画位（占位画布，加载到作品后替换）
-  const slots = [];
-  // 共享占位纹理
-  const ph = document.createElement('canvas');
-  ph.width = 256;
-  ph.height = 192;
-  const px = ph.getContext('2d');
-  px.fillStyle = '#fff';
-  px.fillRect(0, 0, 256, 192);
-  px.fillStyle = '#bbb';
-  px.font = '20px sans-serif';
-  px.textAlign = 'center';
-  px.fillText('虚位以待', 128, 100);
-  const pTex = new THREE.CanvasTexture(ph);
-  pTex.colorSpace = THREE.SRGBColorSpace;
-  for (let i = 0; i < SLOT_N; i++) {
-    const x = -WALL_W / 2 + GAP + SLOT_W / 2 + i * (SLOT_W + GAP);
-    const g = new THREE.Group();
-    g.position.set(x, 1.5, WALL_Z - 0.15);
-    g.rotation.y = Math.PI; // 面向白板方向(-z)
-    g.userData = {
-      isPainting: true,
-      ox: x,
-      oy: 1.5,
-      oz: WALL_Z - 0.15,
-      nx: 0,
-      nz: -1,
-      ry: Math.PI,
-      zoomed: false,
-      aiDesc: '白板手绘作品',
-    };
-    s.add(g);
-    iG.push(g);
-    g.add(new THREE.Mesh(new THREE.BoxGeometry(SLOT_W, SLOT_H, 0.07), fW));
-    const cm = new THREE.MeshStandardMaterial({ map: pTex, roughness: 0.6 });
-    const plane = new THREE.Mesh(new THREE.PlaneGeometry(SLOT_W - 0.14, SLOT_H - 0.14), cm);
-    plane.position.z = 0.045;
-    g.add(plane);
-    slots.push({ g: g, cm: cm, name: '' });
-  }
-  // 拉取白板作品，按修改时间从新到旧上墙；每 5 秒自动刷新，无需重进页面
-  function refreshWall() {
-    fetch('/api/files?dir=photos', { cache: 'no-store' })
-      .then(function (r) {
-        return r.json();
-      })
-      .then(function (d) {
-        const files = (d.photos || [])
-          .filter(function (f) {
-            return /^whiteboard-.*\.png$/i.test(f.name);
-          })
-          .sort(function (a, b) {
-            return b.mtime.localeCompare(a.mtime);
-          })
-          .slice(0, SLOT_N);
-        for (let i = 0; i < SLOT_N; i++) {
-          const f = files[i],
-            slot = slots[i];
-          const newName = f ? f.name : '';
-          if (newName === slot.name) continue; // 画位内容没变，跳过
-          slot.name = newName;
-          if (!f) {
-            // 作品被删除，恢复占位
-            slot.cm.map = pTex;
-            slot.cm.needsUpdate = true;
-            slot.g.userData.aiDesc = '白板手绘作品';
-            continue;
-          }
-          tL.load(f.url, function (tex) {
-            tex.colorSpace = THREE.SRGBColorSpace;
-            const oldTex = slot.cm.map;
-            slot.cm.map = tex;
-            slot.cm.needsUpdate = true;
-            if (oldTex && oldTex !== pTex) oldTex.dispose(); // 释放旧纹理,占位纹理除外
-            slot.g.userData.aiDesc =
-              '白板手绘作品 · ' +
-              f.name
-                .replace(/^whiteboard-|\.\w+$/g, '')
-                .replace('T', ' ')
-                .slice(0, 19);
-          });
-        }
-      })
-      .catch(function (e) {
-        console.warn('白板作品墙刷新失败:', e);
-      });
-  }
-  refreshWall();
-  // 作品墙刷新:SSE 即时推送为主(有人保存白板服务端即踢),60s 轮询兜底
-  let wallTimer = null;
-  let es = null;
-  function startWatch() {
-    try {
-      es = new EventSource('/api/entry/watch');
-      es.onmessage = function (ev) {
-        if (ev.data && ev.data.indexOf('recheck') >= 0) refreshWall();
-      };
-      es.onerror = function () {
-        /* 浏览器自动重连 */
-      };
-    } catch (e) {}
-  }
-  startWatch();
-  wallTimer = setInterval(refreshWall, 60000); // 兜底降频到 60s(实时性靠 SSE)
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden) {
-      clearInterval(wallTimer);
-    } else {
-      refreshWall();
-      wallTimer = setInterval(refreshWall, 60000);
-    }
-  });
-})();
 
 // 挂画注册表:模式系统(mode.js)按 src 决定每幅画的可见性
 const paintGroups = [];
@@ -699,11 +528,6 @@ function onC3D(e) {
       cg.position.z < 29
     )
       return;
-    // ===== 户外白板点击:内嵌面板打开,不脱离画廊 =====
-    if (cg.userData && cg.userData.isWB) {
-      window.openPanel('whiteboard.html', '希沃白板');
-      return;
-    }
     // ===== 视频墙/梦幻之门:按代码指令顺序连播,不提供暂停功能 =====
     if (cg.userData && cg.userData.isVideo45) {
       return; // 点击无效,视频按序自动播放

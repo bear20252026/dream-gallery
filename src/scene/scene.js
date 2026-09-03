@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { createPaperTerrainMaterial, updatePaperTerrain } from './paper-floor.js'; // 山河舆图·纸质地形地板(2026-08-29)
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'; // 婚礼拱廊外壳加载(museum.js 同款静态导入,项目验证过)
 
 const L = document.getElementById('l'),
   C = document.getElementById('c'),
@@ -169,6 +170,12 @@ ctx.scene.addBounds = function (list) {
   for (const b of list) bounds.push(b);
 };
 const wI = []; // 墙壁信息数组
+// ===================== 婚礼拱廊外壳(C方案·全体大装修,2026-09-03) =====================
+// 用婚礼拱廊 GLB(models/hall/wedding-arch.glb, CC-BY 4.0, 署名见 CREDITS.md)整体替换
+// 原始建筑的可见外观:三段拱廊沿 z 覆盖 36×40 全馆,旧外围墙隐藏但保留碰撞(边界不破),
+// 内墙保留挂画并刷暖白以配大理石风格。回滚开关:置 false 即恢复旧外观,零残留。
+const WEDDING_SHELL = true;
+const ARCH_SCL = 36 / 27.6; // 拱廊长轴 27.6m → 对齐原馆东西向 36m
 // 古典装饰材质（深棕色带光泽）:腰线/门框装饰线 与 踢脚线 分开,房屋换色可独立染色
 const decoM = new THREE.MeshStandardMaterial({ color: '#4a2510', roughness: 0.4, metalness: 0.15 });
 const baseM = new THREE.MeshStandardMaterial({ color: '#3a1d0c', roughness: 0.4, metalness: 0.15 });
@@ -186,8 +193,11 @@ function w(x1, z1, x2, z2) {
     ang = Math.atan2(dx, dz);
   const hue = 335 + Math.random() * 20;
   const wallMat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(`hsl(${hue},45%,70%)`),
-    roughness: 0.92,
+    // 婚礼拱廊装修:内墙刷暖白(近似大理石),配合白拱+木格栅天花;关闭开关恢复随机粉
+    color: WEDDING_SHELL
+      ? new THREE.Color('hsl(40,18%,86%)')
+      : new THREE.Color(`hsl(${hue},45%,70%)`),
+    roughness: WEDDING_SHELL ? 0.85 : 0.92,
     metalness: 0.02,
   });
   houseMats.wall.push(wallMat); // 房屋换色(housecolor.js)分组染色
@@ -197,13 +207,19 @@ function w(x1, z1, x2, z2) {
   s.add(wall);
   const sA = Math.abs(Math.sin(ang)),
     cA = Math.abs(Math.cos(ang));
-  bounds.push({
+  const bBox = {
     mnX: cx - ((sA * len) / 2 + cA * 0.2) - 0.1,
     mxX: cx + ((sA * len) / 2 + cA * 0.2) + 0.1,
     mnZ: cz - ((cA * len) / 2 + sA * 0.2) - 0.1,
     mxZ: cz + ((cA * len) / 2 + sA * 0.2) + 0.1,
-  });
-  wI.push({ x1, z1, x2, z2, cx, cz, ang, len });
+  };
+  // 婚礼拱廊装修:标记外围墙(四至边线)的碰撞盒,供外壳装配时整批移除。
+  //   不标记的话旧房隐形墙会把落地窗全堵死——看得见通、走不过去(2026-09-03 用户反馈)
+  if (WEDDING_SHELL)
+    bBox.perim =
+      (x1 === x2 && (x1 === OL || x1 === OR)) || (z1 === z2 && (z1 === OT || z1 === OBR));
+  bounds.push(bBox);
+  wI.push({ x1, z1, x2, z2, cx, cz, ang, len, mesh: wall, bases: [], tubes: [] });
   // 法线方向（版本27验证：cos(ang), -sin(ang)）
   const pX = Math.cos(ang),
     pZ = -Math.sin(ang);
@@ -220,6 +236,7 @@ function w(x1, z1, x2, z2) {
   bm2.position.set(cx - pX * 0.2, 0.05, cz - pZ * 0.2);
   bm2.rotation.y = ang;
   s.add(bm2);
+  wI[wI.length - 1].bases.push(bm1, bm2); // 婚礼拱廊装修:外围墙隐藏时一并隐藏
 }
 
 // ===== 外围（覆盖整体范围） =====
@@ -419,7 +436,89 @@ wI.forEach((wi) => {
   const rT = new THREE.Mesh(new THREE.CylinderGeometry(tubeR, tubeR, WH, seg), edgeTubeMat);
   rT.position.set(wi.x2 - tX * 0.15 + pX * off, WH / 2, wi.z2 - tZ * 0.15 + pZ * off);
   s.add(rT);
+  wi.tubes.push(topT, botT, lT, rT); // 婚礼拱廊装修:外围墙隐藏时一并隐藏
 });
+
+// ===================== 婚礼拱廊外壳装配（C方案,2026-09-03） =====================
+// 旧外围墙(含踢脚线/圆角管)与东门框隐藏,但 bounds 保留——碰撞边界不破,门洞仍通行;
+// 三段拱廊实例沿 z 均布覆盖 36×40 全馆(单段 36×14.1×6.65m,南端外挑 2.3m 入沙漠);
+// 挂画墙筛选(paintings.js)同步排除隐藏墙,挂画自动重分配到内墙。
+if (WEDDING_SHELL) {
+  const isPerimeter = (wi) =>
+    (wi.x1 === wi.x2 && (wi.x1 === OL || wi.x1 === OR)) ||
+    (wi.z1 === wi.z2 && (wi.z1 === OT || wi.z1 === OBR));
+  wI.forEach((wi) => {
+    if (!isPerimeter(wi)) return;
+    wi.mesh.visible = false;
+    wi.bases.forEach((b) => (b.visible = false));
+    wi.tubes.forEach((t) => (t.visible = false));
+  });
+  df1.visible = df2.visible = df4.visible = false; // 东门框让位拱廊柱
+  // 拆掉旧外围墙的碰撞盒:拱廊是开敞建筑,落地窗应当可以径直走出去(用户要求,不设权限)。
+  //   内墙(展厅隔断/回字内墙)碰撞保留——那是实心墙,照旧挡人。
+  const perimB = bounds.filter((b) => b.perim);
+  ctx.scene.removeBounds(perimB);
+  console.log('[wedding] 旧外围隐形墙碰撞已移除 ×' + perimB.length);
+  // 三段实例:几何共享 1 份,显存只多 2 份矩阵
+  // ✅ 用顶部静态导入的 GLTFLoader(museum.js/dome-towers.js 同款,项目内验证过);
+  //    之前用动态 import 引 vendor 副本在此模块上下文始终失败且无日志(2026-09-03 排坑)
+  try {
+    new GLTFLoader().load(
+      '/models/hall/wedding-arch.glb',
+      (g) => {
+        const base = g.scene;
+        base.scale.setScalar(ARCH_SCL);
+        const box = new THREE.Box3().setFromObject(base);
+        const ctr = box.getCenter(new THREE.Vector3());
+        base.position.x -= ctr.x; // 长轴中心对 x=0
+        base.position.z -= ctr.z;
+        base.position.y -= box.min.y; // 底面贴地
+        // ---- 碰撞:只给实心柱子建盒(2026-09-03 用户拍板"玻璃可穿、柱子不可穿") ----
+        // 实测(脚本 scripts/probe/dump-arch-aabb.cjs,世界坐标):
+        //   Square_Pillar ×26  0.96×3.81×0.98m  y 0.36~4.16  → 实心,加碰撞
+        //   Line(窗框)+Shape(窗框)+玻璃材质     y 0.31~5.4   → 落地窗,不挡人
+        //   Box233(地板薄板)                     y 0.24~0.36  → 那是地面,不能挡
+        //   Arch / Support / pasted__Planks / Rectangle 全在 y≥4.03 头顶,天然不参与脚底碰撞
+        base.updateMatrixWorld(true);
+        const pillarBoxes = [];
+        base.traverse((o) => {
+          if (!o.isMesh || !/^Square_Pillar/.test(o.name || '')) return;
+          const bb = new THREE.Box3().setFromObject(o);
+          pillarBoxes.push({
+            mnX: bb.min.x,
+            mxX: bb.max.x,
+            mnZ: bb.min.z,
+            mxZ: bb.max.z,
+            mnY: bb.min.y,
+            mxY: bb.max.y,
+          });
+        });
+        const segD = 10.8 * ARCH_SCL; // 14.09m 每段进深
+        for (let i = 0; i < 3; i++) {
+          const dz = OT + segD / 2 + i * segD;
+          const inst = i === 0 ? base : base.clone(true);
+          inst.position.z = dz;
+          inst.name = 'weddingShell' + i; // 验收探针按此名定位
+          s.add(inst);
+          for (const pb of pillarBoxes)
+            bounds.push({
+              mnX: pb.mnX,
+              mxX: pb.mxX,
+              mnZ: pb.mnZ + dz,
+              mxZ: pb.mxZ + dz,
+              mnY: pb.mnY,
+              mxY: pb.mxY,
+            });
+        }
+        console.log('[wedding] 拱廊外壳已装填 ×3,柱子碰撞盒 +' + pillarBoxes.length * 3);
+      },
+      undefined,
+      (e) => console.error('[wedding] GLB 加载失败:', e)
+    );
+  } catch (e) {
+    console.error('[wedding] loader 同步异常:', e);
+  }
+}
 
 // ===================== 地板（画廊内部拼花）+ 云影外部地面 =====================
 const floorW = OR - OL; // 36
@@ -589,6 +688,11 @@ roofThick.position.y = WH + 0.08;
 roofThick.position.z = (OT + OBR) / 2;
 s.add(roofThick);
 houseMats.ceil.push(roofMat, roofThickM);
+// 婚礼拱廊装修:整块平屋顶隐藏,拱廊木格栅天花接管(金缮补天奖励在拱廊态暂不可见)
+if (WEDDING_SHELL) {
+  roof.visible = false;
+  roofThick.visible = false;
+}
 
 // ===================== 金缮天花板(2026-07-28 C1,补天 100% 奖励,设计文档第 9 步钦定) =====================
 // 天穹 100% 后:天花板换为半透明金缮纹理——天空透过,淡金色愈合纹路如瓷器金缮;
@@ -680,6 +784,12 @@ s.add(diamond);
 const dLight = new THREE.PointLight('#ff88cc', 8, 40, 1.5);
 dLight.position.copy(diamond.position);
 s.add(dLight);
+// 婚礼拱廊装修:粉色四棱锥屋顶+钻石+其点光源一并隐藏,拱廊木格栅天花接管天际线
+if (WEDDING_SHELL) {
+  pyramid.visible = false;
+  diamond.visible = false;
+  dLight.visible = false;
+}
 
 // ============ 天空系统 ============
 const skyUniforms = {
