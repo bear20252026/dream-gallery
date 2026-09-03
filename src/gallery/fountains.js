@@ -275,6 +275,10 @@ new GLTFLoader().load(
         nWater +
         ' 个(已启用流动)'
     );
+    // 验收探针用:标记喷泉已就绪(线上要下 6.5M GLB,探针不能靠固定 sleep 猜)
+    try {
+      window.__fountainReady = true;
+    } catch {}
   },
   undefined,
   (e) => console.error('[fountain] GLB 加载失败:', e)

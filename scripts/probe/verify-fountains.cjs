@@ -31,12 +31,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     ])
       sessionStorage.setItem(k, '1');
   });
-  await page.goto('http://localhost:5173/?noopening&noprologue', {
+  // 默认跑本地 dev:5173;验收线上用 PROBE_URL=https://cloudbear.cloud (线上要下 8M+6M 模型,
+  // 等待窗口用 PROBE_WAIT_MS 放宽,默认 60s)
+  const URL = process.env.PROBE_URL || 'http://localhost:5173';
+  const WAIT = +(process.env.PROBE_WAIT_MS || 60000);
+  await page.goto(URL + '/?noopening&noprologue', {
     waitUntil: 'domcontentloaded',
-    timeout: 60000,
+    timeout: WAIT,
   });
   await page.waitForFunction(() => window.__ctx && window.__ctx.player && window.__ctx.player.pl, {
-    timeout: 60000,
+    timeout: WAIT,
   });
   const clickBtn = (kw) =>
     page.evaluate((k) => {
@@ -60,7 +64,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await clickBtn('先逛逛').catch(() => {});
   await page.waitForTimeout(2500);
   await page.getByText('跳过序章', { exact: false }).click({ timeout: 6000 }).catch(() => {});
-  await page.waitForTimeout(4500);
+  // 等喷泉 GLB 加载完成(线上要下 6.5M,不能死等固定时长,改为等 [fountain] 日志落地)
+  await page
+    .waitForFunction(() => window.__fountainReady === true, { timeout: WAIT })
+    .catch(() => {});
+  await page.waitForTimeout(2500);
   await page.evaluate(() => {
     const gc = document.getElementById('guideCard');
     if (gc) {
