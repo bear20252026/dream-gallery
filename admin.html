@@ -910,6 +910,15 @@
         <div id="clickList"></div>
         <div class="section-title">访客端报错(仅后台可见)</div>
         <div id="errList"></div>
+        <div class="section-title">一念墙(访客写下的一句话 · 可删不当内容)</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 10px">
+          <button class="btn-day" id="wishRefresh">刷新一念</button>
+          <span
+            id="wishTotal"
+            style="align-self: center; color: var(--muted); font-size: 12px"
+          ></span>
+        </div>
+        <div id="wishAdminList"></div>
       </div>
 
       <!-- ========== 文件 ========== -->
@@ -1178,6 +1187,63 @@
         webgl: 'WebGL',
         network: '网络',
       };
+      // ===================== 一念墙管理(2026-09-04) =====================
+      async function loadWishes() {
+        try {
+          const r = await fetch('/api/admin/wishes' + tk());
+          const d = await r.json();
+          if (!r.ok) throw new Error(d.error || '加载失败');
+          $('wishTotal').textContent = '共 ' + d.total + ' 念';
+          const box = $('wishAdminList');
+          box.innerHTML = '';
+          if (!d.list.length) {
+            box.innerHTML =
+              '<div class="card" style="color:var(--muted)">墙还空着——还没有访客写过一念。</div>';
+            return;
+          }
+          for (const w of d.list) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.style.cssText = 'padding:10px 14px;margin-bottom:8px';
+            const txt = document.createElement('div');
+            txt.style.cssText = 'font-size:14px;word-break:break-all';
+            txt.textContent = w.t;
+            const row = document.createElement('div');
+            row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:6px';
+            const meta = document.createElement('span');
+            meta.style.cssText = 'color:var(--muted);font-size:12px';
+            meta.textContent = w.n + ' · ' + fmt(w.ts);
+            const del = document.createElement('button');
+            del.className = 'btn-del';
+            del.textContent = '删除';
+            del.addEventListener('click', async function () {
+              if (!(await confirmAsync('确定删除这条一念?'))) return;
+              try {
+                const rr = await fetch('/api/admin/wish' + tk(), {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'del', id: w.id }),
+                });
+                if (!rr.ok) throw new Error('删除失败');
+                toast('已删除');
+                loadWishes();
+              } catch (e) {
+                toast(e.message, true);
+              }
+            });
+            row.appendChild(meta);
+            row.appendChild(del);
+            card.appendChild(txt);
+            card.appendChild(row);
+            box.appendChild(card);
+          }
+        } catch (e) {
+          $('wishAdminList').innerHTML =
+            '<div class="card" style="color:#c64545">加载失败: ' + esc(e.message) + '</div>';
+        }
+      }
+      $('wishRefresh').addEventListener('click', loadWishes);
+
       async function loadErrors() {
         try {
           const type = $('errType').value;

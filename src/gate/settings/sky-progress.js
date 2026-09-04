@@ -2,10 +2,12 @@
 import { ctx } from '../../ctx.js';
 
 // ===== 天穹 100 制与里程碑文案系统(2026-07-26 主人定) =====
+// 2026-09-04:一念接入——每写一念=灵蕴+5(零门槛参与,与上传照片同权重)
 function skyVal() {
   const q = ctx.store.num('quiz'),
-    u = ctx.store.num('up');
-  return Math.min(q + u * 5, 100);
+    u = ctx.store.num('up'),
+    w = ctx.store.num('wishN');
+  return Math.min(q + u * 5 + w * 5, 100);
 }
 
 // 里程碑 11 档:屏幕中央大字 3 秒 + TTS 旁白(每档只触发一次);100% 后出选择对话框
@@ -305,7 +307,13 @@ function drawSky() {
             : '灵蕴正在苏醒……';
   document.getElementById('skyLine').textContent = val >= 1 && val < 100 ? SKY_LINES[val - 1] : '';
   document.getElementById('skyStats').textContent =
-    '答对选择题：' + ctx.store.num('quiz') + ' 题 · 上传照片：' + ctx.store.num('up') + ' 张';
+    '答对选择题：' +
+    ctx.store.num('quiz') +
+    ' 题 · 上传照片：' +
+    ctx.store.num('up') +
+    ' 张 · 一念：' +
+    ctx.store.num('wishN') +
+    ' 句';
   document.getElementById('skyFull').style.display = val >= 100 ? 'block' : 'none';
 }
 

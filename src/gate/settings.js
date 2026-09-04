@@ -1,10 +1,11 @@
 // settings.js — 昵称系统(双渠道,进馆后自愿,不强制) + 设置面板入口
-// 子模块:sky-progress(天穹) / chat-room(聊天室) / spirit-page(六灵蕴) / upload-import(展厅选片) / quality(画质)
+// 子模块:sky-progress(天穹) / chat-room(聊天室) / spirit-page(六灵蕴) / wish-page(一念) / upload-import(展厅选片) / quality(画质)
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { skyApi, openSky } from './settings/sky-progress.js';
 import { chatApi } from './settings/chat-room.js';
 import { spApi } from './settings/spirit-page.js';
+import { wishApi, openWish } from './settings/wish-page.js';
 import { etPickApi, openEternalPick } from './settings/upload-import.js';
 import { qApi, openQuality } from './settings/quality.js';
 const bag = hotBegin('settings');
@@ -79,6 +80,7 @@ panel.innerHTML = `<h4>设 置<span class="px" id="gearX">✕</span></h4>
     <button id="gmColor">🎨 房屋换色</button>
     <button id="gmGuide">📖 元素共鸣准则(说明书)</button>
     <button id="gmSky">🌌 天穹</button>
+    <button id="gmWish">✧ 写下你的一念</button>
     <button id="gmSpirits">✦ 六灵蕴</button>
     <button id="gmSelectEternal">🖼 展厅选片</button>
     <button id="gmQuality">🎚 画质</button>
@@ -96,6 +98,10 @@ function closePanel() {
 document.getElementById('gmSky').onclick = function () {
   closePanel();
   openSky();
+};
+document.getElementById('gmWish').onclick = function () {
+  closePanel();
+  openWish();
 };
 document.getElementById('gmSelectEternal').onclick = function () {
   closePanel();
@@ -146,6 +152,7 @@ bag.custom.push(() => {
   skyApi.unregister();
   chatApi.unregister();
   spApi.unregister();
+  wishApi.unregister();
   etPickApi.unregister();
   qApi.unregister();
 });
