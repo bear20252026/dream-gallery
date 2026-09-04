@@ -286,6 +286,7 @@ function finish(openQuizAfter) {
       ctx.ui.modeToast && ctx.ui.modeToast('残镜已亮。你可以自由探索昆仑了。');
       // 2026-07-31:序章结束后不再自动弹出答题,答题只用于天穹进度
     } else {
+      ctx.store.mark('prologueDone'); // 跳过同样记档:否则跳过者每次访问都重播(2026-09-04 审计)
       ctx.ui.modeToast && ctx.ui.modeToast('序章已跳过——残镜在右下角等你回头。');
       leaveDimMirror();
     }

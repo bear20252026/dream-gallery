@@ -327,21 +327,27 @@ $('doUp').onclick = async () => {
     return last;
   }
   // 灵蕴去重(2026-07-26 主人定):同一张照片按内容哈希只计一次 +5 进度,重复上传不刷分
+  // 2026-09-04 修复:哈希改为上传成功后才入库——失败重试不再被误判 dup 烧掉 +5(审计发现)
   let dup = false;
+  let pendingHex = null;
   if (!isVid) {
     try {
       const h = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
       const hex = [...new Uint8Array(h)].map((b) => b.toString(16).padStart(2, '0')).join('');
       const set = ctx.store.json('upHash', []);
       if (set.includes(hex)) dup = true;
-      else {
-        set.push(hex);
-        ctx.store.setJson('upHash', set);
-      }
+      else pendingHex = hex;
     } catch (e) {}
   }
   try {
     const d = await uploadFile();
+    if (pendingHex) {
+      const set = ctx.store.json('upHash', []);
+      if (!set.includes(pendingHex)) {
+        set.push(pendingHex);
+        ctx.store.setJson('upHash', set);
+      }
+    }
     if (d.mt) {
       ctx.mode.myUploadTokens = ctx.mode.myUploadTokens || {};
       ctx.mode.myUploadTokens[name] = d.mt;
