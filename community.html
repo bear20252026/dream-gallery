@@ -137,7 +137,7 @@
   <body>
     <div class="wrap">
       <h1>游戏社区公约</h1>
-      <div class="sub">梦幻画廊 · 昆仑灵鉴 · 2026 年 7 月 27 日</div>
+      <div class="sub">梦幻画廊 · 昆仑灵鉴 · 修订日期:2026 年 9 月 5 日</div>
 
       <div class="sec">
         <h2>总则</h2>
@@ -546,6 +546,21 @@
           window.history.back();
         };
       })();
+    </script>
+    <script>
+      // 入口闸门阅读模式(?from=gate):左上「‹ 返回」,看完退回闸门,不做签收
+      if (/[?&]from=gate/.test(location.search)) {
+        var b = document.createElement('button');
+        b.textContent = '‹ 返回';
+        b.style.cssText =
+          'position:fixed;left:18px;top:16px;z-index:99;padding:7px 16px;border-radius:6px;border:1px solid rgba(90,72,50,.5);background:rgba(248,241,223,.92);color:#5a4c3a;font-size:14px;cursor:pointer;font-family:inherit';
+        b.onclick = function () {
+          try {
+            parent.window.closePanel();
+          } catch (e) {}
+        };
+        document.body.appendChild(b);
+      }
     </script>
   </body>
 </html>

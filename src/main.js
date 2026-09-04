@@ -385,9 +385,12 @@ function applyGenderColor(gender) {
     }
   })();
 }
-// 性别选择:未选择过则轮询等待协议签完后显示(所有访客统一,不再区分新老)
+// 性别选择:未选择过则等序章档(gate/开场电影走完)再显示,不与开幕电影抢屏(2026-09-05)
 if (!ctx.store.flag('genderSelected')) {
-  setTimeout(showGenderSelect, 4000);
+  (function waitPrologue() {
+    if (ctx.store.flag('prologueDone')) setTimeout(showGenderSelect, 1200);
+    else setTimeout(waitPrologue, 1000);
+  })();
 }
 // 启动时应用已保存的性别颜色
 const savedGender = ctx.store.str('gender');
@@ -417,23 +420,23 @@ function stopAgreementMusic() {
 // 导出给 prologue.js 使用(序章结束时停止协议配乐)
 ctx.stopAgreementMusic = stopAgreementMusic;
 
-// 协议先行(2026-07-27 主人定):三连读——用户协议→隐私指引→游戏社区公约。
-// 首访严格(每份 20s+滚底+打勾+锁死),回访轻量(照弹但即点即走);中途中断,下次从"未签的第一份"接着弹
-if (
-  !sessionStorage.getItem('agreementConsented') ||
-  !sessionStorage.getItem('privacyConsented') ||
-  !sessionStorage.getItem('communityConsented')
-) {
-  setTimeout(function () {
-    const url = !sessionStorage.getItem('agreementConsented')
-      ? 'agreement.html?consent=1'
-      : !sessionStorage.getItem('privacyConsented')
-        ? 'privacy.html?consent=1'
-        : 'community.html?consent=1';
-    window.openPanel(url, '协议与公约');
-    startAgreementMusic(); // 开始播放协议配乐
-  }, 1800);
-}
+// 入口闸门(2026-09-05,B612 定稿):一屏英文开场,点 ENTER 即视为同意三份协议
+// (写会话标记+永久标记);协议全文由闸门底行链接随时点开、可返回。取代三连读强制签署。
+import('./gate/entrygate.js')
+  .then(function (m) {
+    m.setupEntryGate({
+      onEnter: function () {
+        startAgreementMusic();
+      },
+    });
+  })
+  .catch(function (e) {
+    // 闸门加载失败兜底:补齐标记直接放行,不让任何人卡在门外
+    sessionStorage.setItem('agreementConsented', '1');
+    sessionStorage.setItem('privacyConsented', '1');
+    sessionStorage.setItem('communityConsented', '1');
+    console.warn('[gate] 入口闸门初始化失败,已放行:', e.message);
+  });
 if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
 
 // ===================== 开场流程统一调度(2026-08-29 顺序梳理) =====================
@@ -464,23 +467,57 @@ function startPrologueIfNeeded() {
   let done = false;
   function tick() {
     if (done) return;
-    // ① 协议未签完:一律等待(协议先行)
+    // ① 协议未签完:一律等待(入口闸门负责写标记)
     if (!allConsented()) {
       setTimeout(tick, 1000);
       return;
     }
     done = true;
-    // 开场层被显式跳过:标记后直接进序章(不再等开屏)
-    if (skipOpening) {
+    // 收束(2026-09-05):停协议配乐 + 记序章档 + 起大屏视频;deferMedia=老访客首次交互再起播
+    function finishIntro(deferMedia) {
+      if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
+      ctx.store.mark('prologueDone');
+      if (deferMedia) {
+        let started = false;
+        const go = function () {
+          if (started) return;
+          started = true;
+          if (ctx.startVidSeq) ctx.startVidSeq();
+        };
+        document.addEventListener('click', go, { once: true });
+        document.addEventListener('touchstart', go, { once: true });
+        setTimeout(go, 4000);
+      } else if (ctx.startVidSeq) ctx.startVidSeq();
+    }
+    // ② 老访客/测试跳过(?noopening、?noprologue、skipOpening、已看过序章)
+    if (
+      skipOpening ||
+      /noprologue|nofilm/.test(location.search) ||
+      ctx.store.flag('prologueDone')
+    ) {
       window.__openingSplashSkipped = true;
-      startPrologueIfNeeded();
+      finishIntro(true);
       return;
     }
-    // ② 开屏 → 用户点「进入画廊」→ ③ 序章
-    showOpening(function () {
-      hideOpening();
-      startPrologueIfNeeded();
-    });
+    // ③ 回滚通道:?oldintro 走旧「开屏层+残镜序章」
+    if (/oldintro/.test(location.search)) {
+      showOpening(function () {
+        hideOpening();
+        startPrologueIfNeeded();
+      });
+      return;
+    }
+    // ④ 新访客:B612 开幕电影(替代开屏层+残镜序章,2026-09-05 定稿)
+    import('./gate/openfilm.js')
+      .then(function (m) {
+        m.playOpeningFilm(function () {
+          finishIntro(false);
+        });
+      })
+      .catch(function (e) {
+        console.warn('[film] 开幕电影加载失败,退回旧序章:', e.message);
+        startPrologueIfNeeded();
+      });
   }
   setTimeout(tick, 1200);
 })();

@@ -24,6 +24,7 @@ const SCHEMA = {
   skyMs: { key: 'kunlunSkyMs', type: 'num' }, // 天穹里程碑已达档位(25/50/75/100)
   quiz: { key: 'kunlunQuiz', type: 'num' }, // 累计答对题数
   up: { key: 'kunlunUp', type: 'num' }, // 累计上传照片数
+  wishN: { key: 'kunlunWishN', type: 'num' }, // 一念数(每念=灵蕴+5,2026-09-04)
   gaze: { key: 'kunlunGaze', type: 'num' }, // AI 看图次数
   chimeLastRing: { key: 'chimeLastRing', type: 'num' }, // 风铃上次自鸣时间戳
   spiritsCount: { key: 'kunlunSpirits', type: 'num' }, // 兼容键:灵蕴数量(addSpirit 同步写)
@@ -46,12 +47,14 @@ const SCHEMA = {
   skyviewTts: { key: 'skyviewTts', type: 'flag' },
   fireTts: { key: 'fireTts', type: 'flag' },
   letgoTts: { key: 'letgoTts', type: 'flag' },
+  wishTts: { key: 'kunlunWishTts', type: 'flag' }, // 首念 TTS 已播
   resetTts: { key: 'resetTts', type: 'flag' },
   snowTts: { key: 'snowTts', type: 'flag' },
   chimeTts: { key: 'chimeTts', type: 'flag' },
   arkFlew: { key: 'arkFlew', type: 'flag' }, // 飞舟首飞完成(之后登舟直接自由飞)
   arkFFSeen: { key: 'arkFFSeen', type: 'flag' }, // 自由飞教学已播
   prologueDone: { key: 'kunlunPrologueDone', type: 'flag' }, // 序章已播(首访判定)
+  gateEntered: { key: 'b612GateEntered', type: 'flag' }, // 入口闸门已进过(2026-09-05:进过即永不再见闸门)
   genderSelected: { key: 'genderSelected', type: 'flag' }, // 性别选择已完成
   gender: { key: 'gender', type: 'str' }, // 性别(male/female)
 };
