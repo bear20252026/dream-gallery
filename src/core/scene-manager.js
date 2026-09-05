@@ -100,6 +100,12 @@ export class SceneManager {
     ctx.scene.getActiveRoot = () => this.getWorld()?.root;
     ctx.scene.getActiveGround = (x, z) => this.getWorld()?.ground(x, z);
     ctx.scene.getActiveBounds = () => this.getWorld()?.bounds;
+    // 非主世界隐藏小地图(独立世界不需要主世界地图)
+    const mapWrap = document.getElementById('mapWrap') || document.getElementById('mapCanvas');
+    if (mapWrap) mapWrap.style.display = world.id === 'main' ? '' : 'none';
+    // 恢复/保存小地图的容器(可能是 canvas 或 div 包裹)
+    const mc = document.querySelector('#mapWrap,#mapCanvas,#miniMap');
+    if (mc) mc.style.display = world.id === 'main' ? '' : 'none';
   }
 
   capture() {

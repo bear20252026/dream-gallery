@@ -417,19 +417,21 @@ function buildIsland(cfg, idx) {
 PLANETS.forEach(buildIsland);
 
 // 独立世界故事资产:只挂到目标 scene,不进入主世界。
-loadWorldAsset('models/hall/b612-world/king-scene.glb', worldManager.getWorld('king325'), {
-  name: 'kingStoryScene',
-  maxSize: 30,
-  x: 0,
-  y: 0,
-  z: 0,
-});
+// B612:storybook 模型放在 (0,0,-15),玩家出生在 (0,2,12) 面朝它,距离 27m,模型宽 ~35m 填满视野
 loadWorldAsset('models/hall/b612-world/b612-storybook.glb', b612World, {
   name: 'b612Storybook',
-  maxSize: 20,
+  maxSize: 40,
   x: 0,
   y: 0,
-  z: 0,
+  z: -15,
+});
+// King:king-scene 模型放在 (0,0,-15),玩家出生在 (0,7,12) 面朝它
+loadWorldAsset('models/hall/b612-world/king-scene.glb', worldManager.getWorld('king325'), {
+  name: 'kingStoryScene',
+  maxSize: 40,
+  x: 0,
+  y: 0,
+  z: -15,
 });
 // B612 由 storybook GLB 原样呈现(小王子+绵羊+玫瑰+火山+星空全在模型内)
 // 终幕配乐:进入 B612 播放 GARGANTUA intro + main
@@ -658,19 +660,30 @@ function islandOfKey(key) {
 function travelTo(idx) {
   const isl = islands[idx];
   if (!isl || !worldManager) return;
-  const spawn = {
-    position: new THREE.Vector3(0, isl.topY + 1.6, 0),
-    yaw: 0,
-    pitch: 0,
-    vy: 0,
-    onGround: true,
-    gliding: false,
-  };
   // 新入口顺序:主世界石门 → B612 小王子之家;B612 内再进入对应星球世界。
   const targetWorld = ctx.scene.activeWorld === 'main' ? 'b612' : 'king' + isl.cfg.num;
+  // 每个世界有自己的出生坐标(独立坐标系,和主世界无关)
+  const spawn =
+    targetWorld === 'b612'
+      ? {
+          position: new THREE.Vector3(0, 2, 12),
+          yaw: 0,
+          pitch: 0,
+          vy: 0,
+          onGround: true,
+          gliding: false,
+        }
+      : {
+          position: new THREE.Vector3(0, 2, 12),
+          yaw: 0,
+          pitch: 0,
+          vy: 0,
+          onGround: true,
+          gliding: false,
+        };
   worldManager.enter(targetWorld, { snapshot: { camera: null, player: spawn } });
   if (ctx.ui.modeToast)
-    ctx.ui.modeToast(targetWorld === 'b612' ? 'B612 · 小王子的家' : isl.cfg.place);
+    ctx.ui.modeToast(targetWorld === 'b612' ? "B612 · The Little Prince's Home" : isl.cfg.place);
 }
 function backToGallery() {
   veilOff();
@@ -680,10 +693,26 @@ function pl() {
   return ctx.player.pl.p;
 }
 
+/* ===================== 太空人模式:独立世界内无重力+3D 自由移动 ===================== */
+const spaceKeys = {};
+window.addEventListener('keydown', (e) => {
+  spaceKeys[e.code] = true;
+});
+window.addEventListener('keyup', (e) => {
+  spaceKeys[e.code] = false;
+});
+window.addEventListener('blur', () => {
+  for (const k in spaceKeys) spaceKeys[k] = false;
+});
+bag.custom.push(() => {
+  window.removeEventListener('keydown', spaceKeys._kd || function () {});
+  window.removeEventListener('keyup', spaceKeys._ku || function () {});
+});
+
 /* ===================== 主循环 ===================== */
 let hudT = 0,
   lampT = 0;
-onTick(function () {
+onTick(function (dt) {
   const t = performance.now() * 0.001;
   // 星屑呼吸 + 点灯人路灯亮灭
   islands.forEach(function (isl, i) {
@@ -697,9 +726,102 @@ onTick(function () {
   });
   if (!ctx.player.pl) return;
   const p = pl();
+  const plRef = ctx.player.pl;
   const activeWorld = ctx.scene.activeWorld || 'main';
-  // ==== 主世界石台触发(主世界内始终显示按钮,不搞距离判定) ====
+
+  // ==== 太空人模式:非主世界时自由飞行,无重力,3D 全方向移动 ====
+  if (activeWorld !== 'main') {
+    const dt2 = Math.min(dt || 0.016, 0.05);
+    const speed = spaceKeys['ShiftLeft'] || spaceKeys['ShiftRight'] ? 22 : 9;
+    const yaw = plRef.y || 0;
+    const pitch = plRef.pi || 0;
+    // 相机方向 3D 向量
+    const fx = -Math.sin(yaw) * Math.cos(pitch);
+    const fy = Math.sin(pitch);
+    const fz = -Math.cos(yaw) * Math.cos(pitch);
+    const rx = Math.cos(yaw);
+    const rz = -Math.sin(yaw);
+    if (spaceKeys['KeyW']) {
+      p.x += fx * speed * dt2;
+      p.y += fy * speed * dt2;
+      p.z += fz * speed * dt2;
+    }
+    if (spaceKeys['KeyS']) {
+      p.x -= fx * speed * dt2;
+      p.y -= fy * speed * dt2;
+      p.z -= fz * speed * dt2;
+    }
+    if (spaceKeys['KeyA']) {
+      p.x -= rx * speed * dt2;
+      p.z -= rz * speed * dt2;
+    }
+    if (spaceKeys['KeyD']) {
+      p.x += rx * speed * dt2;
+      p.z += rz * speed * dt2;
+    }
+    if (spaceKeys['Space']) {
+      p.y += speed * dt2;
+    }
+    if (spaceKeys['ControlLeft'] || spaceKeys['KeyC']) {
+      p.y -= speed * dt2;
+    }
+    // 阻止重力:物理步不施加下落
+    plRef.vy = 0;
+    plRef.onGround = true;
+    plRef.gliding = false;
+    // 星屑呼吸 + 点灯人路灯
+    islands.forEach(function (isl, i) {
+      isl.mote.rotation.y += 0.01;
+      if (!isl.mote.visible) return;
+      if (i === 4) {
+        const on = Math.floor((performance.now() * 0.001) / 1.2) % 2 === 0;
+        isl.props.userData.lampHead.material.color.set(on ? 0xffe9b0 : 0x555044);
+      }
+    });
+    // 传送按钮(太空中也能用)
+    const nearB612Pad = Math.hypot(p.x, p.z) < 6;
+    mainBtn.style.display = nearB612Pad ? 'block' : 'none';
+    mainBtn.onclick = function () {
+      worldManager.toMainWorld();
+    };
+    if (/^king/.test(activeWorld)) {
+      showWorldTravel('← 返回 B612', function () {
+        worldManager.back();
+      });
+    } else if (activeWorld === 'b612') {
+      showWorldTravel('前往 325 国王星球 →', function () {
+        worldManager.enter('king325', {
+          snapshot: {
+            camera: null,
+            player: {
+              position: new THREE.Vector3(0, R * 0.42 + 1.6, 4),
+              yaw: 0,
+              pitch: 0,
+              vy: 0,
+              onGround: true,
+            },
+          },
+        });
+      });
+    }
+    hud.style.display = 'none';
+    pickBtn.style.display = 'none';
+    doorBtn.style.display = 'none';
+    return;
+  }
+
+  // ==== 主世界:靠近石门自动传送 + 远处显示按钮 ====
   if (activeWorld === 'main') {
+    const dgx = p.x - 0.1,
+      dgz = p.z - 56.0;
+    const nearGate = dgx * dgx + dgz * dgz < 16; // 4m 范围自动传送
+    if (nearGate) {
+      padBtn.style.display = 'none';
+      hud.style.display = 'none';
+      travelTo(0);
+      return;
+    }
+    // 不在门旁:显示按钮
     padBtn.style.display = 'block';
     hud.style.display = 'none';
     doorBtn.style.display = 'none';
