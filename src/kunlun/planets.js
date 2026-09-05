@@ -756,7 +756,7 @@ onTick(function () {
           snapshot: {
             camera: null,
             player: {
-              position: new THREE.Vector3(0, PLANETS[0].topY + 1.6, 4),
+              position: new THREE.Vector3(0, R * 0.42 + 1.6, 4),
               yaw: 0,
               pitch: 0,
               vy: 0,

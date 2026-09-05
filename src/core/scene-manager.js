@@ -42,6 +42,8 @@ export class SceneManager {
     this.worldStack = [];
     this.transitioning = false;
     this.registerWorld('main', { scene: mainScene, persistent: true });
+    // 后处理管线绑定的是主世界场景;非主世界时置空,让 LoopManager 回退到 rnd.render(activeScene)
+    this._mainPost = ctx.scene.renderPostProcessing || null;
     this.syncCtx();
   }
 
@@ -93,6 +95,8 @@ export class SceneManager {
     // ctx.scene.s 是既有主循环唯一渲染入口,换引用即可保持旧系统兼容。
     ctx.scene.s = world.scene;
     ctx.scene.activeWorld = world.id;
+    // 后处理跟随主世界;其他世界直接渲染,避免 postprocessing 把主场景画回来
+    ctx.scene.renderPostProcessing = world.id === 'main' ? this._mainPost : null;
     ctx.scene.getActiveRoot = () => this.getWorld()?.root;
     ctx.scene.getActiveGround = (x, z) => this.getWorld()?.ground(x, z);
     ctx.scene.getActiveBounds = () => this.getWorld()?.bounds;
@@ -155,12 +159,25 @@ export class SceneManager {
       eventBus.emit('world:changed', { from: source.id, to: target.id });
     };
     try {
+      let commitError = null;
       await new Promise((resolve) =>
         darkTeleport(() => {
-          commit().then(resolve).catch(resolve);
+          commit()
+            .then(resolve)
+            .catch((e) => {
+              commitError = e;
+              resolve();
+            });
         })
       );
       this.transitioning = false;
+      if (commitError) {
+        console.error('[scene-manager] world enter failed:', source.id, '→', id, commitError);
+        this.worldStack.pop();
+        this.activeWorld = source.id;
+        this.syncCtx();
+        return false;
+      }
       return true;
     } catch (e) {
       this.transitioning = false;

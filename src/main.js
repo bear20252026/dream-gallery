@@ -2,6 +2,7 @@
 expose('BUILD', '2026-07-28-r9'); // 部署序号(诊断+刷新产物哈希,绕开边缘节点缓存的 404)
 import { ctx } from './ctx.js';
 import './error-report.js'; // 客户端报错反馈(2026-08-30):尽早挂载才能捕获启动期错误
+import './shared/audio-guard.js'; // 全站 AudioParam 时间参数守卫,静默拦截 NaN(2026-09-05)
 
 import './ui/overlay.js'; // 弹层注册处(冷核心,必须最先 import:Esc 栈优先级靠监听器注册顺序)
 import './state/store.js'; // 存档登记处(冷核心,紧随 overlay:全站 localStorage 唯一入口 ctx.store)
