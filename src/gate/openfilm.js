@@ -440,7 +440,8 @@ export function playOpeningFilm(onDone) {
       o.frequency.value = 62;
       const g2 = AC.createGain();
       g2.gain.setValueAtTime(0.5, AC.currentTime);
-      g2.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.3);
+      if (Number.isFinite(AC.currentTime))
+        g2.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + 0.3);
       o.connect(g2).connect(AC.destination);
       o.start();
       o.stop(AC.currentTime + 0.32);

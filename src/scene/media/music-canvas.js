@@ -111,7 +111,8 @@ function startMusicNote(ux, uy) {
   f2.frequency.value = freq * 2;
   g2.gain.value = 0.15;
   g.gain.value = 0;
-  g.gain.linearRampToValueAtTime(vol, mxCtx.currentTime + 0.02);
+  if (Number.isFinite(mxCtx.currentTime))
+    g.gain.linearRampToValueAtTime(vol, mxCtx.currentTime + 0.02);
   osc.connect(g);
   f2.connect(g2);
   g2.connect(g);
@@ -137,7 +138,8 @@ function updateMusicNote(id, ux, uy) {
 function stopMusicNote(id) {
   const v = mxNotes.get(id);
   if (!v) return;
-  v.g.gain.linearRampToValueAtTime(0, mxCtx.currentTime + 0.3);
+  if (Number.isFinite(mxCtx.currentTime))
+    v.g.gain.linearRampToValueAtTime(0, mxCtx.currentTime + 0.3);
   setTimeout(() => {
     try {
       v.osc.stop();
