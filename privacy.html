@@ -3,110 +3,79 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>隐私保护指引 · 梦幻画廊</title>
+    <title>Privacy Guidelines · B612</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Satisfy&display=swap');
       body {
         margin: 0;
         min-height: 100vh;
-        background: linear-gradient(160deg, #16101e, #241226 55%, #101822);
-        color: #e8e0d8;
-        font-family: 'Microsoft YaHei', serif;
-        padding: 0 0 120px;
+        padding: 0 0 140px;
+        color: #3f3529;
+        font-family: Georgia, 'Times New Roman', 'Microsoft YaHei', serif;
+        background:
+          repeating-linear-gradient(63deg, rgba(90, 72, 50, 0.028) 0 1px, transparent 1px 9px),
+          repeating-linear-gradient(-57deg, rgba(90, 72, 50, 0.024) 0 1px, transparent 1px 11px),
+          radial-gradient(120% 90% at 50% 20%, #f8f1df 0%, #f3ead2 55%, #eadfc2 100%);
       }
-      .wrap {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 36px 22px 0;
+      .wrap { max-width: 760px; margin: 0 auto; padding: 40px 22px 0; }
+      .eyebrow {
+        text-align: center; letter-spacing: 0.62em; font-size: 13px;
+        color: #8a7a62; margin-bottom: 10px;
       }
-      h1 {
-        color: #ffd9c4;
-        font-size: 24px;
-        text-align: center;
-        letter-spacing: 6px;
-        margin: 12px 0 4px;
+      h1.brand {
+        text-align: center; font-weight: 400; font-size: clamp(52px, 9vw, 88px);
+        letter-spacing: 0.16em; color: #3f3529; line-height: 1.05; margin: 0;
       }
-      .sub {
-        text-align: center;
-        color: rgba(255, 217, 196, 0.55);
-        font-size: 12px;
-        letter-spacing: 3px;
-        margin-bottom: 26px;
+      .script {
+        font-family: 'Satisfy', cursive; text-align: center; color: #8a6a4a;
+        font-size: clamp(22px, 3.4vw, 32px); margin: 6px 0 10px;
       }
+      .meta {
+        text-align: center; color: rgba(84, 70, 58, 0.6); font-size: 12px;
+        letter-spacing: 0.12em; margin-bottom: 8px;
+      }
+      .ornline { width: 120px; height: 1px; background: rgba(90, 72, 50, 0.4); margin: 14px auto 6px; }
+      .part { text-align: center; margin: 46px 0 20px; }
+      .part .pt { font-family: 'Satisfy', cursive; font-size: clamp(28px, 4.4vw, 40px); color: #a04a35; }
+      .part .pl { width: 120px; height: 1px; background: rgba(160, 74, 53, 0.45); margin: 10px auto 0; }
       .sec {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 20px 22px;
-        margin-bottom: 16px;
+        background: rgba(253, 248, 236, 0.78);
+        border: 1px solid rgba(90, 72, 50, 0.18);
+        border-radius: 12px; padding: 18px 20px; margin-bottom: 14px;
       }
       .sec h2 {
-        color: #ffe2c4;
-        font-size: 16px;
-        margin: 0 0 10px;
-        letter-spacing: 2px;
+        color: #a04a35; font-size: 15px; margin: 0 0 10px;
+        letter-spacing: 0.14em; font-weight: 600;
       }
-      .sec h2::before {
-        content: '◆ ';
-        color: #c98a4b;
-        font-size: 13px;
-      }
-      .sec p,
-      .sec li {
-        font-size: 13px;
-        line-height: 2;
-        color: rgba(232, 224, 216, 0.88);
-      }
-      .sec ul {
-        margin: 6px 0;
-        padding-left: 20px;
-      }
+      .sec h2::before { content: '❧ '; color: #8a6a4a; font-size: 13px; }
+      .sec p, .sec li { font-size: 13.5px; line-height: 2; color: #54463a; }
+      .sec ul { margin: 6px 0; padding-left: 20px; }
       .k {
-        color: #ffd9a8;
-        background: rgba(255, 217, 168, 0.1);
-        padding: 1px 8px;
-        border-radius: 6px;
-        font-size: 12px;
+        color: #7a4a2a; background: rgba(160, 116, 74, 0.12);
+        padding: 1px 8px; border-radius: 6px; font-size: 12.5px;
+      }
+      .poem {
+        text-align: center; line-height: 2.2; color: #7a5c3e;
+        background: rgba(160, 116, 74, 0.07); border-radius: 12px;
+        padding: 14px 10px; margin-top: 8px;
       }
       #consentBar {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        display: none;
-        background: rgba(20, 10, 18, 0.97);
-        border-top: 1px solid rgba(255, 214, 170, 0.4);
-        padding: 16px 20px;
-        text-align: center;
-        z-index: 50;
+        position: fixed; left: 0; right: 0; bottom: 0; display: none;
+        background: rgba(248, 241, 223, 0.97);
+        border-top: 1px solid rgba(90, 72, 50, 0.4);
+        padding: 16px 20px; text-align: center; z-index: 50;
       }
-      #consentBar label {
-        font-size: 14px;
-        color: #ffe2c4;
-        cursor: pointer;
-      }
+      #consentBar label { font-size: 14px; color: #4e4237; cursor: pointer; }
       #consentBar input {
-        width: 18px;
-        height: 18px;
-        vertical-align: -3px;
-        margin-right: 8px;
-        accent-color: #c98a4b;
+        width: 18px; height: 18px; vertical-align: -3px; margin-right: 8px;
+        accent-color: #a04a35;
       }
       #okBtn {
-        margin-top: 10px;
-        width: 100%;
-        padding: 13px;
-        border: none;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #c98a4b, #8a5a2a);
-        color: #fff;
-        font-size: 15px;
-        letter-spacing: 3px;
-        cursor: pointer;
+        margin-top: 10px; width: 100%; padding: 13px; border: none; border-radius: 12px;
+        background: #a04a35; color: #f8f1df; font-size: 15px; letter-spacing: 3px;
+        cursor: pointer; font-family: inherit;
       }
-      #okBtn:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
-      }
+      #okBtn:disabled { opacity: 0.35; cursor: not-allowed; }
     </style>
     <script>
       // 防复制(2026-07-27 主人定):公开展示不可复制,只有后台能修改/复制;
@@ -130,16 +99,322 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>隐 私 保 护 指 引</h1>
-      <div class="sub">
-        梦幻画廊 · 昆仑灵鉴 · 更新日期:2026 年 9 月 5 日 · 生效日期:2026 年 9 月 5 日
+      <div class="eyebrow">T H E&#8194;D E S E R T</div>
+      <h1 class="brand">B612</h1>
+      <div class="script">Privacy Guidelines</div>
+      <div class="meta">
+        Updated &amp; Effective: September 6, 2026 · 更新与生效日期:2026 年 9 月 6 日
+      </div>
+      <div class="ornline"></div>
+
+      <!-- ================= PART I · ENGLISH ================= -->
+      <div class="part">
+        <div class="pt">English</div>
+        <div class="pl"></div>
+      </div>
+
+      <div class="sec">
+        <h2>Preamble</h2>
+        <p>
+          <b>Our mission is to keep every treasured memory gently stored.</b> B612 — a gallery for
+          unfinished drawings (the "Gallery") is published by China (Shanghai) Pilot Free Trade
+          Zone Dreamlight Digital Culture &amp; Technology Interactive Entertainment International
+          United Holding Group Co., Ltd. and operated together with its global teams. We take
+          personal information protection seriously and keep improving it.
+        </p>
+        <p>
+          <b>Please read and understand these Guidelines before using the Gallery.</b> You may
+          choose not to use the Gallery; continued use is deemed acceptance of these Guidelines.
+        </p>
+        <p>The Gallery follows the "minimum necessary" principle. Key points:</p>
+        <ul>
+          <li>We explain, per feature, what information is involved, why, and how;</li>
+          <li>Core experiences such as the quiz, entry gate and opening film run in your browser or are used only for the single purpose you triggered;</li>
+          <li>Some content you upload is stored on the platform solely for display, with access controlled by the Gallery's display rules;</li>
+          <li>You may correct your nickname, request deletion of uploaded content, clear local data, or stop using the Gallery at any time.</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>1. Information We Do NOT Collect</h2>
+        <p>The following are not necessary for the service and we undertake never to collect them:</p>
+        <p>
+          <b>1. Precise location.</b> No GPS, base-station or Wi-Fi list location data.
+        </p>
+        <p>
+          <b>2. Biometrics.</b> No face, voice-print, fingerprint or iris recognition is
+          implemented or enabled, and no such biometric features are collected.
+        </p>
+        <p>
+          <b>3. Device-unique identifiers.</b> We do not read IMEI, IMSI, device serial numbers,
+          MAC addresses, Android ID, OAID or IDFA; we do not read contacts, call logs, SMS,
+          calendars, photo albums or app lists.
+        </p>
+        <p>
+          <b>4. Behavioural profiling.</b> We do not profile your interests and do not provide
+          personalised advertising or recommendations.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>2. Information We Collect &amp; Store (Server-Side)</h2>
+        <p>
+          The following are stored on the platform's servers, each for the stated purpose only:
+        </p>
+        <p>
+          <b>1. Uploaded content.</b> Photos, videos and links you upload are stored so they can be
+          displayed on the gallery walls. Access is controlled by the Gallery's display rules
+          (demonstration content is public; your own uploads are access-controlled). Each item is
+          recorded with its uploader and timestamp. Deletion follows the "request + platform
+          handling" mechanism described in the Terms of Service.
+        </p>
+        <p>
+          <b>2. Chat and wish-wall messages.</b> Messages you send in the chat room (only the most
+          recent 100 per room are kept) and wishes you post on the wish wall are stored and
+          publicly visible, as these features are public by nature.
+        </p>
+        <p>
+          <b>3. Quiz submissions.</b> Your quiz session, chosen answers and score are submitted for
+          grading (rule-based or AI-assisted) and for your sky progress. They are used for grading
+          and progress only — not for profiling.
+        </p>
+        <p>
+          <b>4. Device identity (minimal).</b> To remember you between visits and merge identities
+          when you switch browsers, we compute a device key from your browser User-Agent and store
+          a random cookie (vid) in your browser; on entry you may also submit a client-side
+          display/timezone/canvas hash used only for identity merging. No IMEI/IMSI/GPS-type
+          identifiers are involved.
+        </p>
+        <p>
+          <b>5. Security &amp; abuse-prevention logs.</b> Time, IP address and User-Agent of
+          requests are recorded to prevent abuse (rate limits, upload attack prevention) and for
+          legal compliance. They are not used for behavioural profiling.
+        </p>
+        <p>
+          <b>6. Client error reports.</b> When a script error occurs, the error message is sent to
+          the platform to fix bugs; it may contain page state but is not used to identify you.
+        </p>
+        <p>
+          <b>7. Quota counters.</b> Per-device daily counters for AI captioning (20/day) and voice
+          synthesis (30/day) to prevent abuse.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>3. Information Processed Locally Only</h2>
+        <p>
+          The following are processed and stored only in your browser's local storage and never
+          synced to the server:
+        </p>
+        <ul>
+          <li>Your sky progress, star-mote and spirit-mote collection status;</li>
+          <li>Gallery preferences such as house coloring and view settings;</li>
+          <li>Your reading/consent marks for the Terms of Service and Privacy Guidelines;</li>
+          <li>Your nickname, until you choose to display it publicly in features you trigger.</li>
+        </ul>
+        <p>
+          Clearing browser data removes the above permanently; it does not affect the basic
+          availability of the Gallery.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>4. AI Services</h2>
+        <p>
+          AI (third-party large-model services, including but not limited to the Moonshot Kimi
+          family) is used for: quiz grading; automatic captioning of uploaded photos; and chat AI
+          replies. Uploaded photos may be transmitted to the AI service for caption generation;
+          they are used only for that generation, not for training other purposes by us. AI output
+          is for reference only. You may refuse AI features; refusal does not affect other
+          functions.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>5. Third-Party Basic Services</h2>
+        <p>For page quality, media speed and voice features, the Gallery uses:</p>
+        <ul>
+          <li><b>Cloudflare CDN &amp; R2 storage</b>: caching and nearby delivery of media files; not used to profile you;</li>
+          <li><b>Text-to-speech service</b>: converts fixed page texts to speech; carries no personal information about you;</li>
+          <li><b>AI large-model services</b>: as described in section 4.</li>
+        </ul>
+        <p>
+          Otherwise we do not share or transfer your information to third parties, and no ad
+          networks, analytics services or third-party social logins are integrated.
+        </p>
+        <p>
+          Under applicable laws and national standards, we may process relevant information without
+          prior consent where: necessary for concluding/performing a contract with you; necessary
+          for statutory duties or obligations; necessary for emergency response to protect life,
+          health or property; processing information you have made public or that is lawfully
+          public, within a reasonable scope; or other circumstances provided by law.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>6. Storage</h2>
+        <p>
+          <b>1. Scope &amp; purpose.</b> Server-side storage is limited to the items in section 2,
+          each stored only for the stated display/security purpose. No personal-information dossier
+          is otherwise built or maintained.
+        </p>
+        <p>
+          <b>2. Retention.</b> Information is kept no longer than necessary for the stated
+          purposes; upon your deletion request or withdrawal of consent we delete it within a
+          reasonable period. Where laws require longer retention (compliance, audit, disputes), we
+          keep it for that mandated period, then delete or anonymise it.
+        </p>
+        <p>
+          <b>3. Region.</b> Information collected and generated within mainland China is stored
+          within mainland China; no cross-border transfer is currently involved. If ever needed, we
+          will separately inform you (purpose, recipient, method, safeguards, risks) and obtain
+          your consent.
+        </p>
+        <p>
+          <b>4. Shutdown.</b> If the Gallery ceases operation, we will stop collection and delete
+          or anonymise held information within a reasonable period; anonymised data is no longer
+          personal information.
+        </p>
+        <p>
+          <b>5. Security.</b> We take all reasonable and feasible measures to protect information,
+          including access control, least privilege and tiered credential management; please
+          understand no measure guarantees absolute security.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>7. Cookies &amp; Similar Technologies</h2>
+        <p>
+          The Gallery uses cookies and browser local storage (localStorage/sessionStorage) on your
+          device to: remember your session state and nickname; save your preferences and progress;
+          and record your reading/consent status for the Terms of Service and Privacy Guidelines.
+        </p>
+        <p>
+          These technologies are strictly necessary for the above functions and carry no tracking
+          or advertising purpose. You may manage or clear cookies and site data in browser
+          settings; some preferences and progress will be unrecoverable, but basic Gallery
+          functions remain usable.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>8. Your Rights</h2>
+        <p>During your use of the Gallery you have the following rights:</p>
+        <ul>
+          <li><b>Access &amp; correction</b>: change your nickname anytime via the compass → settings; progress and preferences are stored in your browser and viewable anytime;</li>
+          <li><b>Deletion</b>: request deletion of your uploaded content via the wish wall or page contacts — handled within 15 working days after verification; local data can be cleared instantly via browser settings;</li>
+          <li><b>Withdrawal of consent</b>: stop using the Gallery at any time (deemed withdrawal); clearing browser site data restores the first-reading flow of the Terms and Guidelines;</li>
+          <li><b>Complaints &amp; suggestions</b>: submit via the contacts below; we verify necessary information and answer within 15 working days.</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>9. Protection of Minors</h2>
+        <p>
+          Minors under 18 should use the Gallery accompanied and guided by a guardian, and obtain
+          guardian consent before uploading any content or filling any nickname. We protect
+          minors' personal information per national laws, processing minors' information only where
+          permitted by law, with explicit guardian consent, or as necessary to protect minors'
+          rights. <b>If we discover that a minor's information was collected without verifiable
+          guardian consent, we will delete it promptly.</b>
+        </p>
+        <p><b>We encourage</b> every minor visitor and guardian to read and practise the National Youth Internet Civilization Convention:</p>
+        <p class="poem">
+          强国使命心头记，时代新人笃于行。<br />向上向善共营造，上网用网要文明。<br />善恶美丑知明辨，诚信友好永传承。<br />传播中国好故事，抒写青春爱国情。<br />个人信息防泄露，谣言蜚语莫轻听。<br />适度上网防沉迷，饭圈乱象请绕行。<br />远离污秽不炫富，谨防诈骗常提醒。<br />与人为善拒网暴，守好底线不欺凌。<br />线上新知勤学习，数字素养常提升。<br />网络安全靠你我，共筑清朗好环境。
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>10. How These Guidelines Update</h2>
+        <p>
+          We may update these Guidelines as the product/service and legal requirements evolve.
+          <b>Without your explicit consent we will not reduce the rights you enjoy under the
+          currently effective version.</b> After an update we will prompt you prominently on the
+          page; continued use after publication is deemed reading, understanding and acceptance of
+          the updated version.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>11. Contact Us</h2>
+        <p>For questions, complaints or suggestions about privacy:</p>
+        <p>
+          1. Leave a message on the wish wall (一念之墙) inside the Gallery;<br />
+          2. Email legal@dreamlight.com.hk;<br />
+          3. Write to: Legal Department, 38/F, Tower 2, Huiya Tower, 1233 Lujiazui Ring Road,
+          China (Shanghai) Pilot Free Trade Zone; or Global HQ (Hong Kong): Suites 5601-5605, 56/F,
+          The Center, 99 Queen's Road Central.
+        </p>
+        <p>
+          We will verify necessary information and process requests within 15 working days or the
+          legally mandated period. We may be unable to respond where: required by legal
+          obligations; directly related to national/defence security, public security, public
+          health or major public interests, or criminal investigation/prosecution/trial; there is
+          sufficient evidence of bad faith or abuse of rights; responding would seriously harm the
+          lawful rights of you or others; trade secrets are involved.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>12. Dispute Resolution</h2>
+        <p>
+          These Guidelines are governed by the laws of mainland China (excluding HK/Macau/Taiwan).
+          Disputes arising from these Guidelines or our processing of personal information shall
+          first be resolved through friendly consultation; failing that, either party may submit
+          the dispute to the Shenzhen Nanshan District People's Court for first-instance
+          litigation. If you believe our processing of personal information has harmed your lawful
+          rights, you may also report to the relevant government departments. Section headings are
+          for convenience only and do not affect the meaning or interpretation of any provision.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>13. Glossary</h2>
+        <p>
+          <b>Personal information</b>: various information recorded electronically or otherwise
+          relating to an identified or identifiable natural person, excluding anonymised
+          information.
+        </p>
+        <p>
+          <b>Sensitive personal information</b>: information whose leakage or unlawful use could
+          easily harm a person's dignity or personal/property safety, including biometrics,
+          religious beliefs, specific identity, medical health, financial accounts, location
+          tracks, and personal information of minors under 14.
+        </p>
+        <p>
+          <b>Device information</b>: usually includes device brand/model, OS type and version,
+          language, resolution, network access type, IP address, browser type and settings, UA,
+          etc. (the Gallery only uses the browser UA from these).
+        </p>
+        <p>
+          <b>SSL</b>: a security protocol above transport communication protocols achieving
+          confidential transmission via public-key and symmetric-key technologies.
+        </p>
+        <p>
+          <b>Cookies &amp; similar technologies</b>: small files containing strings and other
+          technologies achieving similar purposes, stored on your device to remember your state
+          and preferences.
+        </p>
+        <p>
+          <b>Anonymisation</b>: technical processing of personal information such that the subject
+          cannot be identified or associated and the result cannot be restored.
+        </p>
+        <p>
+          <b>De-identification</b>: technical processing of personal information such that it
+          cannot identify or be associated with a subject without additional information.
+        </p>
+      </div>
+
+      <!-- ================= PART II · 简体中文 ================= -->
+      <div class="part">
+        <div class="pt">简体中文</div>
+        <div class="pl"></div>
       </div>
 
       <div class="sec">
         <h2>前言</h2>
         <p>
-          <b>我们的使命,是让每一段被珍藏的回忆都被温柔安放。</b
-          >我们相信,凡人眼中的光,值得被一座山记住。《梦幻画廊·昆仑灵鉴》(以下简称"本画廊")由中国(上海)自由贸易试验区梦幻绮光数字文化科技互动娱乐国际联合控股集团股份有限公司发行,联合全球开发及运营团队共同运营。我们深知个人信息保护的重要性,将一如既往地重视并持续改进您的隐私保护体验。
+          <b>我们的使命,是让每一段被珍藏的回忆都被温柔安放。</b>《B612——一场为未完成画作而设的画廊》(以下简称"本画廊")由中国(上海)自由贸易试验区梦幻绮光数字文化科技互动娱乐国际联合控股集团股份有限公司发行,联合全球开发及运营团队共同运营。我们深知个人信息保护的重要性,将一如既往地重视并持续改进您的隐私保护体验。
         </p>
         <p>
           <b>我们提醒您:在使用本画廊前,请您务必仔细阅读并透彻理解本指引。</b
@@ -147,83 +422,123 @@
         </p>
         <p>本画廊在信息处理活动中遵循"最小必要"原则。本指引要点如下:</p>
         <ul>
-          <li>
-            我们将按功能场景逐一说明相关信息的处理范围与方式,以便您了解针对某一特定功能所涉及的信息种类、处理目的及处理方式;
-          </li>
-          <li>答题、浏览、凝视等核心体验均在您的设备本地即时完成,不形成持续性记录档案;</li>
-          <li>您上传的任何内容,均请您在设备本地进行处理,本画廊平台不予存储;</li>
-          <li>
-            您可以通过本指引所列途径更正雅号、申请删除上传内容、清除本机数据,或停止使用本画廊服务。
-          </li>
+          <li>我们将按功能场景逐一说明相关信息的处理范围与方式;</li>
+          <li>答题、入口闸门、开幕电影等核心环节均在您的浏览器内完成,或仅为您触发的当次目的所使用;</li>
+          <li>您上传的部分内容会为"展示"之目的存储于平台,其可见性由画廊展示规则控制;</li>
+          <li>您可以通过本指引所列途径更正雅号、申请删除上传内容、清除本机数据,或停止使用本画廊服务。</li>
         </ul>
-        <p>
-          请您注意:本指引所描述的处理方式,可能因您使用的设备型号、操作系统版本、浏览器版本等因素存在差异。您继续使用本画廊的行为,即视为您已阅读并理解本指引的全部内容。
-        </p>
       </div>
 
       <div class="sec">
         <h2>一、我们不收集的信息</h2>
         <p>经审慎评估,以下信息不属于本画廊服务所必需,本画廊承诺一律不予收集:</p>
+        <p><b>1. 精准地理位置。</b>不获取 GPS、基站、Wi-Fi 列表等精准位置数据。</p>
         <p>
-          <b>1. 答题记录。</b
-          >心象共鸣(《补天残卷》十问)的题目、选项及作答文本,仅限在您的浏览器本地查看、即时评定,评定完成后即行销毁。本画廊不会将您的答卷上传至服务器留存,亦不会将其用于任何形式的评估、画像或分析。
-        </p>
-        <p>
-          <b>2. 设备隐私标识。</b>本画廊不获取 IMEI、IMSI、设备序列号、MAC 地址、Android
-          ID、OAID、IDFA 等可用于唯一识别您设备的标识符;不获取精准地理位置信息(包括 GPS、基站、Wi-Fi
-          列表);不读取通讯录、通话记录、短信、日历、相册目录及应用程序列表。
-        </p>
-        <p>
-          <b>3. 生物识别信息。</b
+          <b>2. 生物识别信息。</b
           >本画廊未设置亦不会启用人脸、声纹、指纹、虹膜等任何生物识别功能,不收集相关生物特征信息。
         </p>
         <p>
+          <b>3. 设备唯一标识。</b
+          >本画廊不读取 IMEI、IMSI、设备序列号、MAC 地址、Android ID、OAID、IDFA
+          等可用于唯一识别设备的标识符;不读取通讯录、通话记录、短信、日历、相册目录及应用程序列表。
+        </p>
+        <p>
           <b>4. 行为画像数据。</b
-          >本画廊不统计您的点击行为、不追踪您的游览路径、不分析您的兴趣偏好,亦不向您提供个性化推荐服务。
+          >本画廊不分析您的兴趣偏好,不提供个性化广告或推荐服务。
         </p>
       </div>
 
       <div class="sec">
-        <h2>二、仅在本地处理的少量信息</h2>
-        <p>
-          下列信息仅在<span class="k">您的设备本地</span
-          >由您的浏览器进行处理,请您知悉其处理范围与存储期限:
-        </p>
+        <h2>二、我们会收集并存储的信息(服务端)</h2>
+        <p>下列信息存储于本平台服务器,各自仅用于所述目的:</p>
         <p>
           <b>1. 您上传的内容。</b
-          >您在画廊建筑内上传的图片、视频及其他文件,<b>仅在您的设备本地查看与处理,不进入本平台服务器</b>;仅当您使用户外白板并主动保存作品时,该部分白板内容将在白板展示墙上公开展示,并由本平台予以存储。请您注意:请仅上传您依法有权分享、且适宜公开呈现的内容。
+          >您上传的照片、视频与链接,为实现画廊上墙展示而存储,并按画廊展示规则进行可见性控制(演示内容公开展示;您本人上传的内容按门禁与展示规则管理)。每件内容记录上传者与时间。删除按《用户协议》所述"申请+平台处理"机制执行。
         </p>
         <p>
-          <b>2. 游览偏好与进度信息。</b
-          >您的天穹进度、六灵蕴收集状态、展厅配色、雅号前缀等个性化设置,均保存于您本机的浏览器存储中,不会同步至服务器或其他设备。更换设备或清除浏览器数据后,上述信息将不可恢复。
+          <b>2. 聊天与一念之墙。</b
+          >您在聊天室发送的消息(每房间仅保留最近 100 条)与在一念之墙发布的心愿会被存储并公开展示——这是上述功能公开属性所决定的。
         </p>
         <p>
-          <b>3. 雅号。</b
-          >雅号系您主动填写、用于在本画廊中标识称呼的信息。您可以随时对其进行修改或停用。
+          <b>3. 答题提交。</b
+          >您的答题会话、所选答案与得分会提交用于判卷(规则或 AI 辅助)与天穹进度记录,仅用于判卷与进度,不用于画像。
         </p>
         <p>
-          <b>4. 回声壁发言。</b>您在昆仑回声壁中主动发布的文字内容,仅保留最近 100
-          条,超出部分将被系统自动移除且不可恢复。
+          <b>4. 设备身份(最小化)。</b
+          >为在您下次访问时记得您、以及在您更换浏览器时合并身份,我们以浏览器 User-Agent
+          计算设备键,并在您的浏览器存放随机 Cookie(vid);进入时您还可以选择提交一段
+          屏幕分辨率/时区/画布哈希,仅用于身份合并。不涉及 IMEI/IMSI/GPS 类标识符。
+        </p>
+        <p>
+          <b>5. 安全与防滥用日志。</b
+          >请求的时间、IP 地址与 User-Agent
+          会被记录,用于防滥用(频次限制、上传攻击防护)与法律法规合规,不用于行为画像。
+        </p>
+        <p>
+          <b>6. 客户端错误上报。</b
+          >脚本出错时,错误信息会发送至平台以修复缺陷,其中可能包含页面状态,但不用于识别您。
+        </p>
+        <p>
+          <b>7. 配额计数。</b
+          >AI 看图配文(每设备每日 20 次)与语音合成(每设备每日 30 次)的按日计数,用于防滥用。
         </p>
       </div>
 
       <div class="sec">
-        <h2>三、信息的存储</h2>
+        <h2>三、仅在本地处理的信息</h2>
+        <p>下列信息仅在您的浏览器本地存储与处理,不会同步至服务器:</p>
+        <ul>
+          <li>您的天穹进度、星屑与灵蕴收集状态;</li>
+          <li>房屋换色、视角等画廊偏好设置;</li>
+          <li>您对《用户协议》《隐私保护指引》的阅读/同意标记;</li>
+          <li>您的雅号——直到您在主动触发的功能中选择公开显示。</li>
+        </ul>
+        <p>清除浏览器数据将永久移除上述信息,但不影响本画廊基本功能的可用性。</p>
+      </div>
+
+      <div class="sec">
+        <h2>四、人工智能服务</h2>
+        <p>
+          AI(第三方大模型服务,包括但不限于月之暗面 Kimi
+          系列)用于:答题判卷;您上传照片的自动配文;聊天室 AI
+          回帖。您上传的照片可能被传输至 AI 服务以生成配文;仅用于当次生成,不被我们用于其他目的。AI
+          输出仅供参考。您有权拒绝使用 AI 功能;拒绝不影响其他功能。
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>五、第三方基础服务</h2>
+        <p>为保障页面访问质量、媒体加载速度及语音等功能,本画廊使用:</p>
+        <ul>
+          <li><b>Cloudflare CDN 与 R2 存储</b>:媒体文件的缓存与就近传输,不用于对您画像;</li>
+          <li><b>语音合成服务</b>:将页面固定文案转换为语音,不夹带与您相关的个人信息;</li>
+          <li><b>AI 大模型服务</b>:见第四节。</li>
+        </ul>
+        <p>
+          除上述情形外,本画廊不会向任何第三方主动共享、转让您的信息,亦未接入广告联盟、数据分析服务及第三方社交登录服务。
+        </p>
+        <p>
+          依据相关法律法规及国家标准,在下列情形中,我们可能会在不事先征得您授权同意的情况下处理相关信息:为订立、履行您作为一方当事人的合同所必需;为履行法定职责或者法定义务所必需;为应对突发公共卫生事件或紧急情况所必需;在合理范围内处理您自行公开或其他已经合法公开的信息;法律、行政法规规定的其他情形。
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>六、信息的存储</h2>
         <p>
           <b>1. 存储范围与目的。</b
-          >本平台仅存储您通过户外白板主动保存并公开展示的作品内容,存储目的在于实现白板展示墙的公开展示功能。除此之外,本画廊不以任何形式建立或维护您的个人信息档案。
+          >服务端存储仅限第二节所列内容,各自仅为所述展示/安全目的保存;除此之外不以任何形式建立或维护您的个人信息档案。
         </p>
         <p>
           <b>2. 存储期限。</b
-          >我们在为实现本指引所述目的所必需且最短的期间内保留上述信息;当您申请删除或撤回同意时,我们将在合理期限内予以删除。相关法律法规对保存期限另有要求的(如合规、审计、争议解决之必要),我们按其规定的必要期限保存。超出上述期限后,我们会对相关信息进行删除或匿名化处理,法律法规另有规定的除外。
+          >我们在实现所述目的所必需且最短的期间内保留信息;当您申请删除或撤回同意时,我们将在合理期限内予以删除。法律法规对保存期限另有要求的(如合规、审计、争议解决),按其规定的必要期限保存,期满后删除或匿名化。
         </p>
         <p>
           <b>3. 存储地域。</b
-          >我们依照法律法规的规定,仅将在中华人民共和国境内收集和产生的信息存储于中华人民共和国境内,不涉及跨境传输;如未来确需跨境传输的,我们将单独向您明确告知(包括出境的目的、接收方、使用方式与范围、安全保障措施、安全风险等),征得您的授权同意,并确保接收方具备充足的个人信息保护能力。
+          >在中华人民共和国境内收集和产生的信息仅存储于境内,不涉及跨境传输;如未来确需跨境传输,我们将单独向您明确告知并征得授权同意。
         </p>
         <p>
           <b>4. 停止运营时的处理。</b
-          >如本画廊停止运营服务,我们将及时停止收集行为,并在合理期限内对持有的上述信息进行删除或匿名化处理;经匿名化处理的数据不再属于个人信息范畴。
+          >如本画廊停止运营,我们将及时停止收集,并在合理期限内对持有的信息进行删除或匿名化处理;经匿名化处理的数据不再属于个人信息范畴。
         </p>
         <p>
           <b>5. 安全保护。</b
@@ -232,72 +547,28 @@
       </div>
 
       <div class="sec">
-        <h2>四、第三方基础服务</h2>
-        <p>
-          为保障页面访问质量、媒体加载速度及语音合成等基础功能的实现,本画廊使用下列第三方提供的技术型基础服务:
-        </p>
-        <ul>
-          <li>
-            <b>内容分发网络(Cloudflare)</b
-            >:仅承担媒体文件的缓存与就近传输,不涉及对您个人信息的收集、存储或画像;
-          </li>
-          <li>
-            <b>语音合成服务</b
-            >:仅将页面固定文案转换为语音输出,处理过程中不夹带任何与您相关的个人信息。
-          </li>
-        </ul>
-        <p>
-          除上述情形外,本画廊不会向任何第三方主动共享、转让您的信息,亦未接入广告联盟、数据分析服务及第三方社交登录服务。
-        </p>
-        <p>
-          依据相关法律法规及国家标准,在下列情形中,我们可能会在不事先征得您授权同意的情况下处理相关信息:
-        </p>
-        <ul>
-          <li>为订立、履行您作为一方当事人的合同所必需;</li>
-          <li>为履行法定职责或者法定义务所必需;</li>
-          <li>为应对突发公共卫生事件,或者紧急情况下为保护自然人的生命健康和财产安全所必需;</li>
-          <li>
-            依照《中华人民共和国个人信息保护法》规定,在合理范围内处理您自行公开或者其他已经合法公开的信息;
-          </li>
-          <li>法律、行政法规规定的其他情形。</li>
-        </ul>
-      </div>
-
-      <div class="sec">
-        <h2>五、信息安全</h2>
-        <p>
-          您的信息安全对我们至关重要。我们将严格遵守相关法律法规,采取业内认可的合理可行措施,防止信息遭到未经授权的访问、披露、使用、修改、损坏或丢失,包括但不限于:使用加密传输(SSL)保护传输过程;建立访问控制机制,确保仅授权人员可访问相关系统;对服务端访问实行最小授权与凭证分级管控,敏感配置信息仅保存于受控环境,不向任何访客公开。
-        </p>
-        <p>
-          我们制定了安全事故预警机制与应急预案。一旦发生信息安全事件,我们将按照法律法规的要求及时向您告知:事件的基本情况和可能的影响、我们已采取或将要采取的处置措施、您可自主防范和降低风险的建议,以及我们对您的补救措施,并立即启动应急预案,力求将损失最小化。
-        </p>
-        <p>
-          安全提示:尽管已采取上述合理有效措施,请您理解,由于技术的限制以及可能存在的各种恶意手段,我们无法保证信息百分之百的安全。也请您采取积极措施保护本机数据安全,包括但不限于不将您的设备借予不可信的人、定期清理浏览器站点数据。
-        </p>
-      </div>
-
-      <div class="sec">
-        <h2>五之二、Cookie 及同类技术</h2>
+        <h2>七、Cookie 及同类技术</h2>
         <p>
           为保障您的正常使用,本画廊会在您的设备上使用 Cookie
           与浏览器本地存储(localStorage/sessionStorage),用于:记住您的通行状态与雅号、保存您的游览偏好与进度、记录您对《用户协议》《隐私保护指引》的阅读状态。
         </p>
         <p>
-          上述技术仅实现前述功能所必需,不含任何追踪或广告用途。您可以通过浏览器设置管理或清除 Cookie
-          与站点数据;清除后,您的部分偏好与进度将不可恢复,但不影响您继续使用本画廊的基本功能。
+          上述技术仅实现前述功能所必需,不含任何追踪或广告用途。您可以通过浏览器设置管理或清除
+          Cookie 与站点数据;清除后,您的部分偏好与进度将不可恢复,但不影响您继续使用本画廊的基本功能。
         </p>
       </div>
 
       <div class="sec">
-        <h2>六、您的权利</h2>
-        <p>依照相关法律法规,您在使用本画廊服务期间享有如下权利,各项权利的行使方式如下:</p>
+        <h2>八、您的权利</h2>
+        <p>依照相关法律法规,您在使用本画廊服务期间享有如下权利:</p>
         <ul>
           <li>
             <b>查询与更正</b
             >:雅号可随时在「昆仑罗盘→设置」中修改;您的进度与偏好信息保存于您的浏览器中,可随时查阅;
           </li>
           <li>
-            <b>删除</b>:您上传的内容,可通过「昆仑回声壁」留言申请删除,我们将在核实后 15
+            <b>删除</b
+            >:您上传的内容,可通过一念之墙或页面联系方式留言申请删除,我们将在核实后 15
             个工作日内处理完毕;您本机存储的数据可通过清除浏览器站点数据即时删除;
           </li>
           <li>
@@ -312,73 +583,51 @@
       </div>
 
       <div class="sec">
-        <h2>七、未成年人保护</h2>
+        <h2>九、未成年人保护</h2>
         <p>
           若您是未满 18
-          周岁的未成年人,请在监护人的陪同与指导下使用本画廊,并在上传任何内容、填写任何称呼前征得监护人的同意。我们根据国家相关法律法规的规定保护未成年人的个人信息,只会在法律法规允许、监护人明确同意或保护未成年人权益所必要的情况下,处理未成年人的相关信息。若您是未成年人的监护人,当您对所监护的未成年人在本画廊中的行为存在疑问时,请通过本指引所载方式与我们联系;<b
+          周岁的未成年人,请在监护人的陪同与指导下使用本画廊,并在上传任何内容、填写任何称呼前征得监护人的同意。我们根据国家相关法律法规的规定保护未成年人的个人信息,只会在法律法规允许、监护人明确同意或保护未成年人权益所必要的情况下,处理未成年人的相关信息。<b
             >如果我们发现在未事先获得可证实的监护人同意的情况下收集了未成年人的相关信息,我们将尽快删除相关数据。</b
           >
         </p>
         <p><b>我们倡导</b>每一位未成年访客与监护人共同熟读并践行《新时代青少年网络文明公约》:</p>
-        <p
-          style="
-            text-align: center;
-            line-height: 2.2;
-            color: #ffd9a8;
-            background: rgba(255, 217, 168, 0.06);
-            border-radius: 12px;
-            padding: 14px 10px;
-            margin-top: 8px;
-          "
-        >
+        <p class="poem">
           强国使命心头记，时代新人笃于行。<br />向上向善共营造，上网用网要文明。<br />善恶美丑知明辨，诚信友好永传承。<br />传播中国好故事，抒写青春爱国情。<br />个人信息防泄露，谣言蜚语莫轻听。<br />适度上网防沉迷，饭圈乱象请绕行。<br />远离污秽不炫富，谨防诈骗常提醒。<br />与人为善拒网暴，守好底线不欺凌。<br />线上新知勤学习，数字素养常提升。<br />网络安全靠你我，共筑清朗好环境。
         </p>
       </div>
 
       <div class="sec">
-        <h2>八、本指引如何更新</h2>
+        <h2>十、本指引如何更新</h2>
         <p>
-          我们会根据产品/服务的更新情况及法律法规的相关要求,适时更新本指引的条款。<b>未经您明确同意,我们不会削减您按照当前生效指引所享有的权利。</b>本指引更新后,我们将在页面显著位置提示或以其他合理方式提醒您,以便您及时了解本指引的最新版本;公示后继续使用的,视为您已阅读、理解并接受更新后的指引。
+          我们会根据产品/服务的更新情况及法律法规的相关要求,适时更新本指引的条款。<b>未经您明确同意,我们不会削减您按照当前生效指引所享有的权利。</b
+          >本指引更新后,我们将在页面显著位置提示或以其他合理方式提醒您;公示后继续使用的,视为您已阅读、理解并接受更新后的指引。
         </p>
       </div>
 
       <div class="sec">
-        <h2>九、联系我们</h2>
+        <h2>十一、联系我们</h2>
+        <p>如您对本指引或个人信息保护相关事宜有任何疑问、投诉、建议,您可以通过如下方式与我们联系:</p>
         <p>
-          如您对本指引或个人信息保护相关事宜有任何疑问、投诉、建议,您可以通过如下方式与我们联系:
-        </p>
-        <p>
-          1. 通过画廊内的「昆仑回声壁」在线留言反馈;<br />
-          2. 发送邮件至法务/合规邮箱
-          <span class="k">legal@dreamlight.com.hk</span>(梅向荣先生团队直通);<br />
+          1. 通过画廊内的「一念之墙」在线留言反馈;<br />
+          2. 发送邮件至法务/合规邮箱 <span class="k">legal@dreamlight.com.hk</span>;<br />
           3. 写信至:中国(上海)自由贸易试验区陆家嘴环路1233号汇亚大厦T2栋38楼
           法务部(收);或全球总部(香港):中国香港特别行政区中环皇后大道中99号中环中心56楼5601-5605室。
         </p>
         <p>
           我们将在核实必要信息后尽快审核所涉请求,并在 15
-          个工作日或法律法规规定的期限内完成处理。此外,在与个人信息有关的如下情形下,我们将无法回复您的请求:
+          个工作日或法律法规规定的期限内完成处理。此外,在与个人信息有关的如下情形下,我们将无法回复您的请求:与履行法律法规义务相关的;与国家安全、国防安全直接有关的;与公共安全、公共卫生、重大公共利益直接相关的;与刑事侦查、起诉、审判和执行判决等直接相关的;有充分证据表明您存在主观恶意或滥用权利的;出于维护重大合法权益但又很难得到本人授权同意的;响应请求将导致他人合法权益受到严重损害的;涉及商业秘密的。
         </p>
-        <ul>
-          <li>与我们履行法律法规规定的义务相关的;</li>
-          <li>与国家安全、国防安全直接有关的;</li>
-          <li>与公共安全、公共卫生、重大公共利益直接相关的;</li>
-          <li>与刑事侦查、起诉、审判和执行判决等直接相关的;</li>
-          <li>有充分证据表明您存在主观恶意或滥用权利的;</li>
-          <li>出于维护您或其他个人的生命、财产等重大合法权益但又很难得到本人授权同意的;</li>
-          <li>响应您的请求将导致您或其他个人、组织的合法权益受到严重损害的;</li>
-          <li>涉及商业秘密的。</li>
-        </ul>
       </div>
 
       <div class="sec">
-        <h2>十、争议解决</h2>
+        <h2>十二、争议解决</h2>
         <p>
           本指引的解释及争议解决均适用中华人民共和国境内(不含港澳台)地区法律。任何因本指引以及我们处理个人信息事宜引起的争议,双方应尽量友好协商解决;协商不成的,任何一方均有权将争议提交至深圳市南山区人民法院进行一审诉讼。如果您认为我们处理个人信息的行为损害了您的合法权益,您也可以选择向有关政府部门反映。本指引的章节标题仅为方便阅读而设,不影响正文任何规定的含义或解释。
         </p>
       </div>
 
       <div class="sec">
-        <h2>十一、名词解释</h2>
+        <h2>十三、名词解释</h2>
         <p>
           <b>个人信息</b
           >:以电子或者其他方式记录的与已识别或者可识别的自然人有关的各种信息,不包括匿名化处理后的信息。
@@ -417,24 +666,26 @@
       <button
         id="exitBtn"
         style="
-          margin-left: 12px;
-          padding: 8px 16px;
-          border-radius: 6px;
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          background: rgba(60, 40, 20, 0.6);
-          color: #ffe9c4;
+          margin-top: 10px;
+          width: 100%;
+          padding: 10px;
+          border: 1px solid rgba(90, 72, 50, 0.4);
+          border-radius: 12px;
+          background: none;
+          color: #5a4c3a;
           font-size: 13px;
+          letter-spacing: 2px;
           cursor: pointer;
           font-family: inherit;
         "
       >
-        暂不阅读，返回
+        暂不阅读,返回
       </button>
     </div>
 
     <script>
-      // 自动慢速滚动播放(与说明书同规;用户手动滚动/点击即转为手动)
-      var autoScroll = true;
+      // 自动慢速滚动(仅 ?autoscroll 时启用;用户手动滚动/点击即转为手动)
+      var autoScroll = /[?&]autoscroll/.test(location.search);
       function stopAuto() {
         autoScroll = false;
       }
@@ -449,9 +700,6 @@
         if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2)
           clearInterval(_st);
       }, 50);
-      function reachedBottom() {
-        return window.innerHeight + window.scrollY >= document.body.scrollHeight - 140;
-      }
 
       (function () {
         var consent =
@@ -462,7 +710,6 @@
           exitBtn = document.getElementById('exitBtn');
         if (!consent) return;
         bar.style.display = 'block';
-        // 2026-07-31:取消强制阅读,勾选即可继续(不冻时间、不锁面板)
         function enterGallery() {
           sessionStorage.setItem('privacyConsented', '1');
           location.href = 'community.html?consent=1';
@@ -476,7 +723,6 @@
           if (!ck.checked) return;
           enterGallery();
         };
-        // 退出按钮:返回主页(不阻拦)
         exitBtn.onclick = function () {
           if (window.parent && window.parent.setPanelLock) window.parent.setPanelLock(false);
           window.history.back();

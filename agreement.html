@@ -3,130 +3,89 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>用户协议 · 梦幻画廊</title>
+    <title>Terms of Service · B612</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Satisfy&display=swap');
       body {
         margin: 0;
         min-height: 100vh;
-        background: linear-gradient(160deg, #16101e, #241226 55%, #101822);
-        color: #e8e0d8;
-        font-family: 'Microsoft YaHei', serif;
-        padding: 0 0 120px;
+        padding: 0 0 140px;
+        color: #3f3529;
+        font-family: Georgia, 'Times New Roman', 'Microsoft YaHei', serif;
+        background:
+          repeating-linear-gradient(63deg, rgba(90, 72, 50, 0.028) 0 1px, transparent 1px 9px),
+          repeating-linear-gradient(-57deg, rgba(90, 72, 50, 0.024) 0 1px, transparent 1px 11px),
+          radial-gradient(120% 90% at 50% 20%, #f8f1df 0%, #f3ead2 55%, #eadfc2 100%);
       }
-      .wrap {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 36px 22px 0;
+      .wrap { max-width: 760px; margin: 0 auto; padding: 40px 22px 0; }
+      .eyebrow {
+        text-align: center; letter-spacing: 0.62em; font-size: 13px;
+        color: #8a7a62; margin-bottom: 10px;
       }
-      h1 {
-        color: #ffd9c4;
-        font-size: 24px;
-        text-align: center;
-        letter-spacing: 6px;
-        margin: 12px 0 4px;
+      h1.brand {
+        text-align: center; font-weight: 400; font-size: clamp(52px, 9vw, 88px);
+        letter-spacing: 0.16em; color: #3f3529; line-height: 1.05; margin: 0;
       }
-      .sub {
-        text-align: center;
-        color: rgba(255, 217, 196, 0.55);
-        font-size: 12px;
-        letter-spacing: 3px;
-        margin-bottom: 26px;
+      .script {
+        font-family: 'Satisfy', cursive; text-align: center; color: #8a6a4a;
+        font-size: clamp(22px, 3.4vw, 32px); margin: 6px 0 10px;
+      }
+      .meta {
+        text-align: center; color: rgba(84, 70, 58, 0.6); font-size: 12px;
+        letter-spacing: 0.12em; margin-bottom: 8px;
+      }
+      .ornline {
+        width: 120px; height: 1px; background: rgba(90, 72, 50, 0.4);
+        margin: 14px auto 6px;
+      }
+      .part {
+        text-align: center; margin: 46px 0 20px;
+      }
+      .part .pt {
+        font-family: 'Satisfy', cursive; font-size: clamp(28px, 4.4vw, 40px); color: #a04a35;
+      }
+      .part .pl {
+        width: 120px; height: 1px; background: rgba(160, 74, 53, 0.45); margin: 10px auto 0;
       }
       .sec {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 20px 22px;
-        margin-bottom: 16px;
+        background: rgba(253, 248, 236, 0.78);
+        border: 1px solid rgba(90, 72, 50, 0.18);
+        border-radius: 12px; padding: 18px 20px; margin-bottom: 14px;
       }
       .sec h2 {
-        color: #ffe2c4;
-        font-size: 16px;
-        margin: 0 0 10px;
-        letter-spacing: 2px;
+        color: #a04a35; font-size: 15px; margin: 0 0 10px;
+        letter-spacing: 0.14em; font-weight: 600;
       }
-      .sec h2::before {
-        content: '◆ ';
-        color: #c98a4b;
-        font-size: 13px;
-      }
-      .sec p,
-      .sec li {
-        font-size: 13px;
-        line-height: 2;
-        color: rgba(232, 224, 216, 0.88);
-      }
-      .sec ul,
-      .sec ol {
-        margin: 6px 0;
-        padding-left: 20px;
-      }
+      .sec h2::before { content: '❧ '; color: #8a6a4a; font-size: 13px; }
+      .sec p, .sec li { font-size: 13.5px; line-height: 2; color: #54463a; }
+      .sec ul, .sec ol { margin: 6px 0; padding-left: 20px; }
       .k {
-        color: #ffd9a8;
-        background: rgba(255, 217, 168, 0.1);
-        padding: 1px 8px;
-        border-radius: 6px;
-        font-size: 12px;
+        color: #7a4a2a; background: rgba(160, 116, 74, 0.12);
+        padding: 1px 8px; border-radius: 6px; font-size: 12.5px;
       }
       .cr {
-        font-size: 11px;
-        line-height: 1.9;
-        color: rgba(232, 224, 216, 0.6);
-        border-top: 1px dashed rgba(255, 214, 170, 0.3);
-        padding-top: 14px;
-        margin-top: 14px;
+        font-size: 11.5px; line-height: 1.9; color: rgba(84, 70, 58, 0.72);
+        border-top: 1px dashed rgba(90, 72, 50, 0.35); padding-top: 14px; margin-top: 14px;
       }
-      .cr b {
-        color: rgba(255, 217, 196, 0.85);
-        font-size: 12px;
-        letter-spacing: 1px;
-      }
-      .cr h3 {
-        color: #ffe2c4;
-        font-size: 12px;
-        letter-spacing: 2px;
-        margin: 12px 0 4px;
-      }
+      .cr b { color: #4e4237; font-size: 12px; letter-spacing: 0.08em; }
+      .cr h3 { color: #a04a35; font-size: 12.5px; letter-spacing: 0.16em; margin: 12px 0 4px; }
       #consentBar {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        display: none;
-        background: rgba(20, 10, 18, 0.97);
-        border-top: 1px solid rgba(255, 214, 170, 0.4);
-        padding: 16px 20px;
-        text-align: center;
-        z-index: 50;
+        position: fixed; left: 0; right: 0; bottom: 0; display: none;
+        background: rgba(248, 241, 223, 0.97);
+        border-top: 1px solid rgba(90, 72, 50, 0.4);
+        padding: 16px 20px; text-align: center; z-index: 50;
       }
-      #consentBar label {
-        font-size: 14px;
-        color: #ffe2c4;
-        cursor: pointer;
-      }
+      #consentBar label { font-size: 14px; color: #4e4237; cursor: pointer; }
       #consentBar input {
-        width: 18px;
-        height: 18px;
-        vertical-align: -3px;
-        margin-right: 8px;
-        accent-color: #c98a4b;
+        width: 18px; height: 18px; vertical-align: -3px; margin-right: 8px;
+        accent-color: #a04a35;
       }
       #okBtn {
-        margin-top: 10px;
-        width: 100%;
-        padding: 13px;
-        border: none;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #c98a4b, #8a5a2a);
-        color: #fff;
-        font-size: 15px;
-        letter-spacing: 3px;
-        cursor: pointer;
+        margin-top: 10px; width: 100%; padding: 13px; border: none; border-radius: 12px;
+        background: #a04a35; color: #f8f1df; font-size: 15px; letter-spacing: 3px;
+        cursor: pointer; font-family: inherit;
       }
-      #okBtn:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
-      }
+      #okBtn:disabled { opacity: 0.35; cursor: not-allowed; }
     </style>
     <script>
       // 防复制(2026-07-27 主人定):公开展示不可复制,只有后台能修改/复制;
@@ -150,20 +109,490 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>用 户 协 议</h1>
-      <div class="sub">
-        梦幻画廊 · 昆仑灵鉴 · 更新日期:2026 年 9 月 5 日 · 生效日期:2026 年 9 月 5 日
+      <div class="eyebrow">T H E&#8194;D E S E R T</div>
+      <h1 class="brand">B612</h1>
+      <div class="script">Terms of Service</div>
+      <div class="meta">
+        Updated &amp; Effective: September 6, 2026 · 更新与生效日期:2026 年 9 月 6 日
+      </div>
+      <div class="ornline"></div>
+
+      <!-- ================= PART I · ENGLISH ================= -->
+      <div class="part">
+        <div class="pt">English</div>
+        <div class="pl"></div>
+      </div>
+
+      <div class="sec">
+        <h2>Special Notice</h2>
+        <p>
+          Welcome to <b>B612 — a gallery for unfinished drawings</b> (the "Gallery"), a web-based
+          3D interactive art experience where memories are kept and farewells too. The Gallery is
+          published by <b>China (Shanghai) Pilot Free Trade Zone Dreamlight Digital Culture &amp;
+          Technology Interactive Entertainment International United Holding Group Co., Ltd.</b>
+          ("we" / "the Company") and provided together with its global development and operations
+          teams. It offers browsing, uploading, quizzes and interactive features in your browser.
+        </p>
+        <p>
+          <b>Please read this Agreement carefully and in its entirety</b>, especially the clauses
+          that materially affect your rights (including but not limited to content rules,
+          disclaimers and intellectual property). <b>Unless you have read and accepted all terms of
+          this Agreement, you have no right to use the Gallery.</b> By ticking "agree" and pressing
+          ENTER, or by using the Gallery in any other way, you are deemed to have read and accepted
+          this Agreement, which then takes legal effect between you and us.
+        </p>
+        <p>
+          If you are a minor (under 18), please read this Agreement together with your parent or
+          other guardian, and do not use the Gallery without their consent.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>1. Scope</h2>
+        <p>
+          This Agreement is concluded between you and us regarding your access to and use of the
+          Gallery. It includes its body text, the Privacy Guidelines, and any rules, notes and
+          announcements already published or to be published with reasonable notice. All of the
+          foregoing form an integral part of this Agreement with equal legal effect.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>2. Nickname &amp; Account</h2>
+        <p>
+          1. The Gallery uses a "nickname" (雅号) as your in-Gallery name and the term "account"
+          refers to your overall user identity. <b>You only hold a right to use the account; the
+          account and its virtual items and progress (star-motes, spirit marks, prefixes, etc.) are
+          owned by the Gallery.</b> Without our written consent you may not dispose of your account
+          or its benefits by gift, loan, transfer, sale or pledge.
+        </p>
+        <p>
+          2. When choosing a nickname you must not impersonate others, and must not include content
+          that is unlawful, against public order and good morals, or confusing, nor infringe the
+          lawful rights of any third party.
+        </p>
+        <p>
+          3. Your account is for your personal use only. Any acts and consequences arising from
+          lending your device to others are borne by you.
+        </p>
+        <p>
+          4. If your nickname violates these rules, we may require you to correct it within a
+          specified period; if you refuse, we may clear the nickname and suspend the service to you.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>3. Our Services</h2>
+        <p>The Gallery provides the following services, subject to what the pages actually show:</p>
+        <ul>
+          <li>3D gallery browsing: walking, jumping, gliding, flight, teleporting, view switching;</li>
+          <li>
+            Opening rite: the entry gate and the paper-plane opening film, shown on every entry and
+            skippable at any time;
+          </li>
+          <li>
+            Little Prince's home &amp; the six planet worlds: independent miniature worlds reached
+            through the stone gate and portal platforms;
+          </li>
+          <li>"Heart-resonance" quiz, as the admission certification for the gallery building;</li>
+          <li>
+            Content uploading: upload your photos, videos and links, shown on the walls with
+            AI-generated captions;
+          </li>
+          <li>
+            Interactive features: the music floor, whiteboard doodles, house re-coloring, outdoor
+            big screens, the wish wall (一念之墙) and the chat room;
+          </li>
+          <li>Collection play: sky progress, star-motes and spirit-motes with related rewards;</li>
+          <li>Docs: reading the Elements Code, these Terms of Service and the Privacy Guidelines.</li>
+        </ul>
+        <p>
+          <b>Special notice:</b> accessing via the Gallery's official domain (cloudbear.cloud) is
+          the only lawful channel for the service; services obtained by cracking, mirroring or
+          scraping are not covered by this Agreement, and all consequences fall on the actor. The
+          Gallery is for your non-commercial use only and may not be used for any commercial purpose
+          without our prior written consent.
+        </p>
+        <p>
+          Star-motes, sky progress, spirit marks and similar are virtual collectibles of the
+          Gallery. <b>They have no cash value and cannot be refunded, exchanged, transferred or
+          redeemed for money</b>; they may only be used and displayed inside the Gallery under its
+          rules.
+        </p>
+        <p>
+          We keep updating and improving the Gallery and may add, remove or adjust features; for
+          major changes we will notify you reasonably on the pages.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>4. Content &amp; Conduct Rules</h2>
+        <p>
+          A basic principle first: the Gallery practises data minimisation. Uploaded photos, videos
+          and links are stored on the platform solely for display, and their visibility is governed
+          by the display rules of the Gallery (demonstration content is public; your own uploads are
+          access-controlled). For how information is handled, see the Privacy Guidelines.
+        </p>
+        <p>
+          <b>Please understand: collecting less information does not exempt responsibility.</b>
+          Whether content exists on our servers and who is responsible for it are two different
+          things. The legality and appropriateness of anything you choose to display publicly remain
+          your own responsibility — that is the requirement of law and the rule of B612. You
+          undertake not to upload, publish or spread any content of the following nature, or to
+          engage in the following acts:
+        </p>
+        <ol>
+          <li>Content opposing the basic principles of the Constitution, endangering national security, leaking state secrets, subverting state power or undermining national unity;</li>
+          <li>Content harming national honour or interests, inciting ethnic hatred or discrimination, undermining national unity or religious policy, or promoting cults and superstition;</li>
+          <li>Spreading rumours to disturb social order, or spreading obscenity, pornography, gambling, violence, murder, terror or abetting crime;</li>
+          <li>Insulting or defaming others, infringing privacy, reputation, portrait rights, intellectual property, trade secrets or other lawful rights;</li>
+          <li>Other information prohibited by laws and administrative regulations;</li>
+          <li>Unauthorised access to or scanning/attacking of the Gallery or its servers, planting malicious code, or bulk-scraping Gallery content by automated means;</li>
+          <li>Impersonating others, or using the Gallery for fraud, money laundering, pyramid selling or other illegal activities;</li>
+          <li>Interfering with the normal operation of the Gallery or harming other visitors' experience in any way.</li>
+        </ol>
+        <p>
+          You warrant that you own the lawful rights to, or are fully authorised for, the content
+          you upload. Any third-party complaints, claims or administrative/judicial investigations
+          arising from your uploaded content shall be borne solely by you; if losses are caused to
+          us, you shall compensate in full.
+        </p>
+        <p>
+          The Gallery <b>encourages</b> you to upload and share: content that promotes core
+          socialist values and displays fine traditional culture; content recording sincere moments
+          and passing on warmth; content that helps build consensus and answer questions; and other
+          content of taste, class and responsibility.
+        </p>
+        <p>
+          <b>We restrict the following improper acts and content:</b> exaggerated headlines seriously mismatched with content; improper commentary on disasters and major accidents; sexually suggestive content causing bad associations; bloody, horrifying or cruel content causing physical or mental discomfort; inciting group or regional discrimination; vulgar, cheap or pandering content; content likely to induce minors to imitate unsafe acts or adopt bad habits; and other acts or content harming the online ecosystem.
+        </p>
+        <p>
+          <b>We prohibit the following violations:</b> impersonating any person or organisation, or falsely implying association with any person or organisation; forging sources to make people believe content was published by the Gallery; publicly transmitting content you have no right to transmit (such as internal material or others' privacy); uploading advertising letters, promotional material or "spam"; stalking or otherwise harassing others; uploading viruses, trojans or other code interfering with computer functions; illegally intruding into or interfering with the Gallery or connected servers and networks; obtaining Gallery content or data by robots, crawlers, scripts or any automated means; creating or spreading non-genuine audio/video produced by deep-learning or similar new technologies without prominent labelling; and other acts violating laws, public order and good morals, or this Agreement.
+        </p>
+        <p>
+          <b>Brand use restriction:</b> without our written consent you may not use, on any channel
+          or media, wording such as "in cooperation with the Gallery" or "co-produced with the
+          Gallery" carrying the Gallery's brands (B612, Dreamlight) for promotion; violators shall
+          bear all losses caused to us.
+        </p>
+        <p>
+          If the content you provide contains information violating laws, public order and good
+          morals or this Agreement, you bear all adverse consequences directly; if adverse
+          consequences are caused to us, you shall eliminate the influence and compensate for all
+          losses.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>5. Platform Content &amp; Third-Party Links</h2>
+        <p>
+          1. Content uploaded by visitors (photos, videos, messages, etc.) is the responsibility of
+          the uploader as to accuracy, legality and appropriateness. <b>We cannot know in advance
+          and review all visitor content; you may encounter content that upsets you while browsing,
+          and you waive claims against the Gallery arising therefrom.</b> However, you may report
+          via the wish wall (一念之墙) or the contact details on the page; after verification we
+          will take necessary measures such as deletion or blocking, keep records as appropriate
+          and report to the relevant authorities.
+        </p>
+        <p>
+          2. The Gallery and visitor content may contain links to third-party websites or resources
+          (including in-scene embedded links and visitor-built links). <b>Third-party websites'
+          content and activities are beyond our control; we are not liable for any loss or damage
+          arising from visiting or relying on them.</b> Before leaving the Gallery for a
+          third-party site, you are advised to read its terms of service and privacy policy.
+        </p>
+        <p>
+          3. You confirm and agree: you authorise the Gallery to display your uploaded content
+          within the Gallery and its co-operating channels; you may withdraw this authorisation at
+          any time by requesting deletion.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>6. Intellectual Property</h2>
+        <p>
+          1. The Gallery's overall design, code, copy, art and music (except as legally owned by
+          third parties) are owned by us and our developers. <b>You may not reverse-engineer,
+          decompile or disassemble the Gallery's software, pages or technology, or obtain source
+          code by any other means;</b> may not modify or adapt any part of the Gallery or create
+          derivative works; and may not remove, cover or alter the Gallery's copyright, trademark
+          or other rights notices.
+        </p>
+        <p>
+          2. Original content you upload remains your intellectual property; however you grant us a
+          non-exclusive, royalty-free licence strictly necessary for <b>displaying</b> it in the
+          Gallery to you and the visitors you designate.
+        </p>
+        <p>3. The Gallery's and rights holders' IP does not transfer by any use of yours.</p>
+        <p>
+          <b>4. Takedown complaints &amp; counter-notices.</b> We take IP protection seriously. Any
+          person or entity believing visitor-uploaded content in the Gallery infringes their lawful
+          rights (copyright, portrait, reputation, etc.) may file a <b>notice</b>; after receiving
+          a valid notice and verifying it, we will take necessary measures such as deletion or
+          blocking:
+        </p>
+        <p>
+          (1) proof of the claimant's lawful rights (copyright registration, original files, ID,
+          etc.);<br />
+          (2) the exact location of the allegedly infringing content (title, uploader nickname,
+          page position);<br />
+          (3) the claimant's true contact information;<br />
+          (4) the following statement: "I am the lawful rights holder of the complained content;
+          the information in this notice is true, accurate and complete; if it is untrue I will
+          bear all legal liability arising therefrom."<br />
+          Please send the above to
+          <span class="k">legal@dreamlight.com.hk</span>, or by mail to the Legal Department, China
+          HQ (Shanghai): 38/F, Tower 2, Huiya Tower, 1233 Lujiazui Ring Road, China (Shanghai) Pilot
+          Free Trade Zone.
+        </p>
+        <p>
+          <b>5. Counter-notice.</b> If your uploaded content was removed due to such a notice and
+          you believe it does not constitute infringement, you may file a <b>counter-notice</b>
+          with: a description and location of the removed content, proof of your rights or
+          authorisation, true contact information, and a statement of equivalent effect. After
+          verification we will decide whether to restore it; we are not liable for lawful
+          restorations. Anyone filing an untrue notice or counter-notice bears all legal liability.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>7. Artificial Intelligence Services</h2>
+        <p>
+          1. The Gallery uses AI services in the following scenarios: (1) grading of the
+          "heart-resonance" quiz; (2) automatic captioning of photos you upload; (3) AI replies in
+          the chat room.
+        </p>
+        <p>
+          2. These services are provided by third-party large-model services (including but not
+          limited to the Moonshot Kimi family). Text or images you input in the above scenarios are
+          used only for that generation or grading, and for no other purpose.
+        </p>
+        <p>
+          3. AI-generated content (grades, comments, captions, replies) is for reference only and
+          may be inaccurate or incomplete; we do not guarantee its absolute correctness and are not
+          liable for any direct or indirect consequences arising from it. You may refuse to use
+          these AI features; refusal does not affect your normal use of other Gallery features.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>8. Virtual Items &amp; Collection Rules</h2>
+        <p>
+          1. Spirit-motes, sky progress, spirit marks, nickname prefixes and the like are virtual
+          collectibles. <b>They have no cash value and cannot be refunded, exchanged, transferred,
+          sold, pledged or redeemed for money</b>; they may only be used and displayed inside the
+          Gallery under its rules.
+        </p>
+        <p>
+          2. Acquisition rules are as published on the pages. Virtual collectibles obtained by
+          cheating, plug-ins, scripts or other improper means may be zeroed by us, with
+          restrictions imposed as the case warrants.
+        </p>
+        <p>
+          3. Your virtual collectibles are stored in your browser's local storage. We are not
+          liable for restoring or compensating losses caused by your clearing browser data or
+          changing devices.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>9. Moderation &amp; Disposal</h2>
+        <p>
+          1. The Gallery reviews uploaded content by "system identification + manual re-check".
+          System identification may misjudge; manual re-check is the final basis.
+        </p>
+        <p>
+          2. For suspected violations we will dispose in gradients under the Community Guidelines:
+          reminder/labelling, restricted display, deletion and takedown, nickname clearing,
+          function restriction, up to blacklisting. Records may be published at our discretion.
+        </p>
+        <p>
+          3. Your reports and appeals will be accepted and answered within 15 working days. Malicious
+          or fabricated reporting is likewise handled as a violation.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>10. Breach Handling</h2>
+        <p>
+          If you breach this Agreement, we may, at our sole discretion and per severity: warn and
+          require correction, delete content, block functions, clear nicknames, suspend or
+          terminate services to you, and reserve the right to pursue legal liability. For suspected
+          violations of law we are obliged to keep records, report to the relevant authorities and
+          co-operate with investigations.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>11. Disclaimers &amp; Limitation of Liability</h2>
+        <p>
+          1. The Gallery is provided "as is" and "as available", without warranty of uninterrupted
+          or error-free service or fitness for your expectations. We are not liable for
+          interruption, delay or data anomaly caused by network fluctuations, device differences,
+          force majeure, hacking, line failures or other causes beyond our reasonable control.
+        </p>
+        <p>
+          2. Visitor-uploaded content's accuracy, legality and appropriateness are the uploader's
+          responsibility; risks from browsing or using others' content are borne by you.
+        </p>
+        <p>
+          3. We are not liable for any direct, indirect, incidental, consequential or punitive
+          losses (including data loss or progress anomaly) caused by: total or partial
+          unavailability of the service; clearing, damage or loss of data stored locally on your
+          device; or other matters relating to the Gallery service.
+        </p>
+        <p>
+          4. Some jurisdictions do not allow exclusion or limitation of certain warranties and
+          liabilities; if such laws apply to you, all or part of the above exclusions may not
+          apply, without affecting your statutory rights as a consumer.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>12. Protection of Minors</h2>
+        <p>
+          We take the healthy growth of minors seriously. If you are a minor, read this Agreement
+          under the supervision and guidance of your statutory guardian and use the Gallery only
+          with their consent. Guardians should teach minors online safety, reasonable usage time
+          and avoidance of internet addiction.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>13. Privacy &amp; Personal Information</h2>
+        <p>
+          We take your personal information and privacy seriously. Please read the separately
+          presented Privacy Guidelines for the principles, methods and your rights regarding
+          information processing. This Agreement and the Privacy Guidelines together form the
+          complete understanding for your use of the Gallery.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>14. Changes, Termination &amp; Notices</h2>
+        <p>
+          <b>1. Changes.</b> We may revise this Agreement from time to time. The revised version
+          will be published on this page with its update date; your continued use of the Gallery
+          after publication is deemed acceptance of the revised Agreement.
+        </p>
+        <p>
+          <b>2. Service changes and transfer.</b> For operational reasons we may change, interrupt
+          or terminate part of the services; in case of merger, division or asset transfer, related
+          assets, services, rights and obligations may be succeeded by a third party, with
+          reasonable notice to you.
+        </p>
+        <p>
+          <b>3. Termination and deregistration.</b> You may stop using the Gallery at any time. You
+          may deregister your nickname and all local preferences and progress by clearing this
+          site's browser data; after deregistration, related information cannot be recovered except
+          as required by law. Uploaded content stored on the platform cannot be self-deleted by
+          visitors; you may request deletion via the channels on the page, and after verification
+          we will handle it by hiding or taking it offline (platform archiving obligations excepted).
+        </p>
+        <p>
+          <b>4. Notices.</b> The Gallery sends notices via page announcements and in-page notices,
+          deemed delivered upon publication. Notices to the Gallery may be sent via a message on
+          the wish wall (一念之墙) or the contact details on the page.
+        </p>
+        <p>
+          <b>5. Survival.</b> After you stop using the Gallery, rights and obligations under this
+          Agreement terminate, but you remain liable for your conduct during usage.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>15. Governing Law &amp; Jurisdiction</h2>
+        <p>
+          The conclusion, effectiveness, performance, interpretation and dispute resolution of this
+          Agreement are governed by the laws of mainland China. Any dispute arising from or in
+          connection with this game shall first be resolved through friendly consultation; failing
+          that, either party may submit the dispute to the <b>Shenzhen Nanshan District People's
+          Court</b> for first-instance litigation, and both parties waive any objection to that
+          court's jurisdiction.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>16. Miscellaneous</h2>
+        <p>1. Invalidity of any clause does not affect the validity of the others.</p>
+        <p>2. Headings are for reading convenience only and are not a basis for interpretation.</p>
+        <p>
+          3. For questions, opinions or complaints about this Agreement, leave a message on the
+          wish wall (一念之墙) or contact us via the details on the page; we will answer within 15
+          working days. We may be unable to respond where: matters relate to national or defence
+          security, public security, public health or major public interests, or criminal
+          investigation, prosecution and trial; there is sufficient evidence of your bad faith or
+          abuse of rights; responding would seriously harm others' lawful rights; trade secrets are
+          involved; or other circumstances prescribed by law.
+        </p>
+
+        <div class="cr">
+          <h3>📜 版权页 / COPYRIGHT</h3>
+          <p>
+            <b>发行方</b
+            >:中国(上海)自由贸易试验区梦幻绮光数字文化科技互动娱乐国际联合控股集团股份有限公司<br />
+            <b>开发商</b
+            >:阿联酋阿布扎比沙漠星辰数字创意与互动娱乐实验室(哈利法科技园区)有限责任公司<br />
+            <b>联合运营方</b>:英国伦敦圣弗朗西斯数字艺术集团(开曼)控股股份有限公司<br />
+            <b>中国区独家授权</b>:美国好莱坞梦幻影业集团IP授权中心<br />
+            <b>资金提供方</b
+            >:瑞士联合银行集团(UBS)数字文娱产业投资基金与阿布扎比皇室家族办公室(ADRO)及迪拜未来基金(DFF)联合注资<br />
+            <b>法律策略合作伙伴</b
+            >:深圳市腾讯计算机系统有限公司法务部(为本公司提供常年法律策略咨询及合规顾问服务)<br />
+            <b>特别鸣谢</b>:北京市盈科律师事务所(全球合伙人机制及市场拓展战略顾问)<br />
+            <b>法律管辖与争议解决</b
+            >:本公司日常法律合规事务及商业策略咨询由深圳市腾讯计算机系统有限公司法务部长期提供顾问服务。凡因本游戏引发的或与本游戏相关的任何商业及法律事宜,双方应首先友好协商解决;协商不成的,任何一方均有权将争议提交至深圳市南山区人民法院进行一审诉讼,双方均放弃对上述法院管辖权提出异议的任何权利。<br />
+            <b>联系方式</b
+            >:全球总部(香港):中国香港特别行政区中环皇后大道中99号·中环中心56楼5601-5605室 电话:+852
+            3666 8888<br />
+            中国总部(上海):中国(上海)自由贸易试验区陆家嘴环路1233号·汇亚大厦T2栋38楼(整层) 电话:+86
+            21 6882 8888<br />
+            业务咨询:info@dreamlight.com.hk · 媒体/PR:pr@dreamlight.com.hk ·
+            法务/合规:legal@dreamlight.com.hk
+          </p>
+          <p>
+            <b>Publisher</b>: China (Shanghai) Pilot Free Trade Zone Dreamlight Digital Culture
+            &amp; Technology Interactive Entertainment International United Holding Group Co.,
+            Ltd.<br />
+            <b>Developer</b>: Abu Dhabi Desert Star Digital Creativity &amp; Interactive
+            Entertainment Laboratory (Khalifa Science and Technology Park) LLC, United Arab
+            Emirates<br />
+            <b>Co-Operator</b>: St. Francis Digital Art Group (Cayman) Holding Co., Ltd., London,
+            United Kingdom<br />
+            <b>Exclusive China Region License</b>: Hollywood Dreamlight Pictures Group IP Licensing
+            Center, USA<br />
+            <b>Funding Provided By</b>: UBS Digital Entertainment Industry Investment Fund, in
+            conjunction with the Abu Dhabi Royal Office (ADRO) and the Dubai Future Fund (DFF)
+            Joint Investment Initiative<br />
+            <b>Contact Us</b>: Global Headquarters (Hong Kong): Suites 5601-5605, 56/F, The Center,
+            99 Queen's Road Central, Central, Hong Kong SAR, PRC. Tel: +852 3666 8888<br />
+            China Headquarters (Shanghai): 38/F, Tower 2, Huiya Tower, 1233 Lujiazui Ring Road,
+            China (Shanghai) Pilot Free Trade Zone, Shanghai, PRC. Tel: +86 21 6882 8888<br />
+            Business Inquiries: info@dreamlight.com.hk · Media/PR: pr@dreamlight.com.hk ·
+            Legal/Compliance: legal@dreamlight.com.hk
+          </p>
+        </div>
+      </div>
+
+      <!-- ================= PART II · 简体中文 ================= -->
+      <div class="part">
+        <div class="pt">简体中文</div>
+        <div class="pl"></div>
       </div>
 
       <div class="sec">
         <h2>特别提示</h2>
         <p>
-          欢迎您使用《梦幻画廊·昆仑灵鉴》(以下简称"本画廊")。本画廊由<b>中国(上海)自由贸易试验区梦幻绮光数字文化科技互动娱乐国际联合控股集团股份有限公司</b>(以下简称"我们"或"公司")发行,联合全球开发及运营团队共同向您提供
+          欢迎您使用《B612——一场为未完成画作而设的画廊》(以下简称"本画廊")。本画廊由<b
+            >中国(上海)自由贸易试验区梦幻绮光数字文化科技互动娱乐国际联合控股集团股份有限公司</b
+          >(以下简称"我们"或"公司")发行,联合全球开发及运营团队共同向您提供
           3D 交互艺术服务,以网页形式向您提供游览、上传、答题、互动等功能。
         </p>
         <p>
           <b>请您务必审慎并完整阅读本协议全部内容</b
-          >,特别是涉及您重大权益的条款(包括但不限于内容规范、责任限制、知识产权等条款)。<b>除非您已充分阅读并接受本协议所有条款,否则您无权使用本画廊。</b>您点击"同意",或以其他任何方式使用本画廊,即视为您已阅读并同意本协议,本协议即在您与我们之间产生法律效力。
+          >,特别是涉及您重大权益的条款(包括但不限于内容规范、责任限制、知识产权等条款)。<b
+            >除非您已充分阅读并接受本协议所有条款,否则您无权使用本画廊。</b
+          >您勾选"同意"并点击 ENTER,或以其他任何方式使用本画廊,即视为您已阅读并同意本协议,本协议即在您与我们之间产生法律效力。
         </p>
         <p>
           若您是未成年人(未满十八周岁),请您与父母或其他监护人一起阅读本协议,在获得父母或其他监护人同意之前,请勿使用本画廊。
@@ -181,15 +610,13 @@
         <h2>二、雅号与账号管理</h2>
         <p>
           1.
-          本画廊以"雅号"作为您在画廊中的称呼(昵称);以"账号"指称您在本画廊的整体使用者身份。<b>您仅享有账号的使用权,账号及其项下的虚拟物品与进度(灵蕴、六灵蕴印记、前缀等)的所有权归本画廊所有。</b>未经我们书面同意,您不得以赠与、出借、转让、出售、抵押等方式处置您的账号及项下权益。
+          本画廊以"雅号"作为您在画廊中的称呼(昵称);以"账号"指称您在本画廊的整体使用者身份。<b>您仅享有账号的使用权,账号及其项下的虚拟物品与进度(星屑、灵蕴印记、前缀等)的所有权归本画廊所有。</b>未经我们书面同意,您不得以赠与、出借、转让、出售、抵押等方式处置您的账号及项下权益。
         </p>
         <p>
           2.
           您设置雅号时,不得冒用他人姓名、名称、字号,不得含有违法违规、违背公序良俗或足以引起混淆的内容,不得侵害第三方的合法权益。
         </p>
-        <p>
-          3. 您的账号仅由您本人使用。因您主动将设备借予他人使用而产生的一切行为与后果,由您自行承担。
-        </p>
+        <p>3. 您的账号仅由您本人使用。因您主动将设备借予他人使用而产生的一切行为与后果,由您自行承担。</p>
         <p>
           4.
           如您使用存在违规情形的雅号,我们有权要求您限期改正;拒不改正的,我们有权清除该雅号并暂停向您提供服务。
@@ -200,11 +627,13 @@
         <h2>三、本画廊的服务</h2>
         <p>本画廊向您提供以下服务,具体以页面实际呈现为准:</p>
         <ul>
-          <li>3D 画廊游览:行走、跳跃、滑翔、传送、视角切换;</li>
-          <li>心象共鸣:十问答题,作为进入画廊建筑的资格认证;</li>
+          <li>3D 画廊游览:行走、跳跃、滑翔、飞行、传送、视角切换;</li>
+          <li>开场仪式:入口闸门与纸飞机开幕电影,每次进入呈现,随时可跳过;</li>
+          <li>小王子之家与六颗星球世界:经星门与传送石台抵达的独立星球场景;</li>
+          <li>「心象共鸣」答题,作为进入画廊建筑的资格认证;</li>
           <li>内容上传:上传您的照片、视频与链接,自动上墙展示并生成配文;</li>
-          <li>互动功能:音乐地板、白板涂鸦、房屋换色、昆仑回声壁、户外大屏;</li>
-          <li>收集玩法:天穹进度、六合灵蕴收集及其附属奖励;</li>
+          <li>互动功能:音乐地板、白板涂鸦、房屋换色、户外大屏、一念之墙(愿望留言)、聊天室;</li>
+          <li>收集玩法:天穹进度、星屑与灵蕴收集及其附属奖励;</li>
           <li>说明与协议:《元素共鸣准则》《用户协议》《隐私保护指引》的查阅。</li>
         </ul>
         <p>
@@ -212,7 +641,9 @@
           >经本画廊官方域名(cloudbear.cloud)访问,是使用本画廊服务的唯一合法渠道;以任何破解、镜像、抓取等非法手段获取或使用的服务,均不属于本协议约定之服务,由此引起的一切后果由行为人自行承担。本画廊服务仅供您非商业性使用,未经我们事先书面同意,不得用于任何商业目的。
         </p>
         <p>
-          灵蕴、天穹进度、六灵蕴印记等均为本画廊内的虚拟收集物,<b>不具有任何现金价值,不支持退换、转让或兑换</b>,仅可在画廊内按规则使用与展示。
+          星屑、天穹进度、灵蕴印记等均为本画廊内的虚拟收集物,<b
+            >不具有任何现金价值,不支持退换、转让或兑换</b
+          >,仅可在画廊内按规则使用与展示。
         </p>
         <p>
           我们一直在更新与改善本画廊,可能增删或调整部分功能;如有重大调整,我们将在页面以合理方式告知。
@@ -222,29 +653,20 @@
       <div class="sec">
         <h2>四、内容与使用规范</h2>
         <p>
-          关于您上传的内容,请先了解我们的基本原则:本画廊对信息的收集坚持最小化——<b>您在画廊建筑内上传的图片、视频等文件,仅在您的设备本地查看与处理,不进入本平台服务器;仅当您通过户外白板主动保存作品时,该部分内容才会在本平台存储并公开展示</b>(详见《隐私保护指引》)。
+          关于您上传的内容,请先了解我们的基本原则:本画廊对信息的收集坚持最小化——您上传的照片、视频与链接,仅为本画廊展示之目的存储于平台,其可见性由画廊的展示规则控制(演示内容公开展示;您本人上传的内容按门禁与展示规则进行可见性管理)。信息如何处理,详见《隐私保护指引》。
         </p>
         <p>
           <b>但请您理解:少收信息,不等于免除责任。</b
-          >内容存不存在我们手里,与您对它负不负责任,是两件事。您选择公开展示的任何内容,其合法性、适当性始终由您本人负责——这是法律的要求,也是昆仑的规则。您承诺,不会利用本画廊上传、发布、传播任何含有下列性质的内容,或从事下列行为:
+          >内容存不存在我们手里,与您对它负不负责任,是两件事。您选择公开展示的任何内容,其合法性、适当性始终由您本人负责——这是法律的要求,也是 B612
+          的规则。您承诺,不会利用本画廊上传、发布、传播任何含有下列性质的内容,或从事下列行为:
         </p>
         <ol>
-          <li>
-            反对宪法所确定的基本原则,危害国家安全、泄露国家秘密、颠覆国家政权、破坏国家统一的内容;
-          </li>
-          <li>
-            损害国家荣誉和利益,煽动民族仇恨、民族歧视,破坏民族团结,破坏国家宗教政策,宣扬邪教和封建迷信的内容;
-          </li>
-          <li>
-            散布谣言、扰乱社会秩序、破坏社会稳定,或散布淫秽、色情、赌博、暴力、凶杀、恐怖、教唆犯罪的内容;
-          </li>
-          <li>
-            侮辱、诽谤他人,侵害他人隐私权、名誉权、肖像权、知识产权、商业秘密等合法权益的内容;
-          </li>
+          <li>反对宪法所确定的基本原则,危害国家安全、泄露国家秘密、颠覆国家政权、破坏国家统一的内容;</li>
+          <li>损害国家荣誉和利益,煽动民族仇恨、民族歧视,破坏民族团结,破坏国家宗教政策,宣扬邪教和封建迷信的内容;</li>
+          <li>散布谣言、扰乱社会秩序、破坏社会稳定,或散布淫秽、色情、赌博、暴力、凶杀、恐怖、教唆犯罪的内容;</li>
+          <li>侮辱、诽谤他人,侵害他人隐私权、名誉权、肖像权、知识产权、商业秘密等合法权益的内容;</li>
           <li>含有法律、行政法规禁止的其他内容的信息;</li>
-          <li>
-            未经授权访问、扫描、攻击本画廊或其服务器,植入恶意代码,或以自动化手段批量抓取本画廊内容;
-          </li>
+          <li>未经授权访问、扫描、攻击本画廊或其服务器,植入恶意代码,或以自动化手段批量抓取本画廊内容;</li>
           <li>冒充他人,或利用本画廊从事欺诈、洗钱、传销等违法违规活动;</li>
           <li>干扰本画廊正常运行,或以任何方式损害其他访客的使用体验。</li>
         </ol>
@@ -252,7 +674,8 @@
           您保证对您上传的内容拥有合法权利或已获充分授权。因您上传的内容引发任何第三方投诉、索赔或行政、司法机关调查的,由您独立承担全部责任;给我们造成损失的,您应予全额赔偿。
         </p>
         <p>
-          本画廊<b>鼓励</b>您上传与分享:弘扬社会主义核心价值观、展现中华优秀传统文化与时代精神的内容;记录真情瞬间、传递温暖善意的内容;有助于形成共识、解疑释惑的内容;以及其他讲品味、讲格调、讲责任的内容。
+          本画廊<b>鼓励</b
+          >您上传与分享:弘扬社会主义核心价值观、展现中华优秀传统文化与时代精神的内容;记录真情瞬间、传递温暖善意的内容;有助于形成共识、解疑释惑的内容;以及其他讲品味、讲格调、讲责任的内容。
         </p>
         <p>
           <b>我们限制下列不良行为与内容:</b
@@ -264,7 +687,7 @@
         </p>
         <p>
           <b>品牌使用限制:</b
-          >未经我们书面同意,您不得通过任何渠道或媒体使用"与本画廊合作""与本画廊共同出品"等携带本画廊品牌(梦幻画廊·昆仑灵鉴、梦幻绮光)的字样进行宣传推广;违者应承担由此给我们造成的全部损失。
+          >未经我们书面同意,您不得通过任何渠道或媒体使用"与本画廊合作""与本画廊共同出品"等携带本画廊品牌(B612、梦幻绮光)的字样进行宣传推广;违者应承担由此给我们造成的全部损失。
         </p>
         <p>
           您提供的内容如含有上述违反法律法规、公序良俗或本协议约定的信息,由您直接承担由此导致的一切不利后果;如因此给我们造成不利后果,您应负责消除影响,并赔偿由此导致的一切损失。
@@ -275,11 +698,13 @@
         <h2>五、平台内容与第三方链接</h2>
         <p>
           1.
-          本画廊中由访客上传的内容(照片、视频、发言等),其准确性、合法性、适当性由上传者自行负责。<b>我们无法预先知晓并逐一审查全部访客内容,您在游览过程中可能接触到令您感到不快、不适的内容,您同意放弃由此产生的针对本画廊的追索权;</b>但您有权通过「昆仑回声壁」或页面联系方式举报,我们将在核实后采取删除、屏蔽等必要措施,并视情况保存有关记录、向国家有关机关报告。
+          本画廊中由访客上传的内容(照片、视频、发言等),其准确性、合法性、适当性由上传者自行负责。<b>我们无法预先知晓并逐一审查全部访客内容,您在游览过程中可能接触到令您感到不快、不适的内容,您同意放弃由此产生的针对本画廊的追索权;</b
+          >但您有权通过「一念之墙」或页面联系方式举报,我们将在核实后采取删除、屏蔽等必要措施,并视情况保存有关记录、向国家有关机关报告。
         </p>
         <p>
           2.
-          本画廊及访客上传内容中可能包含指向第三方网站或资源的链接(含场景内嵌链接与访客自建链接)。<b>第三方网站的内容与活动不受我们控制,您因访问、使用或依赖第三方网站所产生的任何损失或损害,我们不承担责任;</b>建议您在离开本画廊访问第三方网站前,仔细阅读其服务条款与隐私政策。
+          本画廊及访客上传内容中可能包含指向第三方网站或资源的链接(含场景内嵌链接与访客自建链接)。<b>第三方网站的内容与活动不受我们控制,您因访问、使用或依赖第三方网站所产生的任何损失或损害,我们不承担责任;</b
+          >建议您在离开本画廊访问第三方网站前,仔细阅读其服务条款与隐私政策。
         </p>
         <p>
           3.
@@ -291,7 +716,8 @@
         <h2>六、知识产权</h2>
         <p>
           1.
-          本画廊的整体设计、代码、文案、美术与音乐素材(依法由第三方享有权利的除外),其知识产权归我们及我们的开发方所有。<b>您不得对本画廊的软件、页面、技术进行反向工程、反编译、反汇编,或以其他任何方式试图获取源代码;</b>不得修改、改编本画廊的任何部分或创作衍生作品;不得擅自删除、掩盖或更改本画廊的版权、商标及其他权利声明。
+          本画廊的整体设计、代码、文案、美术与音乐素材(依法由第三方享有权利的除外),其知识产权归我们及我们的开发方所有。<b>您不得对本画廊的软件、页面、技术进行反向工程、反编译、反汇编,或以其他任何方式试图获取源代码;</b
+          >不得修改、改编本画廊的任何部分或创作衍生作品;不得擅自删除、掩盖或更改本画廊的版权、商标及其他权利声明。
         </p>
         <p>
           2.
@@ -323,7 +749,7 @@
         <h2>七、人工智能服务说明</h2>
         <p>
           1.
-          本画廊在下列场景使用人工智能(AI)服务:①心象共鸣问答题的阅卷评分;②您上传照片的自动配文(图片描述生成);③聊天室「昆仑之灵」的对话应答。
+          本画廊在下列场景使用人工智能(AI)服务:①「心象共鸣」答题的阅卷评分;②您上传照片的自动配文(图片描述生成);③聊天室的 AI 对话应答。
         </p>
         <p>
           2. 上述服务由第三方大模型服务提供(包括但不限于月之暗面 Kimi
@@ -341,7 +767,7 @@
         <h2>八、虚拟物品与收集规则</h2>
         <p>
           1.
-          本画廊内的灵蕴、天穹进度、六灵蕴印记、雅号前缀等均为虚拟收集物。<b>虚拟收集物不具有任何现金价值,不支持退换、转让、出售、抵押或兑换现金</b>,仅可在画廊内按既定规则使用与展示。
+          本画廊内的星屑、灵蕴、天穹进度、雅号前缀等均为虚拟收集物。<b>虚拟收集物不具有任何现金价值,不支持退换、转让、出售、抵押或兑换现金</b>,仅可在画廊内按既定规则使用与展示。
         </p>
         <p>
           2.
@@ -399,7 +825,7 @@
       <div class="sec">
         <h2>十二、未成年人保护</h2>
         <p>
-          我们非常重视未成年人的健康成长。若您为未成年人,应在法定监护人的监护、指导下阅读本协议,并在取得法定监护人同意后使用本画廊。监护人应指导未成年人注意上网安全、合理安排使用时间、避免沉迷网络。我们倡导全体未成年访客共同践行《新时代青少年网络文明公约》(全文见《隐私保护指引》未成年人保护章节)。
+          我们非常重视未成年人的健康成长。若您为未成年人,应在法定监护人的监护、指导下阅读本协议,并在取得法定监护人同意后使用本画廊。监护人应指导未成年人注意上网安全、合理安排使用时间、避免沉迷网络。
         </p>
       </div>
 
@@ -422,11 +848,11 @@
         </p>
         <p>
           <b>3. 服务终止与注销。</b
-          >您可以随时停止使用本画廊。您可通过清除浏览器站点数据的方式注销您的雅号及全部本地偏好与进度;注销后,除法律法规另有规定外,与您相关的信息将不可恢复。您在画廊建筑内上传的内容本就不进入服务器,无需另行删除;白板作品可留言申请删除。
+          >您可以随时停止使用本画廊。您可通过清除浏览器站点数据的方式注销您的雅号及全部本地偏好与进度;注销后,除法律法规另有规定外,与您相关的信息将不可恢复。您上传至平台的内容不提供访客自行删除;您可经页面所载渠道提出删除申请,经核实后由我们作隐藏或下线处理(法律法规要求留存的除外)。
         </p>
         <p>
           <b>4. 通知与送达。</b
-          >本画廊以页面公告、站内提示等方式向您发出各类通知;上述通知自发布之时视为已送达。您向本画廊发出的通知,可通过「昆仑回声壁」留言或页面所载联系方式送达。
+          >本画廊以页面公告、站内提示等方式向您发出各类通知;上述通知自发布之时视为已送达。您向本画廊发出的通知,可通过「一念之墙」留言或页面所载联系方式送达。
         </p>
         <p>
           <b>5. 责任延续。</b
@@ -437,7 +863,8 @@
       <div class="sec">
         <h2>十五、适用法律及管辖</h2>
         <p>
-          本协议的订立、生效、履行、解释及争议解决,均适用中华人民共和国大陆地区法律。凡因本游戏引发的或与本游戏相关的任何争议,双方应首先友好协商解决;协商不成的,任何一方均有权将争议提交至<b>深圳市南山区人民法院</b>进行一审诉讼,双方均放弃对上述法院管辖权提出异议的任何权利。
+          本协议的订立、生效、履行、解释及争议解决,均适用中华人民共和国大陆地区法律。凡因本游戏引发的或与本游戏相关的任何争议,双方应首先友好协商解决;协商不成的,任何一方均有权将争议提交至<b>深圳市南山区人民法院</b
+          >进行一审诉讼,双方均放弃对上述法院管辖权提出异议的任何权利。
         </p>
       </div>
 
@@ -447,309 +874,41 @@
         <p>2. 本协议中的小标题仅为阅读方便而设,不作为条款解释依据。</p>
         <p>
           3.
-          如您对本协议有任何疑问、意见或投诉,欢迎通过画廊内的「昆仑回声壁」留言,或经页面所载联系方式与我们沟通,我们将在
+          如您对本协议有任何疑问、意见或投诉,欢迎通过「一念之墙」留言,或经页面所载联系方式与我们沟通,我们将在
           15
           个工作日内予以答复。但在下列情形下,我们可能无法回复您的请求:与国家安全、国防安全有关的;与公共安全、公共卫生、重大公共利益有关的;与犯罪侦查、起诉和审判有关的;有充分证据表明您存在主观恶意或滥用权利的;响应请求将导致他人合法权益受到严重损害的;涉及商业秘密的;法律法规规定的其他情形。
         </p>
-
-        <div class="cr">
-          <h3>📜 版权页 / COPYRIGHT</h3>
-          <p>
-            <b>发行方</b
-            >:中国(上海)自由贸易试验区梦幻绮光数字文化科技互动娱乐国际联合控股集团股份有限公司<br />
-            <b>开发商</b
-            >:阿联酋阿布扎比沙漠星辰数字创意与互动娱乐实验室(哈利法科技园区)有限责任公司<br />
-            <b>联合运营方</b>:英国伦敦圣弗朗西斯数字艺术集团(开曼)控股股份有限公司<br />
-            <b>中国区独家授权</b>:美国好莱坞梦幻影业集团IP授权中心<br />
-            <b>资金提供方</b
-            >:瑞士联合银行集团(UBS)数字文娱产业投资基金与阿布扎比皇室家族办公室(ADRO)及迪拜未来基金(DFF)联合注资<br />
-            <b>法律策略合作伙伴</b
-            >:深圳市腾讯计算机系统有限公司法务部(为本公司提供常年法律策略咨询及合规顾问服务)<br />
-            <b>特别鸣谢</b>:北京市盈科律师事务所(全球合伙人机制及市场拓展战略顾问)<br />
-            <b>法律管辖与争议解决</b
-            >:本公司日常法律合规事务及商业策略咨询由深圳市腾讯计算机系统有限公司法务部长期提供顾问服务。凡因本游戏引发的或与本游戏相关的任何商业及法律事宜,双方应首先友好协商解决;协商不成的,任何一方均有权将争议提交至深圳市南山区人民法院进行一审诉讼,双方均放弃对上述法院管辖权提出异议的任何权利。<br />
-            <b>特别声明</b
-            >:本公司已就全部法律纠纷及潜在诉讼事宜,全权委托北京市盈科律师事务所创始人梅向荣先生及其团队统筹处理。梅向荣先生作为盈科律师事务所创始合伙人、全球董事会前主任,将全权负责本游戏相关的全部法律事务及争议解决工作。<br />
-            <b>免责声明</b
-            >:本公司及本游戏与北京市盈科律师事务所及其创始人梅向荣先生相关融资事件无任何关联,各方业务均独立运营。<br />
-            <b>本公司常年法律顾问</b
-            >:北京市盈科律师事务所创始合伙人梅向荣先生及其律师团队(唯一法律顾问)<br />
-            <b>联系方式</b
-            >:全球总部(香港):中国香港特别行政区中环皇后大道中99号·中环中心56楼5601-5605室 电话:+852
-            3666 8888<br />
-            中国总部(上海):中国(上海)自由贸易试验区陆家嘴环路1233号·汇亚大厦T2栋38楼(整层) 电话:+86
-            21 6882 8888<br />
-            业务咨询:info@dreamlight.com.hk · 媒体/PR:pr@dreamlight.com.hk ·
-            法务/合规(梅向荣先生团队直通):legal@dreamlight.com.hk
-          </p>
-          <p>
-            本产品仅限中华人民共和国大陆地区发行,许可范围不包括中国台湾省、中国香港特别行政区、中国澳门特别行政区。
-          </p>
-
-          <h3>🌐 ENGLISH</h3>
-          <p>
-            <b>Publisher</b>: China (Shanghai) Pilot Free Trade Zone Dreamlight Digital Culture
-            &amp; Technology Interactive Entertainment International United Holding Group Co.,
-            Ltd.<br />
-            <b>Developer</b>: Abu Dhabi Desert Star Digital Creativity &amp; Interactive
-            Entertainment Laboratory (Khalifa Science and Technology Park) LLC, United Arab
-            Emirates<br />
-            <b>Co-Operator</b>: St. Francis Digital Art Group (Cayman) Holding Co., Ltd., London,
-            United Kingdom<br />
-            <b>Exclusive China Region License</b>: Hollywood Dreamlight Pictures Group IP Licensing
-            Center, USA<br />
-            <b>Funding Provided By</b>: UBS Digital Entertainment Industry Investment Fund, in
-            conjunction with the Abu Dhabi Royal Office (ADRO) and the Dubai Future Fund (DFF) Joint
-            Investment Initiative<br />
-            <b>Legal Strategy Partner</b>: Legal Department of Shenzhen Tencent Computer Systems
-            Co., Ltd. (Providing ongoing legal strategy consulting and compliance advisory services
-            to the Company)<br />
-            <b>Special Acknowledgement</b>: Beijing Yingke Law Firm (Global Partner Mechanism &amp;
-            Market Expansion Strategy Advisor)<br />
-            <b>Governing Law &amp; Dispute Resolution</b>: Any commercial or legal disputes arising
-            from or in connection with this game shall first be resolved through friendly
-            consultation between the parties. Should such consultation fail, either party may submit
-            the dispute to the Shenzhen Nanshan District People's Court for first-instance
-            litigation, and both parties waive any objection to the jurisdiction of the
-            aforementioned court.<br />
-            <b>Special Statement</b>: The Company has fully entrusted all legal disputes and
-            potential litigation matters related to this game to Mr. Mei Xiangrong, founder of
-            Beijing Yingke Law Firm, and his team. Mr. Mei Xiangrong, as the founding partner of
-            Yingke Law Firm and former President of the Global Board, shall take full responsibility
-            for all legal affairs and dispute resolution work related to this game.<br />
-            <b>Disclaimer</b>: Neither the Company nor this game has any affiliation with the
-            financing events related to Beijing Yingke Law Firm or its founder, Mr. Mei Xiangrong.
-            All parties operate their businesses independently.<br />
-            <b>Permanent Legal Counsel</b>: Mr. Mei Xiangrong, Founding Partner of Beijing Yingke
-            Law Firm, and his legal team (Sole Legal Counsel)<br />
-            <b>Contact Us</b>: Global Headquarters (Hong Kong): Suites 5601-5605, 56/F, The Center,
-            99 Queen's Road Central, Central, Hong Kong SAR, PRC. Tel: +852 3666 8888<br />
-            China Headquarters (Shanghai): 38/F, Tower 2, Huiya Tower, 1233 Lujiazui Ring Road,
-            China (Shanghai) Pilot Free Trade Zone, Shanghai, PRC. Tel: +86 21 6882 8888<br />
-            Business Inquiries: info@dreamlight.com.hk · Media/PR: pr@dreamlight.com.hk ·
-            Legal/Compliance (Direct to Mr. Mei Xiangrong's Team): legal@dreamlight.com.hk
-          </p>
-          <p>
-            This product is exclusively licensed for distribution within the mainland of the
-            People's Republic of China only. Licensed territory does not include Taiwan Province of
-            China, the Hong Kong Special Administrative Region of China, or the Macao Special
-            Administrative Region of China.
-          </p>
-
-          <h3>🇩🇪 DEUTSCH</h3>
-          <p>
-            <b>Verleger</b>: China (Shanghai) Pilot-Freihandelszone Dreamlight Digital Culture &amp;
-            Technology Interactive Entertainment International United Holding Group Co., Ltd.<br />
-            <b>Entwickler</b>: Abu Dhabi Wüstenstern Digital Creative &amp; Interactive
-            Entertainment Labor (Khalifa Science and Technology Park) LLC, Vereinigte Arabische
-            Emirate<br />
-            <b>Co-Betreiber</b>: St. Francis Digital Art Group (Cayman) Holding Co., Ltd., London,
-            Vereinigtes Königreich<br />
-            <b>Exklusive Lizenz für die China-Region</b>: Hollywood Dreamlight Pictures Group IP
-            Licensing Center, USA<br />
-            <b>Finanzierung</b>: UBS Digital Entertainment Industry Investment Fund in
-            Zusammenarbeit mit dem Abu Dhabi Royal Office (ADRO) und der Dubai Future Fund (DFF)
-            Joint Investment Initiative<br />
-            <b>Partner für Rechtsstrategie</b>: Rechtsabteilung der Shenzhen Tencent Computer
-            Systems Co., Ltd.<br />
-            <b>Besonderer Dank</b>: Beijing Yingke Law Firm (Berater für globales
-            Partnerschaftssystem und Marktexpansionsstrategie)<br />
-            <b>Rechtliche Regelung und Streitbeilegung</b>: Alle kommerziellen oder rechtlichen
-            Streitigkeiten, die sich aus diesem Spiel ergeben oder damit zusammenhängen, werden
-            zunächst in freundschaftlicher Beratung zwischen den Parteien gelöst. Sollte eine solche
-            Beratung scheitern, kann jede Partei den Streit dem Volksgericht des Bezirks Nanshan in
-            Shenzhen zur Verhandlung erster Instanz vorlegen, und beide Parteien verzichten auf
-            jegliche Einwände gegen die Zuständigkeit des genannten Gerichts.<br />
-            <b>Besondere Erklärung</b>: Die Gesellschaft hat alle Rechtsstreitigkeiten und
-            potenziellen Klageangelegenheiten im Zusammenhang mit diesem Spiel vollständig an Herrn
-            Mei Xiangrong, den Gründer der Beijing Yingke Law Firm, und sein Team übertragen.<br />
-            <b>Haftungsausschluss</b>: Weder die Gesellschaft noch dieses Spiel stehen in
-            irgendeiner Verbindung zu den Finanzierungsereignissen im Zusammenhang mit der Beijing
-            Yingke Law Firm oder deren Gründer, Herrn Mei Xiangrong. Alle Parteien führen ihre
-            Geschäfte unabhängig voneinander.<br />
-            <b>Ständige Rechtsberatung</b>: Herr Mei Xiangrong, Gründungspartner der Beijing Yingke
-            Law Firm, und sein Anwaltsteam (Einziger Rechtsberater)<br />
-            <b>Kontakt</b>: Globaler Hauptsitz (Hongkong): Suites 5601-5605, 56/F, The Center, 99
-            Queen's Road Central, Central, Hongkong SAR, VR China. Tel: +852 3666 8888<br />
-            China-Hauptsitz (Shanghai): 38/F, Tower 2, Huiya Tower, 1233 Lujiazui Ring Road, China
-            (Shanghai) Pilot-Freihandelszone, Shanghai, VR China. Tel: +86 21 6882 8888<br />
-            Geschäftsanfragen: info@dreamlight.com.hk · Medien/PR: pr@dreamlight.com.hk ·
-            Rechtswesen/Compliance (Direkt zum Team von Herrn Mei Xiangrong):
-            legal@dreamlight.com.hk
-          </p>
-          <p>
-            Dieses Produkt ist ausschließlich für den Vertrieb auf dem Festland der Volksrepublik
-            China lizenziert. Das Lizenzgebiet umfasst nicht die Provinz Taiwan Chinas, die
-            Sonderverwaltungsregion Hongkong Chinas oder die Sonderverwaltungsregion Macao Chinas.
-          </p>
-
-          <h3>🇫🇷 FRANÇAIS</h3>
-          <p>
-            <b>Éditeur</b>: China (Shanghai) Zone Pilote de Libre-Échange Dreamlight Digital Culture
-            &amp; Technology Interactive Entertainment International United Holding Group Co.,
-            Ltd.<br />
-            <b>Développeur</b>: Abu Dhabi Desert Star Digital Creativity &amp; Interactive
-            Entertainment Laboratory (Khalifa Science and Technology Park) LLC, Émirats Arabes
-            Unis<br />
-            <b>Co-Exploitant</b>: St. Francis Digital Art Group (Cayman) Holding Co., Ltd., Londres,
-            Royaume-Uni<br />
-            <b>Licence Exclusive pour la Région Chine</b>: Hollywood Dreamlight Pictures Group IP
-            Licensing Center, États-Unis<br />
-            <b>Financement Fourni Par</b>: UBS Digital Entertainment Industry Investment Fund, en
-            collaboration avec l'Abu Dhabi Royal Office (ADRO) et le Dubai Future Fund (DFF) Joint
-            Investment Initiative<br />
-            <b>Partenaire de Stratégie Juridique</b>: Département Juridique de Shenzhen Tencent
-            Computer Systems Co., Ltd.<br />
-            <b>Remerciement Spécial</b>: Beijing Yingke Law Firm (Conseiller pour le mécanisme
-            mondial de partenariat et la stratégie d'expansion du marché)<br />
-            <b>Règlement Juridique et Résolution des Litiges</b>: Tout litige commercial ou
-            juridique découlant de ou lié à ce jeu sera d'abord résolu par consultation amiable
-            entre les parties. Si une telle consultation échoue, l'une ou l'autre des parties peut
-            soumettre le litige au Tribunal Populaire du District de Nanshan à Shenzhen pour une
-            procédure de première instance, et les deux parties renoncent à toute objection à la
-            compétence dudit tribunal.<br />
-            <b>Déclaration Spéciale</b>: La Société a entièrement confié tous les litiges juridiques
-            et les questions de contentieux potentiel liés à ce jeu à M. Mei Xiangrong, fondateur du
-            cabinet Beijing Yingke Law Firm, et à son équipe.<br />
-            <b>Avis de Non-Responsabilité</b>: Ni la Société ni ce jeu n'ont aucune affiliation avec
-            les événements de financement liés à Beijing Yingke Law Firm ou à son fondateur, M. Mei
-            Xiangrong. Toutes les parties mènent leurs activités de manière indépendante.<br />
-            <b>Conseil Juridique Permanent</b>: M. Mei Xiangrong, Associé Fondateur du Cabinet
-            Beijing Yingke Law Firm, et son équipe juridique (Conseil Juridique Unique)<br />
-            <b>Nous Contacter</b>: Siège Mondial (Hong Kong): Suites 5601-5605, 56/F, The Center, 99
-            Queen's Road Central, Central, RAS de Hong Kong, RP Chine. Tél: +852 3666 8888<br />
-            Siège Chine (Shanghai): 38/F, Tower 2, Huiya Tower, 1233 Lujiazui Ring Road, Zone Pilote
-            de Libre-Échange de Shanghai, Shanghai, RP Chine. Tél: +86 21 6882 8888<br />
-            Demandes Commerciales: info@dreamlight.com.hk · Médias/RP: pr@dreamlight.com.hk ·
-            Juridique/Conformité (Ligne directe vers l'équipe de M. Mei Xiangrong):
-            legal@dreamlight.com.hk
-          </p>
-          <p>
-            Ce produit est exclusivement licencié pour la distribution sur le continent de la
-            République Populaire de Chine uniquement. Le territoire sous licence n'inclut pas la
-            province de Taïwan de la Chine, la région administrative spéciale de Hong Kong de la
-            Chine, ni la région administrative spéciale de Macao de la Chine.
-          </p>
-
-          <h3>🇮🇹 ITALIANO</h3>
-          <p>
-            <b>Editore</b>: China (Shanghai) Zona Pilota di Libero Scambio Dreamlight Digital
-            Culture &amp; Technology Interactive Entertainment International United Holding Group
-            Co., Ltd.<br />
-            <b>Sviluppatore</b>: Abu Dhabi Desert Star Digital Creativity &amp; Interactive
-            Entertainment Laboratory (Khalifa Science and Technology Park) LLC, Emirati Arabi
-            Uniti<br />
-            <b>Co-Gestore</b>: St. Francis Digital Art Group (Cayman) Holding Co., Ltd., Londra,
-            Regno Unito<br />
-            <b>Licenza Esclusiva per la Regione Cina</b>: Hollywood Dreamlight Pictures Group IP
-            Licensing Center, Stati Uniti<br />
-            <b>Finanziamento Fornito Da</b>: UBS Digital Entertainment Industry Investment Fund, in
-            collaborazione con l'Abu Dhabi Royal Office (ADRO) e il Dubai Future Fund (DFF) Joint
-            Investment Initiative<br />
-            <b>Partner per la Strategia Legale</b>: Dipartimento Legale di Shenzhen Tencent Computer
-            Systems Co., Ltd.<br />
-            <b>Ringraziamento Speciale</b>: Beijing Yingke Law Firm (Consulente per il meccanismo
-            globale di partenariato e la strategia di espansione del mercato)<br />
-            <b>Regolamento Giuridico e Risoluzione delle Controversie</b>: Qualsiasi controversia
-            commerciale o legale derivante da o in connessione con questo gioco sarà prima risolta
-            attraverso consultazioni amichevoli tra le parti. Se tali consultazioni dovessero
-            fallire, ciascuna parte può sottoporre la controversia al Tribunale Popolare del
-            Distretto di Nanshan a Shenzhen per il giudizio di primo grado, e entrambe le parti
-            rinunciano a qualsiasi eccezione alla giurisdizione del suddetto tribunale.<br />
-            <b>Dichiarazione Speciale</b>: La Società ha affidato integralmente tutte le
-            controversie legali e le questioni di potenziale contenzioso relative a questo gioco al
-            Sig. Mei Xiangrong, fondatore del Beijing Yingke Law Firm, e al suo team.<br />
-            <b>Esclusione di Responsabilità</b>: Né la Società né questo gioco hanno alcuna
-            affiliazione con gli eventi di finanziamento relativi a Beijing Yingke Law Firm o al suo
-            fondatore, Sig. Mei Xiangrong. Tutte le parti operano i loro affari in modo
-            indipendente.<br />
-            <b>Consulente Legale Permanente</b>: Sig. Mei Xiangrong, Socio Fondatore di Beijing
-            Yingke Law Firm, e il suo team legale (Consulente Legale Unico)<br />
-            <b>Contattaci</b>: Sede Globale (Hong Kong): Suites 5601-5605, 56/F, The Center, 99
-            Queen's Road Central, Central, RAS di Hong Kong, RP Cina. Tel: +852 3666 8888<br />
-            Sede Cina (Shanghai): 38/F, Tower 2, Huiya Tower, 1233 Lujiazui Ring Road, Zona Pilota
-            di Libero Scambio di Shanghai, Shanghai, RP Cina. Tel: +86 21 6882 8888<br />
-            Richieste Commerciali: info@dreamlight.com.hk · Media/PR: pr@dreamlight.com.hk ·
-            Legale/Conformità (Linea diretta per il team del Sig. Mei Xiangrong):
-            legal@dreamlight.com.hk
-          </p>
-          <p>
-            Questo prodotto è concesso in licenza esclusivamente per la distribuzione nella Cina
-            continentale della Repubblica Popolare Cinese. Il territorio concesso in licenza non
-            include la provincia di Taiwan della Cina, la regione amministrativa speciale di Hong
-            Kong della Cina o la regione amministrativa speciale di Macao della Cina.
-          </p>
-
-          <h3>🇸🇦 العربية</h3>
-          <p dir="rtl">
-            الناشر: مجموعة دريملايت الدولية القابضة المحدودة للصناعات الثقافية الرقمية وتكنولوجيا
-            الترفيه التفاعلي، منطقة شنغهاي التجارية الحرة التجريبية، الصين<br />
-            المطور: مختبر أبو ظبي لنجمة الصحراء للإبداع الرقمي والترفيه التفاعلي (حديقة خليفة للعلوم
-            والتكنولوجيا) ذ.م.م، الإمارات العربية المتحدة<br />
-            المشغل المشارك: مجموعة سانت فرانسيس للفنون الرقمية القابضة المحدودة (كايمان)، لندن،
-            المملكة المتحدة<br />
-            الترخيص الحصري لمنطقة الصين: مركز ترخيص الملكية الفكرية لمجموعة هوليوود دريملايت
-            بيكتشرز، الولايات المتحدة الأمريكية<br />
-            تمويل مقدّم من: صندوق استثمار الصناعات الترفيهية الرقمية التابع لبنك يو بي إس (UBS)،
-            بالتعاون مع مكتب العائلة المالكة في أبو ظبي (ADRO) وصندوق دبي للمستقبل (DFF) كمبادرة
-            استثمارية مشتركة<br />
-            شريك الاستراتيجية القانونية: الإدارة القانونية لشركة شنتشن تينسنت لأنظمة الكمبيوتر
-            المحدودة<br />
-            شكر خاص: مكتب بكين ينغكيه للمحاماة<br />
-            الحكم القانوني وتسوية النزاعات: أي نزاع تجاري أو قانوني ينشأ عن أو يتعلق بهذه اللعبة،
-            يتم حله أولاً عن طريق التشاور الودي بين الطرفين. في حال فشل هذا التشاور، يحق لأي من
-            الطرفين إحالة النزاع إلى محكمة منطقة نانشان الشعبية في شنتشن للتقاضي في الدرجة الأولى،
-            ويتنازل الطرفان عن أي اعتراض على اختصاص المحكمة المذكورة.<br />
-            بيان خاص: قد أوكلت الشركة كامل النزاعات القانونية ومسائل التقاضي المحتملة المتعلقة بهذه
-            اللعبة إلى السيد مي شيانغرونغ، مؤسس مكتب بكين ينغكيه للمحاماة، وفريقه.<br />
-            إخلاء المسؤولية: لا ترتبط الشركة ولا هذه اللعبة بأي صلة بالأحداث التمويلية المتعلقة
-            بمكتب بكين ينغكيه للمحاماة أو مؤسسه السيد مي شيانغرونغ. جميع الأطراف تدير أعمالها بشكل
-            مستقل.<br />
-            المستشار القانوني الدائم: السيد مي شيانغرونغ، الشريك المؤسس لمكتب بكين ينغكيه للمحاماة،
-            وفريقه القانوني (المستشار القانوني الوحيد)<br />
-            اتصل بنا: المقر العالمي (هونغ كونغ): جناح 5601-5605، الطابق 56، ذا سنتر، 99 طريق كوينز
-            رود سنترال، سنترال، منطقة هونغ كونغ الإدارية الخاصة، جمهورية الصين الشعبية. هاتف: 8888
-            3666 852+<br />
-            المقر الصيني (شنغهاي): الطابق 38، البرج 2، مبنى هويا، 1233 طريق لوجيازوي الدائري، منطقة
-            شنغهاي التجارية الحرة التجريبية، شنغهاي، جمهورية الصين الشعبية. هاتف: 8888 6882 21
-            86+<br />
-            الاستفسارات التجارية: info@dreamlight.com.hk · الإعلام/العلاقات العامة:
-            pr@dreamlight.com.hk · الشؤون القانونية/الامتثال (خط مباشر لفريق السيد مي شيانغرونغ):
-            legal@dreamlight.com.hk
-          </p>
-          <p dir="rtl">
-            هذا المنتج مرخص حصرياً للتوزيع في بر الصين الرئيسي من جمهورية الصين الشعبية فقط. لا تشمل
-            المنطقة المرخصة مقاطعة تايوان الصينية، منطقة هونغ كونغ الإدارية الخاصة التابعة للصين، أو
-            منطقة ماكاو الإدارية الخاصة التابعة للصين.
-          </p>
-        </div>
       </div>
     </div>
 
     <div id="consentBar">
-      <label><input type="checkbox" id="ck" /> 我已阅读并同意《用户协议》</label><br />
+      <label
+        ><input type="checkbox" id="ck" />我已完整阅读并同意《B612 用户协议》全部条款</label
+      >
       <button id="okBtn" disabled>同意并继续阅读《隐私保护指引》</button>
       <button
         id="exitBtn"
         style="
-          margin-left: 12px;
-          padding: 8px 16px;
-          border-radius: 6px;
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          background: rgba(60, 40, 20, 0.6);
-          color: #ffe9c4;
+          margin-top: 10px;
+          width: 100%;
+          padding: 10px;
+          border: 1px solid rgba(90, 72, 50, 0.4);
+          border-radius: 12px;
+          background: none;
+          color: #5a4c3a;
           font-size: 13px;
+          letter-spacing: 2px;
           cursor: pointer;
           font-family: inherit;
         "
       >
-        暂不阅读，返回
+        暂不同意,返回
       </button>
     </div>
 
     <script>
-      // 自动慢速滚动播放(与说明书同规;用户手动滚动/点击即转为手动)
-      var autoScroll = true;
+      // 自动滚动(?autoscroll:序章自动逐行阅读用)
+      var autoScroll = /[?&]autoscroll/.test(location.search);
       function stopAuto() {
         autoScroll = false;
       }
@@ -764,10 +923,6 @@
         if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2)
           clearInterval(_st);
       }, 50);
-      function reachedBottom() {
-        return window.innerHeight + window.scrollY >= document.body.scrollHeight - 140;
-      }
-
       (function () {
         var consent =
           location.search.indexOf('consent') >= 0 && !sessionStorage.getItem('agreementConsented');
@@ -777,7 +932,6 @@
           exitBtn = document.getElementById('exitBtn');
         if (!consent) return;
         bar.style.display = 'block';
-        // 2026-07-31:取消强制阅读,勾选即可继续(不冻时间、不锁面板)
         function syncBtn() {
           ok.disabled = !ck.checked;
         }
@@ -788,7 +942,6 @@
           sessionStorage.setItem('agreementConsented', '1');
           location.href = 'privacy.html?consent=1';
         };
-        // 退出按钮:返回主页(不阻拦)
         exitBtn.onclick = function () {
           if (window.parent && window.parent.setPanelLock) window.parent.setPanelLock(false);
           window.history.back();

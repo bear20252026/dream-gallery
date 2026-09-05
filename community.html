@@ -3,116 +3,77 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>游戏社区公约 · 梦幻画廊</title>
+    <title>Community Guidelines · B612</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Satisfy&display=swap');
       body {
         margin: 0;
         min-height: 100vh;
-        background: linear-gradient(160deg, #16101e, #241226 55%, #101822);
-        color: #e8e0d8;
-        font-family: 'Microsoft YaHei', serif;
-        padding: 0 0 120px;
+        padding: 0 0 140px;
+        color: #3f3529;
+        font-family: Georgia, 'Times New Roman', 'Microsoft YaHei', serif;
+        background:
+          repeating-linear-gradient(63deg, rgba(90, 72, 50, 0.028) 0 1px, transparent 1px 9px),
+          repeating-linear-gradient(-57deg, rgba(90, 72, 50, 0.024) 0 1px, transparent 1px 11px),
+          radial-gradient(120% 90% at 50% 20%, #f8f1df 0%, #f3ead2 55%, #eadfc2 100%);
       }
-      .wrap {
-        max-width: 720px;
-        margin: 0 auto;
-        padding: 36px 22px 0;
+      .wrap { max-width: 760px; margin: 0 auto; padding: 40px 22px 0; }
+      .eyebrow {
+        text-align: center; letter-spacing: 0.62em; font-size: 13px;
+        color: #8a7a62; margin-bottom: 10px;
       }
-      h1 {
-        color: #ffd9c4;
-        font-size: 24px;
-        text-align: center;
-        letter-spacing: 6px;
-        margin: 12px 0 4px;
+      h1.brand {
+        text-align: center; font-weight: 400; font-size: clamp(52px, 9vw, 88px);
+        letter-spacing: 0.16em; color: #3f3529; line-height: 1.05; margin: 0;
       }
-      .sub {
-        text-align: center;
-        color: rgba(255, 217, 196, 0.55);
-        font-size: 12px;
-        letter-spacing: 3px;
-        margin-bottom: 26px;
+      .script {
+        font-family: 'Satisfy', cursive; text-align: center; color: #8a6a4a;
+        font-size: clamp(22px, 3.4vw, 32px); margin: 6px 0 10px;
       }
+      .meta {
+        text-align: center; color: rgba(84, 70, 58, 0.6); font-size: 12px;
+        letter-spacing: 0.12em; margin-bottom: 8px;
+      }
+      .ornline { width: 120px; height: 1px; background: rgba(90, 72, 50, 0.4); margin: 14px auto 6px; }
+      .part { text-align: center; margin: 46px 0 20px; }
+      .part .pt { font-family: 'Satisfy', cursive; font-size: clamp(28px, 4.4vw, 40px); color: #a04a35; }
+      .part .pl { width: 120px; height: 1px; background: rgba(160, 74, 53, 0.45); margin: 10px auto 0; }
       .sec {
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 16px;
-        padding: 20px 22px;
-        margin-bottom: 16px;
+        background: rgba(253, 248, 236, 0.78);
+        border: 1px solid rgba(90, 72, 50, 0.18);
+        border-radius: 12px; padding: 18px 20px; margin-bottom: 14px;
       }
       .sec h2 {
-        color: #ffe2c4;
-        font-size: 16px;
-        margin: 0 0 10px;
-        letter-spacing: 2px;
+        color: #a04a35; font-size: 15px; margin: 0 0 10px;
+        letter-spacing: 0.14em; font-weight: 600;
       }
-      .sec h2::before {
-        content: '◆ ';
-        color: #c98a4b;
-        font-size: 13px;
-      }
+      .sec h2::before { content: '❧ '; color: #8a6a4a; font-size: 13px; }
       .sec h3 {
-        color: #ffd9a8;
-        font-size: 14px;
-        margin: 14px 0 6px;
+        color: #8a6a4a; font-size: 14px; margin: 14px 0 6px; letter-spacing: 0.08em;
       }
-      .sec p,
-      .sec li {
-        font-size: 13px;
-        line-height: 2;
-        color: rgba(232, 224, 216, 0.88);
-      }
-      .sec ul,
-      .sec ol {
-        margin: 6px 0;
-        padding-left: 20px;
-      }
+      .sec p, .sec li { font-size: 13.5px; line-height: 2; color: #54463a; }
+      .sec ul, .sec ol { margin: 6px 0; padding-left: 20px; }
       .k {
-        color: #ffd9a8;
-        background: rgba(255, 217, 168, 0.1);
-        padding: 1px 8px;
-        border-radius: 6px;
-        font-size: 12px;
+        color: #7a4a2a; background: rgba(160, 116, 74, 0.12);
+        padding: 1px 8px; border-radius: 6px; font-size: 12.5px;
       }
       #consentBar {
-        position: fixed;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        display: none;
-        background: rgba(20, 10, 18, 0.97);
-        border-top: 1px solid rgba(255, 214, 170, 0.4);
-        padding: 16px 20px;
-        text-align: center;
-        z-index: 50;
+        position: fixed; left: 0; right: 0; bottom: 0; display: none;
+        background: rgba(248, 241, 223, 0.97);
+        border-top: 1px solid rgba(90, 72, 50, 0.4);
+        padding: 16px 20px; text-align: center; z-index: 50;
       }
-      #consentBar label {
-        font-size: 14px;
-        color: #ffe2c4;
-        cursor: pointer;
-      }
+      #consentBar label { font-size: 14px; color: #4e4237; cursor: pointer; }
       #consentBar input {
-        width: 18px;
-        height: 18px;
-        vertical-align: -3px;
-        margin-right: 8px;
-        accent-color: #c98a4b;
+        width: 18px; height: 18px; vertical-align: -3px; margin-right: 8px;
+        accent-color: #a04a35;
       }
       #okBtn {
-        margin-top: 10px;
-        width: 100%;
-        padding: 13px;
-        border: none;
-        border-radius: 12px;
-        background: linear-gradient(135deg, #c98a4b, #8a5a2a);
-        color: #fff;
-        font-size: 15px;
-        letter-spacing: 3px;
-        cursor: pointer;
+        margin-top: 10px; width: 100%; padding: 13px; border: none; border-radius: 12px;
+        background: #a04a35; color: #f8f1df; font-size: 15px; letter-spacing: 3px;
+        cursor: pointer; font-family: inherit;
       }
-      #okBtn:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
-      }
+      #okBtn:disabled { opacity: 0.35; cursor: not-allowed; }
     </style>
     <script>
       // 防复制(2026-07-27 主人定):公开展示不可复制,只有后台能修改/复制;
@@ -136,8 +97,387 @@
   </head>
   <body>
     <div class="wrap">
-      <h1>游戏社区公约</h1>
-      <div class="sub">梦幻画廊 · 昆仑灵鉴 · 修订日期:2026 年 9 月 5 日</div>
+      <div class="eyebrow">T H E&#8194;D E S E R T</div>
+      <h1 class="brand">B612</h1>
+      <div class="script">Community Guidelines</div>
+      <div class="meta">
+        Updated &amp; Effective: September 6, 2026 · 修订日期:2026 年 9 月 6 日
+      </div>
+      <div class="ornline"></div>
+
+      <!-- ================= PART I · ENGLISH ================= -->
+      <div class="part">
+        <div class="pt">English</div>
+        <div class="pl"></div>
+      </div>
+
+      <div class="sec">
+        <h2>General Principles</h2>
+        <p>
+          To build an open, friendly and rewarding gallery community, and to maintain a good
+          atmosphere for browsing and creation, we have formulated these Guidelines under
+          applicable laws and in combination with the Terms of Service and the Privacy Guidelines.
+          Whenever you upload, publish, spread content or interact in the Gallery, you shall comply
+          with laws, public order and good morals, and with these Guidelines.
+        </p>
+        <p>
+          We encourage you to upload and share: content that promotes core socialist values and
+          displays fine traditional Chinese culture and the spirit of the times; content recording
+          sincere moments and passing on warmth; content that helps build consensus and answer
+          questions; and other content of taste, class and responsibility.
+        </p>
+        <p>
+          The following chapters classify prohibited content and disposal rules. Every prohibition
+          is a red line. Violations are determined by these Guidelines; where laws provide
+          otherwise, those provisions prevail.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>Part One · Platform Advocacy &amp; User Consensus</h2>
+        <p>
+          <b>General.</b> This platform is operated and managed by Dreamlight Digital Culture
+          &amp; Technology Interactive Entertainment International United Holding Group Co., Ltd.
+          (the "Company"). To build a clear, healthy, orderly and harmonious cyberspace, foster a
+          positive, civil and friendly gaming environment, and protect the lawful rights of every
+          user, the Company formulates this Advocacy &amp; Consensus under the Cybersecurity Law,
+          the Data Security Law, the Personal Information Protection Law, the Law on the
+          Protection of Minors, the Provisions on the Governance of the Online Information Content
+          Ecosystem, the Measures for the Administration of Internet Information Services, the
+          Interim Measures for the Administration of Online Games and other laws and regulatory
+          documents, in light of the platform's actual operations. The Company firmly believes
+          that the internet is not only a frontier of technological innovation but also an
+          important vehicle for spreading advanced culture, promoting social integrity and
+          strengthening the national spirit; it always places social responsibility at the core of
+          enterprise development, adhering to the philosophy of "technology for good, content
+          upward, responsibility in depth".
+        </p>
+
+        <h3>Chapter 1 · Political Guidance: Building the Ideological Foundation</h3>
+        <p>
+          <b>Article 1. Uphold the overall leadership of the Party.</b> The platform resolutely
+          supports the leadership of the Communist Party of China, follows Xi Jinping Thought on
+          Socialism with Chinese Characteristics for a New Era, implements the spirit of the 20th
+          National Congress and its second and third plenary sessions, and integrates the Party's
+          innovative theories into content building, technical development, operations management
+          and user services.
+        </p>
+        <p>
+          <b>Article 2. Safeguard network ideological security.</b> We advocate that all users
+          consciously safeguard network ideological security and resolutely resist erroneous
+          trends such as historical nihilism and harmful information. The platform will establish
+          risk-prevention mechanisms and strengthen review of user-generated content to keep
+          cyberspace clear and orderly.
+        </p>
+        <p>
+          <b>Article 3. Implement the holistic view of national security.</b> The platform fully
+          implements the holistic view of national security, places national security at the
+          highest position of platform development, strictly complies with the National Security
+          Law, prevents and stops acts endangering national security, and actively co-operates
+          with national security organs.
+        </p>
+        <p>
+          <b>Article 4. Promote core socialist values.</b> We advocate prosperity, democracy,
+          civility and harmony as national goals; freedom, equality, justice and the rule of law
+          as social values; and patriotism, dedication, integrity and friendliness as personal
+          values, making core socialist values the common pursuit of all users.
+        </p>
+        <p>
+          <b>Article 5. Implement the responsibility system for network ideological work.</b> The
+          platform has a dedicated content review team applying strict review standards to content
+          involving political direction, stance and attitude, and resolutely prevents speech and
+          conduct that violate the Party's line, principles and policies.
+        </p>
+
+        <h3>Chapter 2 · Economic Development: Serving the Real Economy, Stimulating Innovation</h3>
+        <p>
+          <b>Article 6. Promote high-quality development of the digital economy.</b> The platform
+          actively responds to the national digital economy strategy, promotes deep integration of
+          digital technology with the real economy through technological and model innovation, and
+          contributes to high-quality digital economic development.
+        </p>
+        <p>
+          <b>Article 7. Support the digital transformation of SMEs.</b> We advocate lowering
+          digital thresholds, providing technical enablement and opening platform resources so
+          that small and medium-sized enterprises share the dividends of the digital economy.
+        </p>
+        <p>
+          <b>Article 8. Maintain fair market competition.</b> The platform upholds fair
+          competition, strictly complies with the Anti-Monopoly Law and the Anti-Unfair
+          Competition Law, and opposes all forms of monopoly and unfair competition.
+        </p>
+        <p>
+          <b>Article 9. Promote employment, entrepreneurship and talent.</b> We advocate creating
+          jobs through the platform economy, building digital-skills training systems, helping
+          workers improve digital literacy and vocational skills, contributing to stable
+          employment and entrepreneurship.
+        </p>
+        <p>
+          <b>Article 10. Serve coordinated regional development.</b> The platform responds to the
+          national strategy of coordinated regional development, works to narrow the digital
+          divide, promotes inclusive digital services, and participates in rural revitalisation
+          toward common prosperity.
+        </p>
+
+        <h3>Chapter 3 · Cultural Prosperity: Promoting Chinese Culture and Confidence</h3>
+        <p>
+          <b>Article 11. Inherit fine traditional Chinese culture.</b> We advocate creative
+          transformation and innovative development of fine traditional Chinese culture through
+          digital technology, encourage digital cultural products on traditional themes, and
+          promote the spread and recognition of traditional culture among the young.
+        </p>
+        <p>
+          <b>Article 12. Promote revolutionary and advanced socialist culture.</b> We advocate
+          spreading revolutionary culture and advanced socialist culture — telling the stories of
+          the Party, the revolution and heroes — so the red gene is passed on in the digital age.
+        </p>
+        <p>
+          <b>Article 13. Tell China's story well.</b> The platform strives to be a window showing
+          China's image and voice, advocating culture as a carrier of values, presenting a true,
+          three-dimensional and comprehensive China to the world.
+        </p>
+        <p>
+          <b>Article 14. Cultivate healthy online culture.</b> We advocate creating and spreading
+          online cultural products that unite thought, artistry and watchability, resolutely
+          resist vulgar, cheap and pandering content, and make positive, healthy and uplifting
+          online culture the mainstream of the platform.
+        </p>
+        <p>
+          <b>Article 15. Strengthen online civility.</b> We advocate civilised browsing,
+          interaction and expression, conscious compliance with online conduct norms, and joint
+          maintenance of online civility suited to the new era.
+        </p>
+
+        <h3>Chapter 4 · Social Harmony: Social Responsibility, a Clear Cyberspace</h3>
+        <p>
+          <b>Article 16. Put social benefits first.</b> The platform always puts social benefits
+          first while unifying social and economic benefits, integrates enterprise development
+          into social progress, and consciously accepts social supervision.
+        </p>
+        <p>
+          <b>Article 17. Strengthen protection of minors.</b> The platform attaches great
+          importance to protecting minors, strictly implements the Law on the Protection of
+          Minors and the Regulations on the Online Protection of Minors, fully implements
+          anti-addiction, age-appropriateness notices and parental supervision measures, and has
+          zero tolerance for violations involving minors.
+        </p>
+        <p>
+          <b>Article 18. Protect users' lawful rights.</b> We advocate respecting and serving
+          users, safeguarding users' rights to know, participate, express and supervise, keeping
+          complaint channels open, and responding promptly to reasonable demands.
+        </p>
+        <p>
+          <b>Article 19. Strengthen personal information protection.</b> The platform strictly
+          complies with the Personal Information Protection Law, advocates the principles of
+          minimum necessity, openness and transparency, and user consent, periodically conducts
+          personal information protection impact assessments, and uses encryption,
+          de-identification and other technical measures to ensure information security.
+        </p>
+        <p>
+          <b>Article 20. Build pluralistic co-governance.</b> The platform promotes a governance
+          pattern of government regulation, corporate responsibility, social supervision and user
+          self-discipline, actively accepts supervision and criticism from all sectors, and
+          promotes co-building, co-governance and shared benefits.
+        </p>
+        <p>
+          <b>Article 21. Protect the rights of special groups.</b> The platform cares about the
+          digital rights of the elderly and the disabled, advocates an accessible digital
+          environment, helps special groups cross the digital divide and share the fruits of
+          digital civilisation.
+        </p>
+
+        <h3>Chapter 5 · Ecological Protection: Green Philosophy, Digital Homeland</h3>
+        <p>
+          <b>Article 22. Respond to the national dual-carbon strategy.</b> The platform actively
+          responds to the national goals of carbon peaking and carbon neutrality, advocates
+          green and low-carbon internet use, and integrates ecological civilisation into platform
+          development.
+        </p>
+        <p>
+          <b>Article 23. Promote green data centres.</b> We advocate advanced technologies to
+          improve energy efficiency and reduce carbon intensity, preferentially purchase green
+          electricity, and promote green, low-carbon transformation of data centres.
+        </p>
+        <p>
+          <b>Article 24. Advocate low-carbon internet behaviour.</b> The platform advocates that
+          all users save resources and protect the environment, conserving energy and reducing
+          unnecessary consumption when using digital services.
+        </p>
+        <p>
+          <b>Article 25. Resist pollution by harmful content.</b> The platform resolutely resists
+          vulgar, cheap and pandering content that pollutes the online ecosystem, maintains
+          regular content inspection and cleaning, and advocates that users consciously resist and
+          report harmful information.
+        </p>
+        <p>
+          <b>Article 26. Integrate digital and ecological civilisation.</b> We advocate using
+          digital technology to empower ecological monitoring, biodiversity protection and green
+          low-carbon development, enhancing environmental awareness across society and
+          contributing digital strength to a beautiful China.
+        </p>
+
+        <h3>Chapter 6 · Closing</h3>
+        <p>
+          <b>Article 27. Common vision.</b> The internet is the common spiritual home of humanity.
+          Building a clear, healthy, orderly and harmonious cyberspace is the shared
+          responsibility and vision of all society. The platform calls on all users: let us start
+          with ourselves, start now, start with small things, hold to the legal bottom line,
+          observe online morality, actively spread positive energy and consciously resist negative
+          energy.
+        </p>
+        <p>
+          <b>Article 28. Advance hand in hand.</b> Guided by core socialist values, anchored in
+          laws and regulations, shouldering social responsibility, aiming at cultural prosperity
+          and ecological protection, let us advance together and contribute magnificent digital
+          strength to building a modern socialist country and national rejuvenation!
+        </p>
+        <p>
+          <b>Article 29. Continuous improvement.</b> This Advocacy &amp; Consensus will be revised
+          and improved in light of changes in laws, social development and platform operations. We
+          welcome users' valuable comments and suggestions to continuously improve platform
+          governance.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>Part Two · Community Red Lines</h2>
+        <p>
+          The following are red lines no user may cross. Every prohibition guards the consensus
+          above.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>1. Illegality &amp; Prohibited Content</h2>
+        <p>It is strictly forbidden to publish the following:</p>
+        <ul>
+          <li>Content endangering the socialist system, or attacking or negating the guiding ideology and action guidelines of the Party and the state;</li>
+          <li>Content splitting the country or harming national sovereignty and territorial integrity (including misuse of national symbols, callsigns, titles and maps);</li>
+          <li>Content harming national honour and interests (insulting the national anthem, flag, emblem or currency; defaming revolutionary leaders, heroes and martyrs, or public servants and Party members);</li>
+          <li>Content leaking important Party and state secrets (privately filming military operations, disclosing coordinates of military sites, leaking unpublished documents and deployments);</li>
+          <li>Content harming ethnic and regional unity (mocking or hurting ethnic/regional feelings, rendering confrontation, defaming ethnic customs);</li>
+          <li>Content violating national religious policy (religious extremism, cults and superstition, using religion to undermine the system and unity);</li>
+          <li>Spreading terrorism or extremism (advocating terrorist acts, showing violent terror imagery or symbols);</li>
+          <li>Glorifying wars of aggression and colonial history (advocating fascism, extreme nationalism, using colonial-flavoured wording and imagery);</li>
+          <li>Spreading or marketing feudal superstition (recruiting for profit, sorcery, divination for healing or fortune-changing, conspiracy theories via superstition);</li>
+          <li>Promoting, producing, selling or using prohibited items (guns and ammunition, controlled knives, explosives and dangerous chemicals, drugs and narcotic/psychotropic substances, reactionary publications, etc.);</li>
+          <li>Infringing the lawful rights of individuals or organisations (copyright infringement, impersonating rights holders, leaking privacy and trade secrets, insult, defamation, harming reputation and goodwill);</li>
+          <li>Other illegal or non-compliant content (gambling tricks, organised crime, fake certificates and tickets, illegal trading of personal information, surrogacy, illegal adoption, illegal finance, illegal circulation of tobacco and alcohol, lock-picking tools, drone hacking, false fundraising, domestic violence, illegal equipment, all kinds of fraud, abusing/killing protected animals, illegally introducing or releasing alien species, etc.).</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>2. Violating Public Order &amp; Good Morals</h2>
+        <ul>
+          <li>Terror, blood, violence, freakish or disgusting content causing strong discomfort (severe injury/bleeding, blood-horror as a selling point, abusing animals, corpses, suicide/accident scenes, jump scares);</li>
+          <li>Content causing disgust (excrement, filth, trypophobia imagery, freakish eating);</li>
+          <li>Expressing opinions or marketing with aggressive catchphrases, internet slang, profanity or insulting gestures (generic-kin slurs, stigmatising homophones, group-confrontation terms, insulting acts);</li>
+          <li>Content risking serious injury or death (choking/electric-shock challenges, eating toxic substances, dangerous driving disturbing traffic);</li>
+          <li>Instigating, teaching or promoting self-harm or suicide, showing tendencies or expressing suicidal intent;</li>
+          <li>Risk-seeking behaviour for attention or marketing (death-defying challenges, prank stunts, displaying lethal weapons);</li>
+          <li>Spreading bad trends and values (smoking, drinking, flaunting wealth, money worship; AI face-swap risks; pseudo-superstition; mocking disasters; bottomless ugly-idol worship; damaging the environment; fighting violence with violence; benefiting at others' expense; improper views on relations; paid companionship; malicious group marketing; exploiting the deceased for sympathy; "sang" defeatist culture; vulgar wedding pranks; wasting food and binge eating; distorting classics; following disgraced celebrities);</li>
+          <li>Other content not advocated by law and social morality.</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>3. Pornography &amp; Vulgarity</h2>
+        <ul>
+          <li>Publishing obscene or pornographic information, or promoting/redirecting to it;</li>
+          <li>Publishing imagery, acts, words, text or sounds with sexual innuendo, teasing, inducement or association.</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>4. Harming Minors' Physical &amp; Mental Health</h2>
+        <ul>
+          <li>Content involving minors' sexual acts, nudity, sexual transactions, molestation or harassment; showing school or domestic violence, cyberbullying or doxxing of minors; showing minors' drug use, gambling or illegal child labour;</li>
+          <li>Inducing minors to publish content leaking personal information; improperly showing names, faces, addresses or schools of minors under 14 without guardian consent;</li>
+          <li>Showing minors' smoking, drinking or tattoos, profanity or cosmetic procedures, school-weariness, entering commercial entertainment venues, joining gangs; showing extreme fan-circle behaviour (fan wars, vote-baiting); causing extreme emotions, inducing high-risk imitation, spreading bad slang, promoting ghostwritten homework or bullying, providing companion-play or boosting services, or advocating drug abuse;</li>
+          <li>Spreading content affecting minors' values (corrupt cartoons, wealth-flaunting, early marriage/dating/pregnancy, cracking anti-addiction systems, negative self-deprecation, extravagant decadence, pseudo-science scaremongering, bad views on friendship or the uselessness of study);</li>
+          <li>Exploiting minors for profit (merchandising, inducing tipping, using their image for traffic, controversial personas for clicks, improper tests and judgements, sensationalising minors' crimes);</li>
+          <li>Displaying content that may affect minors' physical and mental health without a prominent notice.</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>5. Violating Science &amp; Truthfulness</h2>
+        <ul>
+          <li>Impersonating persons or organisations (usernames, avatars, brands) to pretend to be state organs, news media, social organisations or other accounts;</li>
+          <li>Publishing information proven to be rumour or inconsistent with facts; distorting, tampering with or fabricating misleading information;</li>
+          <li>Over-generalising or falsely assigning causality; using time-expired information to interpret recent events; repeating hearsay, quoting out of context, fabricating or exaggerating;</li>
+          <li>Content violating scientific common sense or misinterpreting scientific principles; unverified historical rumours and distorted history; sensational and unwarranted content; distorting interpretations without reliable sources or fabricating authoritative opinions; material errors in objective facts (names, data, times, places);</li>
+          <li>Using deep learning, virtual reality and other new technologies to produce or spread non-genuine audio/video without prominent labelling;</li>
+          <li>Providing internet news information services beyond licensing; publishing finance, medical, judicial or educational professional content requires corresponding qualifications — publishing financial product recommendations, medication guidance, legal interpretation or paid education/training without qualifications is prohibited.</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>6. Unfriendly Conduct</h2>
+        <ul>
+          <li>Attacking others for unfair competition or traffic; insults, personal attacks, vulgar profanity in discussions; harassment, coercion, threats or malicious cursing;</li>
+          <li>Exposing others' private information (real names, phones, addresses, contacts, photos) without permission, or using public information to harass; naming-and-shaming or exposing accounts likely to cause cyberbullying;</li>
+          <li>Negative statements contrary to facts or emotionally inflamed; groundless bias; inciting or instigating radical follow-the-crowd acts; malicious labelling; false-flag smears and deliberate provocation; clipping and relaying controversial fragments to split the community;</li>
+          <li>"Dark jokes" entertainment-ising death, illness, disability or disasters; improper behaviour at solemn commemorations; violence and hatred toward disaster victims and their families;</li>
+          <li>Inciting group confrontation, creating group conflicts, spreading extreme hatred; insulting others' occupations, status or physical features; prejudice and discrimination against any group;</li>
+          <li>Extreme fan-circle behaviour (mutual scolding, fan wars, mindless rants, false exposés, romance hype, calling for rankings/fundraising/account buying/traffic brushing/control-commenting, organised paid trolls, advocating traffic supremacy and deformed aesthetics).</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>7. Disrupting Platform Order</h2>
+        <ul>
+          <li>Improperly inducing data growth (prize interactions, incentivised transactions and fake data); using automated systems to brush comments or buying fake data from third parties;</li>
+          <li>Deceptive, misleading, ambiguous or out-of-context covers and headlines for attention;</li>
+          <li>Publishing large amounts of repetitive, purposeless or irrelevant spam; batch auto-generated content; sock-puppet submissions; grey-industry funnel-selling;</li>
+          <li>Counterfeit, shoddy or pirated spam advertising and non-compliant promotion; improperly funneling users to third-party platforms for registration or transactions;</li>
+          <li>Displaying, teaching or promoting game plug-ins and private servers;</li>
+          <li>Repeatedly uploading violating content ignoring rules and notices, or anomalously swapping sources to replace data;</li>
+          <li>Abusing platform functions (malicious reporting, fabricating evidence for reports, exploiting loopholes for profit, improper funneling);</li>
+          <li>Disposing of account usage rights by gift, loan, transfer, sale, pledge, inheritance or licensing to others;</li>
+          <li>Unauthorised use of brand wording such as "in cooperation with the Gallery" or "co-produced with the Gallery" for promotion.</li>
+        </ul>
+      </div>
+
+      <div class="sec">
+        <h2>8. Disposal of Violations</h2>
+        <p>
+          For content violating these Guidelines we will, per severity: remind and label, restrict
+          display, fold, delete and take offline, and remove violating information. For violating
+          visitors: clear nicknames, restrict functions, blacklist.
+        </p>
+        <p>
+          Disposal follows the gradient principle: escalating with accumulated violations and
+          severity — leniency for first offences, strictness for repeat offenders; for major
+          social harm, serious adverse influence or extremely bad circumstances, the gradient does
+          not apply and we go straight to strictness up to permanent banning. Frequent-reported
+          visitors will be warned first and observed. Disposal information may be published as
+          notices; illegal matters are reported to the relevant authorities by law.
+        </p>
+        <p>
+          For content infringing others' lawful rights, rights holders may complain via the
+          "notice" procedure in the Terms of Service; the disposed party may appeal via the
+          "counter-notice" procedure. Reports and appeals are accepted via the wish wall
+          (一念之墙) or legal@dreamlight.com.hk.
+        </p>
+      </div>
+
+      <div class="sec">
+        <h2>9. Supplementary</h2>
+        <p>
+          These Guidelines, together with the Terms of Service and the Privacy Guidelines, form
+          the complete understanding for your use of the Gallery. They may be revised from time to
+          time (detailed lists of each chapter's prohibitions will be supplemented successively);
+          revisions will be published on this page. Let us guard this clear gallery of B612
+          together.
+        </p>
+      </div>
+
+      <!-- ================= PART II · 简体中文 ================= -->
+      <div class="part">
+        <div class="pt">简体中文</div>
+        <div class="pl"></div>
+      </div>
 
       <div class="sec">
         <h2>总则</h2>
@@ -298,59 +638,30 @@
         <p>严禁发布以下内容(详目见后续修订版):</p>
         <ul>
           <li>禁止发布危害中国特色社会主义制度、攻击否定党和国家指导思想与行动指南的内容;</li>
-          <li>
-            禁止发布分裂国家、破坏国家主权与领土完整的内容(含错用滥用国家标识、呼号、称谓、地图的);
-          </li>
-          <li>
-            禁止发布损害国家荣誉和利益的内容(侮辱国歌国旗国徽人民币、贬损恶搞革命领袖与英雄烈士、贬损公务人员与党员形象的);
-          </li>
-          <li>
-            禁止发布泄露党和国家重要机密的内容(私拍军事行动、泄露军事场所坐标、泄露未公开文件部署的);
-          </li>
+          <li>禁止发布分裂国家、破坏国家主权与领土完整的内容(含错用滥用国家标识、呼号、称谓、地图的);</li>
+          <li>禁止发布损害国家荣誉和利益的内容(侮辱国歌国旗国徽人民币、贬损恶搞革命领袖与英雄烈士、贬损公务人员与党员形象的);</li>
+          <li>禁止发布泄露党和国家重要机密的内容(私拍军事行动、泄露军事场所坐标、泄露未公开文件部署的);</li>
           <li>禁止发布损害民族与地域团结的内容(嘲笑伤害民族地域感情、渲染对立、丑化民族习俗的);</li>
-          <li>
-            禁止发布违背国家宗教政策的内容(宗教极端、邪教迷信、利用宗教破坏制度与团结的——本项从简,详目另行公布);
-          </li>
+          <li>禁止发布违背国家宗教政策的内容(宗教极端、邪教迷信、利用宗教破坏制度与团结的——本项从简,详目另行公布);</li>
           <li>禁止传播恐怖主义、极端主义的内容(宣扬恐怖活动、展示暴恐画面与标志的);</li>
-          <li>
-            禁止宣扬、美化历史上侵略战争和殖民史的内容(宣扬法西斯主义、极端民族主义、使用殖民色彩词汇画面的);
-          </li>
-          <li>
-            禁止散布或营销封建迷信的内容(收徒开班敛财、巫术作法、占卜治病改运、借迷信传播阴谋论的);
-          </li>
-          <li>
-            禁止发布违禁物品的宣传、制作、销售、使用内容(枪支弹药、管制刀具、爆炸腐蚀性危险品、毒品及麻醉精神物品、反动出版物等);
-          </li>
-          <li>
-            禁止发布侵犯他人或组织合法权益的内容(侵犯著作权、冒充权利人、泄露他人隐私与商业秘密、侮辱诽谤损害名誉商誉的);
-          </li>
-          <li>
-            禁止发布其他违法违规内容(赌博千术、黑恶势力、假证假票、非法买卖个人信息、代孕、非法领养、非法金融、烟草酒类非法流通、开锁工具、无人机破解、虚假募捐、家庭暴力、非法设备、各类欺骗诈骗、虐待捕杀食用保护动物、非法引进放生外来物种等)。
-          </li>
+          <li>禁止宣扬、美化历史上侵略战争和殖民史的内容(宣扬法西斯主义、极端民族主义、使用殖民色彩词汇画面的);</li>
+          <li>禁止散布或营销封建迷信的内容(收徒开班敛财、巫术作法、占卜治病改运、借迷信传播阴谋论的);</li>
+          <li>禁止发布违禁物品的宣传、制作、销售、使用内容(枪支弹药、管制刀具、爆炸腐蚀性危险品、毒品及麻醉精神物品、反动出版物等);</li>
+          <li>禁止发布侵犯他人或组织合法权益的内容(侵犯著作权、冒充权利人、泄露他人隐私与商业秘密、侮辱诽谤损害名誉商誉的);</li>
+          <li>禁止发布其他违法违规内容(赌博千术、黑恶势力、假证假票、非法买卖个人信息、代孕、非法领养、非法金融、烟草酒类非法流通、开锁工具、无人机破解、虚假募捐、家庭暴力、非法设备、各类欺骗诈骗、虐待捕杀食用保护动物、非法引进放生外来物种等)。</li>
         </ul>
       </div>
 
       <div class="sec">
         <h2>二、违背公序良俗</h2>
         <ul>
-          <li>
-            禁止发布恐怖、血腥、暴力、猎奇、恶心等引人强烈不适的内容(严重损伤流血画面、以血腥恐怖为卖点的作品、虐杀虐待动物、尸体露出、事故自杀现场、突发惊吓画面的);
-          </li>
-          <li>
-            禁止发布易造成恶心不适的内容(展示排泄物、恶心脏污、密集恐惧画面、猎奇恶俗进食行为的);
-          </li>
-          <li>
-            禁止以带有攻击侮辱意味的口头禅、网络用语、粗口、行为动作表达观点或进行营销(泛亲属类粗口、污名化谐音、群体性煽动对立词汇、侮辱性动作等);
-          </li>
-          <li>
-            禁止发布可能造成严重伤害或死亡危险的内容(窒息/电击等危险挑战、进食有毒有害物质、危险驾驶扰乱交通的);
-          </li>
+          <li>禁止发布恐怖、血腥、暴力、猎奇、恶心等引人强烈不适的内容(严重损伤流血画面、以血腥恐怖为卖点的作品、虐杀虐待动物、尸体露出、事故自杀现场、突发惊吓画面的);</li>
+          <li>禁止发布易造成恶心不适的内容(展示排泄物、恶心脏污、密集恐惧画面、猎奇恶俗进食行为的);</li>
+          <li>禁止以带有攻击侮辱意味的口头禅、网络用语、粗口、行为动作表达观点或进行营销(泛亲属类粗口、污名化谐音、群体性煽动对立词汇、侮辱性动作等);</li>
+          <li>禁止发布可能造成严重伤害或死亡危险的内容(窒息/电击等危险挑战、进食有毒有害物质、危险驾驶扰乱交通的);</li>
           <li>禁止发布教唆、教授、宣传自残自杀,展示自残自杀倾向及表达自杀意愿的内容;</li>
           <li>禁止以危险行为博取眼球进行营销炒作(作死挑战、恶作剧噱头、展示使用杀伤力器物的);</li>
-          <li>
-            禁止传播不良风气与价值观(吸烟酗酒炫富拜金、AI
-            换脸风险内容、泛迷信、恶搞灾难、无底线审丑、破坏环境、以暴制暴、损人利己、不当两性观念、有偿交友、恶意群体营销、炒作逝者卖惨、丧文化、低俗婚闹、浪费粮食暴饮暴食、篡改歪曲名著、追崇劣迹艺人等);
-          </li>
+          <li>禁止传播不良风气与价值观(吸烟酗酒炫富拜金、AI 换脸风险内容、泛迷信、恶搞灾难、无底线审丑、破坏环境、以暴制暴、损人利己、不当两性观念、有偿交友、恶意群体营销、炒作逝者卖惨、丧文化、低俗婚闹、浪费粮食暴饮暴食、篡改歪曲名著、追崇劣迹艺人等);</li>
           <li>禁止发布其他法律法规与社会道德所不倡导的内容。</li>
         </ul>
       </div>
@@ -366,21 +677,11 @@
       <div class="sec">
         <h2>四、危害或影响未成年人身心健康</h2>
         <ul>
-          <li>
-            禁止发布涉及未成年人性行为、裸露、性交易、猥亵、性骚扰等内容,禁止展示校园暴力、家庭暴力、对未成年人网络暴力与人肉搜索,禁止展示未成年人吸毒赌博、违法雇佣童工;
-          </li>
-          <li>
-            禁止诱导未成年人发布泄露个人信息的内容,禁止未经监护人同意不当展示不满十四周岁未成年人的姓名、面貌、住址、学校等信息;
-          </li>
-          <li>
-            禁止展示未成年人抽烟酗酒纹身、粗口医美、厌学弃学、出入营业性娱乐场所、参加黑社会组织等不良行为,禁止展示极端饭圈行为(拉踩引战、号召打榜投票),禁止引发未成年人极端情绪、诱导高风险模仿、传播不良网络用语、宣扬代写代抄欺凌、提供陪玩代练服务、宣扬滥用药物;
-          </li>
-          <li>
-            禁止传播影响未成年人价值观的内容(邪典卡通、炫富拜金、早婚早恋早孕、破解防沉迷、消极自我贬损、奢靡颓废低俗、伪科学危言耸听、不良交友观与读书无用论等);
-          </li>
-          <li>
-            禁止利用未成年人牟利(带货营销、诱导充值打赏、借形象引流摆拍、争议人设博流量、不当测试评判、歪曲炒作涉未成年人违法犯罪);
-          </li>
+          <li>禁止发布涉及未成年人性行为、裸露、性交易、猥亵、性骚扰等内容,禁止展示校园暴力、家庭暴力、对未成年人网络暴力与人肉搜索,禁止展示未成年人吸毒赌博、违法雇佣童工;</li>
+          <li>禁止诱导未成年人发布泄露个人信息的内容,禁止未经监护人同意不当展示不满十四周岁未成年人的姓名、面貌、住址、学校等信息;</li>
+          <li>禁止展示未成年人抽烟酗酒纹身、粗口医美、厌学弃学、出入营业性娱乐场所、参加黑社会组织等不良行为,禁止展示极端饭圈行为(拉踩引战、号召打榜投票),禁止引发未成年人极端情绪、诱导高风险模仿、传播不良网络用语、宣扬代写代抄欺凌、提供陪玩代练服务、宣扬滥用药物;</li>
+          <li>禁止传播影响未成年人价值观的内容(邪典卡通、炫富拜金、早婚早恋早孕、破解防沉迷、消极自我贬损、奢靡颓废低俗、伪科学危言耸听、不良交友观与读书无用论等);</li>
+          <li>禁止利用未成年人牟利(带货营销、诱导充值打赏、借形象引流摆拍、争议人设博流量、不当测试评判、歪曲炒作涉未成年人违法犯罪);</li>
           <li>发布可能对未成年人身心健康产生影响的内容时,禁止不作显著提示直接展示。</li>
         </ul>
       </div>
@@ -388,60 +689,34 @@
       <div class="sec">
         <h2>五、违背科学与真实性</h2>
         <ul>
-          <li>
-            禁止冒用他人或机构身份(用户名、头像、品牌等)伪装冒充国家机构、新闻媒体、社会组织或他人账号;
-          </li>
+          <li>禁止冒用他人或机构身份(用户名、头像、品牌等)伪装冒充国家机构、新闻媒体、社会组织或他人账号;</li>
           <li>禁止发布被证实为谣言或与事实不一致的信息,禁止扭曲、篡改、误导编造的虚假信息;</li>
-          <li>
-            禁止以偏概全、乱赋因果的失实内容,禁止用无法追溯时效的信息解读近期事件,禁止以讹传讹、断章取义、杜撰夸大;
-          </li>
-          <li>
-            禁止发布违背科学常识、曲解科学原理的内容,禁止无权威论证的历史传闻与曲解历史,禁止耸人听闻名不副实的内容,禁止无可靠信源歪曲解读、虚构权威观点,禁止重要客观事实(名称、数据、时间、地点)错误;
-          </li>
+          <li>禁止以偏概全、乱赋因果的失实内容,禁止用无法追溯时效的信息解读近期事件,禁止以讹传讹、断章取义、杜撰夸大;</li>
+          <li>禁止发布违背科学常识、曲解科学原理的内容,禁止无权威论证的历史传闻与曲解历史,禁止耸人听闻名不副实的内容,禁止无可靠信源歪曲解读、虚构权威观点,禁止重要客观事实(名称、数据、时间、地点)错误;</li>
           <li>禁止利用深度学习、虚拟现实等新技术制作传播未作显著标识的非真实音视频信息;</li>
-          <li>
-            禁止超越许可范围开展互联网新闻信息服务;发布财经、医疗、司法、教育等专业领域内容须具备相应资质,禁止无资质发布金融产品推荐、用药指导、法条解读、收费教育培训等内容。
-          </li>
+          <li>禁止超越许可范围开展互联网新闻信息服务;发布财经、医疗、司法、教育等专业领域内容须具备相应资质,禁止无资质发布金融产品推荐、用药指导、法条解读、收费教育培训等内容。</li>
         </ul>
       </div>
 
       <div class="sec">
         <h2>六、不友善行为</h2>
         <ul>
-          <li>
-            禁止以不正当竞争或博眼球博流量为目的攻击他人,禁止辱骂谩骂、人身攻击、以粗俗脏话参与讨论,禁止骚扰、胁迫、威胁、恶意诅咒他人;
-          </li>
-          <li>
-            禁止未经允许曝光他人隐私信息(真实姓名、电话、地址、联系方式、照片等)或利用公开信息骚扰挑事,禁止挂人、曝光账号等可能致使网络暴力的行为;
-          </li>
-          <li>
-            禁止以违背客观事实或情绪激化的形式发布负面言论,禁止无端偏见,禁止挑拨煽动教唆跟风过激行为,禁止恶意贴标签扣帽子,禁止反串抹黑、故意抬杠挑衅,禁止截取搬运争议性碎片信息制造社区撕裂;
-          </li>
-          <li>
-            禁止对死亡、病痛、伤残、灾难进行娱乐化恶搞的"地狱笑话",禁止在严肃纪念场合的不雅举止,禁止对灾难受害者及其亲属施加暴力仇视;
-          </li>
-          <li>
-            禁止挑拨煽动群体对立、制造群体矛盾、宣扬极端仇恨,禁止侮辱贬损他人职业身份、社会地位、身体特征,禁止对各群体的偏见与歧视;
-          </li>
-          <li>
-            禁止饭圈极端行为(互撕谩骂、拉踩引战、无脑吐槽、不实爆料、绯闻炒作、号召诱导打榜集资买号刷量控评、策动雇佣水军职业黑粉、鼓吹流量至上畸形审美)。
-          </li>
+          <li>禁止以不正当竞争或博眼球博流量为目的攻击他人,禁止辱骂谩骂、人身攻击、以粗俗脏话参与讨论,禁止骚扰、胁迫、威胁、恶意诅咒他人;</li>
+          <li>禁止未经允许曝光他人隐私信息(真实姓名、电话、地址、联系方式、照片等)或利用公开信息骚扰挑事,禁止挂人、曝光账号等可能致使网络暴力的行为;</li>
+          <li>禁止以违背客观事实或情绪激化的形式发布负面言论,禁止无端偏见,禁止挑拨煽动教唆跟风过激行为,禁止恶意贴标签扣帽子,禁止反串抹黑、故意抬杠挑衅,禁止截取搬运争议性碎片信息制造社区撕裂;</li>
+          <li>禁止对死亡、病痛、伤残、灾难进行娱乐化恶搞的"地狱笑话",禁止在严肃纪念场合的不雅举止,禁止对灾难受害者及其亲属施加暴力仇视;</li>
+          <li>禁止挑拨煽动群体对立、制造群体矛盾、宣扬极端仇恨,禁止侮辱贬损他人职业身份、社会地位、身体特征,禁止对各群体的偏见与歧视;</li>
+          <li>禁止饭圈极端行为(互撕谩骂、拉踩引战、无脑吐槽、不实爆料、绯闻炒作、号召诱导打榜集资买号刷量控评、策动雇佣水军职业黑粉、鼓吹流量至上畸形审美)。</li>
         </ul>
       </div>
 
       <div class="sec">
         <h2>七、扰乱平台秩序</h2>
         <ul>
-          <li>
-            禁止以不正当手段诱导提升数据(互动有奖选取、利益诱导交易刷数据),禁止利用自动化系统刷评、向第三方购买虚假数据;
-          </li>
+          <li>禁止以不正当手段诱导提升数据(互动有奖选取、利益诱导交易刷数据),禁止利用自动化系统刷评、向第三方购买虚假数据;</li>
           <li>禁止利用欺骗、误导、歧义、断章取义等形式的封面标题博取关注;</li>
-          <li>
-            禁止发布大量重复、无目的或无关的垃圾内容,禁止批量自动生成内容、小号批量投稿、黑灰产引流贩卖;
-          </li>
-          <li>
-            禁止发布山寨假货盗版资源的垃圾广告与违规推广,禁止诱导用户至第三方平台注册交易的不正当引流;
-          </li>
+          <li>禁止发布大量重复、无目的或无关的垃圾内容,禁止批量自动生成内容、小号批量投稿、黑灰产引流贩卖;</li>
+          <li>禁止发布山寨假货盗版资源的垃圾广告与违规推广,禁止诱导用户至第三方平台注册交易的不正当引流;</li>
           <li>禁止游戏外挂、私服的展示、教学及推广;</li>
           <li>禁止无视规则与提示反复上传违规内容、异常换源顶替数据;</li>
           <li>禁止滥用平台功能(恶意举报、伪造证据举报、利用漏洞牟利、不当引流);</li>
@@ -459,7 +734,7 @@
           处置按梯度原则执行:依据累计违规次数与情节严重程度逐次加重,初犯从轻、屡犯从严;造成重大社会危害、严重不良影响或情节极其恶劣的,不受梯度限制,直接从严直至永久封禁。对高频被举报的访客,我们将先行预警并持续观察。违规处置信息可酌情以公告形式公示;涉及违法的,依法向国家有关机关报告。
         </p>
         <p>
-          对侵犯他人合法权益的内容,权利人可依照《用户协议》所载「权利通知」程序投诉;被处置人对处置结果有异议的,可依「反通知」程序申诉。举报与申诉均通过「昆仑回声壁」或法务/合规邮箱
+          对侵犯他人合法权益的内容,权利人可依照《用户协议》所载「权利通知」程序投诉;被处置人对处置结果有异议的,可依「反通知」程序申诉。举报与申诉均通过「一念之墙」或法务/合规邮箱
           <span class="k">legal@dreamlight.com.hk</span> 受理。
         </p>
       </div>
@@ -467,7 +742,8 @@
       <div class="sec">
         <h2>九、附则</h2>
         <p>
-          本公约与《用户协议》《隐私保护指引》共同构成您使用本画廊的完整约定。本公约可能适时修订(各章禁令详目将陆续补充),修订后将在本页面公示。让我们共同守护这座清朗的昆仑。
+          本公约与《用户协议》《隐私保护指引》共同构成您使用本画廊的完整约定。本公约可能适时修订(各章禁令详目将陆续补充),修订后将在本页面公示。让我们共同守护这座属于
+          B612 的清朗画廊。
         </p>
       </div>
     </div>
@@ -478,24 +754,26 @@
       <button
         id="exitBtn"
         style="
-          margin-left: 12px;
-          padding: 8px 16px;
-          border-radius: 6px;
-          border: 1px solid rgba(255, 255, 255, 0.3);
-          background: rgba(60, 40, 20, 0.6);
-          color: #ffe9c4;
+          margin-top: 10px;
+          width: 100%;
+          padding: 10px;
+          border: 1px solid rgba(90, 72, 50, 0.4);
+          border-radius: 12px;
+          background: none;
+          color: #5a4c3a;
           font-size: 13px;
+          letter-spacing: 2px;
           cursor: pointer;
           font-family: inherit;
         "
       >
-        暂不阅读，返回
+        暂不阅读,返回
       </button>
     </div>
 
     <script>
-      // 自动慢速滚动播放(用户手动滚动/点击即转为手动)
-      var autoScroll = true;
+      // 自动慢速滚动(仅 ?autoscroll 时启用;用户手动滚动/点击即转为手动)
+      var autoScroll = /[?&]autoscroll/.test(location.search);
       function stopAuto() {
         autoScroll = false;
       }
@@ -510,9 +788,6 @@
         if (window.innerHeight + window.scrollY >= document.body.scrollHeight - 2)
           clearInterval(_st);
       }, 50);
-      function reachedBottom() {
-        return window.innerHeight + window.scrollY >= document.body.scrollHeight - 140;
-      }
 
       (function () {
         var consent =
@@ -523,7 +798,6 @@
           exitBtn = document.getElementById('exitBtn');
         if (!consent) return;
         bar.style.display = 'block';
-        // 2026-07-31:取消强制阅读,勾选即可继续(不冻时间、不锁面板)
         function enterGallery() {
           sessionStorage.setItem('communityConsented', '1');
           if (window.parent && window.parent.setPanelLock) window.parent.setPanelLock(false);
@@ -540,7 +814,6 @@
           localStorage.setItem('consentDone', '1');
           enterGallery();
         };
-        // 退出按钮:返回主页(不阻拦)
         exitBtn.onclick = function () {
           if (window.parent && window.parent.setPanelLock) window.parent.setPanelLock(false);
           window.history.back();
