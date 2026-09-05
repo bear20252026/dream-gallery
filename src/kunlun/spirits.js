@@ -104,6 +104,8 @@ function nextIdx() {
   return SPIRITS.findIndex((sp) => !k.includes(sp.key));
 } // 首个未收集=当前揭示目标
 function questActive() {
+  // B612 星球章节模式(2026-09-05):planets.js 接管章节流,门槛恒开(天穹100%前置退役)
+  if (ctx.kunlun.planetsMode) return true;
   // 天穹 100% 后开启(里程碑已触发过 100 档,或进度值已达 100)
   if (ctx.store.num('skyMs') >= 100) return true;
   const q = ctx.store.num('quiz'),
@@ -276,36 +278,50 @@ const chime = (i) =>
 // ===================== 收集流程 =====================
 let collecting = false,
   pickIdx = -1; // pickIdx:主循环判定的"脚下这颗"(含未揭示的乱序拾取)
-function collect() {
+function collect(extKey, extLine) {
   if (collecting) return;
-  const ti = pickIdx >= 0 ? pickIdx : nextIdx();
+  // 2026-09-05:planets.js 星球岛星屑拾取走外部调用(extKey+星球版台词),沙漠光柱系统休眠
+  const ti = extKey
+    ? SPIRITS.findIndex((sp) => sp.key === extKey)
+    : pickIdx >= 0
+      ? pickIdx
+      : nextIdx();
   if (ti < 0) return;
   collecting = true;
   pickIdx = -1;
   pickBtn.style.display = 'none';
-  pillar.visible = pillarRing.visible = false;
-  nameSpr.visible = false;
+  if (pillar) pillar.visible = pillarRing.visible = false;
+  if (nameSpr) nameSpr.visible = false;
   if (wildSpr) wildSpr.visible = false;
   const sp = SPIRITS[ti];
+  const line = extLine || sp;
   const keys = ctx.store.addSpirit(sp.key); // 写入库存数组+同步兼容数量键
   const n = keys.length;
   chime(n - 1);
   edgeFlash(sp.color);
-  bigText(sp.popup, { hold: 2600 });
-  ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak(sp.tts, 'spirits'); // B6 收集音色
+  bigText(line.popup, { hold: 2600 });
+  ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak(line.tts, 'spirits'); // B6 收集音色
   ctx.ui.modeToast &&
-    ctx.ui.modeToast(sp.name + ' · ' + sp.emotion + ' · 已收入罗盘（' + n + '/6）');
+    ctx.ui.modeToast(
+      (line.toast || sp.name + ' · ' + sp.emotion + ' · 已收入罗盘') + '（' + n + '/6）'
+    );
   setTimeout(() => {
     collecting = false;
     if (n >= 6) {
       finale();
-    } else placePillar(nextIdx()); // 乱序拾取后:揭示目标=下一颗未收集(系统调序,结局不变)
+    } else if (!ctx.kunlun.planetsMode) placePillar(nextIdx()); // 乱序拾取后:揭示目标=下一颗未收集(系统调序,结局不变)
     refreshSpiritsPage();
   }, 2000);
 }
 function finale() {
   ctx.store.mark('spiritsDone');
-  // 六道光束冲天(3 秒壮观特效)
+  // 六道光束冲天(3 秒壮观特效)——星球章节模式下岛在天空,沙漠光束改由 planets.js 终幕接管
+  if (ctx.kunlun.planetsMode) {
+    bigText(FINAL_POPUP, { hold: 2600 });
+    ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak(FINAL_TTS);
+    refreshSpiritsPage();
+    return;
+  }
   const beams = [];
   for (const sp of SPIRITS) {
     const y = groundY(sp.pos[0], sp.pos[1]);
@@ -347,6 +363,7 @@ let started = false,
   nearT = 0,
   hudT = 0;
 onTick(function () {
+  if (ctx.kunlun.planetsMode) return; // 星球章节模式:沙漠光柱/HUD/野灵系统休眠(planets.js 接管)
   if (!questActive()) return;
   if (!started) {
     started = true;
@@ -463,6 +480,8 @@ function refreshSpiritsPage() {
 }
 // 小地图灵蕴标记(player.js drawMap 读取):返回当前目标 {x,z,name,color},无目标返回 null
 function spiritMark() {
+  // 星球章节模式:交给 planets.js(星门/当前岛星屑)
+  if (ctx.kunlun.planetsMode && ctx.kunlun.planetsMark) return ctx.kunlun.planetsMark();
   if (!questActive()) return null;
   const ti = nextIdx();
   if (ti < 0) return null;
@@ -477,6 +496,8 @@ Object.assign(ctx.kunlun, {
   spiritsGot: got,
   spiritsTTS: SPIRITS.map((sp) => sp.tts),
   spiritMark,
+  spiritsCollectExternal: collect, // planets.js 星球岛星屑拾取入口(2026-09-05)
+  spiritsNextKey: () => (nextIdx() >= 0 ? SPIRITS[nextIdx()].key : null),
 }); // spiritsTTS 供 finale.js 灵蕴归位重听
 bag.custom.push(() => {
   if (pickBtn) pickBtn.remove();

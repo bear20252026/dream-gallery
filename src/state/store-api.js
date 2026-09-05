@@ -55,6 +55,7 @@ const SCHEMA = {
   arkFFSeen: { key: 'arkFFSeen', type: 'flag' }, // 自由飞教学已播
   prologueDone: { key: 'kunlunPrologueDone', type: 'flag' }, // 序章已播(首访判定)
   gateEntered: { key: 'b612GateEntered', type: 'flag' }, // 入口闸门已进过(2026-09-05:进过即永不再见闸门)
+  planetsChapter: { key: 'b612PlanetChapter', type: 'num' }, // B612 六星章节进度(0..6,2026-09-05)
   genderSelected: { key: 'genderSelected', type: 'flag' }, // 性别选择已完成
   gender: { key: 'gender', type: 'str' }, // 性别(male/female)
 };

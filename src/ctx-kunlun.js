@@ -30,6 +30,10 @@ export function createKunlunNamespace(vault) {
     'spiritMark',
     'spiritsTTS',
     'spiritsState',
+    'spiritsCollectExternal', // planets.js 星球岛星屑拾取入口(2026-09-05)
+    'spiritsNextKey', // 当前未收集星屑 key
+    'planetsMode', // B612 星球章节模式(spirits 沙漠系统休眠开关)
+    'planetsMark', // 星门/当前岛小地图标记
     'checkSkyMs',
     'fadeTeleport',
     'rebuildEternalPicks',
@@ -59,7 +63,7 @@ export function createKunlunNamespace(vault) {
       configurable: true,
     });
   }
-  
+
   return Object.freeze(proxy);
 }
 
