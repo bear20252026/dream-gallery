@@ -15,19 +15,21 @@ const SAMPLE_S = parseInt(args.find(a => /^\d+$/.test(a)) || '20', 10);
   page.on('console', m => { if (/context|lost|WebGL/i.test(m.text())) console.log('[CONSOLE]', m.text().slice(0, 200)); });
   await page.goto(URL_ARG, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-  // === 过审批门:浏览器内申请(带上本机cookie/设备指纹)→ 管理员接口批准 → 重进 ===
+  // === 过审批门:页面内 XHR(带页面 Cookie/UA/设备指纹,与页面同源)→ 管理员接口批准 → 重进 ===
+  // 注:审批走页面自身上下文,对任何目标 origin 都正确;云端全链路验收另有 verify-all.js
   try {
-    await page.evaluate(() => fetch('/api/gate/apply', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ answer: '性能探针' })
-    }));
-    const list = await (await fetch(URL_ARG + 'api/admin/list?token='+encodeURIComponent(process.env.ADMIN_TOKEN||'')+'')).json().catch(() => null);
+    const xhrJson = (method, url, body) => page.evaluate(({ m, u, b }) => new Promise((res) => {
+      const x = new XMLHttpRequest();
+      x.open(m, u);
+      x.onload = () => { try { res(JSON.parse(x.responseText)); } catch (e) { res(null); } };
+      x.onerror = () => res(null);
+      x.send(b);
+    }), { m: method, u: url, b: body });
+    await xhrJson('POST', '/api/gate/apply', JSON.stringify({ answer: '性能探针' }));
+    const list = await xhrJson('GET', '/api/admin/list?token=' + encodeURIComponent(process.env.ADMIN_TOKEN || ''), null);
     const me = list && list.applicants && list.applicants.find(a => a.answer === '性能探针' && a.status === 'pending');
     if (me) {
-      await fetch(URL_ARG + 'api/admin/decide?token='+encodeURIComponent(process.env.ADMIN_TOKEN||'')+'', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: me.id, action: 'day' })
-      });
+      await xhrJson('POST', '/api/admin/decide?token=' + encodeURIComponent(process.env.ADMIN_TOKEN || ''), JSON.stringify({ id: me.id, action: 'day' }));
       console.log('[GATE] 已批准探针设备:', me.id);
       await page.goto(URL_ARG, { waitUntil: 'domcontentloaded', timeout: 60000 });
     } else console.log('[GATE] 未找到待批准申请(可能已放行):', list ? 'list ok' : 'list fail');

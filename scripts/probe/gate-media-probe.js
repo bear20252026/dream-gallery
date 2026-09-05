@@ -1,6 +1,8 @@
 // gate-media-probe.js — 验证媒体加载新规:未过答题→室内媒体静默;授 VIP 后→放行
 const { chromium } = require('playwright-core');
 const BASE = 'http://101.133.235.110:3000';
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
+const api = (p) => { const u = new URL(p, BASE); u.searchParams.set('token', ADMIN_TOKEN); return u; };
 
 (async () => {
   const browser = await chromium.launch({ channel: 'msedge', headless: false });
@@ -31,10 +33,10 @@ const BASE = 'http://101.133.235.110:3000';
   console.log('室内挂画视频请求数(应为0):', wallPlaying1);
 
   console.log('--- 阶段2:后台授予 VIP 免答 ---');
-  const list = await (await fetch(BASE + '/api/admin/list?token='+encodeURIComponent(process.env.ADMIN_TOKEN||'')+'')).json();
+  const list = await (await fetch(api('/api/admin/list'))).json();
   const me = list.applicants.find(a => a.answer === '性能探针');
   if (!me) { console.log('找不到探针设备记录!'); await browser.close(); return; }
-  const r = await fetch(BASE + '/api/admin/decide?token='+encodeURIComponent(process.env.ADMIN_TOKEN||'')+'', {
+  const r = await fetch(api('/api/admin/decide'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: me.id, action: 'vip' })
   });
@@ -49,7 +51,7 @@ const BASE = 'http://101.133.235.110:3000';
   });
   console.log('大屏(应仍在播):', JSON.stringify(s3));
   // 恢复:撤销 VIP,避免影响真实规则
-  await fetch(BASE + '/api/admin/decide?token='+encodeURIComponent(process.env.ADMIN_TOKEN||'')+'', {
+  await fetch(api('/api/admin/decide'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id: me.id, action: 'unvip' })
   });

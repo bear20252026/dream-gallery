@@ -18,11 +18,15 @@ let made = 0, skipped = 0, failed = 0;
 for (const f of fs.readdirSync(SRC)) {
   const ext = path.extname(f).toLowerCase();
   if (!IMG_EXT.includes(ext)) continue;
+  if (/^-/.test(f) || f.includes('\0')) continue; // 文件名不以 - 开头,防 ffmpeg 选项注入
   const out = path.join(DST, f.replace(/\.[^.]+$/, '.webp'));
   try {
     if (fs.existsSync(out) && fs.statSync(out).mtimeMs >= fs.statSync(path.join(SRC, f)).mtimeMs) { skipped++; continue; }
-    const r = spawnSync('ffmpeg', ['-y', '-i', path.join(SRC, f), '-vf', "scale='min(1024,iw)':-2", '-q:v', '4', out], { stdio: 'ignore' });
-    if (r.status === 0 && fs.existsSync(out)) made++;
+    // 全字面量参数:原图走 stdin、缩略图走 stdout,文件名不进命令行(彻底消除选项注入面)
+    const r = spawnSync('ffmpeg',
+      ['-y', '-f', 'image2pipe', '-i', 'pipe:0', '-vf', "scale='min(1024,iw)':-2", '-q:v', '4', '-update', '1', '-f', 'image2pipe', '-c:v', 'libwebp', 'pipe:1'],
+      { stdio: ['pipe', 'pipe', 'ignore'], input: fs.readFileSync(SRC + path.sep + f), maxBuffer: 64 * 1024 * 1024, encoding: 'buffer' });
+    if (r.status === 0 && r.stdout && r.stdout.length) { fs.writeFileSync(out, r.stdout); made++; }
     else failed++;
   } catch (e) { failed++; }
 }

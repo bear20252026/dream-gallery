@@ -9,7 +9,7 @@ const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'store-test-'));
 const tmpFile = path.join(tmpDir, 'gate_data.json');
 process.env.GATE_DATA_FILE = tmpFile; // 必须在 require store 之前设置
 
-const store = require(path.join(__dirname, '..', '..', 'lib', 'store.js'));
+const store = require('../../lib/store.js');
 
 let passed = 0, failed = 0;
 function ok(cond, name) {

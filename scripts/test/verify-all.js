@@ -2,6 +2,7 @@
 const { chromium } = require('playwright-core');
 const BASE = 'http://101.133.235.110:3000';
 const TOKEN = process.env.ADMIN_TOKEN || ''; // 后台密码走环境变量(2026-07-28 脱敏:不入库)
+const api = (p) => { const u = new URL(p, BASE); u.searchParams.set('token', TOKEN); return u; };
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ProbeUA/4.0 KimiVerify';
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n); } };
@@ -50,10 +51,10 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   ok(passed === true, '前端已解锁(quizPassed=true)');
 
   console.log('[4] 后台授予特殊访问 → 图库恢复可见');
-  const list = await (await fetch(BASE + '/api/admin/list?token=' + TOKEN)).json();
+  const list = await (await fetch(api('/api/admin/list'))).json();
   const me = list.applicants.find(a => (a.ua || '').includes('ProbeUA'));
   ok(!!me, '后台有探针设备记录');
-  const dec = await fetch(BASE + '/api/admin/decide?token=' + TOKEN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: me.id, action: 'special' }) });
+  const dec = await fetch(api('/api/admin/decide'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: me.id, action: 'special' }) });
   ok(dec.status === 200, '授予特殊访问操作成功');
   await page.evaluate(() => window.__ctx.refreshMode && window.__ctx.refreshMode());
   await page.waitForTimeout(2500);
@@ -84,7 +85,7 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   ok(hold, '彩蛋期间大屏已挂起(bigScreenHold)');
 
   // 收尾:取消特殊访问,避免探针设备留在特殊名单
-  await fetch(BASE + '/api/admin/decide?token=' + TOKEN, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: me.id, action: 'unspecial' }) });
+  await fetch(api('/api/admin/decide'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: me.id, action: 'unspecial' }) });
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   await browser.close();
   process.exit(fail ? 1 : 0);

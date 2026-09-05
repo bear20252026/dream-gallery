@@ -81,8 +81,8 @@ const server = http.createServer((req, res) => {
 
   // 健康检查(供 pm2 / 隧道探活)
   if (pathname === '/__health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ ok: true, root: ROOT }));
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'X-Content-Type-Options': 'nosniff' });
+    res.end(JSON.stringify({ ok: true }));
     return;
   }
 

@@ -8,6 +8,7 @@ const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
 const BASE = process.env.BASE_URL || 'http://localhost:3000';
+const api = (p) => new URL(p, BASE).href;
 let failed = 0;
 
 // ---- 1. ES 模块语法检查 ----
@@ -32,7 +33,7 @@ for (const f of jsFiles) {
   const urls = ['/', '/data.js', '/api/files?dir=photos', ...jsFiles.filter(f => f.startsWith('src/')).map(f => '/' + f)];
   for (const u of urls) {
     try {
-      const res = await fetch(BASE + u);
+      const res = await fetch(api(u));
       if (res.status === 200) console.log('HTTP  OK   ' + u);
       else { failed++; console.error('HTTP  FAIL ' + u + ' → ' + res.status); }
     } catch (e) {

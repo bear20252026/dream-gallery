@@ -22,7 +22,7 @@ for (const [pkg, inner, out] of VENDORS) {
     console.error(`[sync-vendor] 未找到 ${src},请先 npm install`);
     process.exit(1);
   }
-  const ver = require(path.join(ROOT, 'node_modules', pkg, 'package.json')).version;
+  const ver = JSON.parse(fs.readFileSync(path.join(ROOT, 'node_modules', pkg, 'package.json'), 'utf8')).version;
   fs.copyFileSync(src, path.join(DST_DIR, out));
   console.log(`[sync-vendor] vendor/${out} 已同步(${pkg}@${ver})`);
 }

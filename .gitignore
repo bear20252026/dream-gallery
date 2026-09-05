@@ -50,3 +50,8 @@ review_results.json
 models/showcase/
 # Windows 下脚本 `> /dev/null` 被当成相对路径,在项目里生成的垃圾文件 dev/null
 dev/
+
+# Mimosa 安全钩子会话状态(机器本地运行时)
+.mimosa/
+# 照片缩略图(gen-thumbs 可重建,服务器自跑)
+photos/thumbs/

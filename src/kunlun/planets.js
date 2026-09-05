@@ -14,20 +14,19 @@ import { initSceneManager } from '../core/scene-manager.js';
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
-// 独立世界灯光工厂:GLB 内含 PBR 材质,必须有足够强的光才能渲染出颜色(否则全黑)
+// 独立世界灯光工厂:超强力灯光让 GLB 内嵌 PBR 贴图颜色全部展开
 function addWorldLights(scene) {
-  scene.add(new THREE.AmbientLight(0xfff8f0, 1.8));
-  const key = new THREE.DirectionalLight(0xfff4e0, 4.0);
-  key.position.set(8, 12, 6);
+  scene.add(new THREE.AmbientLight(0xffffff, 2.5));
+  const key = new THREE.DirectionalLight(0xfff8f0, 5.0);
+  key.position.set(10, 20, 15);
   scene.add(key);
-  const fill = new THREE.DirectionalLight(0x8fb0d8, 1.5);
-  fill.position.set(-6, 4, -5);
-  scene.add(fill);
-  const rim = new THREE.DirectionalLight(0xffd9a0, 1.0);
-  rim.position.set(0, 3, -8);
-  scene.add(rim);
-  // 半球光:天空蓝+地面暖,让模型底部也不死黑
-  scene.add(new THREE.HemisphereLight(0x8fb0d8, 0x8b7654, 1.2));
+  const warm = new THREE.DirectionalLight(0xffe0b0, 2.0);
+  warm.position.set(-8, 6, -10);
+  scene.add(warm);
+  const cool = new THREE.DirectionalLight(0x8fb0ff, 1.2);
+  cool.position.set(0, -5, 8);
+  scene.add(cool);
+  scene.add(new THREE.HemisphereLight(0xa8c8ff, 0x4a3820, 1.5));
 }
 // 星空粒子背景(每个世界独立实例)
 function addStarfield(scene) {
@@ -55,7 +54,7 @@ const b612World = worldManager.registerWorld('b612', {
   scene: new THREE.Scene(),
   meta: { title: 'B612' },
 });
-b612World.scene.background = new THREE.Color(0x0a0a1e);
+b612World.scene.background = new THREE.Color(0x05050f);
 addWorldLights(b612World.scene);
 addStarfield(b612World.scene);
 
@@ -395,7 +394,7 @@ function buildIsland(cfg, idx) {
     scene: new THREE.Scene(),
     meta: { title: cfg.name },
   });
-  planetWorld.scene.background = new THREE.Color(0x0a0a1e);
+  planetWorld.scene.background = new THREE.Color(0x05050f);
   addWorldLights(planetWorld.scene);
   addStarfield(planetWorld.scene);
   grp.position.set(0, 0, 0);
@@ -417,13 +416,13 @@ function buildIsland(cfg, idx) {
 PLANETS.forEach(buildIsland);
 
 // 独立世界故事资产:只挂到目标 scene,不进入主世界。
-// B612:storybook 模型放在 (0,0,-15),玩家出生在 (0,2,12) 面朝它,距离 27m,模型宽 ~35m 填满视野
+// B612:storybook 模型放大到 200 单位,玩家出生在模型表面上方,一眼看到绿色星球+小王子
 loadWorldAsset('models/hall/b612-world/b612-storybook.glb', b612World, {
   name: 'b612Storybook',
-  maxSize: 40,
+  maxSize: 200,
   x: 0,
-  y: 0,
-  z: -15,
+  y: -30,
+  z: -60,
 });
 // King:king-scene 模型放在 (0,0,-15),玩家出生在 (0,7,12) 面朝它
 loadWorldAsset('models/hall/b612-world/king-scene.glb', worldManager.getWorld('king325'), {
@@ -564,7 +563,6 @@ refreshGate();
 // king 台放在第一座岛中心,玩家进入国王星球后立即可见;B612 台在原点。
 loadPortalPad(worldManager.getWorld('main'), { x: 0.1, y: mainGateY + 0.03, z: 56.0 }, 'b612');
 loadPortalPad(worldManager.getWorld('king325'), { x: 0, y: 0, z: 0 }, 'b612');
-loadPortalPad(b612World, { x: 0, y: 0, z: 0 }, 'king');
 
 /* ===================== 天幕色罩(每章进入时淡入的 DOM 渐变) ===================== */
 let veil = null;

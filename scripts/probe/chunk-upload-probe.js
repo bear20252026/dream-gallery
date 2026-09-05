@@ -14,7 +14,7 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   // 造一个 700KB 的可识别内容文件(非合法图片也无妨,扩展名用 .png 过白名单)
   const raw = Buffer.alloc(700 * 1024);
   for (let i = 0; i < raw.length; i += 997) raw[i] = (i / 997) % 251;
-  const md5 = crypto.createHash('md5').update(raw).digest('hex');
+  const digest = crypto.createHash('sha256').update(raw).digest('hex');
   const CH = 256 * 1024, total = Math.ceil(raw.length / CH), name = 'chunk-probe.png';
   const post = (url, body) => fetch(B + url, { method: 'POST', body, headers: { 'user-agent': 'chunk-probe/1.0' } });
 
@@ -29,7 +29,7 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
 
   // ② 重组字节一致
   const saved = fs.readFileSync(path.join(ROOT, 'photos', name));
-  ok(crypto.createHash('md5').update(saved).digest('hex') === md5, '重组文件 md5 与原文件一致');
+  ok(crypto.createHash('sha256').update(saved).digest('hex') === digest, '重组文件 sha256 与原文件一致');
   ok(saved.length === raw.length, '重组文件大小一致');
 
   // ③ 归属:同 UA 可见 myUploads

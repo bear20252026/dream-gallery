@@ -12,8 +12,6 @@ function ok(cond, name) {
   else { failed++; console.error('  ✗ ' + name); }
 }
 
-const LIB = path.join(__dirname, '..', '..', 'lib');
-
 // 子进程跑一段脚本,输出 JSON 到 stdout(隔离 require 缓存/模块级状态)
 function runInChild(env, code) {
   const out = execFileSync(process.execPath, ['-e', code], {
@@ -24,7 +22,7 @@ function runInChild(env, code) {
   return JSON.parse(out);
 }
 const STORE_SNIPPET = `
-const store = require(${JSON.stringify(LIB)} + '/store.js');
+const store = require('./lib/store.js'); // runInChild 的 cwd 已是仓库根
 const done = JSON.parse(process.env.SEED || 'null');
 if (done) {
   for (const k of Object.keys(done)) {

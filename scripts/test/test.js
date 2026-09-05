@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
-const { QUIZ_PASS_SCORE } = require(path.join(ROOT, 'lib', 'quiz.js')); // 分数线单一源:测试判定跟随服务端常量,不再单独硬编码
+const { QUIZ_PASS_SCORE } = require('../../lib/quiz.js'); // 分数线单一源:测试判定跟随服务端常量,不再单独硬编码
 let passed = 0, failed = 0;
 const children = [];
 
@@ -76,7 +76,7 @@ async function testApi(base) {
   // 媒体目录自愈:CI/新环境 checkout 后 videos 可能不存在(git 不跟踪空目录),先确保目录在
   for (const d of ['photos', 'videos', 'music']) fs.mkdirSync(path.join(ROOT, d), { recursive: true });
   const TEST_NAME = '_test_upload_' + Date.now() + '.jpg';
-  const testPath = path.join(ROOT, 'photos', TEST_NAME);
+  const testPath = `${path.join(ROOT, 'photos')}${path.sep}${TEST_NAME}`;
 
   // 列表
   let res = await fetch(base + '/api/files');

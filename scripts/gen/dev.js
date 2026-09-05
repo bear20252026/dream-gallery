@@ -27,8 +27,13 @@ function start(name, cmd, args, env = {}) {
 
 // 后端:媒体/门禁/API(固定 :3000,Vite 代理的目标)
 start('后端 server.js (:3000)', process.execPath, ['server.js'], { PORT: '3000' });
-// 前端:Vite 开发服务器(命令行参数如 --port 7100 --host 原样转发)
-start('前端 Vite', process.execPath, [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js'), ...process.argv.slice(2)]);
+// 前端:Vite 开发服务器(命令行参数如 --port 7100 --host 原样转发;逐个校验防注入)
+const viteArgs = [path.join(ROOT, 'node_modules', 'vite', 'bin', 'vite.js')];
+for (const a of process.argv.slice(2)) {
+  if (!/^[\w@/:=.,\-]+$/.test(a)) { console.error('[dev] 拒绝透传不安全参数:' + a); process.exit(1); }
+  viteArgs.push(a);
+}
+start('前端 Vite', process.execPath, viteArgs);
 
 process.on('SIGINT', () => {
   exiting = true;

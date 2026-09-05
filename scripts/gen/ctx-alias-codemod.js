@@ -34,7 +34,8 @@ for (const ns of nsList) {
     const re = new RegExp('\\bctx\\.' + prop + '\\b', 'g');
     for (const f of fs.readdirSync(dir)) {
       if (!f.endsWith('.js')) continue;
-      const p = path.join(dir, f);
+      const base = path.resolve(dir);
+      const p = `${base}${path.sep}${f}`; // 与 join 等价(dir/f 均无路径分隔符),只处理目录直接子文件
       const src = fs.readFileSync(p, 'utf8');
       const out = src.replace(re, 'ctx.' + ns + '.' + prop);
       if (out !== src) {
