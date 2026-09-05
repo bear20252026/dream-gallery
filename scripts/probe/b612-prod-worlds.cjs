@@ -12,12 +12,17 @@ const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-  // 闸门→协议→进电影→skip(与 b612-prod-verify 同路径)
-  await page.waitForSelector('#b612Gate', { timeout: 60000 });
-  await page.click('#b612Gate .gEnter').catch(() => null);
-  await page.waitForFunction(() => !document.getElementById('b612Gate'), null, { timeout: 15000 }).catch(() => null);
-  await page.waitForSelector('#b612film', { timeout: 20000 }).catch(() => null);
-  await page.click('#b612film #fSkip').catch(() => null);
+  // 闸门→协议→进电影→skip(兼容已 entered 档案:闸门/电影都可能被跳过)
+  const hasGate = await page
+    .waitForSelector('#b612Gate', { timeout: 20000 })
+    .then(() => true)
+    .catch(() => false);
+  if (hasGate) {
+    await page.click('#b612Gate .gEnter').catch(() => null);
+    await page.waitForFunction(() => !document.getElementById('b612Gate'), null, { timeout: 15000 }).catch(() => null);
+  }
+  const hasFilm = await page.waitForSelector('#b612film', { timeout: 8000 }).then(() => true).catch(() => false);
+  if (hasFilm) await page.click('#b612film #fSkip').catch(() => null);
   await page.waitForFunction(() => !!window.__ctx, null, { timeout: 30000 });
   await page.waitForTimeout(8000); // 等场景与 GLB 就绪
 
