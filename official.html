@@ -1,0 +1,492 @@
+<!doctype html>
+<!-- ============================================================
+  B612 官方网站(2026-09-06)
+  绘本式单页:默认英文,右上角切换中文;滚动=翻页讲故事。
+  纯静态零依赖;字体自托管 official-assets/fonts;图片 official-assets/*.webp
+  (主人提供的 Dola AI 生成图,右下角水印已由 dev/process-official-art.py 修补)
+  语言切换走 sessionStorage(会话级,非游戏存档,不进 ctx.store)。
+============================================================ -->
+<html lang="en" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B612 — Step into the story</title>
+<meta name="description" content="An interactive tribute to Antoine de Saint-Exupéry's classic. A crash in the Sahara, a door that should not be there, and six small planets waiting. Enter the desert.">
+<meta property="og:title" content="B612 — Step into the story">
+<meta property="og:description" content="A hat. A desert. A boy no grown-up could see. An interactive tribute to the world's most beloved tale.">
+<meta property="og:image" content="official-assets/og.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23c99b4a' d='M12 2l2.6 6.6L21 9.3l-5 4.6 1.4 6.8L12 17.2 6.6 20.7 8 13.9 3 9.3l6.4-.7z'/%3E%3C/svg%3E">
+<style>
+/* ---------- 自托管字体 ---------- */
+@font-face{font-family:'Cormorant Garamond';src:url(official-assets/fonts/cormorant-500.woff2) format('woff2');font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:'Cormorant Garamond';src:url(official-assets/fonts/cormorant-600.woff2) format('woff2');font-weight:600;font-style:normal;font-display:swap}
+@font-face{font-family:'Cormorant Garamond';src:url(official-assets/fonts/cormorant-500i.woff2) format('woff2');font-weight:500;font-style:italic;font-display:swap}
+@font-face{font-family:'Inter';src:url(official-assets/fonts/inter-500.woff2) format('woff2');font-weight:500;font-style:normal;font-display:swap}
+@font-face{font-family:'Caveat';src:url(official-assets/fonts/caveat-600.woff2) format('woff2');font-weight:600;font-style:normal;font-display:swap}
+
+/* ---------- 设计系统:纸 / 墨 / 玫瑰陶土 / 金 ---------- */
+:root{
+  --paper:#f4eedd; --paper-2:#efe6cf; --ink:#3d372e; --ink-soft:#7a7060;
+  --rose:#b96f58; --gold:#b3873c; --violet:#7c729c; --night:#1d2233;
+  --serif:'Cormorant Garamond',Georgia,'Times New Roman',serif;
+  --sans:'Inter','Segoe UI',system-ui,sans-serif;
+  --hand:'Caveat','Segoe Script',cursive;
+}
+body.zh{
+  --serif:'Cormorant Garamond','Songti SC','STSong','SimSun',Georgia,serif;
+  --sans:'Inter','Segoe UI',system-ui,'PingFang SC','Microsoft YaHei',sans-serif;
+  --hand:'Caveat','Kaiti SC','KaiTi','Segoe Script',cursive;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--serif);font-size:20px;line-height:1.75;
+  -webkit-font-smoothing:antialiased;overflow-x:hidden}
+/* 纸纹颗粒 */
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.5;mix-blend-mode:multiply;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .42 0 0 0 0 .36 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E")}
+img{display:block;max-width:100%}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 6vw}
+
+/* ---------- 排版 ---------- */
+.kicker{font-family:var(--sans);font-size:12px;font-weight:500;letter-spacing:.34em;text-transform:uppercase;
+  color:var(--gold);margin-bottom:22px}
+h2{font-weight:600;font-size:clamp(30px,4.2vw,52px);line-height:1.15;letter-spacing:-.01em;margin-bottom:26px}
+h2 em{font-style:italic;font-weight:500;color:var(--rose)}
+.prose p{max-width:640px;color:var(--ink);margin-bottom:1.1em;font-size:clamp(18px,1.55vw,21px)}
+.prose p.soft{color:var(--ink-soft)}
+.hand{font-family:var(--hand);color:var(--rose);font-size:clamp(22px,2.2vw,30px);transform:rotate(-2deg);display:inline-block}
+.hand .zh-hide-en{display:none}
+body.zh .hand{font-size:clamp(19px,1.9vw,25px)}
+
+/* ---------- 按钮 ---------- */
+.btn{display:inline-block;font-family:var(--sans);font-weight:500;letter-spacing:.22em;text-transform:uppercase;
+  font-size:13px;color:var(--ink);text-decoration:none;border:1px solid var(--gold);border-radius:999px;
+  padding:15px 34px;background:transparent;cursor:pointer;transition:background .35s,color .35s,box-shadow .35s}
+.btn:hover{background:var(--gold);color:#fffdf6;box-shadow:0 6px 24px rgba(179,135,60,.35)}
+.btn.big{padding:19px 46px;font-size:14px}
+.btn.gold{background:var(--gold);color:#fffdf6}
+.btn.gold:hover{background:#9a7331}
+
+/* ---------- 导航 ---------- */
+nav{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:26px;
+  padding:16px 4vw;transition:background .4s,box-shadow .4s,padding .4s}
+nav.solid{background:rgba(244,238,221,.88);backdrop-filter:blur(10px);box-shadow:0 1px 0 rgba(61,55,46,.12);padding:10px 4vw}
+nav .logo{font-weight:600;font-size:24px;letter-spacing:.12em;text-decoration:none}
+nav .logo b{color:var(--gold);font-weight:600}
+nav .links{display:flex;gap:26px;margin-left:auto}
+nav .links a{font-family:var(--sans);font-size:12.5px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;
+  text-decoration:none;color:var(--ink-soft);transition:color .3s}
+nav .links a:hover{color:var(--ink)}
+nav .acts{display:flex;align-items:center;gap:14px;margin-left:26px}
+#langBtn{font-family:var(--sans);font-size:12.5px;letter-spacing:.12em;border:1px solid rgba(61,55,46,.35);
+  background:transparent;color:var(--ink);border-radius:999px;padding:8px 16px;cursor:pointer}
+#langBtn:hover{border-color:var(--gold);color:var(--gold)}
+nav .acts .btn{padding:10px 24px;font-size:12px}
+
+/* ---------- 首屏 ---------- */
+#hero{position:relative;min-height:100svh;display:flex;align-items:center;justify-content:center;overflow:hidden;text-align:center}
+#hero .bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  animation:drift 26s ease-out both}
+@keyframes drift{from{transform:scale(1.09)}to{transform:scale(1)}}
+#hero::after{content:'';position:absolute;inset:0;background:
+  radial-gradient(120% 90% at 50% 108%,rgba(244,238,221,.92) 0%,rgba(244,238,221,0) 52%),
+  linear-gradient(rgba(244,238,221,.55),rgba(244,238,221,0) 30%)}
+#hero .in{position:relative;z-index:2;padding:0 6vw;animation:rise 1.6s .2s cubic-bezier(.2,.7,.2,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(34px)}to{opacity:1;transform:none}}
+.overline{font-family:var(--sans);font-size:12px;font-weight:500;letter-spacing:.42em;text-transform:uppercase;color:var(--ink-soft)}
+#hero h1{font-size:clamp(84px,15vw,190px);font-weight:600;line-height:1;letter-spacing:.04em;margin:18px 0 10px}
+#hero h1 span{color:var(--gold)}
+#hero .tag{font-size:clamp(22px,2.6vw,34px);font-style:italic;font-weight:500;color:var(--ink)}
+#hero .sub{max-width:560px;margin:16px auto 34px;color:var(--ink-soft);font-size:clamp(17px,1.5vw,20px)}
+#hero .btn{margin-top:6px}
+.scrollhint{position:absolute;bottom:26px;left:50%;transform:translateX(-50%);z-index:2;
+  font-family:var(--sans);font-size:11px;letter-spacing:.3em;text-transform:uppercase;color:var(--ink-soft);
+  animation:bob 2.4s ease-in-out infinite}
+@keyframes bob{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,9px)}}
+
+/* ---------- 通用分节 ---------- */
+section{position:relative}
+.sect{padding:16vh 0}
+.center{text-align:center}
+.center .prose p{margin-left:auto;margin-right:auto}
+
+/* ---------- 那顶“帽子”:滚动翻画 ---------- */
+#drawing{height:230vh}
+#drawing .stick{position:sticky;top:0;height:100svh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 6vw;text-align:center}
+#drawing .frame{position:relative;width:min(880px,88vw);aspect-ratio:16/10}
+#drawing .frame img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
+  filter:drop-shadow(0 24px 44px rgba(61,55,46,.16))}
+#drawing .frame .eleph{opacity:0;transition:none}
+#drawing .cap{margin-top:40px;height:2.6em;position:relative;width:100%}
+#drawing .cap p{position:absolute;inset:0;font-size:clamp(26px,3.2vw,40px);font-weight:600;transition:opacity .5s}
+#drawing .cap .c2{font-style:italic;color:var(--rose)}
+#drawing .why{max-width:600px;margin-top:6px;color:var(--ink-soft);opacity:0;transition:opacity .8s;font-size:clamp(17px,1.5vw,20px)}
+.no-js #drawing{height:auto;padding:14vh 0}
+.no-js #drawing .stick{position:static;height:auto}
+.no-js #drawing .frame .eleph{opacity:1}
+
+/* ---------- 飞行员(纸胶带底) ---------- */
+#pilot{background:url(official-assets/paper-scrap.webp) center/cover no-repeat}
+#pilot::before{content:'';position:absolute;inset:0;background:linear-gradient(rgba(244,238,221,.78),rgba(244,238,221,.62))}
+#pilot .wrap{position:relative}
+
+/* ---------- 六个人 ---------- */
+#six .still{margin:54px auto 10px;width:min(980px,92vw);border:1px solid rgba(61,55,46,.14);
+  outline:8px solid rgba(244,238,221,.6);box-shadow:0 30px 60px rgba(61,55,46,.14);transform:rotate(-.6deg)}
+#six .still img{width:100%}
+.six-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:44px 40px;margin-top:64px;text-align:left}
+.six-card{border-top:1px solid rgba(61,55,46,.22);padding-top:18px;position:relative}
+.six-card .num{font-family:var(--sans);font-size:11px;letter-spacing:.3em;color:var(--gold)}
+.six-card h3{font-size:26px;font-weight:600;margin:8px 0 8px}
+.six-card p{color:var(--ink-soft);font-size:17.5px;line-height:1.65;font-style:italic}
+.six-out{margin-top:70px}
+
+/* ---------- 男孩与狐狸 ---------- */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:7vw;align-items:center}
+.duo .ph{position:relative}
+.duo .ph img{width:100%;box-shadow:0 34px 70px rgba(61,55,46,.22);border:10px solid #fffdf6}
+.duo .ph .hand{position:absolute;bottom:-14px;right:8px}
+#fox{background:linear-gradient(180deg,var(--paper) 0%,#f1ecdf 50%,var(--paper) 100%)}
+#fox .duo{direction:rtl}
+#fox .duo>*{direction:ltr}
+#rose{background:linear-gradient(180deg,var(--paper),#f2e9f0 45%,var(--paper))}
+
+/* ---------- 终幕前(星河,深色一幕) ---------- */
+#andthen{background:var(--night);color:#efe9da;padding:22vh 0}
+#andthen .kicker{color:var(--gold)}
+#andthen .prose p{color:rgba(239,233,218,.82)}
+#andthen .glow{position:absolute;inset:0;overflow:hidden;pointer-events:none}
+#andthen .glow img{position:absolute;right:-14%;top:-6%;width:min(760px,68vw);opacity:.9;
+  -webkit-mask-image:radial-gradient(72% 72% at 60% 45%,#000 46%,transparent 74%);
+  mask-image:radial-gradient(72% 72% at 60% 45%,#000 46%,transparent 74%)}
+#andthen .wrap{position:relative}
+#andthen h2 em{color:#d8b071}
+
+/* ---------- CTA ---------- */
+#cta{background:url(official-assets/asteroid-calm.webp) center/cover no-repeat;text-align:center}
+#cta::before{content:'';position:absolute;inset:0;background:radial-gradient(90% 90% at 50% 50%,rgba(244,238,221,.42),rgba(244,238,221,.78))}
+#cta .wrap{position:relative;padding-top:4vh;padding-bottom:4vh}
+#cta h2{font-size:clamp(38px,5.4vw,66px)}
+#cta .note{font-family:var(--sans);font-size:13px;letter-spacing:.14em;color:var(--ink-soft);margin-top:20px}
+
+/* ---------- 页脚 ---------- */
+footer{padding:70px 0 46px;text-align:center;color:var(--ink-soft)}
+footer .orn{color:var(--gold);font-size:18px;letter-spacing:.6em;margin-bottom:26px}
+footer p{max-width:760px;margin:0 auto 10px;font-size:15.5px;line-height:1.8}
+footer .flinks{margin:22px 0 8px;display:flex;gap:28px;justify-content:center}
+footer .flinks a{font-family:var(--sans);font-size:12px;letter-spacing:.2em;text-transform:uppercase;text-decoration:none;color:var(--ink-soft)}
+footer .flinks a:hover{color:var(--gold)}
+footer .cp{font-family:var(--sans);font-size:12px;letter-spacing:.1em;opacity:.75}
+
+/* ---------- 滚动浮现 ---------- */
+.rv{opacity:0;transform:translateY(30px);transition:opacity 1s cubic-bezier(.2,.7,.2,1),transform 1s cubic-bezier(.2,.7,.2,1)}
+.rv.on{opacity:1;transform:none}
+.no-js .rv{opacity:1;transform:none}
+
+/* ---------- 响应式 ---------- */
+@media (max-width:880px){
+  .six-grid{grid-template-columns:1fr 1fr;gap:36px 26px}
+  .duo{grid-template-columns:1fr;gap:48px}
+  #fox .duo .ph{order:-1}
+  #andthen .glow img{opacity:.4;width:130vw;right:-40vw}
+}
+@media (max-width:560px){
+  body{font-size:18px}
+  nav .links{display:none}
+  .six-grid{grid-template-columns:1fr}
+  .sect{padding:12vh 0}
+  #hero h1{letter-spacing:.06em}
+}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  #hero .bg{animation:none}
+  #hero .in{animation:none}
+  .scrollhint{animation:none}
+  .rv{opacity:1;transform:none;transition:none}
+}
+</style>
+</head>
+<body>
+
+<nav id="topnav">
+  <a class="logo" href="#hero">B<b>612</b></a>
+  <div class="links">
+    <a href="#pilot" data-i="navStory">The Story</a>
+    <a href="#six" data-i="navSix">The Six</a>
+    <a href="#boy" data-i="navBoy">The Boy</a>
+  </div>
+  <div class="acts">
+    <button id="langBtn" type="button">中文</button>
+    <a class="btn gold" href="./" data-i="navEnter">Enter</a>
+  </div>
+</nav>
+
+<!-- 首屏 -->
+<header id="hero">
+  <img class="bg" src="official-assets/hero-asteroid.webp" alt="" fetchpriority="high">
+  <div class="in">
+    <p class="overline" data-i="heroOver">An interactive tale, after Saint-Exupéry</p>
+    <h1>B<span>612</span></h1>
+    <p class="tag" data-i="heroTag">A hat. A desert. A boy no grown-up could see.</p>
+    <p class="sub" data-i="heroSub">Walk back into the story you loved — and finish the page it never wrote.</p>
+    <a class="btn big gold" href="./" data-i="heroCta">Enter the Desert</a>
+  </div>
+  <div class="scrollhint" data-i="scroll">Scroll</div>
+</header>
+
+<!-- 一、那顶帽子 -->
+<section id="drawing" aria-label="A drawing">
+  <div class="stick">
+    <div class="frame">
+      <img src="official-assets/boa-hat.webp" alt="A pencil drawing of a hat">
+      <img class="eleph" id="elephImg" src="official-assets/boa-elephant.webp" alt="The same drawing: a boa constrictor digesting an elephant">
+    </div>
+    <div class="cap">
+      <p id="cap1" data-i="hat1">This is a hat.</p>
+      <p class="c2" id="cap2" data-i="hat2" style="opacity:0">Look again.</p>
+    </div>
+    <p class="why" id="capWhy" data-i="hatWhy">When you were six, you saw it instantly. Then the grown-ups talked you out of it. B612 exists to give that back.</p>
+  </div>
+</section>
+
+<!-- 二、飞行员 -->
+<section id="pilot" class="sect">
+  <div class="wrap prose">
+    <p class="kicker rv" data-i="pilotKick">The story</p>
+    <h2 class="rv" data-i-html="pilotH">A pilot. A desert. <em>A door that should not be there.</em></h2>
+    <p class="rv" data-i="pilot1">Somewhere over the Sahara an engine falls silent. A pilot wakes beside his broken plane — a thousand miles from the nearest person.</p>
+    <p class="rv" data-i="pilot2">Then he finds it: a door, standing alone among the dunes. It is on no map, and it is very slightly ajar.</p>
+    <p class="rv" data-i="pilot3">Behind it hangs a gallery. In the gallery, six empty frames — six stories he began at six, and never finished.</p>
+    <span class="hand rv" data-i="pilotHand">not on any map!</span>
+  </div>
+</section>
+
+<!-- 三、六个人 -->
+<section id="six" class="sect">
+  <div class="wrap">
+    <p class="kicker rv" data-i="sixKick">The six</p>
+    <h2 class="rv" data-i-html="sixH">Six small planets. <em>Six very grown-ups.</em></h2>
+    <div class="prose">
+      <p class="rv" data-i="sixIntro">Beyond the door, six little worlds drift in the dark — each one exactly large enough for a single grown-up, and a single delusion.</p>
+    </div>
+    <figure class="still rv"><img src="official-assets/six-props.webp" alt="A throne, a mirror, three bottles, an account table, a lamppost, and a stack of books — drawn on paper" loading="lazy"></figure>
+    <div class="six-grid">
+      <div class="six-card rv"><span class="num">I</span><h3 data-i="k1">The King</h3><p data-i="k1d">He rules over the stars — provided no one ever disobeys him.</p></div>
+      <div class="six-card rv"><span class="num">II</span><h3 data-i="k2">The Conceited Man</h3><p data-i="k2d">He waits for applause from an audience that never comes.</p></div>
+      <div class="six-card rv"><span class="num">III</span><h3 data-i="k3">The Tippler</h3><p data-i="k3d">He drinks, to forget the shame of drinking.</p></div>
+      <div class="six-card rv"><span class="num">IV</span><h3 data-i="k4">The Businessman</h3><p data-i="k4d">He counts stars he will never see, because no one counted them first.</p></div>
+      <div class="six-card rv"><span class="num">V</span><h3 data-i="k5">The Lamplighter</h3><p data-i="k5d">He lights and snuffs his lamp sixty times a minute, for a planet that never asked him to.</p></div>
+      <div class="six-card rv"><span class="num">VI</span><h3 data-i="k6">The Geographer</h3><p data-i="k6d">He has mapped every mountain he has never seen.</p></div>
+    </div>
+    <div class="six-out center">
+      <span class="hand rv" data-i="sixOut">“Grown-ups are certainly very strange.” — the boy warned us</span>
+    </div>
+  </div>
+</section>
+
+<!-- 四、男孩 -->
+<section id="boy" class="sect">
+  <div class="wrap duo">
+    <div class="ph rv">
+      <img src="official-assets/prince-moon.webp" alt="A golden-haired boy on a tiny planet, a rose beside him under a crescent moon" loading="lazy">
+      <span class="hand" data-i="boyHand">he is looking for someone</span>
+    </div>
+    <div class="prose">
+      <p class="kicker rv" data-i="boyKick">And then</p>
+      <h2 class="rv" data-i-html="boyH">Someone <em>entirely</em> different</h2>
+      <p class="rv" data-i="boy1">He comes from a planet the size of a house. About flowers, about duty, about leaving — he asks the very biggest questions, and asks them completely seriously.</p>
+      <p class="rv soft" data-i="boy2">He has left a rose behind to see the rest of the stars. What he is really looking for is a friend — someone who still remembers that a hat can be a snake.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 五、狐狸 -->
+<section id="fox" class="sect">
+  <div class="wrap duo">
+    <div class="prose">
+      <p class="kicker rv" data-i="foxKick">The fox</p>
+      <h2 class="rv" data-i-html="foxH">One thing grown-ups <em>never learn</em></h2>
+      <p class="rv" data-i="fox1">On Earth, among a thousand roses that all look alike, the boy will meet a fox — who wants, very politely, to be tamed.</p>
+      <p class="rv" data-i="fox2">“To tame,” the fox explains, means to establish ties. And what that comes to mean is simple: whatever you give your time to becomes unlike anything else in the world.</p>
+    </div>
+    <div class="ph rv">
+      <img src="official-assets/prince-fox.webp" alt="The boy and a fox standing among roses under golden stars" loading="lazy">
+      <span class="hand" data-i="foxHand">“…you will be unique, for me”</span>
+    </div>
+  </div>
+</section>
+
+<!-- 六、玫瑰 -->
+<section id="rose" class="sect center">
+  <div class="wrap prose">
+    <p class="kicker rv" data-i="roseKick">The rose</p>
+    <h2 class="rv" data-i-html="roseH">A story about <em>tending</em></h2>
+    <p class="rv" data-i="rose1">There are thousands of roses in the world, and they are all, more or less, the same rose. Yours is different for exactly one reason: the mornings you watered her, the glass globe you set over her on cold nights, the time you gave her.</p>
+    <p class="rv soft" data-i="rose2">That is the whole secret. You knew it at six. You know it now.</p>
+  </div>
+  <figure class="rv" style="width:min(620px,86vw);margin:56px auto 0">
+    <img src="official-assets/prince-cliff.webp" alt="The boy sits on a cliff at sunset, holding his rose above a sea of clouds" loading="lazy" style="box-shadow:0 34px 70px rgba(61,55,46,.22);border:10px solid #fffdf6">
+  </figure>
+</section>
+
+<!-- 七、未写完 -->
+<section id="andthen" class="sect">
+  <div class="glow"><img src="official-assets/prince-galaxy.webp" alt="" loading="lazy"></div>
+  <div class="wrap prose">
+    <p class="kicker rv" data-i="endKick">After the six</p>
+    <h2 class="rv" data-i-html="endH">The ending is left unfinished. <em>On purpose.</em></h2>
+    <p class="rv" data-i="end1">The book leaves its ending just out of reach — the way childhood does. So we are building a place where you can walk back in: find the six frames, meet the six grown-ups, and write the seventh page yourself.</p>
+    <p class="hand rv" data-i="endHand" style="color:#d8b071">all the stars are yours</p>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="cta" class="sect">
+  <div class="wrap">
+    <h2 class="rv" data-i="ctaH">Step into the desert.</h2>
+    <p class="rv" style="margin-bottom:36px"><a class="btn big gold" href="./" data-i="ctaBtn">Enter B612</a></p>
+    <p class="note rv" data-i="ctaNote">Free · Runs in your browser · About a minute of prologue before the door</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="orn">✦ ✦ ✦</div>
+    <p data-i="foot1">B612 is a non-commercial tribute to Antoine de Saint-Exupéry's <em>Le Petit Prince</em> (1943), a work in the public domain. All prose here is an original homage — no published translation is quoted. Illustrations are original artwork created for this project.</p>
+    <div class="flinks">
+      <a href="privacy.html" data-i="fPrivacy">Privacy</a>
+      <a href="agreement.html" data-i="fTerms">Terms</a>
+      <a href="#hero" data-i="fTop">Back to top</a>
+    </div>
+    <p class="cp">© 2026 B612 Gallery</p>
+  </div>
+</footer>
+
+<script>
+document.documentElement.classList.remove('no-js');
+
+/* ---------- 中文文案(默认英文在 HTML 里) ---------- */
+var ZH = {
+  navStory:'故事', navSix:'六个人', navBoy:'那个孩子', navEnter:'进入',
+  heroOver:'一个可以走进去的故事 · 致敬圣埃克苏佩里',
+  heroTag:'一顶帽子。一片沙漠。一个大人永远看不见的孩子。',
+  heroSub:'走回你深爱的那个故事里——把命运没写完的那一页,亲手写完。',
+  heroCta:'走进沙漠', scroll:'向下翻页',
+  hat1:'这是一顶帽子。', hat2:'再看一眼。',
+  hatWhy:'你六岁时一眼就看了出来。后来,大人们说服了你。B612 想做的,是把它还给你。',
+  pilotKick:'故事', pilotH:'飞行员。沙漠。<em>一扇不该存在的门。</em>',
+  pilot1:'在撒哈拉上空,引擎忽然安静下来。飞行员在摔坏的飞机旁醒来——离最近的人,也有一千英里。',
+  pilot2:'然后,他发现了它:一扇门,独自立在沙丘之间。任何地图上都没有它,而它,虚掩着。',
+  pilot3:'门后是一座画廊。画廊里,挂着六只空画框——六个他六岁时起了头、却再也没画完的故事。',
+  pilotHand:'地图上没有它!',
+  sixKick:'六个人', sixH:'六座小星球。<em>六个大人们。</em>',
+  sixIntro:'门外,六座小小的世界漂在夜色里——每一座都刚好住得下一个大人,和他的一件执念。',
+  k1:'国王', k1d:'他统治着群星——前提是:永远没有人违抗他。',
+  k2:'爱虚荣的人', k2d:'他在等一阵掌声,观众却永远不会来。',
+  k3:'酒鬼', k3d:'他喝酒,为了忘掉喝酒的羞愧。',
+  k4:'商人', k4d:'他数着他永远看不见的星星,理由是:在他之前没有人数过。',
+  k5:'点灯人', k5d:'他每分钟把灯点亮又熄灭六十次,为一颗从没请求过他的星球。',
+  k6:'地理学家', k6d:'他标绘了每一座他从未见过的山。',
+  sixOut:'“大人们实在是太怪了。”——那个孩子早就提醒过我们',
+  boyKick:'然后', boyH:'一个<em>完全不同</em>的人',
+  boy1:'他来自一栋房子大小的星球。关于花,关于责任,关于离开——他把这些最大的问题,问得非常认真。',
+  boy2:'他为了一朵玫瑰留在了原地,又离开她去看其余的星星。他真正在找的,是一个朋友——一个还记得"帽子可以是蟒蛇"的人。',
+  boyHand:'他在找一个人',
+  foxKick:'狐狸', foxH:'大人们<em>永远学不会</em>的一件事',
+  fox1:'在地球上,在一千朵长得一样的玫瑰中间,那个孩子会遇见一只狐狸——一只彬彬有礼地、想被"驯养"的狐狸。',
+  fox2:'"驯养"的意思,是建立联系。而它最终指向的事很简单:你把时间给了什么,什么就会变得举世无双。',
+  foxHand:'"……对我而言,你就是独一无二的"',
+  roseKick:'玫瑰', roseH:'一个关于<em>照料</em>的故事',
+  rose1:'世上有上千朵玫瑰,它们多少都一样。你的那朵不同,只有一个原因:你替她浇过水,在冷夜里为她罩过玻璃罩,把时间给过她。',
+  rose2:'秘密就这么多。你六岁时就懂,现在也还懂。',
+  endKick:'六个人之后', endH:'结局是没写完的。<em>故意的。</em>',
+  end1:'那本书把结局留在刚好够不着的地方——童年也是如此。所以我们在造一个地方,让你可以走回去:找回那六只画框,见过那六个大人,然后,亲手写下第七页。',
+  endHand:'满天星星都是你的',
+  ctaH:'走进沙漠。', ctaBtn:'进入 B612',
+  ctaNote:'免费 · 浏览器直达 · 推门之前,约一分钟的开场',
+  foot1:'B612 是对安托万·德·圣埃克苏佩里《小王子》(1943,公版)的非商业致敬。本站文字均为原创致敬,未引用任何出版社译本;插画为本项目原创绘制。',
+  fPrivacy:'隐私', fTerms:'条款', fTop:'回到顶部',
+  _title:'B612 —— 走进那个故事'
+};
+
+/* ---------- 语言切换 ---------- */
+var langBtn = document.getElementById('langBtn');
+var enSnap = null;
+function applyLang(lang){
+  if (lang === 'en' && !enSnap) lang = 'en';
+  if (lang === 'zh') {
+    if (!enSnap) {                       // 首次切中文:快照英文
+      enSnap = {};
+      document.querySelectorAll('[data-i],[data-i-html]').forEach(function(el){
+        var k = el.getAttribute('data-i') || el.getAttribute('data-i-html');
+        enSnap[k] = el.innerHTML;
+      });
+    }
+    document.querySelectorAll('[data-i]').forEach(function(el){
+      var k = el.getAttribute('data-i'); if (ZH[k] != null) el.textContent = ZH[k];
+    });
+    document.querySelectorAll('[data-i-html]').forEach(function(el){
+      var k = el.getAttribute('data-i-html'); if (ZH[k] != null) el.innerHTML = ZH[k];
+    });
+    document.documentElement.lang = 'zh-CN';
+    document.body.classList.add('zh');
+    document.title = ZH._title;
+    langBtn.textContent = 'EN';
+  } else {
+    if (enSnap) {
+      document.querySelectorAll('[data-i],[data-i-html]').forEach(function(el){
+        var k = el.getAttribute('data-i') || el.getAttribute('data-i-html');
+        if (enSnap[k] != null) el.innerHTML = enSnap[k];
+      });
+    }
+    document.documentElement.lang = 'en';
+    document.body.classList.remove('zh');
+    document.title = 'B612 — Step into the story';
+    langBtn.textContent = '中文';
+  }
+  try { sessionStorage.setItem('b612lang', lang); } catch(e){}
+}
+langBtn.addEventListener('click', function(){
+  applyLang(document.body.classList.contains('zh') ? 'en' : 'zh');
+});
+try { if (sessionStorage.getItem('b612lang') === 'zh') applyLang('zh'); } catch(e){}
+
+/* ---------- 导航底色 ---------- */
+var navEl = document.getElementById('topnav');
+/* ---------- 滚动驱动:浮现 + 帽子翻画 ---------- */
+var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+var drawing = document.getElementById('drawing');
+var eleph = document.getElementById('elephImg');
+var cap1 = document.getElementById('cap1'), cap2 = document.getElementById('cap2');
+var capWhy = document.getElementById('capWhy');
+var io = new IntersectionObserver(function(es){
+  es.forEach(function(e){ if (e.isIntersecting) e.target.classList.add('on'); });
+}, {threshold:.12});
+document.querySelectorAll('.rv').forEach(function(el){ io.observe(el); });
+
+var ticking = false;
+function onScroll(){
+  if (ticking) return; ticking = true;
+  requestAnimationFrame(function(){
+    ticking = false;
+    navEl.classList.toggle('solid', scrollY > 40);
+    if (!reduced) {
+      var r = drawing.getBoundingClientRect();
+      var total = r.height - innerHeight;
+      var p = Math.min(1, Math.max(0, -r.top / total));
+      var t = Math.min(1, Math.max(0, (p - .34) / .3));     // 0→1 过渡带
+      eleph.style.opacity = t.toFixed(3);
+      cap1.style.opacity = (1 - Math.min(1, t * 1.6)).toFixed(3);
+      cap2.style.opacity = (Math.max(0, (t - .55) / .45)).toFixed(3);
+      capWhy.style.opacity = p > .8 ? 1 : 0;
+    }
+  });
+}
+addEventListener('scroll', onScroll, {passive:true});
+onScroll();
+if (reduced) { eleph.style.opacity = 1; cap1.style.opacity = 0; cap2.style.opacity = 1; capWhy.style.opacity = 1; }
+</script>
+</body>
+</html>
