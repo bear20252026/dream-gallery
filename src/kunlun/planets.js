@@ -519,10 +519,15 @@ loadWorldAsset('models/hall/b612-world/kepler.glb', worldManager.getWorld('king3
 });
 
 /* ===================== 星门(出生点正前方;苔藓古石门 GLB + 随章节换色的门内符文环) =====================
-   2026-09-05 主人定:星门精确定位(0.1,1.6,56.0),门洞朝北(360°),
+   2026-09-05 主人定:星门 X/Z=0.1/56.0,门洞朝北(360°),模型与石台均贴地(由沙漠高度场求 Y),
    出生点突出地板(缺图照片+深棕底座)已退役。*/
 const gateGrp = new THREE.Group();
-gateGrp.position.set(0.1, 1.6, 56.0);
+// 石门贴地:模型底座落回沙漠地形高度(不再悬空 Y=1.6);X/Z 与朝向仍按用户指定
+const mainGateY =
+  ctx.media.desert && typeof ctx.media.desert.getH === 'function'
+    ? ctx.media.desert.getH(0.1, 56.0)
+    : 0;
+gateGrp.position.set(0.1, mainGateY, 56.0);
 const pads = { main: gateGrp, king: null, b612: null };
 function loadPortalPad(world, position, targetWorld) {
   const root = new THREE.Group();
@@ -619,7 +624,7 @@ function refreshGate() {
 refreshGate();
 // 独立世界双向传送台:main 石门→B612;B612→king;king→B612/main。
 // king 台放在第一座岛中心,玩家进入国王星球后立即可见;B612 台在原点。
-loadPortalPad(worldManager.getWorld('main'), { x: 0.1, y: 1.6, z: 56.0 }, 'b612');
+loadPortalPad(worldManager.getWorld('main'), { x: 0.1, y: mainGateY + 0.03, z: 56.0 }, 'b612');
 loadPortalPad(worldManager.getWorld('king325'), { x: 0, y: 0, z: 0 }, 'b612');
 loadPortalPad(b612World, { x: 0, y: 0, z: 0 }, 'king');
 
