@@ -622,6 +622,28 @@ mainBtn.style.cssText = doorBtn.style.cssText;
 mainBtn.style.display = 'none';
 mainBtn.style.left = 'calc(50% - 60px)';
 document.body.appendChild(mainBtn);
+// 主世界石台触发按钮(独立于章节系统,站上去就能进 B612)
+const padBtn = document.createElement('button');
+padBtn.textContent = '✦ 进入 B612';
+padBtn.style.cssText =
+  'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:60;display:none;padding:14px 36px;border-radius:24px;border:2px solid rgba(255,214,130,.9);background:rgba(30,18,8,.92);color:#ffe9c4;font-size:18px;letter-spacing:4px;cursor:pointer;font-family:inherit';
+padBtn.onclick = function () {
+  padBtn.style.display = 'none';
+  worldManager.enter('b612', {
+    snapshot: {
+      camera: null,
+      player: {
+        position: new THREE.Vector3(0, 1.6, 3),
+        yaw: 0,
+        pitch: 0,
+        vy: 0,
+        onGround: true,
+        gliding: false,
+      },
+    },
+  });
+};
+document.body.appendChild(padBtn);
 
 function showWorldTravel(label, action) {
   worldBtn.textContent = label;
@@ -676,6 +698,19 @@ onTick(function () {
   if (!ctx.player.pl) return;
   const p = pl();
   const activeWorld = ctx.scene.activeWorld || 'main';
+  // ==== 主世界石台触发(主世界内始终显示按钮,不搞距离判定) ====
+  if (activeWorld === 'main') {
+    padBtn.style.display = 'block';
+    hud.style.display = 'none';
+    doorBtn.style.display = 'none';
+    pickBtn.style.display = 'none';
+    worldBtn.style.display = 'none';
+    mainBtn.style.display = 'none';
+    return;
+  } else {
+    padBtn.style.display = 'none';
+  }
+  // ==== B612 世界 ====
   if (activeWorld === 'b612') {
     pickBtn.style.display = 'none';
     doorBtn.style.display = 'none';
@@ -855,6 +890,7 @@ bag.custom.push(function () {
   doorBtn.remove();
   worldBtn.remove();
   mainBtn.remove();
+  padBtn.remove();
   veilOff();
 });
 hotEnd('planets');
