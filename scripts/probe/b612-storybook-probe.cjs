@@ -19,6 +19,7 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
 
   // 过闸门 → skip 电影 → 等场景
   await page.waitForSelector('#b612Gate', { timeout: 60000 });
+  await page.click('#b612Gate #gAgreeChk').catch(() => null);
   await page.click('#b612Gate .gEnter').catch(() => null);
   await page.waitForFunction(() => !document.getElementById('b612Gate'), null, { timeout: 15000 }).catch(() => null);
   await page.waitForSelector('#b612film', { timeout: 20000 }).catch(() => null);

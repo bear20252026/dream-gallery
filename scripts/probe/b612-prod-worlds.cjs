@@ -18,6 +18,7 @@ const errors = [];
     .then(() => true)
     .catch(() => false);
   if (hasGate) {
+    await page.click('#b612Gate #gAgreeChk').catch(() => null);
     await page.click('#b612Gate .gEnter').catch(() => null);
     await page.waitForFunction(() => !document.getElementById('b612Gate'), null, { timeout: 15000 }).catch(() => null);
   }

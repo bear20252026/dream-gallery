@@ -1,28 +1,14 @@
-// entrygate.js — B612 入口闸门(2026-09-05 定稿)
+// entrygate.js — B612 入口闸门(2026-09-05 定稿;2026-09-06 主人定重构)
 // 结构借自 Chartogne-Taillet 入口(标题+一句话+Enter+底部协议小字),皮肤用本作"纸与墨"语言。
-// - 首访:展示闸门;点 ENTER 即视为同意三份协议(写 3 个会话标记+永久标记);
-//   协议全文从底行链接随时点开阅读(?from=gate 只读模式,左上「‹ 返回」退回闸门,状态不丢)。
-// - 老访客(gateEntered):静默补齐会话标记(下游 watchOpening/昵称弹窗等只认会话键),永不再见闸门。
-// 取代 2026-07-27 的三连读强制签署(主人 2026-09-05 定:三连读太折磨人)。
+// - **每次进入都显示**(主人 2026-09-06 定:闸门是开场第一屏,不再按 gateEntered 跳过)。
+// - 底部一行:勾选一个「同意」+ 三个协议名字;协议全文点开单独阅读
+//   (?from=gate 只读模式,左上「‹ 返回」退回闸门,状态不丢)。
+// - 勾选后 ENTER 才可用;点 ENTER 写 3 个会话标记(下游大屏轮播/指引卡只认会话键)。
+//   取代 2026-07-27 的三连读强制签署。
 import { ctx } from '../ctx.js';
 
 export function setupEntryGate(opts) {
   opts = opts || {};
-  if (ctx.store.flag('gateEntered')) {
-    // 老访客:会话键每次开页都要补(下游逻辑只认会话键)
-    sessionStorage.setItem('agreementConsented', '1');
-    sessionStorage.setItem('privacyConsented', '1');
-    sessionStorage.setItem('communityConsented', '1');
-    return;
-  }
-  if (
-    sessionStorage.getItem('agreementConsented') &&
-    sessionStorage.getItem('privacyConsented') &&
-    sessionStorage.getItem('communityConsented')
-  ) {
-    ctx.store.mark('gateEntered'); // 本会话已从闸门进过(刷新):补永久标记即可
-    return;
-  }
   build(opts);
 }
 
@@ -46,10 +32,13 @@ function build(opts) {
     <button class="gEnter" type="button">E N T E R<span class="gBar"></span></button>
   </div>
   <div class="gLegal">
-    By entering you agree to our
-    <a data-doc="agreement.html" href="javascript:void(0)">Terms of Service</a> ·
-    <a data-doc="privacy.html" href="javascript:void(0)">Privacy Policy</a> ·
-    <a data-doc="community.html" href="javascript:void(0)">Community Guidelines</a>
+    <label class="gAgree">
+      <input type="checkbox" id="gAgreeChk">
+      <span>I have read and agree to the</span>
+      <a data-doc="agreement.html" href="javascript:void(0)">Terms of Service</a> ·
+      <a data-doc="privacy.html" href="javascript:void(0)">Privacy Policy</a> ·
+      <a data-doc="community.html" href="javascript:void(0)">Community Guidelines</a>
+    </label>
     <br>© 2026 B612 · Revised Sep 5, 2026
   </div>
   <style>
@@ -67,21 +56,37 @@ function build(opts) {
   #b612Gate .gScript{font-family:'Satisfy',cursive;color:#8a6a4a;font-size:clamp(18px,2.6vw,28px);margin-top:8px}
   #b612Gate .gPoem{margin:7vh 0 6vh;color:#54463a;font-size:clamp(15px,2vw,22px);letter-spacing:.12em;line-height:2.1}
   #b612Gate .gEnter{font-family:Georgia,serif;font-size:clamp(18px,2.2vw,26px);letter-spacing:.5em;
-    color:#a04a35;background:none;border:none;cursor:pointer;padding:6px 12px}
+    color:#a04a35;background:none;border:none;cursor:pointer;padding:6px 12px;opacity:.22;
+    transition:opacity .4s ease;pointer-events:none}
+  #b612Gate .gEnter.ready{opacity:1;pointer-events:auto}
   #b612Gate .gEnter:hover{color:#7c3421}
   #b612Gate .gBar{display:block;width:1px;height:26px;margin:10px auto 0;background:#a04a35;
     animation:gBlink 1.6s ease-in-out infinite}
   @keyframes gBlink{0%,100%{opacity:1}50%{opacity:.15}}
   #b612Gate .gLegal{position:absolute;left:0;right:0;bottom:26px;text-align:center;
     color:rgba(84,70,58,.55);font-size:13px;letter-spacing:.08em;line-height:2}
+  #b612Gate .gAgree{display:inline-flex;align-items:center;gap:8px;cursor:pointer;user-select:none}
+  #b612Gate .gAgree input{accent-color:#a04a35;width:15px;height:15px;cursor:pointer;flex:none}
   #b612Gate .gLegal a{color:#7a5c3e;text-decoration:none;border-bottom:1px dotted rgba(122,102,74,.6);
     cursor:pointer;margin:0 4px}
   #b612Gate .gLegal a:hover{color:#4e4237;border-bottom-style:solid}
+  @media (max-width:640px){
+    #b612Gate .gLegal{bottom:14px;padding:0 12px}
+    #b612Gate .gAgree{flex-wrap:wrap;justify-content:center;row-gap:4px}
+  }
   </style>`;
   document.body.appendChild(ov);
 
+  const chk = ov.querySelector('#gAgreeChk');
+  const enterBtn = ov.querySelector('.gEnter');
+  // 勾选「同意」后 ENTER 才点亮(2026-09-06 主人定:单勾选 + 三协议可单独展开)
+  chk.addEventListener('change', function () {
+    enterBtn.classList.toggle('ready', chk.checked);
+  });
+
   // ENTER=同意:写齐标记,揭幕,把开场配乐交给主流程
-  ov.querySelector('.gEnter').onclick = function () {
+  enterBtn.onclick = function () {
+    if (!chk.checked) return;
     sessionStorage.setItem('agreementConsented', '1');
     sessionStorage.setItem('privacyConsented', '1');
     sessionStorage.setItem('communityConsented', '1');
@@ -95,7 +100,8 @@ function build(opts) {
     if (opts.onEnter) opts.onEnter();
   };
 
-  // 底行协议:点开只读(?from=gate),闸门暂隐;面板关闭(✕/Esc/‹返回)即回闸门,状态不丢
+  // 底行协议:点开只读(?from=gate),闸门暂隐;面板关闭(✕/Esc/‹返回)即回闸门,状态不丢。
+  // preventDefault 同时阻止 label 默认行为(点链接误触发勾选框)
   ov.querySelectorAll('.gLegal a').forEach(function (a) {
     a.onclick = function (e) {
       e.preventDefault();
@@ -113,7 +119,7 @@ function build(opts) {
     window.closePanel = function () {
       origClose.apply(this, arguments);
       if (!entered) {
-        // 读协议回来:闸门恢复(与 ENTER 终态分开,2026-09-05 修复自挡 bug)
+        // 读协议回来:闸门恢复(勾选状态保留在 checkbox 上,不受隐显影响)
         ov.style.opacity = '1';
         ov.style.pointerEvents = 'auto';
       }

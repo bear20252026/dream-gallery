@@ -36,8 +36,8 @@ import './gate/quiz.js'; // 温柔度测试（弹窗 + 3D墙面板）
 import './scene/desert.js'; // 西域沙海(无限区块地形/昆仑/水波/飞鸟/沙暴)
 import './scene/player.js'; // 玩家/键盘/鼠标/触摸/小地图/跳跃滑翔
 import './gate/quizgate.js'; // 入馆答题系统(悬浮答题屏 + 答题面板 + 门禁)
-import './gate/prologue.js'; // 冷启动·互动序章(残镜四幕回放+"我愿意"抉择,首访播一次)
-import { showOpening, hideOpening } from './ui/opening-bg.js'; // 首页专属开场:协议后的流动背景(z600)
+// 2026-09-06 主人定:开场收敛为「闸门→电影→游戏」,昆仑残镜序章(prologue.js)与旧开屏
+// (opening-bg.js)退出开场链——文件保留备查,不再引入(其兜底线程/握手标志随之失效)。
 import './kunlun/peaks.js'; // 昆仑巅彩蛋(90m 登飞来峰语音 / 100m 彩蛋视频)
 import './kunlun/spirits.js'; // 六合灵蕴收集(天穹100%后开启:光柱指引/拾取/六齐终章)
 import './kunlun/eternal.js'; // 空中永恒展厅·二期①(金门/六边形浮空展厅/晨光留影)
@@ -297,67 +297,9 @@ function showGuideCard() {
 }
 ctx.showGuideCard = showGuideCard;
 
-// ===================== 性别选择弹窗(2026-07-31 v2 全访客) =====================
-// 问访客性别:女生维持现状,男生把建筑颜色调成蓝色
-// v2: 移除 sessionStorage 协议检查(老访客新会话标记为空导致不显示),改为轮询等协议签完
-function showGenderSelect() {
-  // 已选择过则跳过
-  if (ctx.store.flag('genderSelected')) return;
-  // 协议未签完则 2 秒后再试(最多等 60 秒)
-  if (
-    !sessionStorage.getItem('agreementConsented') ||
-    !sessionStorage.getItem('privacyConsented') ||
-    !sessionStorage.getItem('communityConsented')
-  ) {
-    if (!window.__genderRetry) {
-      window.__genderRetry = 1;
-      setTimeout(() => {
-        window.__genderRetry = 0;
-        showGenderSelect();
-      }, 2000);
-    }
-    return;
-  }
-  if (document.getElementById('genderOv')) return;
-  const ov = document.createElement('div');
-  ov.id = 'genderOv';
-  ov.setAttribute('role', 'dialog');
-  ov.setAttribute('aria-modal', 'true');
-  ov.setAttribute('aria-label', '性别选择');
-  ov.style.cssText =
-    'position:fixed;inset:0;z-index:400;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.7)';
-  const card = document.createElement('div');
-  card.style.cssText =
-    'background:rgba(30,18,28,0.95);border:1px solid rgba(255,214,170,0.35);border-radius:16px;padding:30px 40px;text-align:center;color:#ffe2c4;max-width:360px';
-  card.innerHTML =
-    '<div style="font-size:18px;letter-spacing:3px;margin-bottom:20px">你是男生还是女生？</div><div style="font-size:13px;opacity:.7;margin-bottom:24px">这会影响你的画廊配色方案</div>';
-  const btnM = document.createElement('button');
-  btnM.textContent = '男 生';
-  btnM.setAttribute('aria-label', '选择男生配色');
-  btnM.style.cssText =
-    'padding:12px 32px;border:none;border-radius:10px;background:linear-gradient(135deg,#4a8fc0,#2a5f8c);color:#fff;cursor:pointer;margin-right:16px;font-size:15px;letter-spacing:2px';
-  const btnF = document.createElement('button');
-  btnF.textContent = '女 生';
-  btnF.setAttribute('aria-label', '选择女生配色');
-  btnF.style.cssText =
-    'padding:12px 32px;border:none;border-radius:10px;background:linear-gradient(135deg,#e8a0b4,#c07090);color:#fff;cursor:pointer;font-size:15px;letter-spacing:2px';
-  btnM.onclick = () => {
-    ctx.store.mark('genderSelected');
-    ctx.store.setStr('gender', 'male');
-    applyGenderColor('male');
-    ov.remove();
-  };
-  btnF.onclick = () => {
-    ctx.store.mark('genderSelected');
-    ctx.store.setStr('gender', 'female');
-    ov.remove();
-  };
-  card.appendChild(btnM);
-  card.appendChild(btnF);
-  ov.appendChild(card);
-  document.body.appendChild(ov);
-}
-// 应用性别对应的建筑颜色
+// ===================== 性别选择(2026-09-06 主人定:开场门槛删除) =====================
+// showGenderSelect 弹窗流程已整体移除;保留配色应用——老档案里存过 gender=male 的
+// 仍生效(蓝色墙壁),新访客不再被问性别,统一默认暖色。
 function applyGenderColor(gender) {
   if (gender !== 'male') return;
   // 男生:建筑墙壁调成蓝色(黛蓝 #3a5a8c)
@@ -388,14 +330,7 @@ function applyGenderColor(gender) {
     }
   })();
 }
-// 性别选择:未选择过则等序章档(gate/开场电影走完)再显示,不与开幕电影抢屏(2026-09-05)
-if (!ctx.store.flag('genderSelected')) {
-  (function waitPrologue() {
-    if (ctx.store.flag('prologueDone')) setTimeout(showGenderSelect, 1200);
-    else setTimeout(waitPrologue, 1000);
-  })();
-}
-// 启动时应用已保存的性别颜色
+// 启动时应用已保存的性别颜色(老档案兼容;新访客不再有性别选择门槛)
 const savedGender = ctx.store.str('gender');
 if (savedGender) applyGenderColor(savedGender);
 
@@ -442,21 +377,10 @@ import('./gate/entrygate.js')
   });
 if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
 
-// ===================== 开场流程统一调度(2026-08-29 顺序梳理) =====================
-// 正常游戏顺序(单一入口,杜绝双轮询抢跑):
-//   ① 协议三连读(用户协议 → 隐私指引 → 社区公约,必须签完)
-//   ↓
-//   ② 首页开场(开屏:逐字启程仪式 → 标题层 → 点「进入画廊」)
-//   ↓
-//   ③ 残镜序章(仅首访播一次;由本处在开屏结束后显式驱动)
-//   ↓
-//   ④ 3D 画廊
-// 2026-08-29 修订:此前 prologue.js 与开场层各自轮询 consent,存在竞态——
-// 序章可能在开场层之前抢跑(z-index 500 被 600 盖住,用户在开屏上点击时剧情已播完)。
-// 现改为:序章一律由本处驱动;prologue.js 仅保留"开场层不可用"时的延迟兜底。
-function startPrologueIfNeeded() {
-  if (!ctx.store.flag('prologueDone') && ctx.startPrologue) ctx.startPrologue();
-}
+// ===================== 开场流程(2026-09-06 主人定:收敛为唯一链路) =====================
+// 每次进入完全一致:入口闸门(勾选同意→ENTER) → 纸飞机电影(每次都播,skip/Esc 可跳) → 游戏。
+// 旧版五路分叉(?oldintro/序章兜底/prologueDone 跳过)已拆除;prologue.js/opening-bg.js 不再引入。
+// ?noopening / ?noprologue / ?nofilm / sessionStorage.skipOpening 统一=跳过电影直接进馆(探针/测试用)。
 (function watchOpening() {
   function allConsented() {
     return (
@@ -465,18 +389,19 @@ function startPrologueIfNeeded() {
       sessionStorage.getItem('communityConsented')
     );
   }
-  // 测试/探针可加 ?noopening 或置 skipOpening 跳过开场层(与 ?noprologue 同机制)
-  const skipOpening = /noopening/.test(location.search) || !!sessionStorage.getItem('skipOpening');
+  const skipFilm =
+    /noopening|noprologue|nofilm/.test(location.search) ||
+    !!sessionStorage.getItem('skipOpening');
   let done = false;
   function tick() {
     if (done) return;
-    // ① 协议未签完:一律等待(入口闸门负责写标记)
+    // ① 闸门未过(会话标记未写):一律等待(入口闸门每次显示,勾选同意后 ENTER 写标记)
     if (!allConsented()) {
       setTimeout(tick, 1000);
       return;
     }
     done = true;
-    // 收束(2026-09-05):停协议配乐 + 记序章档 + 起大屏视频;deferMedia=老访客首次交互再起播
+    // 收束:停协议配乐 + 记档(兼容旧消费方) + 起大屏轮播;deferMedia=首次交互/4s 兜底再起播
     function finishIntro(deferMedia) {
       if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
       ctx.store.mark('prologueDone');
@@ -492,25 +417,12 @@ function startPrologueIfNeeded() {
         setTimeout(go, 4000);
       } else if (ctx.startVidSeq) ctx.startVidSeq();
     }
-    // ② 老访客/测试跳过(?noopening、?noprologue、skipOpening、已看过序章)
-    if (
-      skipOpening ||
-      /noprologue|nofilm/.test(location.search) ||
-      ctx.store.flag('prologueDone')
-    ) {
-      window.__openingSplashSkipped = true;
+    // ② 测试/探针旁路:统一跳过电影
+    if (skipFilm) {
       finishIntro(true);
       return;
     }
-    // ③ 回滚通道:?oldintro 走旧「开屏层+残镜序章」
-    if (/oldintro/.test(location.search)) {
-      showOpening(function () {
-        hideOpening();
-        startPrologueIfNeeded();
-      });
-      return;
-    }
-    // ④ 新访客:B612 开幕电影(替代开屏层+残镜序章,2026-09-05 定稿)
+    // ③ 每次进入都播纸飞机电影(可跳过);加载失败直接进馆
     import('./gate/openfilm.js')
       .then(function (m) {
         m.playOpeningFilm(function () {
@@ -518,8 +430,8 @@ function startPrologueIfNeeded() {
         });
       })
       .catch(function (e) {
-        console.warn('[film] 开幕电影加载失败,退回旧序章:', e.message);
-        startPrologueIfNeeded();
+        console.warn('[film] 开幕电影加载失败,直接进馆:', e.message);
+        finishIntro(true);
       });
   }
   setTimeout(tick, 1200);
