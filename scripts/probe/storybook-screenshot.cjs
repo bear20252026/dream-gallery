@@ -9,7 +9,7 @@ const srv=http.createServer((req,res)=>{
 });
 srv.listen(8882,async()=>{
   const b=await launch(),p=await b.newPage({viewport:{width:1280,height:800}});
-  await p.goto('http://localhost:8882/storybook-test.html',{waitUntil:'domcontentloaded',timeout:60000});
+  await p.goto('http://localhost:8882/storybook-test.html?src=storybook-pbr.glb',{waitUntil:'domcontentloaded',timeout:60000});
   await p.waitForTimeout(18000);
   await p.screenshot({path:path.resolve(__dirname,'..','artifacts','storybook-render.png')});
   console.log('screenshot saved');

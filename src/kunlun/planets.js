@@ -15,7 +15,22 @@ const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
 // 独立世界灯光工厂:超强力灯光让 GLB 内嵌 PBR 贴图颜色全部展开
-function addWorldLights(scene) {
+// lite=true:B612 storybook 专用——材质已离线转换、天幕自发光,低照度防过曝(灯数不变,守手机账)
+function addWorldLights(scene, lite) {
+  if (lite) {
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    const keyL = new THREE.DirectionalLight(0xfff4e0, 3.2);
+    keyL.position.set(5, 8, 5);
+    scene.add(keyL);
+    const fillL = new THREE.DirectionalLight(0x6b8fc8, 1.3);
+    fillL.position.set(-4, 2, -3);
+    scene.add(fillL);
+    const rimL = new THREE.DirectionalLight(0xffd9a0, 1.0);
+    rimL.position.set(0, 3, -6);
+    scene.add(rimL);
+    scene.add(new THREE.HemisphereLight(0x8fb0d8, 0x3a5a2a, 1.0));
+    return;
+  }
   scene.add(new THREE.AmbientLight(0xffffff, 2.5));
   const key = new THREE.DirectionalLight(0xfff8f0, 5.0);
   key.position.set(10, 20, 15);
@@ -55,7 +70,7 @@ const b612World = worldManager.registerWorld('b612', {
   meta: { title: 'B612' },
 });
 b612World.scene.background = new THREE.Color(0x05050f);
-addWorldLights(b612World.scene);
+addWorldLights(b612World.scene, true);
 addStarfield(b612World.scene);
 
 const assetLoader = new GLTFLoader();
@@ -79,7 +94,7 @@ function loadWorldAsset(url, world, opts = {}) {
       );
       if (opts.rotationY) model.rotation.y = opts.rotationY;
       world.scene.add(model);
-      if (opts.onLoad) opts.onLoad(model);
+      if (opts.onLoad) opts.onLoad(model, gltf);
     },
     undefined,
     (err) => console.warn('[planets] world asset unavailable:', url, err.message)
@@ -416,13 +431,27 @@ function buildIsland(cfg, idx) {
 PLANETS.forEach(buildIsland);
 
 // 独立世界故事资产:只挂到目标 scene,不进入主世界。
-// B612:storybook 模型放大到 200 单位,玩家出生在模型表面上方,一眼看到绿色星球+小王子
-loadWorldAsset('models/hall/b612-world/b612-storybook.glb', b612World, {
+// B612:「球中球」原样呈现——±22.4 天幕壳(内壁手写英文星空画)之内,绿星球顶坐着小王子+绵羊+玫瑰。
+// 2026-09-06 换材质离线转换版(specGloss→metalRough,见 scripts/gen/convert-storybook-pbr.cjs):
+// 原版 23 材质全部是 three r160 不支持的 KHR_materials_pbrSpecularGlossiness,贴图全丢=黑块;
+// 原生尺寸仅 ~1.14(Sketchfab 导出链带 0.025 祖先缩放),等比放大 39.3 倍,天幕壳即世界边界。
+let storybookMixer = null;
+bag.custom.push(function () {
+  if (storybookMixer) storybookMixer.stopAllAction();
+  storybookMixer = null;
+});
+loadWorldAsset('models/hall/b612-world/b612-storybook-pbr.glb', b612World, {
   name: 'b612Storybook',
-  maxSize: 200,
+  maxSize: 44.85,
   x: 0,
-  y: -30,
-  z: -60,
+  y: -22.45, // 天幕壳中心落在 y≈0,星球顶面贴近地面高度
+  z: 0,
+  onLoad: function (model, gltf) {
+    if (gltf.animations && gltf.animations.length) {
+      storybookMixer = new THREE.AnimationMixer(model);
+      storybookMixer.clipAction(gltf.animations[0]).play(); // SceneFull2:小王子坐姿 idle(6.7s 循环)
+    }
+  },
 });
 // King:king-scene 模型放在 (0,0,-15),玩家出生在 (0,7,12) 面朝它
 loadWorldAsset('models/hall/b612-world/king-scene.glb', worldManager.getWorld('king325'), {
@@ -633,8 +662,9 @@ padBtn.onclick = function () {
     snapshot: {
       camera: null,
       player: {
-        position: new THREE.Vector3(0, 1.6, 3),
-        yaw: 0,
+        // 天幕壳内、星球正前方(-z 侧),yaw=π 正对星球——第一眼即 SceneFull2 构图
+        position: new THREE.Vector3(-1.5, 2, -8.5),
+        yaw: Math.PI,
         pitch: 0,
         vy: 0,
         onGround: true,
@@ -664,8 +694,9 @@ function travelTo(idx) {
   const spawn =
     targetWorld === 'b612'
       ? {
-          position: new THREE.Vector3(0, 2, 12),
-          yaw: 0,
+          // 天幕壳内、星球正前方,yaw=π 正对星球(与石台入口一致)
+          position: new THREE.Vector3(-1.5, 2, -8.5),
+          yaw: Math.PI,
           pitch: 0,
           vy: 0,
           onGround: true,
@@ -712,6 +743,8 @@ let hudT = 0,
   lampT = 0;
 onTick(function (dt) {
   const t = performance.now() * 0.001;
+  // B612 小王子坐姿动画(SceneFull2)
+  if (storybookMixer) storybookMixer.update(Math.min(dt || 0.016, 0.05));
   // 星屑呼吸 + 点灯人路灯亮灭
   islands.forEach(function (isl, i) {
     isl.mote.rotation.y += 0.01;
