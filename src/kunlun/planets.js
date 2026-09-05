@@ -481,6 +481,13 @@ ctx.scene.worldChanged &&
       try {
         gargMain.pause();
       } catch (e) {}
+      // 多世界切割修复(2026-09-06):离开时 intro 也要停,否则会独自响完一整段;
+      // 重置 gargStarted,再进 B612 重新从 intro 开始,不会叠两层
+      try {
+        gargIntro.pause();
+        gargIntro.currentTime = 0;
+      } catch (e) {}
+      gargStarted = false;
     }
   });
 
@@ -795,6 +802,35 @@ onTick(function (dt) {
     }
     if (spaceKeys['ControlLeft'] || spaceKeys['KeyC']) {
       p.y -= speed * dt2;
+    }
+    // ▲ 跳跃键(太空=升空推进,2026-09-06 主人定:按键不回收,做成跳跃感):
+    // tickPhysics 在非主世界把 jumpPressed/jumpHold 转成 boostT 爆发 + spaceUp 持续上升
+    if (plRef.boostT > 0) {
+      p.y += speed * 2.6 * dt2;
+      plRef.boostT = Math.max(0, plRef.boostT - dt2);
+    }
+    if (plRef.spaceUp) p.y += speed * 0.9 * dt2;
+    // 手机摇杆(与主世界同一输入源 jD):相机相对 XZ 移动——太空模式此前只认键盘,手机无法移动
+    const jx = (ctx.player.jD && ctx.player.jD.x) || 0;
+    const jz = (ctx.player.jD && ctx.player.jD.z) || 0;
+    const jl = Math.hypot(jx, jz);
+    if (jl > 0.1) {
+      const nx = jx / jl, nz = jz / jl;
+      const fx2 = -Math.sin(yaw), fz2 = -Math.cos(yaw);
+      const rx2 = Math.cos(yaw), rz2 = -Math.sin(yaw);
+      const js = speed * 0.75 * dt2;
+      p.x += (fx2 * nz + rx2 * nx) * js;
+      p.z += (fz2 * nz + rz2 * nx) * js;
+    }
+    // B612 天幕壳即世界边界:软钳在半径 21 内(壳 ±22.4),不会飞出壳外掉进空背景
+    if (activeWorld === 'b612') {
+      const rr = Math.hypot(p.x, p.y, p.z);
+      if (rr > 21) {
+        const k = 21 / rr;
+        p.x *= k;
+        p.y *= k;
+        p.z *= k;
+      }
     }
     // 阻止重力:物理步不施加下落
     plRef.vy = 0;

@@ -212,6 +212,8 @@ export function drawMusicCanvas() {
 // 点击音乐平面
 const mxTouches = new Map();
 function onMusicClick(cx, cy, isStart) {
+  // 多世界切割(2026-09-06):音乐平面属主世界,小世界里不再隔空发声
+  if ((ctx.scene.activeWorld || 'main') !== 'main') return false;
   if (!mcPlane) return;
   const { cam, ray, mP2 } = ctx.scene;
   mP2.x = (cx / innerWidth) * 2 - 1;

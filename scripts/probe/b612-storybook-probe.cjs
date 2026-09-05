@@ -85,6 +85,26 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   ok(d.book && d.book.rose && Math.abs(d.book.rose.x) < 6 && Math.abs(d.book.rose.z) < 6, '玫瑰已归位星球顶 ' + JSON.stringify(d.book && d.book.rose));
   ok(d.player && Math.abs(d.player.z + 8.5) < 2 && Math.abs(d.player.x + 1.5) < 2, '出生点在星球前方 ' + JSON.stringify(d.player));
 
+  // 多世界切割断言(2026-09-06):主世界 UI 隐藏 / 跳跃键保留 / 世界标记
+  const ui = await page.evaluate(() => {
+    const disp = (sel) => {
+      const el = document.querySelector(sel);
+      return el ? el.style.display || getComputedStyle(el).display : 'absent';
+    };
+    return {
+      world: document.body.dataset.world,
+      map: disp('#m'),
+      quest: disp('#questHud'),
+      skyNote: disp('#skyNote'),
+      jumpBtn: disp('#jumpBtnGlide'),
+    };
+  });
+  ok(ui.world === 'b612', 'body[data-world]=b612');
+  ok(ui.map === 'none', '小地图 #m 已隐藏(' + ui.map + ')');
+  ok(ui.quest === 'none', '任务册 #questHud 已隐藏');
+  ok(ui.skyNote === 'none', '昆仑语录 #skyNote 已隐藏');
+  ok(ui.jumpBtn !== 'none' && ui.jumpBtn !== 'absent', '跳跃键 #jumpBtnGlide 保留(太空=升空推进)');
+
   await page.screenshot({ path: path.join(ROOT, 'scripts', 'artifacts', 'b612-ingame-render.png') });
   const realErrors = errors.filter((e) => !/dynamically imported module[^]*src[/\\]gallery[/\\]/.test(e)); // 花瓣画廊 v2/玫瑰画廊本地动态导入噪音(9-2 遗留,生产打包无)
   ok(realErrors.length === 0, '零 JS 错误' + (realErrors.length ? ': ' + realErrors[0] : ''));

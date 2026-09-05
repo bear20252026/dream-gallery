@@ -6,6 +6,7 @@ import { onMediaChanged } from '../../media-push.js'; // 服务端主动推送:�
 
 // ===================== 昆仑灵鉴:氛围小字 =====================
 const skyNote = document.createElement('div');
+skyNote.id = 'skyNote'; // 多世界切割:主世界专属语录,切世界由 scene-manager 统一隐藏
 skyNote.textContent = '昆仑没有日夜。你来了，天就亮了。';
 skyNote.style.cssText =
   'position:fixed;right:12px;bottom:12px;z-index:15;color:rgba(255,200,220,0.35);font-size:10px;letter-spacing:2px;pointer-events:none;font-family:inherit';
@@ -149,6 +150,18 @@ setTimeout(function () {
 });
 
 ctx.media.mA = mA;
+
+// 多世界切割(2026-09-06):非主世界暂停画廊 BGM(避免与小世界配乐叠音),回主世界恢复原状态
+let bgmWasPlaying = false;
+ctx.scene.worldChanged &&
+  ctx.scene.worldChanged(function (d) {
+    if (!d || d.to === 'main') {
+      if (bgmWasPlaying && mA.paused) mA.play().catch(function () {});
+    } else {
+      bgmWasPlaying = !mA.paused;
+      if (bgmWasPlaying) mA.pause();
+    }
+  });
 
 // 诊断钩子
 window.__vidEl = ctx.media.vidEl;

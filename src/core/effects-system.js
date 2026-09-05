@@ -164,6 +164,8 @@ export function createEffectsSystem(deps = {}) {
       autoTimer = setInterval(autoFirework, 2800);
     },
     update() {
+      // 多世界切割(2026-09-06):烟花/漂浮粒子属主世界金字塔,小世界里不再模拟与 GPU 上传
+      if ((ctx.scene.activeWorld || 'main') !== 'main') return;
       updateFireworks();
       updateParticles(performance.now());
     },

@@ -31,10 +31,10 @@ const errors = [];
   w = await page.evaluate(() => window.__ctx.scene.activeWorld);
   ok(w === 'b612', '进入 B612(activeWorld=' + w + ')');
   const mapHidden = await page.evaluate(() => {
-    const m = document.getElementById('mapWrap') || document.getElementById('mapCanvas');
-    return !m || m.style.display === 'none';
+    const m = document.getElementById('m'); // 小地图真实容器(index.html:128)
+    return document.body.dataset.world === 'b612' && m && m.style.display === 'none';
   });
-  ok(mapHidden, '非主世界小地图已隐藏');
+  ok(mapHidden, '非主世界小地图已隐藏(data-world=b612 + #m none)');
   const hasStory = await page.evaluate(() => {
     const s = window.__ctx.scene.s; if (!s) return false;
     let found = null;
@@ -62,10 +62,10 @@ const errors = [];
   w = await page.evaluate(() => window.__ctx.scene.activeWorld);
   ok(w === 'main', '回主世界(activeWorld=' + w + ')');
   const mapBack = await page.evaluate(() => {
-    const m = document.getElementById('mapWrap') || document.getElementById('mapCanvas');
-    return !m || m.style.display !== 'none';
+    const m = document.getElementById('m');
+    return document.body.dataset.world === 'main' && m && m.style.display !== 'none';
   });
-  ok(mapBack, '主世界小地图恢复');
+  ok(mapBack, '主世界小地图恢复(data-world=main)');
 
   ok(errors.length === 0, '零 JS 错误' + (errors.length ? ': ' + errors[0] : ''));
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);

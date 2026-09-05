@@ -24,6 +24,8 @@ export function createMediaSystem(deps = {}) {
       // 无独立初始化:画布与视频元素由 media.js 负责创建,本系统仅驱动其逐帧更新
     },
     update() {
+      // 多世界切割(2026-09-06):音乐画布重绘/视频纹理上传只属主世界(小世界省 CPU/带宽)
+      if ((ctx.scene.activeWorld || 'main') !== 'main') return;
       // 音乐画布(2D 可视化,每帧重绘)
       if (typeof media.drawMusicCanvas === 'function') media.drawMusicCanvas();
       // 视频墙纹理更新(30Hz 节流,标记 needsUpdate 供下一帧渲染上传)

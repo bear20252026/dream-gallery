@@ -188,6 +188,7 @@ function rayHitFrame(px,py){
 function inHallNow(){return !!(ctx.player.pl&&ctx.kunlun.eternalKeepOut&&ctx.kunlun.eternalKeepOut(ctx.player.pl.p.x,ctx.player.pl.p.z));}
 function down(e){
   if(hold||anim||ctx.kunlun.flightLock||ctx.gallery.zG||!inHallNow())return;
+  if((ctx.scene.activeWorld||'main')!=='main')return; // 多世界切割:放下画框只属主世界
   const p=e.touches?e.touches[0]:e;
   const g=rayHitFrame(p.clientX,p.clientY);
   if(!g)return;

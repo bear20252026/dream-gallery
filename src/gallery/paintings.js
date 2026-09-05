@@ -498,6 +498,13 @@ function lerp(a, b, t) {
 }
 
 function onC3D(e) {
+  // 多世界切割(2026-09-06):非主世界禁用主世界交互射线——
+  // iG 是主世界交互物登记册,three 射线不要求对象在当前渲染场景里,
+  // 不守卫会在小世界隔空点响琴声/放大画框(污染主场景)/打开外链
+  if ((ctx.scene.activeWorld || 'main') !== 'main') {
+    if (ctx.gallery.zG) zoomOut();
+    return;
+  }
   let cx, cy;
   if (e.changedTouches && e.changedTouches[0]) {
     cx = e.changedTouches[0].clientX;

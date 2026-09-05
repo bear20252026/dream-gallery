@@ -292,6 +292,8 @@ async function startSequence() {
 
 // ===================== 导出：等待用户首次交互启动序列 =====================
 function retryMedia() {
+  // 多世界切割(2026-09-06):小世界里不解除主世界大屏静音(否则太空里响起画廊视频声)
+  if ((ctx.scene.activeWorld || 'main') !== 'main') return;
   // 主视频:静音播放中但被浏览器静音 → 用户手势后开声
   if (vidEl.src && vidEl.muted && !vidEl.paused) {
     vidEl.muted = false;

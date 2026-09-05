@@ -70,6 +70,9 @@ ctx.scene.avatar = avatar;
 // 现在 resolveMove 内部做子步进(每步 ≤0.12m)+ 逐轴滑行。
 function mv(wx, wz, dt) {
   if (ctx.kunlun.flightLock) return; // 飞舟巡礼中(ark.js):移动冻结,航线接管
+  // 多世界切割(2026-09-06):非主世界由 planets 太空模式接管移动——
+  // 主世界碰撞体照常解算会在小世界里形成"隐形墙"(B612 出生点恰在主世界建筑脚印内)
+  if ((ctx.scene.activeWorld || 'main') !== 'main') return;
   let spd = 3.2 * dt; // 固定速度
   // 滑翔乘风(西域原版):提速1.6倍 + 朝昆仑方向的导向风加成(dot²*0.6);抬头再按俯仰角加成
   if (pl.gliding) {
@@ -130,6 +133,21 @@ let jumpHold = false,
   jumpPressed = false;
 function tickPhysics(dt) {
   ctx._jumpHold = jumpHold; // 暴露给状态机(ctx.player 被 aliasNS 冻结,不能加属性)
+  // 多世界切割(2026-09-06):非主世界零重力零碰撞——主世界物理整套短路。
+  // 跳跃键转交太空:按下瞬间 boostT 爆发(跳跃感),按住 spaceUp 持续上升,
+  // 由 planets.js 太空移动分支消费。此前重力先拉、太空再清零,上升有下坠感。
+  if ((ctx.scene.activeWorld || 'main') !== 'main') {
+    if (jumpPressed) {
+      pl.boostT = 0.3;
+      jumpPressed = false;
+    }
+    pl.spaceUp = jumpHold;
+    pl.vy = 0;
+    pl.onGround = true;
+    pl.gliding = false;
+    updateGlideHUD();
+    return;
+  }
   if (ctx.kunlun.flightLock) {
     jumpPressed = false;
     return;
@@ -586,6 +604,12 @@ homeBtn.addEventListener('click', (e) => {
     window.quizToast && window.quizToast('飞舟巡礼中，坐稳了');
     return;
   } // ark.js:飞行中禁回家
+  // 多世界切割(2026-09-06):小世界里 ⌂ = 返回画廊(旧行为会把玩家扔到
+  // "小世界坐标系里的主世界出生点",直接落到天幕壳外)
+  if ((ctx.scene.activeWorld || 'main') !== 'main') {
+    if (ctx.scene.toMainWorld) ctx.scene.toMainWorld();
+    return;
+  }
   fadeTeleport(() => {
     pl.p.set(SPAWN.x, groundY(SPAWN.x, SPAWN.z) + EYE_HEIGHT, SPAWN.z);
     pl.vy = 0;

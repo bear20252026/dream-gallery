@@ -86,6 +86,7 @@ onTick(function(){
   }else if(cg.rotation.x||cg.rotation.z){cg.rotation.x=0;cg.rotation.z=0;}
   core.material.opacity=0.5+Math.sin(now*0.004)*0.25; // 内芯流光
   chkT++;if(chkT%15)return;
+  if((ctx.scene.activeWorld||'main')!=='main'){wasIn=false;return;} // 多世界切割:风铃问候只属主世界
   const inH=!!(ctx.kunlun.eternalKeepOut&&ctx.player.pl&&ctx.kunlun.eternalKeepOut(ctx.player.pl.p.x,ctx.player.pl.p.z));
   if(inH&&!wasIn)entered();
   wasIn=inH;

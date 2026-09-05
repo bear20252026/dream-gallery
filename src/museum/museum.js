@@ -388,6 +388,8 @@ function makePortal(x, z, y, color, label, action) {
 
 // onTick:门框缓慢旋转 + 全模式距离触发(ctx.onTick(fn) 是注册式,非数组)
 ctx.onTick(function museumTick() {
+  // 多世界切割(2026-09-06):门框走近触发只属主世界(小世界自由飞过坐标不再误传送)
+  if ((ctx.scene.activeWorld || 'main') !== 'main') return;
   for (const p of portals) {
     if (!p.gp || !p.gp.visible) continue;
     p.gp.rotation.z += 0.01;

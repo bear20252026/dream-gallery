@@ -836,13 +836,15 @@ onTick(function () {
       auraGeo.attributes.position.needsUpdate = true;
     }
   }
-  // 登舟提示(4m,250ms 节流)
+  // 登舟提示(4m,250ms 节流;多世界切割:登舟只属主世界,小世界里不出现按钮)
   btnT++;
   if (btnT % 15 === 0 && ctx.player.pl && !flying && !freeFlight.on) {
+    const inMain = (ctx.scene.activeWorld || 'main') === 'main';
     const dx = ctx.player.pl.p.x - PARK.x,
       dz = ctx.player.pl.p.z - PARK.z,
-      near = dx * dx + dz * dz < 16;
-    if (near && n >= 1) {
+      near = inMain && dx * dx + dz * dz < 16;
+    if (!inMain) boardBtn.style.display = 'none';
+    else if (near && n >= 1) {
       boardBtn.style.display = 'block';
       boardBtn.textContent =
         ctx.kunlun.isDone && ctx.kunlun.isDone() ? '登 上 飞 舟' : '飞舟沉睡中（' + n + '/6）';

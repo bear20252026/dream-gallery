@@ -94,6 +94,7 @@ ctx.onTick(function(){
   // 空中永恒展厅内不触发(展厅海拔400m,否则会误唤飞来峰语音/彩蛋视频糊进展厅)
   if(ctx.kunlun.eternalKeepOut&&ctx.kunlun.eternalKeepOut(pl.p.x,pl.p.z))return;
   if(ctx.kunlun.flightLock)return; // 飞舟巡礼中(ark.js)不触发海拔彩蛋:航线会穿越90/100m触发线
+  if((ctx.scene.activeWorld||'main')!=='main')return; // 多世界切割:海拔彩蛋只属主世界(小世界升空不触发)
   const alt=pl.p.y;
   // 90m:登飞来峰语音(期间大屏挂起)
   if(alt>=90&&armed90){

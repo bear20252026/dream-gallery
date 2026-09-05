@@ -231,8 +231,12 @@ export class LoopManager {
     const { jD, ks, pl, mv, drawMap } = ctx.player;
     const { cam, pls, WH, skyUniforms, groundUniforms } = ctx.scene;
     const { desert, dayHour } = ctx.media;
+    // 多世界切割(2026-09-06):非主世界由 planets 太空模式接管移动/物理,
+    // 主世界的移动/碰撞/沙漠/昼夜/吊灯/天空 uniform 全部短路(省 CPU 且消除 B612 隐形墙)
+    const world = ctx.scene.activeWorld || 'main';
 
     // 画廊移动逻辑
+    if (world === 'main') {
     let mx = jD.x, mz = jD.z;
     if (ks.w || ks.arrowup) mz += 1;
     if (ks.s || ks.arrowdown) mz -= 1;
@@ -257,6 +261,7 @@ export class LoopManager {
     } else if (ctx.player.viewMode !== 1) {
       _modelYaw = pl.y; // 第一人称:角色朝向即玩家朝向
     }
+    }
     
     // 跳跃/滑翔/重力物理(player.js tickPhysics,经 Object.assign 挂 ctx.player)
     // ⚠️ 2026-08-30 B2 收敛:历史上函数被挂到扁平 ctx.tickPhysics 而此处读
@@ -273,37 +278,41 @@ export class LoopManager {
     // 相机每帧同步
     this._updateCamera(dt, now);
     
-    // 沙漠区块/水面/飞鸟/沙暴逐帧更新
-    if (desert) desert.update(dt, now * 0.001);
-    
-    // 统一昼夜
-    const hour = (12 + now / 2500) % 24;
-    ctx.media.dayHour = hour;
-    if (desert && now - this._lastDayT > 100) {
-      this._lastDayT = now;
-      desert.dayNight(hour);
+    // 沙漠区块/水面/飞鸟/沙暴逐帧更新(多世界切割:仅主世界)
+    if (desert && world === 'main') desert.update(dt, now * 0.001);
+
+    // 统一昼夜(多世界切割:仅主世界)
+    if (world === 'main') {
+      const hour = (12 + now / 2500) % 24;
+      ctx.media.dayHour = hour;
+      if (desert && now - this._lastDayT > 100) {
+        this._lastDayT = now;
+        desert.dayNight(hour);
+      }
     }
-    
+
     // 滑翔时视野拉宽
     const tFov = pl.gliding ? 82 : ctx.player.viewMode === 1 ? 50 : 75;
     if (Math.abs(cam.fov - tFov) > 0.01) {
       cam.fov += (tFov - cam.fov) * dt * 4;
       cam.updateProjectionMatrix();
     }
-    
-    // 吊灯闪烁 10Hz 节流
-    if (now - this._lastPlsT > 100) {
+
+    // 吊灯闪烁 10Hz 节流(多世界切割:吊灯属主世界)
+    if (world === 'main' && now - this._lastPlsT > 100) {
       this._lastPlsT = now;
       pls.forEach((p, i) => {
         p.l.intensity = p.base * (1 + Math.sin(now * 0.002 + i * 1.3) * 0.06);
       });
     }
-    
-    // 更新天空 uniform
-    skyUniforms.uTime.value = performance.now() * 0.001;
-    groundUniforms.uTime.value = performance.now() * 0.001;
-    skyUniforms.uCameraPos.value.copy(pl.p);
-    groundUniforms.uCameraPos.value.copy(pl.p);
+
+    // 更新天空 uniform(多世界切割:主世界天空/地面着色器)
+    if (world === 'main') {
+      skyUniforms.uTime.value = performance.now() * 0.001;
+      groundUniforms.uTime.value = performance.now() * 0.001;
+      skyUniforms.uCameraPos.value.copy(pl.p);
+      groundUniforms.uCameraPos.value.copy(pl.p);
+    }
 
     // 注:烟花(updateFireworks)/漂浮粒子已迁出到 EffectsSystem(engine/animate),
     // 音乐画布(drawMusicCanvas)/视频墙纹理已迁出到 MediaSystem(presentation/render),
@@ -328,6 +337,7 @@ export class LoopManager {
     const { ctx } = this;
     const { pl } = ctx.player;
     const { cam, avatar, desert } = ctx.scene;
+    const world = ctx.scene.activeWorld || 'main'; // 多世界切割:相机边界/地面按当前世界取
 
     if (ctx.player.viewMode === 1) {
       // 第三人称:轨道相机(2026-08-30 重写)
@@ -350,13 +360,14 @@ export class LoopManager {
       // -- 2) 射线碰撞:胸口 → 理想机位,对建筑碰撞盒求交(解析 slab 法,零分配) --
       // bounds 盒只有 XZ 脚印(墙体足够高),Y 覆盖 0~8m 全楼层。
       // 不对 1788 个场景网格做射线(three.js 论坛证实地形网格射线极慢)。
+      // 多世界切割(2026-09-06):非主世界用当前世界自己的边界(如 B612 天幕壳无墙=不受限)
       const rig = ctx._camRig || (ctx._camRig = { curDist: ob.dist });
       let safeDist = ob.dist;
       {
         const vx = ix - px, vy = iy - py, vz = iz - pz;
         const len = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
         const dx = vx / len, dy = vy / len, dz = vz / len;
-        const boxes = ctx.scene.bounds || [];
+        const boxes = world === 'main' ? ctx.scene.bounds || [] : ctx.scene.getActiveBounds ? ctx.scene.getActiveBounds() || [] : [];
         for (let i = 0; i < boxes.length; i++) {
           const b = boxes[i];
           const t = rayAABB(px, py, pz, dx, dy, dz, b.mnX, b.mxX, 0, 8, b.mnZ, b.mxZ);
@@ -374,7 +385,8 @@ export class LoopManager {
       // -- 4) 地面兜底(解析法,不做地形射线):全局地板 y=0 与室外沙丘取高者 --
       // 展厅室内地板是 y≈0 平板而 desert.getH 返回室外地形(可至 -0.23),
       // 旧版只钳 getH → 相机钻进室内地板下;取 max 后室内外都不会穿。
-      let floorY = desert ? desert.getH(bx, bz) : 0;
+      // 多世界切割(2026-09-06):非主世界用当前世界的地面(如 B612 平面 0)
+      let floorY = world === 'main' ? (desert ? desert.getH(bx, bz) : 0) : ctx.scene.getActiveGround ? ctx.scene.getActiveGround(bx, bz) || 0 : 0;
       if (floorY < 0) floorY = 0;
       let cy = py + sp * dist; // pitch>0:相机升高俯视;pitch<0:压低仰视
       if (cy < floorY + 0.3) cy = floorY + 0.3; // 安全距离 0.3m
@@ -441,8 +453,8 @@ export class LoopManager {
       }
     }
     
-    // 小地图重绘
-    if (drawMap) drawMap();
+    // 小地图重绘(多世界切割:仅主世界;非主世界 #m 已隐藏但每帧重绘仍耗 CPU)
+    if (drawMap && (ctx.scene.activeWorld || 'main') === 'main') drawMap();
   }
 
   /**

@@ -100,12 +100,31 @@ export class SceneManager {
     ctx.scene.getActiveRoot = () => this.getWorld()?.root;
     ctx.scene.getActiveGround = (x, z) => this.getWorld()?.ground(x, z);
     ctx.scene.getActiveBounds = () => this.getWorld()?.bounds;
-    // 非主世界隐藏小地图(独立世界不需要主世界地图)
-    const mapWrap = document.getElementById('mapWrap') || document.getElementById('mapCanvas');
-    if (mapWrap) mapWrap.style.display = world.id === 'main' ? '' : 'none';
-    // 恢复/保存小地图的容器(可能是 canvas 或 div 包裹)
-    const mc = document.querySelector('#mapWrap,#mapCanvas,#miniMap');
-    if (mc) mc.style.display = world.id === 'main' ? '' : 'none';
+    // 多世界切割(2026-09-06 全量审计):主世界专属 UI 统一隐藏/恢复。
+    // 旧版隐藏 #mapWrap/#mapCanvas/#miniMap —— 三个 id 在页面里都不存在,隐藏从未生效。
+    // 真实元素:小地图 #m(index.html:128)、任务册 #questHud、操作提示 #hp、
+    // AI 配文 #aiPanel、残镜 #prologueMirror、沙漠昼夜钟/地形/准星/热浪(desert/atmosphere.js)、
+    // 昆仑语录 #skyNote(audio-manager.js)。跳/滑翔钮 #jumpBtnGlide 刻意保留(太空=升空推进)。
+    const MAIN_ONLY_UI = [
+      '#m', '#questHud', '#hp', '#aiPanel', '#prologueMirror',
+      '#desertTimeHud', '#desertTerrainHud', '#desertCross', '#heatShimmer', '#skyNote',
+    ];
+    const show = world.id === 'main';
+    document.body.dataset.world = world.id;
+    if (!this._uiSaved) this._uiSaved = new Map();
+    for (const sel of MAIN_ONLY_UI) {
+      const el = document.querySelector(sel);
+      if (!el) continue;
+      if (show) {
+        if (this._uiSaved.has(sel)) {
+          el.style.display = this._uiSaved.get(sel);
+          this._uiSaved.delete(sel);
+        }
+      } else if (!this._uiSaved.has(sel)) {
+        this._uiSaved.set(sel, el.style.display);
+        el.style.display = 'none';
+      }
+    }
   }
 
   capture() {
