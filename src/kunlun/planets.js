@@ -14,6 +14,36 @@ import { initSceneManager } from '../core/scene-manager.js';
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
+// 独立世界灯光工厂:GLB 内含 PBR 材质,必须有足够强的光才能渲染出颜色(否则全黑)
+function addWorldLights(scene) {
+  scene.add(new THREE.AmbientLight(0xfff8f0, 1.8));
+  const key = new THREE.DirectionalLight(0xfff4e0, 4.0);
+  key.position.set(8, 12, 6);
+  scene.add(key);
+  const fill = new THREE.DirectionalLight(0x8fb0d8, 1.5);
+  fill.position.set(-6, 4, -5);
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xffd9a0, 1.0);
+  rim.position.set(0, 3, -8);
+  scene.add(rim);
+  // 半球光:天空蓝+地面暖,让模型底部也不死黑
+  scene.add(new THREE.HemisphereLight(0x8fb0d8, 0x8b7654, 1.2));
+}
+// 星空粒子背景(每个世界独立实例)
+function addStarfield(scene) {
+  const geo = new THREE.BufferGeometry();
+  const n = 3000;
+  const pos = new Float32Array(n * 3);
+  for (let i = 0; i < n * 3; i++) pos[i] = (Math.random() - 0.5) * 500;
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const stars = new THREE.Points(
+    geo,
+    new THREE.PointsMaterial({ color: 0xffffff, size: 0.8, transparent: true, opacity: 0.9 })
+  );
+  scene.add(stars);
+  return stars;
+}
+
 // 独立世界容器:main 保留现有画廊,B612 独立注册;六星世界在 PLANETS 数据定义后按序注册。
 const worldManager = initSceneManager({
   renderer: ctx.scene.rnd,
@@ -25,8 +55,9 @@ const b612World = worldManager.registerWorld('b612', {
   scene: new THREE.Scene(),
   meta: { title: 'B612' },
 });
-b612World.scene.background = new THREE.Color(0x10101f);
-b612World.scene.fog = new THREE.FogExp2(0x10101f, 0.001);
+b612World.scene.background = new THREE.Color(0x0a0a1e);
+addWorldLights(b612World.scene);
+addStarfield(b612World.scene);
 
 const assetLoader = new GLTFLoader();
 assetLoader.setMeshoptDecoder(MeshoptDecoder);
@@ -364,8 +395,9 @@ function buildIsland(cfg, idx) {
     scene: new THREE.Scene(),
     meta: { title: cfg.name },
   });
-  planetWorld.scene.background = new THREE.Color(0x090b18);
-  planetWorld.scene.fog = new THREE.FogExp2(0x090b18, 0.0012);
+  planetWorld.scene.background = new THREE.Color(0x0a0a1e);
+  addWorldLights(planetWorld.scene);
+  addStarfield(planetWorld.scene);
   grp.position.set(0, 0, 0);
   planetWorld.scene.add(grp);
   const isl = {
@@ -387,136 +419,40 @@ PLANETS.forEach(buildIsland);
 // 独立世界故事资产:只挂到目标 scene,不进入主世界。
 loadWorldAsset('models/hall/b612-world/king-scene.glb', worldManager.getWorld('king325'), {
   name: 'kingStoryScene',
-  maxSize: 22,
+  maxSize: 30,
   x: 0,
   y: 0,
   z: 0,
 });
 loadWorldAsset('models/hall/b612-world/b612-storybook.glb', b612World, {
   name: 'b612Storybook',
-  maxSize: 12,
+  maxSize: 20,
   x: 0,
   y: 0,
   z: 0,
 });
-// B612 原著节点:三座火山+一朵玫瑰(纯 MeshBasic,独立世界零灯光)
-function buildB612Props() {
-  const root = new THREE.Group();
-  const floor = new THREE.Mesh(
-    new THREE.SphereGeometry(8, 32, 16),
-    new THREE.MeshBasicMaterial({ color: 0x8b7654 })
-  );
-  floor.scale.y = 0.22;
-  floor.position.y = -0.3;
-  root.add(floor);
-  for (const [x, z, h] of [
-    [-3, -1, 1.2],
-    [1, -2, 0.9],
-    [3, 1, 1.4],
-  ]) {
-    const volcano = new THREE.Mesh(
-      new THREE.ConeGeometry(0.8, h, 12),
-      new THREE.MeshBasicMaterial({ color: 0x6e5a45 })
-    );
-    volcano.position.set(x, h * 0.5, z);
-    root.add(volcano);
-  }
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06, 0.08, 1.2, 8),
-    new THREE.MeshBasicMaterial({ color: 0x496338 })
-  );
-  stem.position.set(0.8, 0.65, 0.3);
-  root.add(stem);
-  const rose = new THREE.Mesh(
-    new THREE.SphereGeometry(0.28, 12, 8),
-    new THREE.MeshBasicMaterial({ color: 0xb6424b })
-  );
-  rose.position.set(0.8, 1.35, 0.3);
-  root.add(rose);
-  b612World.scene.add(root);
-  // GARGANTUA:黑球 + 暖色吸积环 + 光晕球(零 PointLight,全 MeshBasic;完整光线追踪 shader 保留在 dev/kimi-planets/gargantua)
-  const bhGroup = new THREE.Group();
-  bhGroup.position.set(0, 16, -18);
-  const bh = new THREE.Mesh(
-    new THREE.SphereGeometry(1.6, 32, 16),
-    new THREE.MeshBasicMaterial({ color: 0x000000 })
-  );
-  bhGroup.add(bh);
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(3.2, 0.9, 12, 40),
-    new THREE.MeshBasicMaterial({
-      color: 0xff8a4a,
-      transparent: true,
-      opacity: 0.85,
-      side: THREE.DoubleSide,
-    })
-  );
-  ring.rotation.x = Math.PI / 2.4;
-  bhGroup.add(ring);
-  const halo = new THREE.Mesh(
-    new THREE.SphereGeometry(4.4, 24, 16),
-    new THREE.MeshBasicMaterial({
-      color: 0xffc080,
-      transparent: true,
-      opacity: 0.12,
-      side: THREE.BackSide,
-    })
-  );
-  bhGroup.add(halo);
-  b612World.scene.add(bhGroup);
-  // 终幕配乐:进入 B612 播放 intro,衔接循环 main(失败静默,符合项目音频铁律)
-  const gargIntro = new Audio('media/gargantua/gargantua-intro.mp3');
-  const gargMain = new Audio('media/gargantua/gargantua-main.mp3');
-  gargMain.loop = true;
-  let gargStarted = false;
-  ctx.scene.worldChanged &&
-    ctx.scene.worldChanged(function (d) {
-      if (d && d.to === 'b612') {
-        if (!gargStarted) {
-          gargStarted = true;
-          gargIntro.play().catch(function () {});
-          gargIntro.onended = function () {
-            gargMain.play().catch(function () {});
-          };
-        } else gargMain.play().catch(function () {});
-      } else {
-        try {
-          gargMain.pause();
-        } catch (e) {}
-      }
-    });
-}
-buildB612Props();
-
-// 外围行星:远景天体,不入碰撞,只在 B612 与国王世界可见
-loadWorldAsset('models/hall/b612-world/kepler.glb', b612World, {
-  name: 'kepler',
-  maxSize: 6,
-  x: 26,
-  y: 4,
-  z: 46,
-});
-loadWorldAsset('models/hall/b612-world/exoplanets.glb', b612World, {
-  name: 'exoplanets',
-  maxSize: 8,
-  x: -22,
-  y: 2,
-  z: 40,
-});
-loadWorldAsset('models/hall/b612-world/purple-planet.glb', worldManager.getWorld('king325'), {
-  name: 'purple',
-  maxSize: 18,
-  x: -14,
-  y: 6,
-  z: 44,
-});
-loadWorldAsset('models/hall/b612-world/kepler.glb', worldManager.getWorld('king325'), {
-  name: 'kepler',
-  maxSize: 8,
-  x: 20,
-  y: 4,
-  z: 40,
-});
+// B612 由 storybook GLB 原样呈现(小王子+绵羊+玫瑰+火山+星空全在模型内)
+// 终幕配乐:进入 B612 播放 GARGANTUA intro + main
+const gargIntro = new Audio('media/gargantua/gargantua-intro.mp3');
+const gargMain = new Audio('media/gargantua/gargantua-main.mp3');
+gargMain.loop = true;
+let gargStarted = false;
+ctx.scene.worldChanged &&
+  ctx.scene.worldChanged(function (d) {
+    if (d && d.to === 'b612') {
+      if (!gargStarted) {
+        gargStarted = true;
+        gargIntro.play().catch(function () {});
+        gargIntro.onended = function () {
+          gargMain.play().catch(function () {});
+        };
+      } else gargMain.play().catch(function () {});
+    } else {
+      try {
+        gargMain.pause();
+      } catch (e) {}
+    }
+  });
 
 /* ===================== 星门(出生点正前方;苔藓古石门 GLB + 随章节换色的门内符文环) =====================
    2026-09-05 主人定:星门 X/Z=0.1/56.0,门洞朝北(360°),模型与石台均贴地(由沙漠高度场求 Y),
