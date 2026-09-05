@@ -101,7 +101,10 @@ function build(opts) {
   };
 
   // 底行协议:点开只读(?from=gate),闸门暂隐;面板关闭(✕/Esc/‹返回)即回闸门,状态不丢。
-  // preventDefault 同时阻止 label 默认行为(点链接误触发勾选框)
+  // preventDefault 同时阻止 label 默认行为(点链接误触发勾选框)。
+  // 2026-09-06 主人定:面板顶栏旧「✕ 返回画廊」在闸门阅读期是错误按钮——返回闸门已由
+  // 文档内「‹ 返回」实现。阅读期间隐藏该按钮,关面板后恢复(音乐/白板等面板不受影响)。
+  const panelCloseBtn = document.getElementById('panelClose');
   ov.querySelectorAll('.gLegal a').forEach(function (a) {
     a.onclick = function (e) {
       e.preventDefault();
@@ -109,6 +112,7 @@ function build(opts) {
         location.href = a.getAttribute('data-doc');
         return;
       }
+      if (panelCloseBtn) panelCloseBtn.style.display = 'none';
       ov.style.opacity = '0';
       ov.style.pointerEvents = 'none';
       window.openPanel(a.getAttribute('data-doc') + '?from=gate', 'B612');
@@ -118,6 +122,7 @@ function build(opts) {
     const origClose = window.closePanel;
     window.closePanel = function () {
       origClose.apply(this, arguments);
+      if (panelCloseBtn) panelCloseBtn.style.display = '';
       if (!entered) {
         // 读协议回来:闸门恢复(勾选状态保留在 checkbox 上,不受隐显影响)
         ov.style.opacity = '1';
