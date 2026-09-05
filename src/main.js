@@ -172,7 +172,8 @@ compositionRoot.register(
 // 阶段3 切片:媒体逐帧逻辑(音乐画布 drawMusicCanvas + 视频墙纹理 needsUpdate)作为 MediaSystem 接入组合根(presentation/render 相位)。
 // 原逻辑散落在 LoopManager._executeUpdatePhase / _executeRenderPhase 直接读 ctx.media.*（上帝渲染器散点读取），
 // 现改为 deps 注入 ctx.media,由唯一单循环驱动;LoopManager 不再持有该逻辑。
-compositionRoot.register(createMediaSystem({ media: ctx.media }));
+// 2026-09-06 多世界切割:增注入 scene 依赖(读 activeWorld,小世界暂停画布重绘/纹理上传)。
+compositionRoot.register(createMediaSystem({ media: ctx.media, scene: ctx.scene }));
 // 阶段3 切片:单向状态库 StateSystem(platform/bootstrap)订阅事件总线,把命名空间状态镜像进 game-state,
 // 使 game-state 成为系统可读/可订阅的统一状态源(读模型);写者/读者零改动。Stage 4 可把写路径也收归此处,关闭 ctx 直写。
 compositionRoot.register(

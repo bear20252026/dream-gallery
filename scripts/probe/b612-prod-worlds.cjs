@@ -68,9 +68,16 @@ const errors = [];
   ok(w === 'main', '回主世界(activeWorld=' + w + ')');
   const mapBack = await page.evaluate(() => {
     const m = document.getElementById('m');
-    return document.body.dataset.world === 'main' && m && m.style.display !== 'none';
+    const d = document.getElementById('descendBtnSpace');
+    const h = document.getElementById('homeBtn');
+    return (
+      document.body.dataset.world === 'main' &&
+      m && m.style.display !== 'none' &&
+      d && d.style.display === 'none' && // ▼ 下降键回主世界隐藏
+      h && h.style.display !== 'none' // ⌂ 回家键主世界恢复
+    );
   });
-  ok(mapBack, '主世界小地图恢复(data-world=main)');
+  ok(mapBack, '主世界小地图恢复、▼隐藏、⌂恢复(data-world=main)');
 
   ok(errors.length === 0, '零 JS 错误' + (errors.length ? ': ' + errors[0] : ''));
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);

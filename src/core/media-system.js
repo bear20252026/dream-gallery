@@ -8,9 +8,12 @@
 import { defineSystem } from './system.js';
 
 export function createMediaSystem(deps = {}) {
-  const { media } = deps;
+  const { media, scene } = deps;
   if (!media) {
     throw new Error('[media-system] 缺少 media 依赖(ctx.media 冻结命名空间)');
+  }
+  if (!scene) {
+    throw new Error('[media-system] 缺少 scene 依赖(ctx.scene 冻结命名空间,读 activeWorld)');
   }
   let lastVidT = 0;
 
@@ -25,7 +28,7 @@ export function createMediaSystem(deps = {}) {
     },
     update() {
       // 多世界切割(2026-09-06):音乐画布重绘/视频纹理上传只属主世界(小世界省 CPU/带宽)
-      if ((ctx.scene.activeWorld || 'main') !== 'main') return;
+      if ((scene.activeWorld || 'main') !== 'main') return;
       // 音乐画布(2D 可视化,每帧重绘)
       if (typeof media.drawMusicCanvas === 'function') media.drawMusicCanvas();
       // 视频墙纹理更新(30Hz 节流,标记 needsUpdate 供下一帧渲染上传)

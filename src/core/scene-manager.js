@@ -104,26 +104,35 @@ export class SceneManager {
     // 旧版隐藏 #mapWrap/#mapCanvas/#miniMap —— 三个 id 在页面里都不存在,隐藏从未生效。
     // 真实元素:小地图 #m(index.html:128)、任务册 #questHud、操作提示 #hp、
     // AI 配文 #aiPanel、残镜 #prologueMirror、沙漠昼夜钟/地形/准星/热浪(desert/atmosphere.js)、
-    // 昆仑语录 #skyNote(audio-manager.js)。跳/滑翔钮 #jumpBtnGlide 刻意保留(太空=升空推进)。
+    // 昆仑语录 #skyNote(audio-manager.js)、⌂ 回归出生点(#homeBtn,2026-09-06 主人定:
+    // 小世界不需要回家键,回画廊走传送石台)。跳/滑翔钮 #jumpBtnGlide 刻意保留(太空=升空推进)。
     const MAIN_ONLY_UI = [
       '#m', '#questHud', '#hp', '#aiPanel', '#prologueMirror',
       '#desertTimeHud', '#desertTerrainHud', '#desertCross', '#heatShimmer', '#skyNote',
+      '#homeBtn',
     ];
+    // 太空专属 UI:只在小世界显示,回主世界隐藏(▼ 下降键,与 ▲ 对称)
+    const SPACE_ONLY_UI = ['#descendBtnSpace'];
     const show = world.id === 'main';
     document.body.dataset.world = world.id;
     if (!this._uiSaved) this._uiSaved = new Map();
-    for (const sel of MAIN_ONLY_UI) {
+    // visibleDisplay:无已保存值时的显示态(▼ 默认 none,进入小世界需显式设 block)
+    const toggleUi = (sel, visible, visibleDisplay) => {
       const el = document.querySelector(sel);
-      if (!el) continue;
-      if (show) {
-        if (this._uiSaved.has(sel)) {
-          el.style.display = this._uiSaved.get(sel);
-          this._uiSaved.delete(sel);
-        }
+      if (!el) return;
+      if (visible) {
+        el.style.display = this._uiSaved.has(sel) ? this._uiSaved.get(sel) : visibleDisplay;
+        this._uiSaved.delete(sel);
       } else if (!this._uiSaved.has(sel)) {
         this._uiSaved.set(sel, el.style.display);
         el.style.display = 'none';
       }
+    };
+    for (const sel of MAIN_ONLY_UI) toggleUi(sel, show, '');
+    // 太空专属 UI 的默认态就是隐藏,不能用保存/恢复(会把 none 存回去)——直接显式切换
+    for (const sel of SPACE_ONLY_UI) {
+      const el = document.querySelector(sel);
+      if (el) el.style.display = show ? 'none' : 'block';
     }
   }
 

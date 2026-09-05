@@ -131,6 +131,9 @@ function updraft(x, z) {
 // 每帧物理:跳跃 + 滑翔(空格/跳跃按钮,空中按住=滑翔,消耗能量,落地回能)
 let jumpHold = false,
   jumpPressed = false;
+// 太空下降键输入(2026-09-06):非主世界由 tickPhysics 转成 pl.spaceDown/pl.boostDownT
+let descendHold = false,
+  descendPressed = false;
 function tickPhysics(dt) {
   ctx._jumpHold = jumpHold; // 暴露给状态机(ctx.player 被 aliasNS 冻结,不能加属性)
   // 多世界切割(2026-09-06):非主世界零重力零碰撞——主世界物理整套短路。
@@ -142,6 +145,11 @@ function tickPhysics(dt) {
       jumpPressed = false;
     }
     pl.spaceUp = jumpHold;
+    if (descendPressed) {
+      pl.boostDownT = 0.3;
+      descendPressed = false;
+    }
+    pl.spaceDown = descendHold;
     pl.vy = 0;
     pl.onGround = true;
     pl.gliding = false;
@@ -192,6 +200,14 @@ const glideHudApi = createGlideHUD({
   },
   onJumpRelease() {
     jumpHold = false;
+  },
+  // ▼ 下降键(太空模式专属,2026-09-06 主人定:只有▲能升不能降,补对称下降)
+  onDescendPress() {
+    descendPressed = true;
+    descendHold = true;
+  },
+  onDescendRelease() {
+    descendHold = false;
   },
 });
 function updateGlideHUD() {
@@ -592,8 +608,9 @@ mapCanvas.addEventListener('pointerdown', (e) => {
   });
 });
 
-// ===================== 一键回归出生点 =====================
+// ===================== 一键回归出生点(主世界专属;小世界隐藏,回画廊走传送石台) =====================
 const homeBtn = document.createElement('button');
+homeBtn.id = 'homeBtn'; // 多世界切割(2026-09-06 主人定:小世界不需要回家键,scene-manager 统一隐藏)
 homeBtn.textContent = '⌂';
 homeBtn.title = '回归出生点';
 homeBtn.style.cssText =
@@ -604,12 +621,6 @@ homeBtn.addEventListener('click', (e) => {
     window.quizToast && window.quizToast('飞舟巡礼中，坐稳了');
     return;
   } // ark.js:飞行中禁回家
-  // 多世界切割(2026-09-06):小世界里 ⌂ = 返回画廊(旧行为会把玩家扔到
-  // "小世界坐标系里的主世界出生点",直接落到天幕壳外)
-  if ((ctx.scene.activeWorld || 'main') !== 'main') {
-    if (ctx.scene.toMainWorld) ctx.scene.toMainWorld();
-    return;
-  }
   fadeTeleport(() => {
     pl.p.set(SPAWN.x, groundY(SPAWN.x, SPAWN.z) + EYE_HEIGHT, SPAWN.z);
     pl.vy = 0;

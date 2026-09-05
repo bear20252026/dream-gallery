@@ -810,6 +810,12 @@ onTick(function (dt) {
       plRef.boostT = Math.max(0, plRef.boostT - dt2);
     }
     if (plRef.spaceUp) p.y += speed * 0.9 * dt2;
+    // ▼ 下降键(太空专属,与 ▲ 对称;tickPhysics 转成 boostDownT 爆发 + spaceDown 持续下降)
+    if (plRef.boostDownT > 0) {
+      p.y -= speed * 2.6 * dt2;
+      plRef.boostDownT = Math.max(0, plRef.boostDownT - dt2);
+    }
+    if (plRef.spaceDown) p.y -= speed * 0.9 * dt2;
     // 手机摇杆(与主世界同一输入源 jD):相机相对 XZ 移动——太空模式此前只认键盘,手机无法移动
     const jx = (ctx.player.jD && ctx.player.jD.x) || 0;
     const jz = (ctx.player.jD && ctx.player.jD.z) || 0;

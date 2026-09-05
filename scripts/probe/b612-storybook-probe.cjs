@@ -97,6 +97,8 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
       quest: disp('#questHud'),
       skyNote: disp('#skyNote'),
       jumpBtn: disp('#jumpBtnGlide'),
+      descendBtn: disp('#descendBtnSpace'),
+      homeBtn: disp('#homeBtn'),
     };
   });
   ok(ui.world === 'b612', 'body[data-world]=b612');
@@ -104,6 +106,8 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   ok(ui.quest === 'none', '任务册 #questHud 已隐藏');
   ok(ui.skyNote === 'none', '昆仑语录 #skyNote 已隐藏');
   ok(ui.jumpBtn !== 'none' && ui.jumpBtn !== 'absent', '跳跃键 #jumpBtnGlide 保留(太空=升空推进)');
+  ok(ui.descendBtn !== 'none' && ui.descendBtn !== 'absent', '下降键 #descendBtnSpace 显示(与▲对称)');
+  ok(ui.homeBtn === 'none', '回家键 #homeBtn 小世界已隐藏');
 
   await page.screenshot({ path: path.join(ROOT, 'scripts', 'artifacts', 'b612-ingame-render.png') });
   const realErrors = errors.filter((e) => !/dynamically imported module[^]*src[/\\]gallery[/\\]/.test(e)); // 花瓣画廊 v2/玫瑰画廊本地动态导入噪音(9-2 遗留,生产打包无)
