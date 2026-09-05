@@ -135,23 +135,9 @@ function addAdorable() {
 }
 addAdorable();
 
-// ===== 出生点地板照片（女孩抱膝，面朝视频墙/北）=====
-(function () {
-  const ft = loadTexCapped('photos/1000001707(1).jpg');
-  const fm = new THREE.MeshStandardMaterial({ map: ft, roughness: 0.4, side: THREE.DoubleSide });
-  const fh = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 1.6), fm);
-  fh.name = 'spawnFloorPhoto'; // 2026-09-03 出生点 z=17→28.5:玩家在 z=27 朝南(182°),正前方 1.5m 平铺,
-  // 玩家低头看到照片正面(rotation.z=π 让图片正面朝北,玩家从北看向南即正面)
-  fh.rotation.x = -Math.PI / 2;
-  fh.position.set(0, 0.02, 28.5);
-  fh.rotation.z = Math.PI;
-  s.add(fh);
-  const fb = new THREE.MeshStandardMaterial({ color: '#5a3020', roughness: 0.7 });
-  const fborder = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.05, 1.9), fb);
-  fborder.name = 'spawnFloorPhotoBorder';
-  fborder.position.set(0, 0.01, 28.5);
-  s.add(fborder);
-})();
+// ===== 出生点突出地板退役(2026-09-05) =====
+// 原 spawnFloorPhoto + spawnFloorPhotoBorder 已移除:照片文件线上 404,只剩深棕底座突兀露出。
+// 原位由 B612 苔藓古石门接替,见 src/kunlun/planets.js。
 
 hotEnd('markers');
 if (import.meta.hot) import.meta.hot.accept();

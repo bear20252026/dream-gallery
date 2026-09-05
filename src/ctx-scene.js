@@ -52,10 +52,21 @@ export function createSceneNamespace(vault) {
     'kintsugiOn',
     'renderPostProcessing',
     'resizePostProcessing',
+    'worldManager',
+    'activeWorld',
+    'worldChanged',
+    'enterWorld',
+    'leaveWorld',
+    'toMainWorld',
+    'worldStack',
+    'getActiveRoot',
+    'getActiveGround',
+    'getActiveBounds',
+    'getActiveAtmosphere',
   ];
-  
+
   const proxy = {};
-  
+
   for (const prop of properties) {
     Object.defineProperty(proxy, prop, {
       get() {
@@ -72,7 +83,7 @@ export function createSceneNamespace(vault) {
       configurable: true,
     });
   }
-  
+
   return Object.freeze(proxy);
 }
 

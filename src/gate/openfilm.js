@@ -10,6 +10,15 @@ import * as THREE from 'three';
 let active = false;
 
 export function playOpeningFilm(onDone) {
+  const timers = new Set();
+  const later = (fn, ms) => {
+    const id = window.setTimeout(() => {
+      timers.delete(id);
+      if (active) fn();
+    }, ms);
+    timers.add(id);
+    return id;
+  };
   if (active) return;
   active = true;
   let renderer = null;
@@ -29,6 +38,8 @@ export function playOpeningFilm(onDone) {
     try {
       window.removeEventListener('resize', onResize);
     } catch (e) {}
+    timers.forEach((id) => window.clearTimeout(id));
+    timers.clear();
     try {
       document.removeEventListener('keydown', onEsc);
     } catch (e) {}
@@ -404,7 +415,9 @@ export function playOpeningFilm(onDone) {
         windGain.gain.value = 0;
         src.connect(f).connect(windGain).connect(AC.destination);
         src.start();
-      } else if (windGain) windGain.gain.linearRampToValueAtTime(0, AC.currentTime + 0.6);
+      } else if (windGain && AC && AC.state === 'running') {
+        windGain.gain.linearRampToValueAtTime(0, AC.currentTime + 0.6);
+      }
     } catch (e) {}
   }
   function thump() {
@@ -477,9 +490,9 @@ export function playOpeningFilm(onDone) {
     restDir.y = 0;
     restDir.normalize();
     restPos = plane.position.clone();
-    setTimeout(() => $('tLand').classList.add('ftshow'), 1300);
-    setTimeout(() => $('fEnd').classList.add('ftshow'), 4200);
-    setTimeout(() => {
+    later(() => $('tLand').classList.add('ftshow'), 1300);
+    later(() => $('fEnd').classList.add('ftshow'), 4200);
+    later(() => {
       $('fSkip').style.display = 'none';
     }, 1900);
   }
@@ -785,7 +798,7 @@ export function playOpeningFilm(onDone) {
     $('fPaper').style.opacity = '0';
     ['tFly1', 'tFly2'].forEach((i) => $(i).classList.remove('ftshow'));
     forceLand();
-    setTimeout(finish, 1600);
+    later(finish, 1600);
   }
   function answer(text, res, boa) {
     choseBoa = boa;
