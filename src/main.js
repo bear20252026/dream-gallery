@@ -221,7 +221,19 @@ expose('gameState', getGameState());
 register((dt) => compositionRoot.update(dt));
 
 // 启动统一循环管理器(唯一主循环)。旧 ctx.loop 不再自起 rAF,避免每帧双执行。
-loopManager.start();
+// 2026-09-06 主人定(开场顺序修正):3D 世界**不再随模块加载启动**——
+// 开场顺序 = 闸门 → 纸飞机电影(画帽子→蛇吞象→掷飞机) → 电影落定后才启动 3D 世界。
+// startWorld() 由 watchOpening 的 finishIntro 调用(电影 skip/播完/加载失败三路都走它)。
+let worldStarted = false;
+function startWorld() {
+  if (worldStarted) return;
+  worldStarted = true;
+  // 着色器预编译一并挪到此处:编译成本发生在电影之后,不再与开场抢主线程
+  if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
+  loopManager.start();
+}
+ctx.startWorld = startWorld;
+expose('startWorld', startWorld);
 
 // 玩家状态机:启动时初始化为空闲状态
 ctx._playerSM.change(new IdleState());
@@ -360,6 +372,9 @@ ctx.stopAgreementMusic = stopAgreementMusic;
 
 // 入口闸门(2026-09-05,B612 定稿):一屏英文开场,点 ENTER 即视为同意三份协议
 // (写会话标记+永久标记);协议全文由闸门底行链接随时点开、可返回。取代三连读强制签署。
+// 同时预热开幕电影代码块:ENTER 后电影即刻开播,消除「闸门已退、电影未上」的空档
+// (此前空档期会露出正在加载的 3D 世界——2026-09-06 主人报的启动顺序问题)。
+import('./gate/openfilm.js').catch(function () {});
 import('./gate/entrygate.js')
   .then(function (m) {
     m.setupEntryGate({
@@ -375,7 +390,7 @@ import('./gate/entrygate.js')
     sessionStorage.setItem('communityConsented', '1');
     console.warn('[gate] 入口闸门初始化失败,已放行:', e.message);
   });
-if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
+// 着色器预编译已并入 startWorld()(2026-09-06:开场顺序修正,世界启动整体推迟到电影落定后)
 
 // ===================== 开场流程(2026-09-06 主人定:收敛为唯一链路) =====================
 // 每次进入完全一致:入口闸门(勾选同意→ENTER) → 纸飞机电影(每次都播,skip/Esc 可跳) → 游戏。
@@ -403,6 +418,8 @@ if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
     done = true;
     // 收束:停协议配乐 + 记档(兼容旧消费方) + 起大屏轮播;deferMedia=首次交互/4s 兜底再起播
     function finishIntro(deferMedia) {
+      // 开场顺序修正(2026-09-06):电影落定后才启动 3D 世界(主循环+着色器编译)
+      if (ctx.startWorld) ctx.startWorld();
       if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
       ctx.store.mark('prologueDone');
       if (deferMedia) {

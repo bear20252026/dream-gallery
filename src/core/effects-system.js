@@ -160,12 +160,16 @@ export function createEffectsSystem(deps = {}) {
     init() {
       initFireworks();
       initParticles();
-      autoFirst = setTimeout(autoFirework, 800);
-      autoTimer = setInterval(autoFirework, 2800);
+      // 自动烟花的定时器改为惰性启动(update 首帧):开场电影期间主循环未启动,
+      // 若在此起 setInterval 会空攒粒子,世界启动瞬间集中爆开
     },
     update() {
       // 多世界切割(2026-09-06):烟花/漂浮粒子属主世界金字塔,小世界里不再模拟与 GPU 上传
       if ((scene.activeWorld || 'main') !== 'main') return;
+      if (!autoFirst && !autoTimer) {
+        autoFirst = setTimeout(autoFirework, 800);
+        autoTimer = setInterval(autoFirework, 2800);
+      }
       updateFireworks();
       updateParticles(performance.now());
     },

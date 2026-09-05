@@ -54,6 +54,20 @@ function startServer(port) {
   page.on('pageerror', e => pageErrs.push(e.message));
 
   await page.goto(base + '/?shaderdebug', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  // 走真实开场路径(2026-09-06):闸门勾选→ENTER→电影→skip;电影落定后 3D 世界才启动
+  await page.waitForSelector('#b612Gate', { timeout: 60000 });
+  await page.evaluate(() => {
+    const c = document.getElementById('gAgreeChk');
+    c.checked = true;
+    c.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page.click('#b612Gate .gEnter');
+  await page.waitForSelector('#b612film', { timeout: 20000 });
+  // 手机视口下 skip 按钮带动画,playwright 稳定性检查过不了 → evaluate 直点
+  await page.evaluate(() => {
+    const s = document.getElementById('fSkip');
+    if (s) s.click();
+  });
   // 等场景初始化(无头环境偏慢,轮询等 canvas 出现)
   let canvases = 0;
   for (let i = 0; i < 10; i++) {
