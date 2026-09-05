@@ -812,6 +812,9 @@ export function playOpeningFilm(onDone) {
   async function play() {
     if (running) return;
     running = true;
+    // skip 后 play 的 async 序列不会自动取消,done() 会移除 DOM——
+    // 每个 await 后必须检查 skipped,否则摸到已删元素报 null.classList(2026-09-06 线上抓获)
+    const dead = () => skipped || !running;
     ['fT0', 'fTq', 'fReply', 'fMind'].forEach((i) => $(i).classList.remove('show'));
     $('fChoice').classList.remove('show');
     $('fPlaneDom').classList.remove('show');
@@ -824,33 +827,46 @@ export function playOpeningFilm(onDone) {
     $('fPaper').style.animation = '';
     $('fPaper').style.opacity = '';
     await wait(400);
+    if (dead()) return;
     $('fPaper').classList.add('show');
     await wait(1400);
+    if (dead()) return;
     $('fT0').classList.add('show');
     await wait(3000);
+    if (dead()) return;
     $('fT0').classList.remove('show');
     await wait(900);
+    if (dead()) return;
     await drawGroup(HAT, false);
     await wait(900);
+    if (dead()) return;
     $('fTq').classList.add('show');
     $('fChoice').classList.add('show');
     await new Promise((res) => {
       $('cHat').onclick = () => answer('That is how every grown-up sees it.', res, false);
       $('cBoa').onclick = () => answer('…Then you see it too.', res, true);
     });
+    if (dead()) return;
     await wait(2600);
+    if (dead()) return;
     $('fReply').classList.remove('show');
     await wait(choseBoa ? 350 : 1200);
+    if (dead()) return;
     await drawGroup(TRUTH, true, choseBoa ? 0.8 : 1);
     await wait(1000);
+    if (dead()) return;
     $('fMind').classList.add('show');
     await wait(3200);
+    if (dead()) return;
     $('fMind').classList.remove('show');
     await wait(900);
+    if (dead()) return;
     await foldPaper();
+    if (dead()) return;
     root.classList.add('act2'); // 黑幕揭开:古地图已在头顶,DOM 纸飞机交给 3D 纸飞机
     startFlight();
     await wait(300);
+    if (dead()) return;
     const pd = $('fPlaneDom');
     pd.animate(
       [
@@ -860,10 +876,13 @@ export function playOpeningFilm(onDone) {
       { duration: 1100, easing: 'ease-in', fill: 'forwards' }
     );
     await wait(1200);
+    if (dead()) return;
     $('tFly1').classList.add('ftshow');
     await wait(3600);
+    if (dead()) return;
     $('tFly2').classList.add('ftshow');
     await wait(4200);
+    if (dead()) return;
     $('tFly1').classList.remove('ftshow');
     $('tFly2').classList.remove('ftshow');
     running = false;
