@@ -415,7 +415,7 @@ export function playOpeningFilm(onDone) {
         windGain.gain.value = 0;
         src.connect(f).connect(windGain).connect(AC.destination);
         src.start();
-      } else if (windGain && AC && AC.state === 'running') {
+      } else if (windGain && AC && AC.state === 'running' && Number.isFinite(AC.currentTime)) {
         windGain.gain.linearRampToValueAtTime(0, AC.currentTime + 0.6);
       }
     } catch (e) {}
