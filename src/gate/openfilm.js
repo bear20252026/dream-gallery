@@ -71,6 +71,7 @@ export function playOpeningFilm(onDone) {
   #b612film #fRose{position:absolute;right:30px;top:28px;width:64px;height:64px;z-index:6;pointer-events:none;opacity:0;transition:opacity 1.4s ease}
   #b612film.act2 #fFrame{opacity:1}#b612film.act2 #fRose{opacity:.55}
   #b612film #fDark{position:absolute;inset:0;background:#0d0b09;transition:opacity 1.6s ease;pointer-events:none;z-index:1}
+  #b612film.act2 #fDark{opacity:0}
   #b612film #fPaper{position:absolute;left:50%;top:50%;translate:-50% -50%;width:min(94vw,940px);aspect-ratio:720/460;z-index:10;
     background:radial-gradient(120% 90% at 50% 40%, #f8f1df 0%, #f3ead2 55%, #eadfc2 100%);
     border-radius:3px;box-shadow:0 30px 80px rgba(0,0,0,.65),0 4px 18px rgba(0,0,0,.4);
@@ -143,31 +144,42 @@ export function playOpeningFilm(onDone) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ================= 第二幕:古地图俯冲(Three.js) ================= */
-  // WebGL 上下文创建失败的重试与降级(2026-09-06 主人报「飞行段无法呈现」):
-  // 页面已有一个 WebGL 上下文时,部分设备/内嵌浏览器再建第二个会失败。
-  // 尝试两次(第二次关抗锯齿+低功耗偏好);仍失败进入「无 GL 降级」——
-  // 手绘各幕照常播放,飞行段以落定文字收束,不再卡死黑屏。
-  try {
-    renderer = new THREE.WebGLRenderer({ canvas: $('fc'), antialias: true });
-  } catch (e1) {
+  // WebGL 上下文健壮创建(2026-09-06 主人报「折纸后黑屏」):
+  // 关键发现——本 three 版本上下文创建失败时只 console.error 不抛异常,
+  // 构造函数"成功"返回但 getContext() 为 null → 渲染永远黑屏。
+  // 因此构造后必须体检 getContext();失败重试一次(关抗锯齿+低功耗),
+  // 仍失败进入「无 GL 降级」:手绘各幕照常播,飞行段以落定文字收束,绝不黑屏卡死。
+  function mkRenderer(attempt) {
     try {
-      renderer = new THREE.WebGLRenderer({
+      const r = new THREE.WebGLRenderer({
         canvas: $('fc'),
-        antialias: false,
-        powerPreference: 'low-power',
+        antialias: attempt === 0,
+        powerPreference: attempt === 0 ? undefined : 'low-power',
       });
-    } catch (e2) {
-      console.warn('[film] WebGL 不可用,飞行段降级为文字落定:', e2.message);
-      if (window.__reportError)
-        window.__reportError('webgl', 'film WebGL 不可用,已降级跳过飞行段: ' + e2.message);
+      if (!r.getContext()) {
+        // 构造"成功"但上下文缺失(本 three 版本不抛错)——视为失败
+        try {
+          r.dispose();
+        } catch (e) {}
+        return null;
+      }
+      return r;
+    } catch (e) {
+      return null;
     }
   }
-  if (renderer) {
+  renderer = mkRenderer(0) || mkRenderer(1);
+  if (!renderer) {
+    console.warn('[film] WebGL 不可用,飞行段降级为文字落定');
+    if (window.__reportError)
+      window.__reportError('webgl', 'film WebGL 不可用(构造后体检为空),已降级跳过飞行段');
+  } else {
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     renderer.setSize(innerWidth, innerHeight);
     // 飞行中上下文丢失:不再渲染,优雅收束进游戏(而非冻结黑屏)
     $('fc').addEventListener('webglcontextlost', function (e) {
       e.preventDefault();
+      renderer = null; // 后续帧直接走降级
       if (window.__reportError)
         window.__reportError('webgl', 'film WebGL context lost,已降级收束');
       later(function () {
@@ -489,8 +501,9 @@ export function playOpeningFilm(onDone) {
     T = new THREE.Vector3(),
     UP = new THREE.Vector3(0, 1, 0);
   function startFlight() {
-    // 降级路径(无 WebGL 渲染器):跳过 3D 飞行,以落定文字收束进游戏
-    if (!renderer) {
+    // 降级路径(无 WebGL 渲染器或上下文已失效):跳过 3D 飞行,以落定文字收束进游戏
+    if (!renderer || !renderer.getContext()) {
+      renderer = null;
       noGL = true;
       $('fc').style.background = '#f3ead2'; // 无渲染器时画布是黑的,垫纸色保住落定文字可读
       $('tLand').classList.add('ftshow');
@@ -648,7 +661,18 @@ export function playOpeningFilm(onDone) {
       shadow.scale.set(sc, sc, 1);
       shadow.material.opacity = landed ? 0.28 : THREE.MathUtils.clamp(0.4 - alt * 0.011, 0.05, 0.4);
     }
-    renderer.render(scene, cam);
+    // 飞行帧渲染:上下文中途失效时(渲染抛错)立即降级收束,绝不留在黑屏
+    if (renderer) {
+      try {
+        renderer.render(scene, cam);
+      } catch (e) {
+        renderer = null;
+        if (window.__reportError)
+          window.__reportError('webgl', 'film flight render threw,已降级收束: ' + e.message);
+        finish();
+        return;
+      }
+    }
   }
   // 降级模式(无渲染器)不启动渲染循环:手绘幕由 DOM/CSS 驱动,不依赖此循环
   if (renderer) requestAnimationFrame(tick);
