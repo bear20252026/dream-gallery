@@ -480,38 +480,37 @@ if (WEDDING_SHELL) {
         //   Line(窗框)+Shape(窗框)+玻璃材质     y 0.31~5.4   → 落地窗,不挡人
         //   Box233(地板薄板)                     y 0.24~0.36  → 那是地面,不能挡
         //   Arch / Support / pasted__Planks / Rectangle 全在 y≥4.03 头顶,天然不参与脚底碰撞
-        base.updateMatrixWorld(true);
-        const pillarBoxes = [];
-        base.traverse((o) => {
-          if (!o.isMesh || !/^Square_Pillar/.test(o.name || '')) return;
-          const bb = new THREE.Box3().setFromObject(o);
-          pillarBoxes.push({
-            mnX: bb.min.x,
-            mxX: bb.max.x,
-            mnZ: bb.min.z,
-            mxZ: bb.max.z,
-            mnY: bb.min.y,
-            mxY: bb.max.y,
-          });
-        });
+        // ⚠️ 2026-09-07 主人报「南出口有透明墙」:旧法在 base 居中后先量局部 AABB,再按
+        //    pb+dz 推算各段世界盒——与实例最终渲染位置错位,南门正中留下一根隐形柱。
+        //    改为:每段实例 add 进场景、updateMatrixWorld 后,从其 Square_Pillar 的
+        //    **最终世界 AABB** 实测注册,碰撞与所见永不脱节。
         const segD = 10.8 * ARCH_SCL; // 14.09m 每段进深
+        let pillarHits = 0;
+        const addPillarBounds = (inst) => {
+          inst.updateMatrixWorld(true);
+          inst.traverse((o) => {
+            if (!o.isMesh || !/^Square_Pillar/.test(o.name || '')) return;
+            const bb = new THREE.Box3().setFromObject(o);
+            bounds.push({
+              mnX: bb.min.x,
+              mxX: bb.max.x,
+              mnZ: bb.min.z,
+              mxZ: bb.max.z,
+              mnY: bb.min.y,
+              mxY: bb.max.y,
+            });
+            pillarHits++;
+          });
+        };
         for (let i = 0; i < 3; i++) {
           const dz = OT + segD / 2 + i * segD;
           const inst = i === 0 ? base : base.clone(true);
           inst.position.z = dz;
           inst.name = 'weddingShell' + i; // 验收探针按此名定位
           s.add(inst);
-          for (const pb of pillarBoxes)
-            bounds.push({
-              mnX: pb.mnX,
-              mxX: pb.mxX,
-              mnZ: pb.mnZ + dz,
-              mxZ: pb.mxZ + dz,
-              mnY: pb.mnY,
-              mxY: pb.mxY,
-            });
+          addPillarBounds(inst);
         }
-        console.log('[wedding] 拱廊外壳已装填 ×3,柱子碰撞盒 +' + pillarBoxes.length * 3);
+        console.log('[wedding] 拱廊外壳已装填 ×3,柱子碰撞盒 +' + pillarHits + '(世界 AABB 实测)');
       },
       undefined,
       (e) => console.error('[wedding] GLB 加载失败:', e)
