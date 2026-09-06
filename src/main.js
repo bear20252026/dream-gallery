@@ -67,15 +67,16 @@ function fadeLoadOnce() {
   }, 8000);
 })();
 
-// ===================== 世界阶段:startWorld =====================
-// 按原 main.js import 顺序动态加载全部世界模块,随后执行原顶层构建代码
-// (灯光限额/后处理接线/组合根系统注册/状态机/坐标 HUD)。加载完成才启动主循环。
+// ===================== 世界阶段:预加载(不渲染)+ 揭幕启动 =====================
+// 拆两段(2026-09-06 主人定「恢复预加载,只加载不展示」):
+//   preloadWorld — 闸门 ENTER 即开始、与电影并行:加载全部世界模块并完成场景构建
+//                  (灯光限额/后处理/组合根/状态机/HUD),但不揭幕、不启动主循环,
+//                  不出一帧画面——加载耗时被电影时长整体吸收,落定即进世界。
+//   startWorld   — 电影落定后调用:等预加载完成(通常已完成)→ 纸色揭幕 → 启动循环。
 let worldStarted = false;
-async function startWorld() {
-  if (worldStarted) return;
-  worldStarted = true;
-  bootState.markWorldStarted();
-
+let worldBooting = null;
+let worldBooted = false;
+async function preloadWorld() {
   // —— 世界模块按原 import 顺序加载(逐模块进度可观测,失败上报) ——
   try { window.__worldPhase = '场景'; await import('./scene/scene.js'); } catch (e) { window.__worldPhase = '失败:场景'; console.error('[startWorld] 场景 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/scene.js ' + e.message); throw e; }
   try { window.__worldPhase = '媒体'; await import('./scene/media.js'); } catch (e) { window.__worldPhase = '失败:媒体'; console.error('[startWorld] 媒体 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/media.js ' + e.message); throw e; }
@@ -145,6 +146,9 @@ async function startWorld() {
   pp.initPostProcessing(rnd, s, cam);
   ctx.scene.renderPostProcessing = pp.renderPostProcessing;
   ctx.scene.resizePostProcessing = pp.resizePostProcessing;
+  // 多世界:把主世界后处理管线注入 SceneManager(切世界时由它接管挂/摘)
+  if (ctx.scene.worldManager && ctx.scene.worldManager.setMainPost)
+    ctx.scene.worldManager.setMainPost(pp.renderPostProcessing);
   compositionRoot.register(createPerfMonitorSystem({ renderer: rnd }));
   initSentry();
   compositionRoot.register(
@@ -225,6 +229,16 @@ async function startWorld() {
     softImport(() => import('./kunlun/avatar.js'));
   }, 2000);
 
+  worldBooted = true; // 预加载完成:模块与场景构建全部就绪(揭幕由 startWorld 负责)
+}
+
+async function startWorld() {
+  if (worldStarted) return;
+  worldStarted = true;
+  bootState.markWorldStarted();
+  await preloadWorld(); // 闸门期已预加载则瞬间完成;迟到(直开/noopening 抢跑)则在此等齐
+  const { s, cam, rnd } = ctx;
+
   // 着色器预编译 + 纸色揭幕过渡 + 主循环启动(世界此刻才第一次渲染)
   if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
   const c3d = document.getElementById('c');
@@ -249,6 +263,9 @@ async function startWorld() {
 }
 ctx.startWorld = startWorld;
 expose('startWorld', startWorld);
+expose('preloadState', function () {
+  return worldBooted ? 'done' : worldBooting ? 'loading' : 'idle';
+}); // 探针钩子:预加载是否已在电影期间完成
 expose('bootState', bootState.default); // 引导期即暴露:生产诊断可见世界加载进度
 expose('worldPhase', () => window.__worldPhase || '(未开始)');
 
@@ -383,6 +400,7 @@ import('./gate/entrygate.js')
       onEnter: function () {
         startAgreementMusic();
         bootState.markGatePassed();
+        preloadWorld().catch(function () {}); // 电影期间后台预加载世界模块(只加载不渲染);失败由 startWorld 的 await 统一上报
       },
     });
   })
@@ -413,7 +431,7 @@ import('./gate/entrygate.js')
     done = true;
     function finishIntro(deferMedia) {
       bootState.bumpIntroFired();
-      if (ctx.startWorld) ctx.startWorld();
+      if (ctx.startWorld) Promise.resolve(ctx.startWorld()).catch(function () {}); // 失败已在 preloadWorld 内上报,此处防 unhandled
       if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
       ctx.store.mark('prologueDone');
       // 大屏轮播启动(审计 P1-R1 完整版):skip/播完/旁路三条路都可能先于

@@ -95,8 +95,16 @@ export class SceneManager {
     // ctx.scene.s 是既有主循环唯一渲染入口,换引用即可保持旧系统兼容。
     ctx.scene.s = world.scene;
     ctx.scene.activeWorld = world.id;
-    // 后处理跟随主世界;其他世界直接渲染,避免 postprocessing 把主场景画回来
-    ctx.scene.renderPostProcessing = world.id === 'main' ? this._mainPost : null;
+    // 后处理跟随主世界;其他世界直接渲染,避免 postprocessing 把主场景画回来。
+    // _mainPost 正常路径由 main.js 在 initPostProcessing 后 setMainPost() 注入
+    //(构造期早于后处理初始化,构造时抓到的恒为 null);此处的兜底补抓只防
+    //「未注入就切世界」的边缘序,因为进入过非主世界后 ctx 里的值已被自己置 null。
+    if (world.id === 'main') {
+      if (!this._mainPost) this._mainPost = ctx.scene.renderPostProcessing || null;
+      ctx.scene.renderPostProcessing = this._mainPost;
+    } else {
+      ctx.scene.renderPostProcessing = null;
+    }
     ctx.scene.getActiveRoot = () => this.getWorld()?.root;
     ctx.scene.getActiveGround = (x, z) => this.getWorld()?.ground(x, z);
     ctx.scene.getActiveBounds = () => this.getWorld()?.bounds;
@@ -134,6 +142,12 @@ export class SceneManager {
       const el = document.querySelector(sel);
       if (el) el.style.display = show ? 'none' : 'block';
     }
+  }
+
+  // main.js 后处理管线就绪后注入(main.js 组合根唯一调用);同步期只认这份引用
+  setMainPost(fn) {
+    this._mainPost = fn || null;
+    if (this.activeWorld === 'main') ctx.scene.renderPostProcessing = this._mainPost;
   }
 
   capture() {
@@ -247,6 +261,10 @@ export class SceneManager {
     this.transitioning = true;
     const commit = async () => {
       if (source.leave) await source.leave({ from: source, to: target, options });
+      // 第三人称角色随世界走:enter() 有这段,enterWithoutPush(返回主世界走此路)此前漏了,
+      // 角色会遗留在原世界场景里,返回后第三人称视角看不到自己(2026-09-06 修复)
+      const avatar = ctx.scene.avatar;
+      if (avatar && target.root && avatar.parent !== target.root) target.root.add(avatar);
       this.activeWorld = id;
       this.syncCtx();
       if (target.enter) await target.enter({ from: source, to: target, options });

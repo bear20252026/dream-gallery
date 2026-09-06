@@ -65,6 +65,9 @@ function addStarfield(scene) {
 const B612_SPAWN = { pos: [-1.5, 2, -8.5], yaw: Math.PI }; // 天幕壳内、星球正前方
 const KING_SPAWN_Y = () => R * 0.42 + 1.6; // 星球岛面站立高度
 const GATE_RADIUS = 4;   // 主世界石门自动传送半径(m)
+// 石门武装标记(2026-09-06 主人报「返回主世界黑屏」根因):自动传送触发即解除,
+// 走出半径才重新武装——否则从 B612 返回时快照把玩家放回圈内,下一帧又被弹回。
+let gateArmed = true;
 const PAD_RADIUS = 3;    // 石台触发半径(m)
 const DOOR_RADIUS = 2.5; // 岛上回程门半径(m)
 const PICK_RADIUS = 3;   // 星屑拾取半径(m)
@@ -663,7 +666,25 @@ function setNav(show, aText, aAction, bText, bAction) {
   worldNav.style.display = 'flex';
 }
 const goMainWorld = function () {
-  ctx.scene.toMainWorld();
+  ctx.scene.toMainWorld().then(function (okFlag) {
+    if (!okFlag) return;
+    gateArmed = false; // 返回落点就在石门旁,先解除自动传送(走出半径后重新武装)
+    const pp = ctx.player.pl && ctx.player.pl.p;
+    if (!pp) return;
+    // 顺手把落点推出石门半径(沿原方向推到圈外 2m):玩家回来即看到「✦ 进入 B612」
+    const EXIT = GATE_RADIUS + 2;
+    const dx = pp.x - 0.1,
+      dz = pp.z - 56.0;
+    const d = Math.sqrt(dx * dx + dz * dz);
+    let ux = d > 0.01 ? dx / d : 0,
+      uz = d > 0.01 ? dz / d : -1; // 与石门完全重叠时默认往画廊方向(-z)退
+    if (d < EXIT) {
+      pp.x = 0.1 + ux * EXIT;
+      pp.z = 56.0 + uz * EXIT;
+      const gy = ctx.desert && ctx.desert.getH && ctx.desert.getH(pp.x, pp.z);
+      if (typeof gy === 'number') pp.y = gy + 1.6;
+    }
+  });
 };
 const goKing325 = function () {
   worldManager.enter('king325', {
@@ -738,7 +759,7 @@ function travelTo(idx) {
     ctx.ui.modeToast(targetWorld === 'b612' ? "B612 · The Little Prince's Home" : isl.cfg.place);
 }
 function backToGallery() {
-  ctx.scene.toMainWorld(); // 管理器方法是 toMain,toMainWorld 是 ctx 包装器(2026-09-06 修复 TypeError)
+  goMainWorld(); // 与导航按钮同路(防回弹+落点外推),别直连 toMainWorld
 }
 function pl() {
   return ctx.player.pl.p;
@@ -883,11 +904,15 @@ onTick(function (dt) {
       dgz = p.z - 56.0;
     const nearGate = dgx * dgx + dgz * dgz < GATE_RADIUS * GATE_RADIUS; // 石门自动传送半径
     if (nearGate) {
-      padBtn.style.display = 'none';
-      hud.style.display = 'none';
-      travelTo(0);
+      if (gateArmed) {
+        gateArmed = false; // 返回落点在圈内不再回弹;走出半径后由下方重新武装
+        padBtn.style.display = 'none';
+        hud.style.display = 'none';
+        travelTo(0);
+      }
       return;
     }
+    gateArmed = true;
     // 不在门旁:显示按钮
     padBtn.style.display = 'block';
     hud.style.display = 'none';
