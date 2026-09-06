@@ -1,5 +1,5 @@
 // EntityRegistry 单元测试
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { EntityRegistry } from '../engine.js';
 
 // Mock THREE.Object3D

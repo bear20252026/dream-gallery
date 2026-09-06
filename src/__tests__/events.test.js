@@ -1,5 +1,5 @@
 // events.js 单元测试
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 
 // events.js 使用模块级 listeners 对象，需要每次重新导入以重置状态
 // 由于 ES 模块缓存，我们直接测试行为而不重置
