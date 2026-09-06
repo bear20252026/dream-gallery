@@ -159,6 +159,10 @@ function resolveAnchor(actor) {
   return c;
 }
 bag.custom.push(() => anchorCache.clear());
+// 调试钩子:探针可读锚点精确传送到角色旁(生产零影响)
+window.__storyDialogs = {
+  anchors: () => Object.fromEntries([...anchorCache].map(([k, v]) => [k, { x: v.x, y: v.y, z: v.z }])),
+};
 
 // ===================== 每帧:就近 Actor 触发 + 轮播 + 渲染 =====================
 let lastWorld = '';
@@ -188,8 +192,11 @@ ctx.onTick(function storyDialogTick() {
     }
   }
   for (const actor of ACTORS) {
-    if (actor.world !== w) continue;
     const st = bubbleOf(actor);
+    if (actor.world !== w) {
+      st.obj.visible = false; // 非当前世界:Actor 的气泡归位其场景,跨世界切换时须隐藏残留
+      continue;
+    }
     const active = best && best.id === actor.id;
     st.obj.visible = !!active;
     if (active && now - st.at > actor.every) {
