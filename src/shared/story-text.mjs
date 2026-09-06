@@ -17,6 +17,21 @@ export const FILM = {
   end: '— to be continued: the B612 gallery waits beside you —',
 };
 
+// 坠机点与开场引导(2026-09-07;英文照 Woods 译,中文据《中文文学译本》)
+export const STORY = {
+  // 小王子叫醒玩家的第一句(=主线发令枪,书内原句 Ch2)
+  princeWake: {
+    speaker: '小王子',
+    en: 'If you please-- draw me a sheep!',
+    zh: '请你——给我画一只羊！',
+  },
+  // 坠机残骸告示牌(木牌 CanvasTexture 双语同绘)
+  wreckSign: {
+    en: 'Something was broken in my engine... I was more isolated than a shipwrecked sailor on a raft in the middle of the ocean.',
+    zh: '发动机里，有什么东西坏了……\n我比大洋中央抱着木筏的水手，还要孤单。',
+  },
+};
+
 // 小世界情景对话(故事书小王子/玫瑰/国王;逐条轮播,全英文 Satisfy 手写体)
 export const DIALOG_LINES = {
   prince: [

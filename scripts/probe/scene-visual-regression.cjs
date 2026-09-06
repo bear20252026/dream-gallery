@@ -55,8 +55,15 @@ function startServer() {
   const b = await launch();
   const page = await b.newPage({ viewport: { width: 960, height: 600 } });
   const errs = [];
+  // 确定性抑制:雅号弹窗/指引卡/欢迎词的时机随交互漂移,会让检查点画面随机混入弹层
   page.on('pageerror', (e) => {
     if (!/dynamically imported module/.test(e.message)) errs.push(String(e).slice(0, 200));
+  });
+  await page.addInitScript(() => {
+    sessionStorage.setItem('nickPopOff', '1'); // 雅号弹窗
+    try {
+      localStorage.setItem('kunlunWelcomed', String(Date.now())); // 首点欢迎词(24h 一次)
+    } catch (e) {}
   });
   await page.goto(ORIGIN + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
@@ -123,6 +130,10 @@ function startServer() {
   // 检查点通用:语义断言 + 截图 + 亮度 + 像素对比
   async function checkpoint(name, worldRe, settleMs) {
     await settle(settleMs);
+    await page.evaluate(() => {
+      const l = document.getElementById('storyDialogLayer');
+      if (l) l.style.display = 'none'; // 气泡轮播文本随时机转,屏蔽保确定性
+    });
     const world = await page.evaluate(() => window.__ctx.scene.activeWorld);
     ok(`[${name}] 世界=${world}`, worldRe.test(world));
     const shot = await page.screenshot();
@@ -157,6 +168,7 @@ function startServer() {
 
   // ① 主世界开世界(等场景/后处理稳定;昼夜钉正午保跨环境可比)
   await page.waitForTimeout(1200);
+  await page.evaluate(() => { try { window.__ctx.store.str('nick', 'vr'); } catch (e) {} }); // 灭指引卡
   await freezeDayNoon();
   await checkpoint('main-boot', /^main$/, 4000);
   // ② 石门 → B612

@@ -53,12 +53,20 @@ function addWorldLights(scene, lite) {
   scene.add(cool);
   scene.add(new THREE.HemisphereLight(0xa8c8ff, 0x4a3820, 1.5));
 }
-// 星空粒子背景(每个世界独立实例)
+// 星空粒子背景(每个世界独立实例;2026-09-07 定种子——随机星位让截图回归每次差 20%+)
 function addStarfield(scene) {
+  let seed = 0x9e3779b9; // 固定种子:星位跨加载恒定
+  const rand = function () {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
   const geo = new THREE.BufferGeometry();
   const n = 3000;
   const pos = new Float32Array(n * 3);
-  for (let i = 0; i < n * 3; i++) pos[i] = (Math.random() - 0.5) * 500;
+  for (let i = 0; i < n * 3; i++) pos[i] = (rand() - 0.5) * 500;
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const stars = new THREE.Points(
     geo,
