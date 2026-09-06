@@ -6,7 +6,8 @@ import { onMediaChanged } from '../../media-push.js'; // 服务端主动推送:�
 
 // ===================== 昆仑灵鉴:氛围小字 =====================
 const skyNote = document.createElement('div');
-skyNote.id = 'skyNote'; // 多世界切割:主世界专属语录,切世界由 scene-manager 统一隐藏
+skyNote.id = 'skyNote';
+skyNote.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui) // 多世界切割:主世界专属语录,切世界由 scene-manager 统一隐藏
 skyNote.textContent = 'B612 在这里等你。你来了，星星就亮了。';
 skyNote.style.cssText =
   'position:fixed;right:12px;bottom:12px;z-index:15;color:rgba(255,200,220,0.35);font-size:10px;letter-spacing:2px;pointer-events:none;font-family:inherit';

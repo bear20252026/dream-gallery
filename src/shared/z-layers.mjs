@@ -21,11 +21,18 @@ export const Z = {
   gateDoc: 99,      // 闸门读协议的「‹ 返回」钮
   loading: 100,     // 加载屏(与闸门交接)
   gate: 150,        // 入口闸门
-  prologue: 500,    // (保留)残镜序章
+  prologue: 500,    // 残镜序章(prologue.js #prologueBlack)
   film: 580,        // 纸飞机开幕电影
 
+  // —— 世界切换过渡与全屏弹层(2026-09-07 P3 收编,原散值 380~400) ——
+  modal: 380,       // 设置面板二级弹层(画質/上传/聊天/灵蕴页/愿望页共用基线)
+  veilFx: 390,      // 过渡特效:金色传送光环(sky-progress)/境暗晕影(letgo)
+  veilLock: 391,    // 遮罩交互层:天穹进度全屏遮罩(sky-progress)
+  teleport: 400,    // darkTeleport 传送黑幕/答题面板 #quizOv(压过一切游戏内 UI)
+  worldToast: 500,  // 世界级提示条(答题门禁 toast,浮在遮罩上)
+
   // —— 系统 ——
-  kickNotice: 9999, // 被踢出通知
+  kickNotice: 9999, // 被踢出通知/浮层提示(ui.kit toast、上传拖罩)
   exitFade: 99998,  // 退出告别淡出
   errTrap: 99999,   // 错误捕获条
 };

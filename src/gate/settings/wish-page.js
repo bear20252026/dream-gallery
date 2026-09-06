@@ -1,3 +1,4 @@
+import { Z } from '../../shared/z-layers.mjs';
 // wish-page.js — 一念(写下你的一句话,化作灵蕴归入天穹 + 心愿墙;2026-09-04 新增)
 // 设计:把「凡人一念,可补天缺」做成零门槛参与——不用传照片、不用答题,一句话即 +5 天穹。
 import { ctx } from '../../ctx.js';
@@ -6,7 +7,7 @@ import { expose } from '../../debug-hooks.js';
 const wOv = document.createElement('div');
 wOv.id = 'wishOv';
 wOv.style.cssText =
-  'position:fixed;inset:0;z-index:380;display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+  'position:fixed;inset:0;z-index:' + Z.modal + ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
 const wCard = document.createElement('div');
 wCard.style.cssText =
   'width:min(460px,92vw);max-height:84vh;overflow-y:auto;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)';
@@ -16,7 +17,7 @@ export const wishApi = ctx.overlay.register(wOv, { x: '#wishX' });
 
 function wishDust() {
   const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden';
+  box.style.cssText = 'position:fixed;inset:0;z-index:' + Z.kickNotice + ';pointer-events:none;overflow:hidden';
   document.body.appendChild(box);
   for (let i = 0; i < 22; i++) {
     const p = document.createElement('div');

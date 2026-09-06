@@ -23,6 +23,7 @@ export function createMediaNamespace(vault) {
     'bigScreenHold',
     'desert',
     'dayHour',
+    'dayTimeSource',
     'updateFireworks',
     'pG',
     'pC',

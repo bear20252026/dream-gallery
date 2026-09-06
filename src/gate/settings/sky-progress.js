@@ -1,3 +1,4 @@
+import { Z } from '../../shared/z-layers.mjs';
 // sky-progress.js — 天穹进度系统:星屑收集、里程碑、天穹画布、选择对话框
 import { ctx } from '../../ctx.js';
 
@@ -148,7 +149,7 @@ const SKY_LINES = [
 function showMs(big, tts, isFull) {
   const d = document.createElement('div');
   d.style.cssText =
-    'position:fixed;inset:0;z-index:390;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
+    'position:fixed;inset:0;z-index:' + Z.veilFx + ';display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
   const inner = document.createElement('div');
   inner.style.cssText =
     'max-width:86vw;text-align:center;font-size:clamp(20px,5vw,34px);letter-spacing:3px;color:#ffe9c4;text-shadow:0 0 30px rgba(255,200,100,.6),0 2px 12px rgba(0,0,0,.8);line-height:1.8';
@@ -173,7 +174,7 @@ function skyFullDialog() {
   const d = document.createElement('div');
   d.id = 'skyFullDlg';
   d.style.cssText =
-    'position:fixed;inset:0;z-index:391;display:flex;align-items:center;justify-content:center;background:rgba(12,6,12,.55)';
+    'position:fixed;inset:0;z-index:' + Z.veilLock + ';display:flex;align-items:center;justify-content:center;background:rgba(12,6,12,.55)';
   d.innerHTML =
     '<div style="background:linear-gradient(160deg,rgba(38,22,34,.98),rgba(24,14,26,.98));border:1px solid rgba(255,214,170,.4);border-radius:18px;padding:24px 26px;text-align:center;color:#ffe9c4;max-width:88vw">' +
     '<div style="font-size:15px;letter-spacing:2px;line-height:2;margin-bottom:14px">天穹已合。接下来，你想——</div>' +

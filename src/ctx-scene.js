@@ -34,6 +34,7 @@ export function createSceneNamespace(vault) {
     'IR',
     'IRT',
     'IRB',
+    'layout',
     'floorW',
     'floorD',
     'bW',

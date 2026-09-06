@@ -610,7 +610,8 @@ mapCanvas.addEventListener('pointerdown', (e) => {
 
 // ===================== 一键回归出生点(主世界专属;小世界隐藏,回画廊走传送石台) =====================
 const homeBtn = document.createElement('button');
-homeBtn.id = 'homeBtn'; // 多世界切割(2026-09-06 主人定:小世界不需要回家键,scene-manager 统一隐藏)
+homeBtn.id = 'homeBtn';
+homeBtn.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui) // 多世界切割(2026-09-06 主人定:小世界不需要回家键,scene-manager 统一隐藏)
 homeBtn.textContent = '⌂';
 homeBtn.title = '回归出生点';
 homeBtn.style.cssText =

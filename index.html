@@ -103,6 +103,7 @@
       <div id="t">B 6 1 2</div>
       <div
         id="hp"
+        data-world-ui="main"
         style="
           position: absolute;
           top: 36px;
@@ -119,7 +120,7 @@
       >
         WASD移动 | 鼠标拖拽转视角 | 滚轮缩放
       </div>
-      <div id="m" role="img" aria-label="小地图"><canvas id="mc"></canvas></div>
+      <div id="m" data-world-ui="main" role="img" aria-label="小地图"><canvas id="mc"></canvas></div>
 
       <div id="j">
         <div id="jb"></div>
@@ -143,7 +144,7 @@
       </div>
       <button id="ab" aria-label="开启音乐" aria-pressed="false">开启音乐</button>
       <!-- AI文字介绍面板 -->
-      <div id="aiPanel">
+      <div id="aiPanel" data-world-ui="main">
         <div class="aiTag">B612 记忆回声</div>
         <div class="aiLine"></div>
         <div class="aiText" id="aiT"></div>

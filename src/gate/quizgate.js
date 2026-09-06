@@ -1,3 +1,4 @@
+import { Z } from '../shared/z-layers.mjs';
 // quizgate.js — 入馆答题系统:悬浮答题屏(3D) + 答题面板(DOM) + 通行证状态/雾效门禁
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
@@ -12,7 +13,7 @@ const { s, iG, onTick } = ctx;
 // ===================== 提示条(节流) =====================
 const toastEl = document.createElement('div');
 toastEl.style.cssText =
-  'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#feca57;padding:10px 24px;border-radius:24px;font-size:14px;z-index:500;display:none;pointer-events:none;font-family:"Microsoft YaHei",sans-serif;letter-spacing:1px;';
+  'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#feca57;padding:10px 24px;border-radius:24px;font-size:14px;z-index:' + Z.worldToast + ';display:none;pointer-events:none;font-family:"Microsoft YaHei",sans-serif;letter-spacing:1px;';
 document.body.appendChild(toastEl);
 let toastTimer = 0,
   lastToast = 0;
@@ -172,7 +173,7 @@ const QZ_TITLES = [
 ];
 const css = document.createElement('style');
 css.textContent = `
-#quizOv{position:fixed;inset:0;z-index:400;display:none;align-items:center;justify-content:center;background:rgba(16,6,14,0.92);font-family:'Microsoft YaHei',sans-serif;overflow-y:auto}
+#quizOv{position:fixed;inset:0;z-index:${Z.teleport};display:none;align-items:center;justify-content:center;background:rgba(16,6,14,0.92);font-family:'Microsoft YaHei',sans-serif;overflow-y:auto}
 #quizBox{width:min(680px,94vw);max-height:92vh;overflow-y:auto;background:linear-gradient(160deg,#2a1025,#3d1830);border:1px solid rgba(255,182,200,0.35);border-radius:22px;padding:28px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.6)}
 #quizBox h2{color:#ffb6c8;text-align:center;margin:0 0 6px;font-size:24px;letter-spacing:3px}
 #quizBox .qsub{text-align:center;color:rgba(255,255,255,.55);font-size:13px;margin-bottom:18px}

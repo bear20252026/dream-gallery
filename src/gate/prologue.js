@@ -1,3 +1,4 @@
+import { Z } from '../shared/z-layers.mjs';
 // prologue.js — 冷启动·互动序章(设计文档序幕,2026-07-27 主人定稿落地)
 // 只在玩家第一次打开时播放一次(localStorage kunlunPrologueDone);全程约 30 秒:
 // 黑屏旁白「三千年了」→ 残镜浮现(古铜边框+蛛网裂纹)→ 镜中四幕回放(女娲碎石→碎末入人间→
@@ -83,7 +84,7 @@ function build() {
   ov = document.createElement('div');
   ov.id = 'prologueOv';
   ov.style.cssText =
-    'position:fixed;inset:0;z-index:500;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:inherit;opacity:1;transition:opacity 1.2s';
+    'position:fixed;inset:0;z-index:' + Z.prologue + ';background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:inherit;opacity:1;transition:opacity 1.2s';
   document.body.appendChild(ov);
   ovApi = ctx.overlay.register(ov, { touchOnly: true }); // 序章一次性全屏:只进触摸白名单,Esc/收尾自管
   // 跳过(三铁律之退出保障;位置低调,不破坏"没有开始按钮"的氛围)
@@ -230,6 +231,7 @@ function leaveDimMirror() {
   // 「让我再想想」:右下角留一面暗哑小残镜,点开重新抉择
   mirrorBtn = document.createElement('button');
   mirrorBtn.id = 'prologueMirror';
+mirrorBtn.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
   mirrorBtn.textContent = '🪞';
   mirrorBtn.title = '残镜——它还在等你';
   mirrorBtn.style.cssText =

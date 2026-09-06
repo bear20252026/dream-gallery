@@ -1,3 +1,4 @@
+import { Z } from '../shared/z-layers.mjs';
 // ui/kit.js — 界面反馈组件库(2026-08-30 统一四份拷贝:spirits/finale/eternal/ark)
 // 中央大字弹窗:全屏居中文字,淡入 → 停留 → 淡出自毁。四模块原实现视觉一致
 // (z=389/同款文字阴影),仅 ark 用略小字号与不同默认停留时长,经参数保留差异。
@@ -37,7 +38,7 @@ export function statusBar() {
     if (el) return;
     el = document.createElement('div');
     el.style.cssText =
-      'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:9999;padding:8px 16px;border-radius:20px;background:rgba(20,10,30,.85);color:#fff;font:13px/1.4 system-ui;border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:none;transition:opacity .4s;white-space:nowrap';
+      'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:' + Z.kickNotice + ';padding:8px 16px;border-radius:20px;background:rgba(20,10,30,.85);color:#fff;font:13px/1.4 system-ui;border:1px solid rgba(255,255,255,.2);box-shadow:0 4px 12px rgba(0,0,0,.4);pointer-events:none;transition:opacity .4s;white-space:nowrap';
     document.body.appendChild(el);
   };
   _sb = {

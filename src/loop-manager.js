@@ -283,7 +283,10 @@ export class LoopManager {
 
     // 统一昼夜(多世界切割:仅主世界)
     if (world === 'main') {
-      const hour = (12 + now / 2500) % 24;
+      // 时间源可注入(2026-09-07 P4):默认挂真实时钟;测试/剧情机关经
+      // ctx.media.dayTimeSource = () => 12 覆盖(0-24),不必再 monkey-patch dayNight。
+      const src = ctx.media.dayTimeSource;
+      const hour = typeof src === 'function' ? Number(src(now)) % 24 : (12 + now / 2500) % 24;
       ctx.media.dayHour = hour;
       if (desert && now - this._lastDayT > 100) {
         this._lastDayT = now;

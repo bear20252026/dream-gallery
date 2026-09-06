@@ -103,6 +103,7 @@ async function preloadWorld() {
   try { window.__worldPhase = '雪窗'; await import('./kunlun/snowwin.js'); } catch (e) { window.__worldPhase = '失败:雪窗'; console.error('[startWorld] 雪窗 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/snowwin.js ' + e.message); throw e; }
   try { window.__worldPhase = '星球世界'; await import('./kunlun/planets.js'); } catch (e) { window.__worldPhase = '失败:星球世界'; console.error('[startWorld] 星球世界 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/planets.js ' + e.message); throw e; }
   try { window.__worldPhase = '对话'; await import('./kunlun/story-dialogs.js'); } catch (e) { window.__worldPhase = '失败:对话'; console.error('[startWorld] 对话 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/story-dialogs.js ' + e.message); throw e; }
+  try { window.__worldPhase = '石门'; await import('./gallery/portal.js'); } catch (e) { window.__worldPhase = '失败:石门'; console.error('[startWorld] 石门 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/portal.js ' + e.message); throw e; }
   try { window.__worldPhase = '重置视角'; await import('./kunlun/resetview.js'); } catch (e) { window.__worldPhase = '失败:重置视角'; console.error('[startWorld] 重置视角 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/resetview.js ' + e.message); throw e; }
   try { window.__worldPhase = '放下'; await import('./kunlun/letgo.js'); } catch (e) { window.__worldPhase = '失败:放下'; console.error('[startWorld] 放下 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/letgo.js ' + e.message); throw e; }
   try { window.__worldPhase = '终章'; await import('./kunlun/finale.js'); } catch (e) { window.__worldPhase = '失败:终章'; console.error('[startWorld] 终章 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/finale.js ' + e.message); throw e; }
@@ -211,6 +212,28 @@ async function preloadWorld() {
     softImport(() => import('./kunlun/avatar.js'));
   }, 2000);
 
+  // P3(2026-09-07 审计):启动自检——模块清单靠人肉同步,漏载的后果是静默的
+  // (2026-09-06「石门消失」就是漏载 planets.js)。对关键装配断言,缺谁喊谁。
+  const missing = [];
+  const need = function (name, getter) {
+    try {
+      if (!getter()) missing.push(name);
+    } catch (e) {
+      missing.push(name);
+    }
+  };
+  need('scene.rnd(渲染器)', function () { return ctx.scene.rnd; });
+  need('scene.s(活动场景)', function () { return ctx.scene.s; });
+  need('scene.worldManager(世界注册表)', function () { return ctx.scene.worldManager; });
+  need('scene.renderPostProcessing(后处理)', function () { return ctx.scene.renderPostProcessing; });
+  need('player.pl(玩家)', function () { return ctx.player && ctx.player.pl; });
+  need('desert.getH(地形)', function () { return ctx.media && ctx.media.desert && ctx.media.desert.getH; });
+  need('kunlun.spiritsState(灵蕴契约)', function () { return ctx.kunlun && ctx.kunlun.spiritsState; });
+  need('media.vidEl(户外大屏)', function () { return ctx.media && ctx.media.vidEl; });
+  window.__bootCheck = { ok: missing.length === 0, missing: missing };
+  if (missing.length)
+    console.error('[startWorld] 启动自检缺项(模块漏载或初始化失败):', missing.join(', '));
+
   worldBooted = true; // 预加载完成:模块与场景构建全部就绪(揭幕由 startWorld 负责)
 }
 
@@ -254,6 +277,37 @@ expose('worldPhase', () => window.__worldPhase || '(未开始)');
 // ===================== 引导期:UI 轻件与开场链路 =====================
 function softImport(load) {
   load().catch(() => setTimeout(() => load().catch(() => console.info('[main] 可选模块暂未加载(不影响进馆)')), 1500));
+}
+
+// P1(2026-09-07 审计):世界启动失败的兜底 UI(纸色,与开场视觉同系)。
+// 模块加载失败多为网络抖动,重载即愈;缺项详情留在 console(__bootCheck/__worldPhase)。
+function showWorldLoadError() {
+  if (document.getElementById('worldErr')) return;
+  const d = document.createElement('div');
+  d.id = 'worldErr';
+  d.style.cssText =
+    'position:fixed;inset:0;z-index:' +
+    (Z.loading + 1) +
+    ';display:flex;flex-direction:column;gap:20px;align-items:center;justify-content:center;' +
+    'background:#f3ead2;color:#4e4237;font-family:Georgia,serif;text-align:center;padding:24px';
+  const t = document.createElement('div');
+  t.style.cssText = 'font-size:19px;letter-spacing:3px';
+  t.textContent = '世界没能落进画里';
+  const s = document.createElement('div');
+  s.style.cssText = 'font-size:13px;opacity:.75;letter-spacing:1px;line-height:1.9';
+  s.textContent = '大概是网络抖了一下。检查连接后,重新开始这段旅程。';
+  const b = document.createElement('button');
+  b.textContent = '重 新 加 载';
+  b.style.cssText =
+    'padding:12px 34px;border:1px solid rgba(90,72,50,.45);border-radius:24px;background:transparent;' +
+    'color:#4e4237;font-size:15px;letter-spacing:4px;cursor:pointer;font-family:inherit';
+  b.onclick = function () {
+    location.reload();
+  };
+  d.appendChild(t);
+  d.appendChild(s);
+  d.appendChild(b);
+  document.body.appendChild(d);
 }
 
 // 《元素共鸣准则》阅读卡(settings.js 4s 后调用)
@@ -413,7 +467,12 @@ import('./gate/entrygate.js')
     done = true;
     function finishIntro(deferMedia) {
       bootState.bumpIntroFired();
-      if (ctx.startWorld) Promise.resolve(ctx.startWorld()).catch(function () {}); // 失败已在 preloadWorld 内上报,此处防 unhandled
+      // P1(2026-09-07 审计):世界启动失败此前是静默的——信标上报了,用户端却
+      // 无限停在加载层。给一层可操作的「加载失败+重试」。
+      if (ctx.startWorld)
+        Promise.resolve(ctx.startWorld()).catch(function () {
+          showWorldLoadError();
+        });
       if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
       ctx.store.mark('prologueDone');
       // 大屏轮播启动(审计 P1-R1 完整版):skip/播完/旁路三条路都可能先于

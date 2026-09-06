@@ -227,6 +227,7 @@ function createGameShellSystem() {
 
       questEl = document.createElement('div');
       questEl.id = 'questHud';
+questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
       questEl.innerHTML = `
         <div class="q-title">任 务 册</div>
         <div class="q-main">◈ 收集六颗星屑</div>

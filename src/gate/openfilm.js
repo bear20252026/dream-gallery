@@ -19,6 +19,8 @@
 import * as THREE from 'three';
 import { Z } from '../shared/z-layers.mjs';
 import { createFilmGate } from './film-gate.mjs';
+import { HAT, TRUTH } from './film-strokes.mjs';
+import { FILM } from '../shared/story-text.mjs';
 
 let active = false;
 
@@ -128,10 +130,10 @@ export function playOpeningFilm(onDone) {
   <div id="fDark"></div>
   <div id="fPaper">
     <svg id="fSketch" viewBox="0 0 720 460" fill="none" stroke-linecap="round" stroke-linejoin="round"></svg>
-    <div class="ftline" id="fT0">When I was six, I drew the very first drawing of my life.</div>
-    <div class="ftline" id="fTq">What is this?</div>
+    <div class="ftline" id="fT0">${FILM.t0}</div>
+    <div class="ftline" id="fTq">${FILM.question}</div>
     <div class="ftline" id="fReply"></div>
-    <div class="ftline" id="fMind">Later, someone taught me — one must look with the heart.</div>
+    <div class="ftline" id="fMind">${FILM.mind}</div>
     <div id="fChoice">
       <button id="cHat" type="button">A Hat</button>
       <button id="cBoa" type="button">A Boa Constrictor</button>
@@ -146,10 +148,10 @@ export function playOpeningFilm(onDone) {
     <path d="M12,84 L288,20 L196,96 Z"/><path d="M196,96 L178,138 L150,102"/>
     <path d="M12,84 L150,102"/><path d="M96,64 C104,58 116,58 124,64" opacity=".55"/>
   </svg>
-  <div class="ffline" id="tFly1">Afterwards, I became a pilot.</div>
-  <div class="ffline" id="tFly2">Later still, my engine went silent over the desert.</div>
-  <div class="ffline" id="tLand">…and the desert received me like a page receiving ink.</div>
-  <div id="fEnd">— to be continued: the B612 gallery waits beside you —</div>
+  <div class="ffline" id="tFly1">${FILM.fly1}</div>
+  <div class="ffline" id="tFly2">${FILM.fly2}</div>
+  <div class="ffline" id="tLand">${FILM.land}</div>
+  <div id="fEnd">${FILM.end}</div>
   <button id="fSkip" type="button">skip ▸</button>`;
   document.body.appendChild(root);
   document.addEventListener('keydown', onEsc);
@@ -691,53 +693,7 @@ export function playOpeningFilm(onDone) {
   if (renderer) requestAnimationFrame(tick);
 
   /* ================= 第一幕:手绘 ================= */
-  const HAT = [
-    {
-      d: 'M64,302 C92,220 168,152 296,144 C392,138 448,192 482,262 C494,284 500,298 503,306',
-      t: 3000,
-      w: 3.8,
-    },
-    {
-      d: 'M300,145 C380,142 436,190 470,248 C482,268 492,288 499,302',
-      t: 1100,
-      w: 2.2,
-      soft: true,
-    },
-    { d: 'M64,302 C56,297 54,290 60,286 C66,283 73,285 77,290', t: 700, w: 3.2 },
-    {
-      d: 'M503,306 C550,301 602,299 640,306 C652,308 660,301 661,293 C662,288 658,285 653,287',
-      t: 1500,
-      w: 3.4,
-    },
-    { d: 'M42,321 C170,329 350,329 506,323 C566,320 616,317 650,314', t: 2100, w: 3.6 },
-    { d: 'M186,238 C232,182 300,162 364,170', t: 1100, w: 2.4, soft: true },
-  ];
-  const TRUTH = [
-    {
-      d: 'M288,202 C316,192 336,196 356,206 C382,218 402,206 424,216 C448,226 462,248 464,270',
-      t: 2200,
-      w: 3.2,
-    },
-    { d: 'M288,202 C279,213 275,223 278,233', t: 500, w: 3 },
-    { d: 'M464,270 C468,278 468,286 464,294', t: 500, w: 3 },
-    { d: 'M462,262 C474,276 478,292 474,306', t: 800, w: 2 },
-    { d: 'M310,224 C320,198 354,194 364,222 C370,240 358,254 340,252', t: 1200, w: 3 },
-    { d: 'M284,212 C290,206 298,206 302,210', t: 400, w: 2.4 },
-    { d: 'M292,222 a3,3 0 1,0 .1,0', t: 300, fill: true },
-    { d: 'M278,232 C256,254 242,280 238,302 C236,312 242,316 250,311', t: 1500, w: 3.2 },
-    { d: 'M284,266 C277,273 271,280 268,288', t: 500, w: 2.2 },
-    { d: 'M318,286 L316,321', t: 400, w: 3 },
-    { d: 'M358,288 L358,321', t: 400, w: 3 },
-    { d: 'M446,280 L450,318', t: 400, w: 3 },
-    { d: 'M196,252 C218,242 240,236 260,233', t: 480, w: 1.7, soft: true },
-    { d: 'M182,272 C204,264 226,259 244,258', t: 480, w: 1.7, soft: true },
-    { d: 'M224,286 C246,279 266,275 282,275', t: 480, w: 1.7, soft: true },
-    { d: 'M372,204 C396,205 418,214 434,228', t: 480, w: 1.7, soft: true },
-    { d: 'M440,244 C452,253 460,263 463,272', t: 480, w: 1.7, soft: true },
-    { d: 'M262,208 C250,216 242,226 238,238', t: 480, w: 1.7, soft: true },
-    { d: 'M60,289 C72,294 86,298 100,301', t: 600, w: 2.2, soft: true },
-    { d: 'M648,296 a3.4,3.4 0 1,0 .1,0', t: 300, fill: true },
-  ];
+  // HAT/TRUTH 笔画数据已外置到 film-strokes.mjs(2026-09-07 P4):本文件只留绘制机制
   const svg = $('fSketch'),
     NS = 'http://www.w3.org/2000/svg';
   function mk(s) {
@@ -920,8 +876,8 @@ export function playOpeningFilm(onDone) {
     $('fTq').classList.add('show');
     $('fChoice').classList.add('show');
     await new Promise((res) => {
-      $('cHat').onclick = () => answer('That is how every grown-up sees it.', res, false);
-      $('cBoa').onclick = () => answer('…Then you see it too.', res, true);
+      $('cHat').onclick = () => answer(FILM.replyHat, res, false);
+      $('cBoa').onclick = () => answer(FILM.replyBoa, res, true);
     });
     if (dead()) return;
     await wait(2600);

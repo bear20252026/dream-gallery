@@ -1,3 +1,4 @@
+import { Z } from '../shared/z-layers.mjs';
 // upload.js — 访客上传(照片 + 我的链接) + AI 配文 + 空中悬浮路标
 // 照片:任何人可传、不限张数、≤5MB;自己只见自己的,后台见全部
 // AI 配文:/api/vision/analyze(审核不过也照常上传,用回退句)
@@ -231,7 +232,7 @@ function playUploadHint(onEnd) {
 // ===== B612灵鉴:上传成功金色微尘(2 秒,灵蕴归位的视觉化;DOM 粒子零依赖) =====
 function goldDust() {
   const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden';
+  box.style.cssText = 'position:fixed;inset:0;z-index:' + Z.kickNotice + ';pointer-events:none;overflow:hidden';
   document.body.appendChild(box);
   for (let i = 0; i < 26; i++) {
     const p = document.createElement('div');

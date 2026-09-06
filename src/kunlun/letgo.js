@@ -1,3 +1,4 @@
+import { Z } from '../shared/z-layers.mjs';
 // letgo.js — 永恒展厅·放下与召回(二期⑤,2026-07-27 主人定稿+数据铁律落地)
 // 长按晨光画 3s(环形进度条+边缘变暗)→ 照片化为暖色光尘消解(3s,边缩边散)→ 空画框:
 // 暖白空面+原图灰影(0.1)+小匾「此处曾有过——日期」。上限 3 张(语气温和不责备)。
@@ -172,7 +173,7 @@ ringHole.textContent='放下';
 ring.appendChild(ringHole);
 document.body.appendChild(ring);
 const dim=document.createElement('div');
-dim.style.cssText='position:fixed;inset:0;z-index:391;pointer-events:none;box-shadow:inset 0 0 140px 40px rgba(0,0,0,0.4);opacity:0;transition:opacity .4s';
+dim.style.cssText='position:fixed;inset:0;z-index:' + Z.veilLock + ';pointer-events:none;box-shadow:inset 0 0 140px 40px rgba(0,0,0,0.4);opacity:0;transition:opacity .4s';
 document.body.appendChild(dim);
 
 let hold=null; // {g,t0}

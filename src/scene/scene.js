@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { createPaperTerrainMaterial, updatePaperTerrain } from './paper-floor.js'; // 山河舆图·纸质地形地板(2026-08-29)
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'; // 婚礼拱廊外壳加载(museum.js 同款静态导入,项目验证过)
+import { LAYOUT } from './layout.mjs'; // 建筑布局尺寸唯一源(2026-09-07 P4)
 
 const L = document.getElementById('l'),
   C = document.getElementById('c'),
@@ -143,21 +144,21 @@ function loadTexCapped(url, onErr, pos) {
   return tex;
 }
 
-// ===================== 整体布局 =====================
+// ===================== 整体布局(尺寸唯一源:layout.mjs,2026-09-07 P4 数据化) =====================
 // 上方展厅区: z = -12 ~ 6（保留原A-G展厅）
 // 下方回字大厅: z = 6 ~ 28（新增，内墙禁区 z=11~23）
 // 整体范围: x=-18~18, z=-12~28
-
-const OL = -18,
-  OR = 18,
-  OT = -12,
-  OBE = 6; // 展厅区边界 (E=exhibition)
-const OBR = 28; // 整体最南端 (R=rectangular hall)
-const WH = 5; // 天花板高度5m（抬高1/4）
-const IL = -7,
-  IR = 7,
-  IRT = 11,
-  IRB = 23; // 回字内墙禁区边界
+const OL = LAYOUT.outerWest,
+  OR = LAYOUT.outerEast,
+  OT = LAYOUT.outerNorth,
+  OBE = LAYOUT.outerSouthEx; // 展厅区边界 (E=exhibition)
+const OBR = LAYOUT.outerSouth; // 整体最南端 (R=rectangular hall)
+const WH = LAYOUT.ceilingHeight; // 天花板高度5m（抬高1/4）
+const IL = LAYOUT.innerWest,
+  IR = LAYOUT.innerEast,
+  IRT = LAYOUT.innerNorth,
+  IRB = LAYOUT.innerSouth; // 回字内墙禁区边界
+ctx.scene.layout = LAYOUT; // 探针/工具可读的布局单一源
 const bounds = [];
 // 碰撞盒移除门面(B4 整改):gate 等外部模块不再直接 indexOf/splice 本数组
 ctx.scene.removeBounds = function (list) {

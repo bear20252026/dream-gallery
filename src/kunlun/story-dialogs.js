@@ -8,21 +8,17 @@ import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRe
 import { ctx } from '../ctx.js';
 import { hotBegin } from '../hot.js';
 import { Z } from '../shared/z-layers.mjs';
+import { DIALOG_LINES } from '../shared/story-text.mjs';
 
 const bag = hotBegin('story-dialogs');
 
-// ===================== 对话数据(全英文,书体手写风) =====================
+// ===================== 对话数据(全英文,书体手写风;台词正文单一源在 story-text.mjs) =====================
 const ACTORS = [
   {
     world: 'b612',
     id: 'prince',
     match: /polySurface[1456]|^hair$/i, // 小王子身体网格(发/身/腿/臂/披风)
-    lines: [
-      'Welcome to B612, little visitor.',
-      'A hat is only a hat — unless you look with your heart.',
-      'My book left its ending unfinished. Perhaps you will write it.',
-      'All the stars are yours tonight.',
-    ],
+    lines: DIALOG_LINES.prince,
     off: 1.6,
     radius: 11,
     every: 7000,
@@ -31,7 +27,7 @@ const ACTORS = [
     world: 'b612',
     id: 'rose',
     match: /rosss/i, // 归位后的玫瑰坛
-    lines: ['Tend me, and I will be unlike any other rose in the world.'],
+    lines: DIALOG_LINES.rose,
     off: 1.7,
     radius: 6,
     every: 9000,
@@ -40,12 +36,7 @@ const ACTORS = [
     world: 'king325',
     id: 'king',
     match: /kingStoryScene/i, // 国王场景整体:气泡锚在其顶面中心
-    lines: [
-      'Approach! You are my very first subject.',
-      'Over my kingdom the stars obey me. I only command the sunset — it always happens at dusk.',
-      'It is contrary to etiquette to yawn before a king. For you, I allow it.',
-      'I command you to enjoy your stay. It will happen anyway.',
-    ],
+    lines: DIALOG_LINES.king,
     off: 2.4,
     radius: 12,
     every: 7000,

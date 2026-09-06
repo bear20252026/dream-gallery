@@ -1,10 +1,11 @@
+import { Z } from '../../shared/z-layers.mjs';
 // chat-room.js — 聊天室·B612回声壁(全员共壁,最近 100 条,@B612之灵 召唤机器人)
 import { ctx } from '../../ctx.js';
 
 const chatOv = document.createElement('div');
 chatOv.id = 'chatOv';
 chatOv.style.cssText =
-  'position:fixed;inset:0;z-index:380;display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+  'position:fixed;inset:0;z-index:' + Z.modal + ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
 const chatCard = document.createElement('div');
 chatCard.style.cssText =
   'width:min(520px,92vw);max-height:82vh;display:flex;flex-direction:column;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:16px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)';

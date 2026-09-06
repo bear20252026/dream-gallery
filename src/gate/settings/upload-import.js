@@ -1,10 +1,11 @@
+import { Z } from '../../shared/z-layers.mjs';
 // upload-import.js — C2 展厅选片导入(从上传中挑选 ≤20 幅呈现在永恒展厅西墙)
 import { ctx } from '../../ctx.js';
 
 const etPickOv = document.createElement('div');
 etPickOv.id = 'etPickOv';
 etPickOv.style.cssText =
-  'position:fixed;inset:0;z-index:380;display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+  'position:fixed;inset:0;z-index:' + Z.modal + ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
 etPickOv.innerHTML =
   '<div style="width:min(420px,92vw);max-height:84vh;overflow-y:auto;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)">' +
   '<div style="display:flex;align-items:center;margin-bottom:6px"><b style="letter-spacing:2px;font-size:15px">展厅选片</b><span id="etPickX" style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.55);padding:2px 8px;font-size:14px">✕</span></div>' +

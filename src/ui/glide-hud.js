@@ -58,6 +58,8 @@ export function createGlideHUD({ onJumpPress, onJumpRelease, onDescendPress, onD
   // ---- 下降按钮(太空模式专属;与 ▲ 同款对称,默认隐藏) ----
   const descendBtn = document.createElement('button');
   descendBtn.id = 'descendBtnSpace';
+descendBtn.dataset.worldUi = 'space'; // 自声明:只太空世界显示
+descendBtn.dataset.worldUiDisplay = 'block'; // 默认 display:none,显示时恢复 block
   descendBtn.textContent = '▼';
   descendBtn.title = '下降(按住)';
   descendBtn.style.cssText =

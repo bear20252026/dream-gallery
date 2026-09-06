@@ -1,7 +1,7 @@
 // film-gate.test.js — 开场电影收束状态机(三路 finish 幂等/skip 幂等/dead 守卫)
 // 背景:skip 后 play() 的 async 残余曾摸到已删 DOM(2026-09-06 线上血泪);
 // 收束定时器曾"先挂先炸",skip 的 1.6s 收束会被更早的自然收束定时器截断。
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { createFilmGate } from '../gate/film-gate.mjs';
 
 function fakeClock() {

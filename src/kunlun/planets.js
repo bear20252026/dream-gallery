@@ -15,15 +15,12 @@ import { initSceneManager } from '../core/scene-manager.js';
 import {
   PLANETS,
   ISLAND_R as R,
-  GATE_RADIUS,
   planetByNum,
   islandTopAt,
   worldForIsland,
   spawnFor,
   kingSpawnPoint,
-  gateStep,
-  exitGateNudge,
-} from './planet-logic.mjs';
+} from '../shared/planet-logic.mjs';
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -72,11 +69,6 @@ function addStarfield(scene) {
 }
 
 // 独立世界容器:main 保留现有画廊,B612 独立注册;六星世界在 PLANETS 数据定义后按序注册。
-
-// ===================== 常量登记(数值/几何/状态机全在 planet-logic.mjs,此处只引) =====================
-// 石门武装标记(2026-09-06 主人报「返回主世界黑屏」根因):自动传送触发即解除,
-// 走出半径才重新武装——否则从 B612 返回时快照把玩家放回圈内,下一帧又被弹回。
-let gateArmed = true;
 
 const worldManager = initSceneManager({
   renderer: ctx.scene.rnd,
@@ -539,7 +531,7 @@ hud.appendChild(hudText);
 document.body.appendChild(hud);
 
 /* ===================== 导航按钮(2026-09-06 主人定:单列上下文式,杜绝重叠与混乱) =====================
-   主世界:石门旁「✦ 进入 B612」(padBtn)
+   主世界:石门旁「✦ 进入 B612」(在 gallery/portal.js)
    B612:  [返回主世界] [前往 325 国王星球 →]   双按钮纵排,常驻
    星球:  [← 返回 B612] [返回画廊]             双按钮纵排,常驻
    修复:管理器方法叫 toMain,没有 toMainWorld——此前 4 处调用点了必报 TypeError */
@@ -560,6 +552,21 @@ worldNav.style.cssText =
 worldNav.appendChild(navA);
 worldNav.appendChild(navB);
 document.body.appendChild(worldNav);
+// P1(2026-09-07 审计):transitioning 期间点击会静默失败——导航动作统一过此守卫:
+// 切换中立即提示;动作被管理器拒绝(promise 解析 false)也提示,不再"按了没反应"
+function navGuard(fn) {
+  return function () {
+    if (worldManager.transitioning) {
+      if (ctx.ui.modeToast) ctx.ui.modeToast('世界切换中，请稍候…');
+      return;
+    }
+    const r = fn();
+    if (r && typeof r.then === 'function')
+      r.then(function (ok) {
+        if (ok === false && ctx.ui.modeToast) ctx.ui.modeToast('现在无法切换世界，稍后再试');
+      });
+  };
+}
 // 上下文导航:show=false 隐藏整组;aText/bText 为空则隐藏对应按钮
 function setNav(show, aText, aAction, bText, bAction) {
   if (!show) {
@@ -567,28 +574,16 @@ function setNav(show, aText, aAction, bText, bAction) {
     return;
   }
   navA.textContent = aText || '';
-  navA.onclick = aAction || null;
+  navA.onclick = aAction ? navGuard(aAction) : null;
   navA.style.display = aText ? 'block' : 'none';
   navB.textContent = bText || '';
-  navB.onclick = bAction || null;
+  navB.onclick = bAction ? navGuard(bAction) : null;
   navB.style.display = bText ? 'block' : 'none';
   worldNav.style.display = 'flex';
 }
 const goMainWorld = function () {
-  ctx.scene.toMainWorld().then(function (okFlag) {
-    if (!okFlag) return;
-    gateArmed = false; // 返回落点就在石门旁,先解除自动传送(走出半径后重新武装)
-    const pp = ctx.player.pl && ctx.player.pl.p;
-    if (!pp) return;
-    // 顺手把落点推出石门半径:玩家回来即看到「✦ 进入 B612」(纯几何在 planet-logic)
-    const np = exitGateNudge(pp.x, pp.z, GATE_RADIUS + 2);
-    if (np.moved) {
-      pp.x = np.x;
-      pp.z = np.z;
-      const gy = ctx.desert && ctx.desert.getH && ctx.desert.getH(pp.x, pp.z);
-      if (typeof gy === 'number') pp.y = gy + 1.6;
-    }
-  });
+  // 回弹解除(gateArmed)与落点外推已随石门职责迁 gallery/portal.js(监听 world:changed)
+  ctx.scene.toMainWorld();
 };
 const goKing325 = function () {
   const sp = kingSpawnPoint();
@@ -608,29 +603,8 @@ const goKing325 = function () {
 const goB612Back = function () {
   worldManager.back();
 };
-// 主世界石台触发按钮(独立于章节系统,站上去就能进 B612)
-const padBtn = document.createElement('button');
-padBtn.textContent = '✦ 进入 B612';
-padBtn.style.cssText =
-  'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:'+Z.navBtn+';display:none;padding:14px 36px;border-radius:24px;border:2px solid rgba(255,214,130,.9);background:rgba(30,18,8,.92);color:#ffe9c4;font-size:18px;letter-spacing:4px;cursor:pointer;font-family:inherit';
-padBtn.onclick = function () {
-  padBtn.style.display = 'none';
-  const sp = spawnFor('b612');
-  worldManager.enter('b612', {
-    snapshot: {
-      camera: null,
-      player: {
-        position: new THREE.Vector3(sp.position.x, sp.position.y, sp.position.z),
-        yaw: sp.yaw,
-        pitch: 0,
-        vy: 0,
-        onGround: true,
-        gliding: false,
-      },
-    },
-  });
-};
-document.body.appendChild(padBtn);
+// 主世界石台按钮已迁 gallery/portal.js(2026-09-07 P2:主世界入口归画廊域);
+// B612 侧返回(goMainWorld 的落点外推)仍留此处——它是太空世界的出口。
 
 /* ===================== 章节流程 ===================== */
 function islandOfKey(key) {
@@ -798,27 +772,13 @@ onTick(function (dt) {
     return;
   }
 
-  // ==== 主世界:靠近石门自动传送 + 远处显示按钮 ====
+  // ==== 主世界:石门自动传送已迁 gallery/portal.js,此处只收起本章 UI ====
   if (activeWorld === 'main') {
-    setNav(false); // 主世界导航隐藏(进 B612 走石门 padBtn)
-    const step = gateStep(gateArmed, p.x, p.z); // 武装状态机(纯逻辑在 planet-logic)
-    if (!step.near) {
-      gateArmed = true;
-      // 不在门旁:显示按钮
-      padBtn.style.display = 'block';
-      hud.style.display = 'none';
-      return;
-    }
-    if (step.fire) {
-      gateArmed = false; // 触发即解除;返回落点在圈内不再回弹,走出半径后重新武装
-      padBtn.style.display = 'none';
-      hud.style.display = 'none';
-      travelTo(0);
-    }
+    setNav(false); // 主世界导航隐藏(进 B612 走石门 portal)
+    hud.style.display = 'none';
     return;
   }
   setNav(false);
-  padBtn.style.display = 'none';
 
   hud.style.display = 'none'; // 章节指引 HUD 已随拾取玩法退役(2026-09-06 审计 P3 死代码清理)
 });
@@ -864,7 +824,6 @@ ctx.kunlun.planetsMark = function () {
 bag.custom.push(function () {
   hud.remove();
   worldNav.remove();
-  padBtn.remove();
 });
 hotEnd('planets');
 if (import.meta.hot) import.meta.hot.accept();

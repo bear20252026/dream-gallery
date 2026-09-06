@@ -21,7 +21,7 @@ function spot(withTarget = false) {
 
 describe('桌面端预算(keepEvery=2, 射灯留 10)', () => {
   it('吊顶灯每 2 留 1,其余点光全删', () => {
-    const pls = Array.from({ length: 8 }, (_, i) => ({ l: point(3) }));
+    const pls = Array.from({ length: 8 }, () => ({ l: point(3) }));
     const { remove, ceil, keepEvery } = selectLightsToRemove(
       (cb) => makeScene(pls.map((p) => p.l)).traverse(cb),
       pls,

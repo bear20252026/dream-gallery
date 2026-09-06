@@ -301,20 +301,24 @@ hudStyle.textContent = `
 document.head.appendChild(hudStyle);
 const timeHud = document.createElement('div');
 timeHud.id = 'desertTimeHud';
+timeHud.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
 timeHud.innerHTML =
   '<div class="tt" id="dtText">12:00</div><div class="tp" id="dtPhase">DAY</div><div class="tb"><div class="tbf" id="dtBar"></div></div>';
 document.body.appendChild(timeHud);
 const terrainHud = document.createElement('div');
 terrainHud.id = 'desertTerrainHud';
+terrainHud.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
 terrainHud.innerHTML =
   '<div class="tn" id="dtName">戈壁</div><div class="te" id="dtElev">海拔 0m</div>';
 document.body.appendChild(terrainHud);
 const cross = document.createElement('div');
 cross.id = 'desertCross';
+cross.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
 cross.innerHTML = '<div class="cd"></div>';
 document.body.appendChild(cross);
 const shimmer = document.createElement('div');
 shimmer.id = 'heatShimmer';
+shimmer.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
 document.body.appendChild(shimmer);
 const dtText = timeHud.querySelector('#dtText'),
   dtPhase = timeHud.querySelector('#dtPhase'),

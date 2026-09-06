@@ -108,40 +108,38 @@ export class SceneManager {
     ctx.scene.getActiveRoot = () => this.getWorld()?.root;
     ctx.scene.getActiveGround = (x, z) => this.getWorld()?.ground(x, z);
     ctx.scene.getActiveBounds = () => this.getWorld()?.bounds;
-    // 多世界切割(2026-09-06 全量审计):主世界专属 UI 统一隐藏/恢复。
-    // 旧版隐藏 #mapWrap/#mapCanvas/#miniMap —— 三个 id 在页面里都不存在,隐藏从未生效。
-    // 真实元素:小地图 #m(index.html:128)、任务册 #questHud、操作提示 #hp、
-    // AI 配文 #aiPanel、残镜 #prologueMirror、沙漠昼夜钟/地形/准星/热浪(desert/atmosphere.js)、
-    // B612语录 #skyNote(audio-manager.js)、⌂ 回归出生点(#homeBtn,2026-09-06 主人定:
-    // 小世界不需要回家键,回画廊走传送石台)。跳/滑翔钮 #jumpBtnGlide 刻意保留(太空=升空推进)。
-    const MAIN_ONLY_UI = [
-      '#m', '#questHud', '#hp', '#aiPanel', '#prologueMirror',
-      '#desertTimeHud', '#desertTerrainHud', '#desertCross', '#heatShimmer', '#skyNote',
-      '#homeBtn',
-    ];
-    // 太空专属 UI:只在小世界显示,回主世界隐藏(▼ 下降键,与 ▲ 对称)
-    const SPACE_ONLY_UI = ['#descendBtnSpace'];
+    // 多世界切割(2026-09-07 P3 单轨化):UI 世界归属完全由元素自声明——
+    //   创建处标 `data-world-ui="main"`(只主世界显示)或 `"space"`(只太空世界显示);
+    //   默认 display 非 block 的再加 `data-world-ui-display="block"`。
+    // syncCtx 切世界时统一扫描。此前硬编码 MAIN_ONLY_UI/SPACE_ONLY_UI 清单的旧机制
+    // 已删除(12 个元素全部完成自声明迁移;双轨并存会因双重保存把 display:'none'
+    // 存进恢复表,导致回主世界后无法还原——2026-09-07 实测)。
+    // 清单成员:小地图 #m、任务册 #questHud、操作提示 #hp、AI 配文 #aiPanel、
+    // 残镜 #prologueMirror、沙漠昼夜钟/地形/准星/热浪(desert/atmosphere.js)、
+    // B612语录 #skyNote(audio-manager.js)、⌂ 回归出生点 #homeBtn、▼ 下降键(glide-hud)。
+    // 跳/滑翔钮 #jumpBtnGlide 刻意保留(太空=升空推进)。
     const show = world.id === 'main';
     document.body.dataset.world = world.id;
     if (!this._uiSaved) this._uiSaved = new Map();
-    // visibleDisplay:无已保存值时的显示态(▼ 默认 none,进入小世界需显式设 block)
-    const toggleUi = (sel, visible, visibleDisplay) => {
-      const el = document.querySelector(sel);
-      if (!el) return;
+    const uiSaved = this._uiSaved;
+    const toggleEl = (el, visible, visibleDisplay) => {
       if (visible) {
-        el.style.display = this._uiSaved.has(sel) ? this._uiSaved.get(sel) : visibleDisplay;
-        this._uiSaved.delete(sel);
-      } else if (!this._uiSaved.has(sel)) {
-        this._uiSaved.set(sel, el.style.display);
+        el.style.display = uiSaved.has(el) ? uiSaved.get(el) : visibleDisplay || '';
+        uiSaved.delete(el);
+      } else if (!uiSaved.has(el)) {
+        uiSaved.set(el, el.style.display);
         el.style.display = 'none';
       }
     };
-    for (const sel of MAIN_ONLY_UI) toggleUi(sel, show, '');
-    // 太空专属 UI 的默认态就是隐藏,不能用保存/恢复(会把 none 存回去)——直接显式切换
-    for (const sel of SPACE_ONLY_UI) {
-      const el = document.querySelector(sel);
-      if (el) el.style.display = show ? 'none' : 'block';
-    }
+    document.querySelectorAll('[data-world-ui]').forEach((el) => {
+      const claim = el.getAttribute('data-world-ui');
+      if (claim === 'space') {
+        // 太空专属:默认隐藏,进太空显式恢复声明的显示态
+        el.style.display = show ? 'none' : el.getAttribute('data-world-ui-display') || 'block';
+        return;
+      }
+      toggleEl(el, claim === 'main' ? show : true, el.getAttribute('data-world-ui-display') || '');
+    });
   }
 
   // main.js 后处理管线就绪后注入(main.js 组合根唯一调用);同步期只认这份引用

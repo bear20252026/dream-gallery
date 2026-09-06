@@ -33,6 +33,13 @@ npm run test:scene                # 场景截图回归 4 检查点(主世界/B61
 
 两个全绿才能部署。前端改动用 `node --input-type=module --check < src/某文件` 查语法;`node --check server.js` 查后端。
 
+## 架构整改(2026-09-07 审计 P1→P4 全项落地)
+
+- **P1 时序**:世界导航按钮过 navGuard(切换中 toast、被拒不静默);startWorld 失败出「世界没能落进画里」重试层(#worldErr)。
+- **P2 结构**:剧情台词单一源 `shared/story-text.mjs`(FILM 字幕+DIALOG_LINES 气泡;星球 tts 仍在 planet-logic);主世界石门归 `gallery/portal.js`(石门自动传送+padBtn+world:changed 解除武装/落点外推),planets.js 只管太空侧。**planet-logic.mjs 已迁 shared/**(gallery 域可用,零跨域违规)。
+- **P3 可维护**:启动自检 `window.__bootCheck`(关键装配缺项 console.error,防模块清单漏载静默);UI 世界归属双轨——新 UI 创建处标 `data-world-ui="main"/("space"+data-world-ui-display)`,scene-manager 扫属性,旧 MAIN_ONLY_UI 清单留兜底;内联 z-index ≥380 已收编 Z 登记册(modal/veilFx/veilLock/teleport/worldToast)。
+- **P4 复杂度**:昼夜时间源可注入 `ctx.media.dayTimeSource=()=>12`(测试/剧情不必再 patch dayNight);建筑布局尺寸唯一源 `src/scene/layout.mjs`(ctx.scene.layout 可读);开场电影笔画数据外置 `gate/film-strokes.mjs`。
+
 ## 场景自动化测试(2026-09-07,三层防线)
 
 3D 场景文件(planets/scene/openfilm)是"拍戏"代码,产出是画面,没有尺子量对错。三层补救:

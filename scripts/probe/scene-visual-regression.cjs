@@ -83,7 +83,8 @@ function startServer() {
     await page.waitForTimeout(ms);
   }
 
-  // 把主世界昼夜钉在正午:dayNight 拨到 12 并锁死,media.dayHour 写入吞掉。
+  // 把主世界昼夜钉在正午。优先用 2026-09-07 P4 的官方注入点 ctx.media.dayTimeSource;
+  // 旧代码(线上未发新版)回退 monkey-patch dayNight + 吞 dayHour 写入。
   // 不锁的话 hour=(12+页面秒数/2.5)%24 随启动耗时漂移,跨环境截图不可比
   //(本地午后 vs 线上黄昏,changedRatio 会假报警到 90%+;2026-09-07 线上实测)。
   async function freezeDayNoon() {
@@ -91,11 +92,18 @@ function startServer() {
       const c = window.__ctx;
       if (!c) return;
       try {
+        const m = c.media;
+        if (m && 'dayTimeSource' in m) {
+          m.dayTimeSource = function () {
+            return 12;
+          };
+          if (c.desert && c.desert.dayNight) c.desert.dayNight(12);
+          return;
+        }
         if (c.desert && c.desert.dayNight) {
           c.desert.dayNight(12);
           c.desert.dayNight = function () {};
         }
-        const m = c.media;
         if (m && !Object.getOwnPropertyDescriptor(m, 'dayHour')?.freeze) {
           const fh = 12;
           Object.defineProperty(m, 'dayHour', {

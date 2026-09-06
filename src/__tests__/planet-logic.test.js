@@ -17,7 +17,7 @@ import {
   islandTopAt,
   gateStep,
   exitGateNudge,
-} from '../kunlun/planet-logic.mjs';
+} from '../shared/planet-logic.mjs';
 
 describe('章节数据完整性(与 spirits SPIRITS 同序同键的前提)', () => {
   it('六颗星球,编号 325..330 连续', () => {
