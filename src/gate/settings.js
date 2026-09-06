@@ -265,9 +265,18 @@ document.getElementById('gearX').onclick = function () {
 };
 
 // ===================== 开局触发 =====================
+// 2026-09-07:等坠机点「王子叫醒」对话收束(window.__crashWakeDone)再弹雅号/指引卡,
+// 不让弹窗盖住开场对白;兜底 25s 强制放行(crash-site.js 异常时不至于永不弹)。
 setTimeout(function () {
-  if (ctx.showGuideCard) ctx.showGuideCard();
-  maybePop();
+  let waited = 0;
+  const t = setInterval(function () {
+    waited++;
+    if (window.__crashWakeDone || waited > 21) {
+      clearInterval(t);
+      if (ctx.showGuideCard) ctx.showGuideCard();
+      maybePop();
+    }
+  }, 1000);
 }, 4000);
 
 hotEnd('settings');
