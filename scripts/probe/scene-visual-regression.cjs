@@ -83,6 +83,33 @@ function startServer() {
     await page.waitForTimeout(ms);
   }
 
+  // 把主世界昼夜钉在正午:dayNight 拨到 12 并锁死,media.dayHour 写入吞掉。
+  // 不锁的话 hour=(12+页面秒数/2.5)%24 随启动耗时漂移,跨环境截图不可比
+  //(本地午后 vs 线上黄昏,changedRatio 会假报警到 90%+;2026-09-07 线上实测)。
+  async function freezeDayNoon() {
+    await page.evaluate(() => {
+      const c = window.__ctx;
+      if (!c) return;
+      try {
+        if (c.desert && c.desert.dayNight) {
+          c.desert.dayNight(12);
+          c.desert.dayNight = function () {};
+        }
+        const m = c.media;
+        if (m && !Object.getOwnPropertyDescriptor(m, 'dayHour')?.freeze) {
+          const fh = 12;
+          Object.defineProperty(m, 'dayHour', {
+            get: function () {
+              return fh;
+            },
+            set: function () {},
+            configurable: true,
+          });
+        }
+      } catch (e) {}
+    });
+  }
+
   // 检查点通用:语义断言 + 截图 + 亮度 + 像素对比
   async function checkpoint(name, worldRe, settleMs) {
     await settle(settleMs);
@@ -118,8 +145,10 @@ function startServer() {
     fs.writeFileSync(path.join(ROOT, 'scripts', 'artifacts', 'vr-' + name + '-last.png'), shot);
   }
 
-  // ① 主世界开世界(等场景/后处理稳定)
-  await checkpoint('main-boot', /^main$/, 5000);
+  // ① 主世界开世界(等场景/后处理稳定;昼夜钉正午保跨环境可比)
+  await page.waitForTimeout(1200);
+  await freezeDayNoon();
+  await checkpoint('main-boot', /^main$/, 4000);
   // ② 石门 → B612
   await page.evaluate(() => {
     const q = window.__ctx.player.pl.p;
@@ -134,11 +163,12 @@ function startServer() {
   );
   await page.waitForFunction(() => /^king325$/.test(window.__ctx.scene.activeWorld), null, { timeout: 20000 });
   await checkpoint('king325', /^king325$/, 2500);
-  // ④ 星球 → B612 → 主世界(直接返回按钮)
+  // ④ 星球 → B612 → 主世界(直接返回按钮;回主世界先解冻昼夜再锁,防中途回到漂移相位)
   await page.evaluate(() =>
     [...document.querySelectorAll('button')].find((x) => x.textContent.includes('返回主世界'))?.click()
   );
   await page.waitForFunction(() => window.__ctx.scene.activeWorld === 'main', null, { timeout: 20000 });
+  await freezeDayNoon();
   await checkpoint('main-return', /^main$/, 2500);
 
   ok('无未捕获页面异常', errs.length === 0);
