@@ -104,7 +104,9 @@ const bubbleOf = (() => {
   return (actor) => (states.has(actor.id) ? states.get(actor.id) : create(actor));
 })();
 
-// ===================== 锚点解析(懒执行,每世界只算一次;CSS2DObject 归位到该世界 scene) =====================
+// ===================== 锚点解析(懒执行;按结构类型定位,不依赖易变的网格名) =====================
+// 王子=b612Storybook 内的蒙皮网格(SkinnedMesh,动画角色);玫瑰=Rosss 组节点世界坐标;
+// 国王=整个 kingStoryScene 的顶面中心(CSS2DObject 挂到该世界 scene,切世界自动跟随)
 const anchorCache = new Map(); // actor.id -> THREE.Vector3
 function resolveAnchor(actor) {
   if (anchorCache.has(actor.id)) return anchorCache.get(actor.id);
@@ -114,29 +116,42 @@ function resolveAnchor(actor) {
   let root = null;
   s.traverse((o) => {
     if (root) return;
-    if (actor.id === 'king') root = o.name === 'kingStoryScene' ? o : root;
-    else if (o.name === 'b612Storybook') root = o;
+    if (o.name === 'b612Storybook' || o.name === 'kingStoryScene') root = o;
   });
   if (!root) return null;
   root.updateMatrixWorld(true);
-  const box = new THREE.Box3();
-  const tmp = new THREE.Box3();
-  let hit = false;
-  root.traverse((o) => {
-    if (!o.isMesh || !o.geometry) return;
-    if (!actor.match.test(o.name || '')) return;
-    o.geometry.computeBoundingBox();
-    tmp.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
-    if (!hit) {
-      box.copy(tmp);
-      hit = true;
-    } else box.union(tmp);
-  });
-  if (!hit) return null;
   const c = new THREE.Vector3();
-  box.getCenter(c);
-  c.y = box.max.y + actor.off;
-  // 把 CSS2DObject 挂进该世界 scene:只有该世界激活时 CSS2DRenderer 才渲染它
+  if (actor.id === 'king') {
+    const box = new THREE.Box3().setFromObject(root);
+    box.getCenter(c);
+    c.y = box.max.y + actor.off;
+  } else if (actor.id === 'rose') {
+    let g = null;
+    root.traverse((o) => {
+      if (!g && /rosss/i.test(o.name || '')) g = o;
+    });
+    if (!g) return null;
+    g.getWorldPosition(c);
+    c.y += actor.off;
+  } else {
+    // 王子:蒙皮网格集合的包围盒
+    const box = new THREE.Box3();
+    const tmp = new THREE.Box3();
+    let hit = false;
+    root.traverse((o) => {
+      if (!o.isMesh || !o.geometry) return;
+      if (!o.isSkinnedMesh) return;
+      o.geometry.computeBoundingBox();
+      tmp.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+      if (!hit) {
+        box.copy(tmp);
+        hit = true;
+      } else box.union(tmp);
+    });
+    if (!hit) return null;
+    box.getCenter(c);
+    c.y = box.max.y + actor.off;
+  }
   const st = bubbleOf(actor);
   st.obj.position.copy(c);
   s.add(st.obj);
