@@ -635,29 +635,64 @@ document.body.appendChild(hud);
 /* ===================== 拾取/回程按钮 ===================== */
 const pickBtn = document.createElement('button');
 pickBtn.style.cssText =
-  'position:fixed;left:50%;bottom:160px;transform:translateX(-50%);z-index:60;display:none;padding:12px 30px;border-radius:24px;border:1px solid rgba(255,214,130,.7);background:rgba(40,26,12,.8);color:#ffe9c4;font-size:16px;letter-spacing:4px;cursor:pointer;font-family:inherit';
+  'position:fixed;left:50%;bottom:95px;transform:translateX(-50%);z-index:60;display:none;padding:12px 30px;border-radius:24px;border:1px solid rgba(255,214,130,.7);background:rgba(40,26,12,.8);color:#ffe9c4;font-size:16px;letter-spacing:4px;cursor:pointer;font-family:inherit';
 pickBtn.textContent = '拾取星屑';
 document.body.appendChild(pickBtn);
-const doorBtn = document.createElement('button');
-doorBtn.textContent = '返回画廊';
-doorBtn.style.cssText = pickBtn.style.cssText;
-doorBtn.style.display = 'none';
-doorBtn.onclick = function () {
-  backToGallery();
+/* ===================== 导航按钮(2026-09-06 主人定:单列上下文式,杜绝重叠与混乱) =====================
+   主世界:石门旁「✦ 进入 B612」(padBtn)
+   B612:  [返回主世界] [前往 325 国王星球 →]   双按钮纵排,常驻
+   星球:  [← 返回 B612] [返回画廊]             双按钮纵排,常驻
+   修复:管理器方法叫 toMain,没有 toMainWorld——此前 4 处调用点了必报 TypeError */
+const NAV_CSS =
+  'padding:12px 30px;border-radius:24px;border:1px solid rgba(255,214,130,.7);background:rgba(40,26,12,.8);color:#ffe9c4;font-size:16px;letter-spacing:4px;cursor:pointer;font-family:inherit';
+function mkNavBtn(text) {
+  const b = document.createElement('button');
+  b.textContent = text;
+  b.style.cssText = NAV_CSS + ';display:none;position:static;transform:none';
+  return b;
+}
+const navA = mkNavBtn('');
+const navB = mkNavBtn('');
+const worldNav = document.createElement('div');
+worldNav.style.cssText =
+  'position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:60;display:none;flex-direction:column;gap:10px;align-items:center';
+worldNav.appendChild(navA);
+worldNav.appendChild(navB);
+document.body.appendChild(worldNav);
+// 上下文导航:show=false 隐藏整组;aText/bText 为空则隐藏对应按钮
+function setNav(show, aText, aAction, bText, bAction) {
+  if (!show) {
+    worldNav.style.display = 'none';
+    return;
+  }
+  navA.textContent = aText || '';
+  navA.onclick = aAction || null;
+  navA.style.display = aText ? 'block' : 'none';
+  navB.textContent = bText || '';
+  navB.onclick = bAction || null;
+  navB.style.display = bText ? 'block' : 'none';
+  worldNav.style.display = 'flex';
+}
+const goMainWorld = function () {
+  ctx.scene.toMainWorld();
 };
-document.body.appendChild(doorBtn);
-const worldBtn = document.createElement('button');
-worldBtn.textContent = '返回 B612';
-worldBtn.style.cssText = doorBtn.style.cssText;
-worldBtn.style.display = 'none';
-worldBtn.style.left = 'calc(50% - 220px)';
-document.body.appendChild(worldBtn);
-const mainBtn = document.createElement('button');
-mainBtn.textContent = '返回主世界';
-mainBtn.style.cssText = doorBtn.style.cssText;
-mainBtn.style.display = 'none';
-mainBtn.style.left = 'calc(50% - 60px)';
-document.body.appendChild(mainBtn);
+const goKing325 = function () {
+  worldManager.enter('king325', {
+    snapshot: {
+      camera: null,
+      player: {
+        position: new THREE.Vector3(0, R * 0.42 + 1.6, 4),
+        yaw: 0,
+        pitch: 0,
+        vy: 0,
+        onGround: true,
+      },
+    },
+  });
+};
+const goB612Back = function () {
+  worldManager.back();
+};
 // 主世界石台触发按钮(独立于章节系统,站上去就能进 B612)
 const padBtn = document.createElement('button');
 padBtn.textContent = '✦ 进入 B612';
@@ -681,12 +716,6 @@ padBtn.onclick = function () {
   });
 };
 document.body.appendChild(padBtn);
-
-function showWorldTravel(label, action) {
-  worldBtn.textContent = label;
-  worldBtn.style.display = 'block';
-  worldBtn.onclick = action;
-}
 
 /* ===================== 章节流程 ===================== */
 function islandOfKey(key) {
@@ -723,7 +752,7 @@ function travelTo(idx) {
 }
 function backToGallery() {
   veilOff();
-  worldManager.toMainWorld();
+  ctx.scene.toMainWorld(); // 管理器方法是 toMain,toMainWorld 是 ctx 包装器(2026-09-06 修复 TypeError)
 }
 function pl() {
   return ctx.player.pl.p;
@@ -851,40 +880,20 @@ onTick(function (dt) {
         isl.props.userData.lampHead.material.color.set(on ? 0xffe9b0 : 0x555044);
       }
     });
-    // 传送按钮(太空中也能用)
-    const nearB612Pad = Math.hypot(p.x, p.z) < 6;
-    mainBtn.style.display = nearB612Pad ? 'block' : 'none';
-    mainBtn.onclick = function () {
-      worldManager.toMainWorld();
-    };
-    if (/^king/.test(activeWorld)) {
-      showWorldTravel('← 返回 B612', function () {
-        worldManager.back();
-      });
-    } else if (activeWorld === 'b612') {
-      showWorldTravel('前往 325 国王星球 →', function () {
-        worldManager.enter('king325', {
-          snapshot: {
-            camera: null,
-            player: {
-              position: new THREE.Vector3(0, R * 0.42 + 1.6, 4),
-              yaw: 0,
-              pitch: 0,
-              vy: 0,
-              onGround: true,
-            },
-          },
-        });
-      });
-    }
+    // 上下文导航(太空中常驻):B612=回主世界/去国王星球;星球=回 B612/回主世界
+    if (activeWorld === 'b612') {
+      setNav(true, '返回主世界', goMainWorld, '前往 325 国王星球 →', goKing325);
+    } else if (/^king/.test(activeWorld)) {
+      setNav(true, '← 返回 B612', goB612Back, '返回主世界', goMainWorld);
+    } else setNav(false);
     hud.style.display = 'none';
     pickBtn.style.display = 'none';
-    doorBtn.style.display = 'none';
     return;
   }
 
   // ==== 主世界:靠近石门自动传送 + 远处显示按钮 ====
   if (activeWorld === 'main') {
+    setNav(false); // 主世界导航隐藏(进 B612 走石门 padBtn)
     const dgx = p.x - 0.1,
       dgz = p.z - 56.0;
     const nearGate = dgx * dgx + dgz * dgz < 16; // 4m 范围自动传送
@@ -897,69 +906,25 @@ onTick(function (dt) {
     // 不在门旁:显示按钮
     padBtn.style.display = 'block';
     hud.style.display = 'none';
-    doorBtn.style.display = 'none';
     pickBtn.style.display = 'none';
-    worldBtn.style.display = 'none';
-    mainBtn.style.display = 'none';
     return;
-  } else {
-    padBtn.style.display = 'none';
   }
-  // ==== B612 世界 ====
+  setNav(false);
+  padBtn.style.display = 'none';
+  // ==== B612 世界(后备路径,正常被上方太空分支接管) ====
   if (activeWorld === 'b612') {
     pickBtn.style.display = 'none';
-    doorBtn.style.display = 'none';
     hud.style.display = 'none';
-    const nearB612Pad = p.x * p.x + p.z * p.z < 9;
-    mainBtn.style.display = nearB612Pad ? 'block' : 'none';
-    mainBtn.onclick = function () {
-      worldManager.toMainWorld();
-    };
-    if (nearB612Pad) {
-      showWorldTravel('前往 325 国王星球', function () {
-        mainBtn.style.display = 'none';
-        worldManager.enter('king325', {
-          snapshot: {
-            camera: null,
-            player: {
-              position: new THREE.Vector3(0, R * 0.42 + 1.6, 4),
-              yaw: 0,
-              pitch: 0,
-              vy: 0,
-              onGround: true,
-            },
-          },
-        });
-      });
-    } else worldBtn.style.display = 'none';
+    setNav(true, '返回主世界', goMainWorld, '前往 325 国王星球 →', goKing325);
     return;
   }
   if (/^king\d+$/.test(activeWorld)) {
-    const nearKingPad = p.x * p.x + p.z * p.z < 9;
-    mainBtn.style.display = nearKingPad ? 'block' : 'none';
-    mainBtn.onclick = function () {
-      worldManager.toMainWorld();
-    };
-    worldBtn.style.display = nearKingPad ? 'block' : 'none';
-    worldBtn.textContent = '返回 B612';
-    worldBtn.onclick = function () {
-      worldManager.back();
-    };
-  } else {
-    worldBtn.style.display = 'none';
-    mainBtn.style.display = 'none';
+    setNav(true, '← 返回 B612', goB612Back, '返回主世界', goMainWorld);
   }
   const curWorldNum = /^king(\d+)$/.test(activeWorld) ? activeWorld.replace('king', '') : null;
   const onIsland = curWorldNum ? islands.find((isl) => isl.cfg.num === curWorldNum) : null;
   // 只有当前章节星球才可拾取,回到完成态星球时不重复计算
   if (onIsland) onIsland.active = onIsland.idx === chapter;
-  // 回程门:任何岛上走近即用(拾取后章节已推进,不能按 idx 匹配)
-  if (onIsland) {
-    const dd =
-      (p.x - onIsland.doorW.x) * (p.x - onIsland.doorW.x) +
-      (p.z - onIsland.doorW.z) * (p.z - onIsland.doorW.z);
-    doorBtn.style.display = dd < 6.25 ? 'block' : 'none';
-  } else doorBtn.style.display = 'none';
   let pending = islands[chapter]; // 当前章节岛
   let hudTarget = null,
     hudName = '';
@@ -998,7 +963,6 @@ onTick(function (dt) {
   } else {
     pickBtn.style.display = 'none';
     hud.style.display = 'none';
-    doorBtn.style.display = 'none';
   }
 
   // HUD(8Hz)
@@ -1082,9 +1046,7 @@ ctx.kunlun.planetsMark = function () {
 bag.custom.push(function () {
   hud.remove();
   pickBtn.remove();
-  doorBtn.remove();
-  worldBtn.remove();
-  mainBtn.remove();
+  worldNav.remove();
   padBtn.remove();
   veilOff();
 });
