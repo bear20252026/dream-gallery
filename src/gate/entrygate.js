@@ -33,6 +33,7 @@ function build(opts) {
     <h1 class="gTitle">B612</h1>
     <div class="gScript">a gallery for unfinished drawings</div>
     <div class="gPoem">Here memories are kept — and farewells too.<br>Every unfinished drawing waits for someone.</div>
+    <div class="gDed">To Leon Werth, when he was a little boy.<br><span>献给莱昂·维尔特——献给那个还是小男孩的他。</span></div>
     <button class="gEnter" type="button">E N T E R<span class="gBar"></span></button>
   </div>
   <div class="gLegal">
@@ -54,6 +55,8 @@ function build(opts) {
       repeating-linear-gradient(-57deg, rgba(90,72,50,.024) 0 1px, transparent 1px 11px),
       radial-gradient(120% 90% at 50% 40%, #f8f1df 0%, #f3ead2 55%, #eadfc2 100%);}
   #b612Gate .gOrn{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+  #b612Gate .gDed{margin-top:18px;font-style:italic;font-size:clamp(12px,1.6vw,15px);color:#8a7a62;line-height:1.8}
+  #b612Gate .gDed span{font-style:normal;font-size:.85em;opacity:.8;letter-spacing:.12em}
   #b612Gate .gInner{position:relative;text-align:center;padding:0 20px;max-width:92vw}
   #b612Gate .gEyebrow{letter-spacing:.62em;font-size:clamp(12px,1.4vw,16px);color:#8a7a62;margin-bottom:16px}
   #b612Gate .gTitle{margin:0;font-weight:400;font-size:clamp(64px,11vw,118px);letter-spacing:.16em;color:#3f3529;line-height:1.05}

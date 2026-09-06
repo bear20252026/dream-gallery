@@ -19,7 +19,7 @@ const WRECK = { x: -9, z: 76, yaw: -0.35 }; // yaw: 机头大致朝北偏东
 const SPAWN_DIR = { x: -5.5, z: 72.8 }; // 出生点(与 player.js SPAWN 常量一致)
 const DUNE = { x: -11.8, z: 72.2 }; // 小王子初见位(玩家睁眼即可见的西南沙地,走出时不穿残骸)
 const PRINCE_DEST = { x: -9.3, z: 72.8 }; // 叫醒站位(相机投影实测:屏幕 84%/75%,对话框右侧空地)
-const PRINCE_H = 0.8; // chibi 王子目标身高(m)
+const PRINCE_H = 3.2; // chibi 王子目标身高(m)(2026-09-07 主人定:放大 3~5 倍,取 4 倍)
 
 const loader = new GLTFLoader();
 const pushedBounds = []; // HMR 退出时回收

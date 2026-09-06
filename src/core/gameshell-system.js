@@ -130,7 +130,7 @@ function createGameShellSystem() {
     if (spirits >= 6) ark = '六颗星屑归位';
     else if (spirits >= 1) ark = '飞舟已现';
     let main;
-    if (spirits < 6) main = '收集六颗星屑';
+    if (spirits < 6) main = '把这本书，写完。 Finish the book.';
     else if (picks < 1) main = '在永恒展厅挂上你的画';
     else main = 'B612 已亮，慢慢逛';
     return { spirits, picks, ark, main };

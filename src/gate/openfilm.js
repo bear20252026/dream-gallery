@@ -95,7 +95,7 @@ export function playOpeningFilm(onDone) {
   #b612film #fCrease{position:absolute;left:50%;top:50%;translate:-50% -50%;width:min(94vw,940px);aspect-ratio:720/460;pointer-events:none;z-index:11}
   #b612film #fCrease line{opacity:0;transition:opacity .22s ease}
   #b612film #fSketch{position:absolute;inset:4% 2%}
-  #b612film .ftline{position:absolute;left:0;right:0;text-align:center;color:#54463a;opacity:0;transition:opacity 1.4s ease;pointer-events:none;text-shadow:0 0 1px rgba(90,76,58,.35)}
+  #b612film .ftline{white-space:pre-line;position:absolute;left:0;right:0;text-align:center;color:#54463a;opacity:0;transition:opacity 1.4s ease;pointer-events:none;text-shadow:0 0 1px rgba(90,76,58,.35)}
   #b612film #fT0{top:6%;font-size:clamp(18px,3vw,30px)}
   #b612film #fTq{top:7%;font-size:clamp(26px,4.4vw,48px);color:#463a2d}
   #b612film #fReply{top:7%;font-size:clamp(20px,3.2vw,36px)}
@@ -109,13 +109,15 @@ export function playOpeningFilm(onDone) {
   #b612film #fChoice button:hover{background:#fff;color:#2f261b;box-shadow:0 4px 14px rgba(90,70,40,.25)}
   #b612film #fPlaneDom{position:absolute;left:50%;top:50%;width:min(30vw,300px);transform:translate(-50%,-50%) rotate(-14deg);opacity:0;z-index:12;pointer-events:none;transition:opacity .8s ease}
   #b612film #fPlaneDom.show{opacity:1}
-  #b612film .ffline{position:fixed;left:0;right:0;text-align:center;color:#4e4237;z-index:14;opacity:0;transition:opacity 1.6s ease;pointer-events:none;text-shadow:0 1px 0 rgba(255,250,235,.5)}
+  #b612film .ffline{white-space:pre-line;position:fixed;left:0;right:0;text-align:center;color:#4e4237;z-index:14;opacity:0;transition:opacity 1.6s ease;pointer-events:none;text-shadow:0 1px 0 rgba(255,250,235,.5)}
   #b612film #tFly1{top:12%;font-size:clamp(20px,3.4vw,36px)}
   #b612film #tFly2{top:20%;font-size:clamp(17px,2.8vw,28px);color:rgba(78,66,55,.8)}
   #b612film #tLand{bottom:16%;font-size:clamp(18px,3vw,32px)}
   #b612film .ftshow{opacity:1 !important}
   #b612film #fEnd{position:absolute;left:0;right:0;bottom:7%;text-align:center;color:rgba(78,66,55,.55);font-size:16px;z-index:14;opacity:0;transition:opacity 1.6s ease}
-  #b612film #fSkip{position:absolute;right:26px;bottom:24px;z-index:20;color:rgba(139,125,99,.75);background:none;
+#b612film #fSleep{position:absolute;left:0;right:0;top:40%;text-align:center;color:#f8f1df;font-size:clamp(16px,2.6vw,26px);line-height:1.9;letter-spacing:.04em;opacity:0;transition:opacity 1.2s ease;z-index:30;white-space:pre-line;padding:0 8vw;pointer-events:none}
+  #b612film #fSleep.show{opacity:1}
+    #b612film #fSkip{position:absolute;right:26px;bottom:24px;z-index:20;color:rgba(139,125,99,.75);background:none;
     border:none;border-bottom:1px dashed rgba(139,125,99,.5);cursor:pointer;font-family:'Satisfy',cursive;font-size:15px;pointer-events:auto}
   </style>
   <canvas id="fc"></canvas>
@@ -130,10 +132,9 @@ export function playOpeningFilm(onDone) {
   <div id="fDark"></div>
   <div id="fPaper">
     <svg id="fSketch" viewBox="0 0 720 460" fill="none" stroke-linecap="round" stroke-linejoin="round"></svg>
-    <div class="ftline" id="fT0">${FILM.t0}</div>
     <div class="ftline" id="fTq">${FILM.question}</div>
     <div class="ftline" id="fReply"></div>
-    <div class="ftline" id="fMind">${FILM.mind}</div>
+    <div class="ftline" id="fSleep"></div>
     <div id="fChoice">
       <button id="cHat" type="button">A Hat</button>
       <button id="cBoa" type="button">A Boa Constrictor</button>
@@ -150,8 +151,6 @@ export function playOpeningFilm(onDone) {
   </svg>
   <div class="ffline" id="tFly1">${FILM.fly1}</div>
   <div class="ffline" id="tFly2">${FILM.fly2}</div>
-  <div class="ffline" id="tLand">${FILM.land}</div>
-  <div id="fEnd">${FILM.end}</div>
   <button id="fSkip" type="button">skip ▸</button>`;
   document.body.appendChild(root);
   document.addEventListener('keydown', onEsc);
@@ -521,10 +520,10 @@ export function playOpeningFilm(onDone) {
       renderer = null;
       noGL = true;
       $('fc').style.background = '#f3ead2'; // 无渲染器时画布是黑的,垫纸色保住落定文字可读
-      $('tLand').classList.add('ftshow');
-      $('fEnd').classList.add('ftshow');
+      $('fSleep').textContent = FILM.crash;
+      $('fSleep').classList.add('show');
       $('fSkip').style.display = 'none';
-      scheduleFinish(2600);
+      scheduleFinish(4200);
       return;
     }
     u = 0;
@@ -554,14 +553,30 @@ export function playOpeningFilm(onDone) {
     restDir.y = 0;
     restDir.normalize();
     restPos = plane.position.clone();
-    later(() => $('tLand').classList.add('ftshow'), 1300);
-    later(() => $('fEnd').classList.add('ftshow'), 4200);
+    // 收尾三拍(2026-09-07 对稿):坠机字幕 → 晕(失焦下沉) → 黑场落「睡去」字幕
+    later(() => {
+      $('fSleep').textContent = FILM.crash;
+      $('fSleep').classList.add('show');
+    }, 1300);
+    later(() => {
+      if (gate.dead) return;
+      root.style.transition = 'filter 1.2s ease-in, transform 1.2s ease-in';
+      root.style.filter = 'blur(9px) brightness(.55)';
+      root.style.transform = 'scale(1.06) translateY(2%)'; // 眼前一晕
+    }, 4200);
+    later(() => {
+      $('fDark').style.opacity = '1'; // 沉入全黑
+      $('fSleep').classList.remove('show');
+    }, 5500);
+    later(() => {
+      $('fSleep').textContent = FILM.sleep;
+      $('fSleep').classList.add('show'); // 黑场上落「睡去」一行
+    }, 6300);
     later(() => {
       $('fSkip').style.display = 'none';
     }, 1900);
-    // 自然收束(2026-09-06 修复:此前落定后 skip 自动隐藏却无人调用 finish,
-    // 影片永远停在落定画面——访客视角即「飞机之后动画消失,页面卡死」)
-    scheduleFinish(5600);
+    // 自然收束改到新节拍末(film-gate 后来居上,skip 仍可随时收束)
+    scheduleFinish(9600);
   }
   function forceLand() {
     if (landed) return;
@@ -580,8 +595,6 @@ export function playOpeningFilm(onDone) {
     cam.lookAt(0, 2, 40);
     for (const s of dust) s.material.opacity = 0;
     route.material.opacity = 0;
-    $('tLand').classList.add('ftshow');
-    $('fEnd').classList.add('ftshow');
     $('fSkip').style.display = 'none';
   }
   function tick(now) {
@@ -827,7 +840,7 @@ export function playOpeningFilm(onDone) {
   function skip() {
     if (!gate.skip()) return; // 幂等+播放中才有效(原 skipped||!running 判断内聚进状态机)
     root.classList.add('act2');
-    ['fT0', 'fTq', 'fReply', 'fMind'].forEach((i) => $(i).classList.remove('show'));
+    ['fTq', 'fReply'].forEach((i) => $(i).classList.remove('show'));
     $('fChoice').classList.remove('show');
     $('fPlaneDom').classList.remove('show');
     $('fPaper').style.opacity = '0';
@@ -835,12 +848,16 @@ export function playOpeningFilm(onDone) {
     forceLand();
     scheduleFinish(1600);
   }
-  function answer(text, res, boa) {
+  function answer(text, quote, res, boa) {
     choseBoa = boa;
-    $('fReply').textContent = text;
+    $('fReply').textContent = text; // 答案句先出
     $('fReply').classList.add('show');
     $('fChoice').classList.remove('show');
     $('fTq').classList.remove('show');
+    later(function () {
+      if (gate.dead) return;
+      $('fReply').textContent = quote; // 1.7s 后切旁白字幕(文学译本)
+    }, 1700);
     res();
   }
   async function play() {
@@ -848,11 +865,10 @@ export function playOpeningFilm(onDone) {
     // skip 后 play 的 async 序列不会自动取消,done() 会移除 DOM——
     // 每个 await 后必须检查 dead,否则摸到已删元素报 null.classList(2026-09-06 线上抓获)
     const dead = () => gate.dead;
-    ['fT0', 'fTq', 'fReply', 'fMind'].forEach((i) => $(i).classList.remove('show'));
+    ['fTq', 'fReply'].forEach((i) => $(i).classList.remove('show'));
     $('fChoice').classList.remove('show');
     $('fPlaneDom').classList.remove('show');
-    ['tFly1', 'tFly2', 'tLand'].forEach((i) => $(i).classList.remove('ftshow'));
-    $('fEnd').classList.remove('ftshow');
+    ['tFly1', 'tFly2'].forEach((i) => $(i).classList.remove('ftshow'));
     choseBoa = false;
     $('fPaper').style.clipPath = '';
     $('fPaper').style.transform = '';
@@ -864,23 +880,17 @@ export function playOpeningFilm(onDone) {
     $('fPaper').classList.add('show');
     await wait(1400);
     if (dead()) return;
-    $('fT0').classList.add('show');
-    await wait(3000);
-    if (dead()) return;
-    $('fT0').classList.remove('show');
-    await wait(900);
-    if (dead()) return;
     await drawGroup(HAT, false);
     await wait(900);
     if (dead()) return;
     $('fTq').classList.add('show');
     $('fChoice').classList.add('show');
     await new Promise((res) => {
-      $('cHat').onclick = () => answer(FILM.replyHat, res, false);
-      $('cBoa').onclick = () => answer(FILM.replyBoa, res, true);
+      $('cHat').onclick = () => answer(FILM.answerHat, FILM.quoteHat, res, false);
+      $('cBoa').onclick = () => answer(FILM.answerBoa, FILM.quoteBoa, res, true);
     });
     if (dead()) return;
-    await wait(2600);
+    await wait(5400); // 答案句 1.7s + 旁白字幕 3.7s
     if (dead()) return;
     $('fReply').classList.remove('show');
     await wait(choseBoa ? 350 : 1200);
@@ -888,10 +898,8 @@ export function playOpeningFilm(onDone) {
     await drawGroup(TRUTH, true, choseBoa ? 0.8 : 1);
     await wait(1000);
     if (dead()) return;
-    $('fMind').classList.add('show');
     await wait(3200);
     if (dead()) return;
-    $('fMind').classList.remove('show');
     await wait(900);
     if (dead()) return;
     await foldPaper();

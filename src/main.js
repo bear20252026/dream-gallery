@@ -30,7 +30,8 @@ import { createStateSystem } from './core/state-system.js'; // 阶段3 切片:�
 import { createUiSystem } from './core/ui-system.js'; // 阶段3 切片:UI 域生命周期收口(组合根拥有 overlay 关闭/销毁出口)
 import { getGameState } from './core/game-state.js'; // 单例状态库(阶段3 store 真正化)
 import * as bootState from './core/boot-state.js';
-import { Z } from './shared/z-layers.mjs'; // 开场链路状态登记册(审计 P2:收编 window.__* 标志)
+import { Z } from './shared/z-layers.mjs';
+import { GLOBAL } from './shared/story-text.mjs'; // 剧本台词/全局文案单一源(2026-09-07 对稿)
 
 // ===================== 主画布视觉保险 + 加载屏交接 =====================
 // 主画布开机隐藏:闸门/电影期间世界不可见——不是遮盖,startWorld 时才显形,
@@ -38,6 +39,16 @@ import { Z } from './shared/z-layers.mjs'; // 开场链路状态登记册(审计
 const loopManager = new LoopManager(ctx); // 构造轻量,引导期即可;start() 在 startWorld 才调
 ctx.loopManager = loopManager;
 setLoop(loopManager); // 注入唯一主循环 facade(新积木经 deps.loop 获取)
+
+// 加载屏引言(2026-09-07 对稿《中文文学译本》全局文案件)
+{
+  const lq = document.getElementById('loadQuote');
+  if (lq) {
+    lq.textContent = GLOBAL.loading;
+    lq.style.cssText =
+      'margin-top:18px;font-style:italic;font-size:14px;line-height:1.9;letter-spacing:1px;color:rgba(84,70,58,.6);white-space:pre-line;text-align:center';
+  }
+}
 
 const _c3d = document.getElementById('c');
 if (_c3d) _c3d.style.visibility = 'hidden';
