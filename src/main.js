@@ -417,8 +417,8 @@ import('./gate/entrygate.js')
         }, 300);
         setTimeout(function () {
           clearInterval(poll);
-          if (!started) console.warn('[main] startVidSeq 30s 未就绪,大屏轮播本轮放弃');
-        }, 30000);
+          if (!started) console.warn('[main] startVidSeq 60s 未就绪,大屏轮播本轮放弃');
+        }, 60000);
       };
       if (deferMedia) {
         let armed = false;
