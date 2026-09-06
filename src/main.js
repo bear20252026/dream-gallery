@@ -225,10 +225,26 @@ async function startWorld() {
     softImport(() => import('./kunlun/avatar.js'));
   }, 2000);
 
-  // 着色器预编译 + 主画布显形 + 主循环启动(世界此刻才第一次渲染)
+  // 着色器预编译 + 纸色揭幕过渡 + 主循环启动(世界此刻才第一次渲染)
   if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
   const c3d = document.getElementById('c');
   if (c3d) c3d.style.visibility = 'visible';
+  // 纸色揭幕(2026-09-06 主人定:从画走进现实的连续感):
+  // 世界容器先垫纸色不透明打底(与电影最后一帧同色系),世界首帧渲染完成后纸幕淡出。
+  const cWrap = document.getElementById('c');
+  if (cWrap) {
+    cWrap.style.background = '#f3ead2';
+    cWrap.style.opacity = '0';
+    cWrap.style.transition = 'opacity 1.6s ease';
+    requestAnimationFrame(function () {
+      cWrap.style.opacity = '1';
+    });
+    setTimeout(function () {
+      cWrap.style.background = '';
+      cWrap.style.transition = '';
+      cWrap.style.opacity = '';
+    }, 1800);
+  }
   loopManager.start();
 }
 ctx.startWorld = startWorld;

@@ -642,6 +642,7 @@ function mkNavBtn(text) {
 const navA = mkNavBtn('');
 const navB = mkNavBtn('');
 const worldNav = document.createElement('div');
+worldNav.id = 'worldNav';
 worldNav.style.cssText =
   'position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:'+Z.navBtn+';display:none;flex-direction:column;gap:10px;align-items:center';
 worldNav.appendChild(navA);
