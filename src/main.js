@@ -236,6 +236,9 @@ function startWorld() {
   if (worldStarted) return;
   worldStarted = true;
   window.__worldStarted = true;
+  // 主画布此时才可见(2026-09-06 视觉保险:开机即隐藏,杜绝任何回归让世界在电影期间闪现)
+  const c3d = document.getElementById('c');
+  if (c3d) c3d.style.visibility = 'visible';
   // 着色器预编译一并挪到此处:编译成本发生在电影之后,不再与开场抢主线程
   if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
   loopManager.start();
@@ -268,6 +271,9 @@ function fadeLoadOnce() {
   _loadFaded = true;
   fadeLoad();
 }
+// 主画布开机隐藏(2026-09-06 视觉保险):闸门/电影期间世界不可见,startWorld 时才显形
+const _c3d = document.getElementById('c');
+if (_c3d) _c3d.style.visibility = 'hidden';
 (function waitGateReady() {
   const t = setInterval(() => {
     if (document.getElementById('b612Gate') || window.__gateFailed) {
