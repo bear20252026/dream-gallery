@@ -34,6 +34,8 @@ const { BASE_URL, launch } = require('./browser');
     const dump = await page.evaluate(() => ({
       url: location.href,
       readyState: document.readyState,
+      navType: (performance.getEntriesByType('navigation')[0] || {}).type,
+      navCount: performance.getEntriesByType('navigation').length,
       title: document.title,
       hasCtx: !!window.__ctx,
       hasC: !!document.querySelector('#c'),
@@ -42,7 +44,13 @@ const { BASE_URL, launch } = require('./browser');
       load: document.getElementById('l') ? document.getElementById('l').style.display : 'no-#l',
       bodyKids: [...document.body.children].slice(0, 14).map((x) => x.id || x.tagName).join(','),
     }));
+    // 服务端直取一个"被中止"的模块:区分浏览器侧中止 vs 服务端响应异常
+    const probeMod = await page.request
+      .get(BASE_URL + '/src/core/game-state.js')
+      .then(async (r) => r.status() + ' len=' + (await r.body()).length)
+      .catch((e) => 'fetch-err: ' + e.message);
     console.error('闸门 60s 未出现,诊断转储:\n' + JSON.stringify(dump, null, 1));
+    console.error('服务端直取 /src/core/game-state.js → ' + probeMod);
     if (diag.length) console.error('网络/控制台诊断:\n' + diag.slice(0, 20).join('\n'));
     throw e;
   }
