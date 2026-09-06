@@ -37,6 +37,7 @@ const THREE_EXAMPLES = [
   'examples/jsm/loaders/GLTFLoader.js',
   'examples/jsm/renderers/CSS2DRenderer.js', // 小世界对话气泡(2026-09-06)
   'examples/jsm/libs/fflate.module.js',
+  'examples/jsm/libs/meshopt_decoder.module.js', // planets/marker 静态导入;漏拷会让 CI 干净检出整个模块图死亡(2026-09-06)
   'examples/jsm/curves/NURBSCurve.js',
   'examples/jsm/curves/NURBSUtils.js',
   // GLTFLoader 的隐式依赖
