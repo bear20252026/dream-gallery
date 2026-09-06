@@ -91,6 +91,18 @@ async function startWorld() {
   await import('./scene/desert.js'); // 西域沙海(无限区块地形/昆仑/水波/飞鸟/沙暴)
   await import('./scene/player.js'); // 玩家/键盘/鼠标/触摸/小地图/跳跃滑翔
   await import('./gate/quizgate.js'); // 入馆答题系统(悬浮答题屏 + 答题面板 + 门禁)
+  // 昆仑层(二期):peaks→spirits→eternal→ark→windchime→fireplace→snowwin,
+  // 然后 planets(石门/传送台/六星世界;须在 eternal 之后,groundOverride 链)→story-dialogs→resetview
+  await import('./kunlun/peaks.js'); // 昆仑巅彩蛋(90m 登飞来峰语音 / 100m 彩蛋视频)
+  await import('./kunlun/spirits.js'); // 六合灵蕴收集
+  await import('./kunlun/eternal.js'); // 空中永恒展厅·二期①
+  await import('./kunlun/ark.js'); // 灵蕴飞舟·二期②
+  await import('./kunlun/windchime.js'); // 风铃回响·二期③
+  await import('./kunlun/fireplace.js'); // 暖色壁炉·二期③
+  await import('./kunlun/snowwin.js'); // 飘雪之窗·二期④
+  await import('./kunlun/planets.js'); // B612 六星章节:星门+传送石台都在此构建(漏载=石门消失,2026-09-06)
+  await import('./kunlun/story-dialogs.js'); // 小世界情景对话(须在 planets 之后)
+  await import('./kunlun/resetview.js'); // 重置视角·二期④
   await import('./kunlun/letgo.js'); // 放下与召回·二期⑤
   await import('./kunlun/finale.js'); // 终章三件套·二期⑥
   await import('./player/states/PlayerStates.js'); // 移动状态机
@@ -206,15 +218,8 @@ async function startWorld() {
   softImport(() => import('./gallery/gallery-v2.js'));
   softImport(() => import('./gallery/rose-gallery.js'));
   softImport(() => import('./gallery/tower-orb.js'));
-  // 神话层延迟 2s(世界首帧之后)
+  // 第三人称角色模型延迟 2s(FBX 较大;其余昆仑层已按序加载)
   setTimeout(function () {
-    softImport(() => import('./kunlun/peaks.js'));
-    softImport(() => import('./kunlun/spirits.js'));
-    softImport(() => import('./kunlun/eternal.js'));
-    softImport(() => import('./kunlun/ark.js'));
-    softImport(() => import('./kunlun/windchime.js'));
-    softImport(() => import('./kunlun/fireplace.js'));
-    softImport(() => import('./kunlun/snowwin.js'));
     softImport(() => import('./kunlun/avatar.js'));
   }, 2000);
 
