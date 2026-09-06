@@ -138,7 +138,9 @@ function pngBrightness(buf) {
 
   ok('无未捕获页面异常', errs.length === 0);
   if (errs.length) console.log('页面异常:\n' + errs.slice(0, 6).join('\n'));
-  fs.writeFileSync(path.join(__dirname, '..', 'artifacts', 'b612-return-last.png'), shot);
+  const artDir = path.join(__dirname, '..', 'artifacts');
+  fs.mkdirSync(artDir, { recursive: true }); // CI 全新检出无此目录,先建再写
+  fs.writeFileSync(path.join(artDir, 'b612-return-last.png'), shot);
   await b.close();
   if (child) child.kill();
   setTimeout(() => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {} }, 500);

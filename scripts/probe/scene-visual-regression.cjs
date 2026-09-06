@@ -49,6 +49,8 @@ function startServer() {
   const UPDATE = !!process.env.VR_UPDATE;
   const STRICT = !!process.env.VR_STRICT;
   if (UPDATE && !fs.existsSync(BASELINE_DIR)) fs.mkdirSync(BASELINE_DIR, { recursive: true });
+  const ART_DIR = path.join(ROOT, 'scripts', 'artifacts');
+  fs.mkdirSync(ART_DIR, { recursive: true }); // CI 全新检出无此目录(gitignore),写对比图前先建
 
   const b = await launch();
   const page = await b.newPage({ viewport: { width: 960, height: 600 } });
