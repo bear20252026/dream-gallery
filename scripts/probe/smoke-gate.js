@@ -10,16 +10,42 @@ const { BASE_URL, launch } = require('./browser');
   const b = await launch(['--use-gl=swiftshader', '--enable-unsafe-swiftshader']);
   const page = await (await b.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   const errs = [];
+  const diag = []; // 失败诊断:控制台错误/失败请求全记录
   page.on('pageerror', (e) => {
     const m = String(e);
     if (m.includes('beacon') || m.includes('cloudflareinsights')) return; // CF 统计脚本被 CSP 拦属预期
     if (m.includes('Failed to fetch dynamically imported module')) return; // 裸服环境噪音(生产打包不存在)
     errs.push(m.slice(0, 220));
   });
+  page.on('console', (m) => {
+    if (m.type() === 'error') diag.push('[console.error] ' + m.text().slice(0, 180));
+  });
+  page.on('requestfailed', (r) => diag.push('[requestfailed] ' + r.url().slice(0, 140) + ' ' + (r.failure() && r.failure().errorText)));
+  page.on('response', (r) => {
+    if (r.status() >= 400) diag.push('[http ' + r.status() + '] ' + r.url().slice(0, 140));
+  });
   await page.goto(BASE_URL + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   // ① 过闸门:勾选同意 → ENTER(每次进入都显示,勾选后 ENTER 才点亮)
-  await page.waitForSelector('#b612Gate', { timeout: 60000 });
+  try {
+    await page.waitForSelector('#b612Gate', { timeout: 60000 });
+  } catch (e) {
+    // 闸门未出现:打印诊断转储再失败(便于 CI 排查模块图/静态服务问题)
+    const dump = await page.evaluate(() => ({
+      url: location.href,
+      readyState: document.readyState,
+      title: document.title,
+      hasCtx: !!window.__ctx,
+      hasC: !!document.querySelector('#c'),
+      cChildren: document.querySelector('#c') ? document.querySelector('#c').children.length : -1,
+      gate: !!document.getElementById('b612Gate'),
+      load: document.getElementById('l') ? document.getElementById('l').style.display : 'no-#l',
+      bodyKids: [...document.body.children].slice(0, 14).map((x) => x.id || x.tagName).join(','),
+    }));
+    console.error('闸门 60s 未出现,诊断转储:\n' + JSON.stringify(dump, null, 1));
+    if (diag.length) console.error('网络/控制台诊断:\n' + diag.slice(0, 20).join('\n'));
+    throw e;
+  }
   await page.evaluate(() => {
     const c = document.getElementById('gAgreeChk');
     c.checked = true;
