@@ -46,6 +46,7 @@ import './kunlun/windchime.js'; // 风铃回响·二期③(西墙风铃/入场�
 import './kunlun/fireplace.js'; // 暖色壁炉·二期③(西南墙壁炉/火焰粒子/灵蕴染色/靠近暖意)
 import './kunlun/snowwin.js'; // 飘雪之窗·二期④(拱窗开闭/窗外飞雪/画上雪纱/风声)
 import './kunlun/planets.js'; // B612 六星章节(2026-09-05:星门+六座悬浮岛+章节流;须在 eternal 之后,groundOverride 链)
+import './kunlun/story-dialogs.js'; // 小世界情景对话(2026-09-06:小王子/玫瑰/国王英文手写气泡,CSS2D 思路,须在 planets 之后)
 import './kunlun/resetview.js'; // 重置视角·二期④(中央平台/最旧晨光画悬浮展演)
 
 // 神话层延迟加载(非首屏必需，等场景就绪后异步加载，减小初始包体积 ~30%)

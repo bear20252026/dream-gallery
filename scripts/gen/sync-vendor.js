@@ -35,6 +35,7 @@ for (const [pkg, inner, out] of VENDORS) {
 const THREE_EXAMPLES = [
   'examples/jsm/loaders/FBXLoader.js',
   'examples/jsm/loaders/GLTFLoader.js',
+  'examples/jsm/renderers/CSS2DRenderer.js', // 小世界对话气泡(2026-09-06)
   'examples/jsm/libs/fflate.module.js',
   'examples/jsm/curves/NURBSCurve.js',
   'examples/jsm/curves/NURBSUtils.js',
