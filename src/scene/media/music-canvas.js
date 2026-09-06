@@ -229,7 +229,7 @@ function onMusicClick(cx, cy, isStart) {
     mxTouches.set(cx + '_' + cy, id);
     if (!onMusicClick.greeted) {
       onMusicClick.greeted = true;
-      ctx.ui.modeToast && ctx.ui.modeToast('昆仑会唱歌。你听到了吗？');
+      ctx.ui.modeToast && ctx.ui.modeToast('B612 会唱歌。你听到了吗？');
     }
     return id;
   } else {

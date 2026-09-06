@@ -1,5 +1,5 @@
 // settings.js — 昵称系统(双渠道,进馆后自愿,不强制) + 设置面板入口
-// 子模块:sky-progress(天穹) / chat-room(聊天室) / spirit-page(六灵蕴) / wish-page(一念) / upload-import(展厅选片) / quality(画质)
+// 子模块:sky-progress(天穹) / chat-room(聊天室) / spirit-page(六星屑) / wish-page(一念) / upload-import(展厅选片) / quality(画质)
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { skyApi, openSky } from './settings/sky-progress.js';
@@ -60,7 +60,7 @@ pop.innerHTML = `<div class="x" id="nickX">✕</div>
   <button class="save" id="nickSave">落 款</button>`;
 document.body.appendChild(pop);
 
-// ===================== 设置面板(昆仑罗盘触发) =====================
+// ===================== 设置面板(B612罗盘触发) =====================
 const gear = document.getElementById('kunlunCompass') || document.createElement('div');
 gear.style.cursor = 'pointer';
 const lkOld = document.getElementById('lk');
@@ -81,12 +81,12 @@ panel.innerHTML = `<h4>设 置<span class="px" id="gearX">✕</span></h4>
     <button id="gmGuide">📖 元素共鸣准则(说明书)</button>
     <button id="gmSky">🌌 天穹</button>
     <button id="gmWish">✧ 写下你的一念</button>
-    <button id="gmSpirits">✦ 六灵蕴</button>
+    <button id="gmSpirits">✦ 六星屑</button>
     <button id="gmSelectEternal">🖼 展厅选片</button>
     <button id="gmQuality">🎚 画质</button>
     <button id="gmChat">💬 聊天</button>
   </div>
-  <div id="skyBox" style="display:none;text-align:center;margin-top:10px"><canvas id="skyCv" width="150" height="150"></canvas><div id="skyTx" style="font-size:12px;color:#ffd9a8;letter-spacing:2px;margin-top:4px"></div><div id="skySub" style="font-size:10px;color:rgba(255,217,168,.55);margin-top:2px"></div><div id="skyLine" style="font-size:11px;color:rgba(255,235,200,.8);line-height:1.7;margin-top:5px;min-height:18px"></div><div id="skyStats" style="font-size:10px;color:rgba(255,255,255,.45);margin-top:4px"></div><div id="skyFull" style="display:none;font-size:11px;color:rgba(255,220,170,.8);line-height:1.8;margin-top:6px">天穹已合。你带来的每一片灵蕴，都回到了它该在的地方。<br>但昆仑不闭门——新的裂痕总会生出，你会回来吗？</div></div>`;
+  <div id="skyBox" style="display:none;text-align:center;margin-top:10px"><canvas id="skyCv" width="150" height="150"></canvas><div id="skyTx" style="font-size:12px;color:#ffd9a8;letter-spacing:2px;margin-top:4px"></div><div id="skySub" style="font-size:10px;color:rgba(255,217,168,.55);margin-top:2px"></div><div id="skyLine" style="font-size:11px;color:rgba(255,235,200,.8);line-height:1.7;margin-top:5px;min-height:18px"></div><div id="skyStats" style="font-size:10px;color:rgba(255,255,255,.45);margin-top:4px"></div><div id="skyFull" style="display:none;font-size:11px;color:rgba(255,220,170,.8);line-height:1.8;margin-top:6px">天穹已合。你带来的每一片星屑，都回到了它该在的地方。<br>但B612不闭门——新的裂痕总会生出，你会回来吗？</div></div>`;
 document.body.appendChild(panel);
 
 // ===================== 快捷菜单入口 =====================
@@ -160,7 +160,7 @@ bag.custom.push(() => {
 // ===================== 保存昵称 =====================
 async function saveNick(name, onOk) {
   name = (name || '').trim().slice(0, 16);
-  const base = name.replace(/^(六合藏梦人|心象行者|昆仑回响)·/, '');
+  const base = name.replace(/^(B612 旅人|心象行者|B612回响)·/, '');
   const p = ctx.kunlun.isDone && ctx.kunlun.isDone() ? ctx.store.str('prefix') : '';
   name = (p + base).slice(0, 16);
   if (!name) {
@@ -177,8 +177,8 @@ async function saveNick(name, onOk) {
     if (!r.ok) throw new Error(d.error || '保存失败');
     myName = name;
     ctx.store.setStr('nick', name);
-    ctx.ui.modeToast && ctx.ui.modeToast('你的名字已被刻入昆仑壁。');
-    ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('你的名字已被刻入昆仑壁。');
+    ctx.ui.modeToast && ctx.ui.modeToast('你的名字已被刻入B612壁。');
+    ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('你的名字已被刻入B612壁。');
     if (onOk) onOk();
   } catch (e) {
     ctx.ui.modeToast && ctx.ui.modeToast(e.message || '保存失败,请稍后再试');

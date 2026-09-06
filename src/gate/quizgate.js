@@ -101,7 +101,7 @@ function drawPanel(unlocked) {
     c.shadowBlur = 0;
     c.fillStyle = 'rgba(60,40,60,0.8)';
     c.font = '46px "Microsoft YaHei",serif';
-    c.fillText('欢迎光临梦幻画廊', 512, 340);
+    c.fillText('Welcome to B612', 512, 340);
   } else {
     c.fillStyle = '#ffffff';
     c.font = 'bold 108px "Microsoft YaHei",serif';
@@ -158,7 +158,7 @@ onTick(function () {
 });
 
 // ===================== 答题面板(DOM) =====================
-// 女娲十问(2026-07-26《昆仑灵鉴》):题号过渡语,学科名保留;模块级,renderQuiz/renderResult 共用
+// 女娲十问(2026-07-26《B612灵鉴》):题号过渡语,学科名保留;模块级,renderQuiz/renderResult 共用
 const QZ_TITLES = [
   '第一问·观天地',
   '第二问·察万物',
@@ -208,7 +208,7 @@ box.id = 'quizBox';
 ov.appendChild(box);
 document.body.appendChild(ov);
 
-// ===================== 昆仑灵鉴 V1:答题动态背景(灰暗天空+金色裂纹,作答越深入裂纹越亮,满分金光填满现昆仑) =====================
+// ===================== B612灵鉴 V1:答题动态背景(灰暗天空+金色裂纹,作答越深入裂纹越亮,满分金光填满现B612) =====================
 const sky = document.createElement('canvas');
 sky.style.cssText =
   'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
@@ -294,7 +294,7 @@ function drawSky() {
   for (const bp of skyBranches) bolt(c, bp, 1.5 + r * 2, r * 0.8); // 支脉
   c.restore();
   if (r >= 0.98) {
-    // 金光填满→昆仑山巅剪影
+    // 金光填满→B612山巅剪影
     const rg = c.createRadialGradient(w / 2, h * 0.35, 10, w / 2, h * 0.35, h * 0.9);
     rg.addColorStop(0, 'rgba(255,215,140,0.85)');
     rg.addColorStop(1, 'rgba(255,190,90,0)');
@@ -361,13 +361,13 @@ let judgedQ = {},
   rightCount = 0; // 逐题批改:题号→已判,答对数(驱动金色裂纹)
 
 window.startQuiz = function () {
-  // 2026-07-26 机制调整:已解锁也可继续答题——答题积攒天穹灵蕴,入口永不关闭
+  // 2026-07-26 机制调整:已解锁也可继续答题——答题积攒天穹星屑,入口永不关闭
   ov.dataset.stage = 'pick';
   skyTo(0.06); // 开卷:灰暗天空现出一道细金裂纹
   box.innerHTML = `<h2>心 象 共 鸣</h2>
-<div class="qsub">女娲碎石之前，曾将十问刻入昆仑石壁，名为《补天残卷》。你答过的每一题，都是残卷上被重新点亮的一行字。开始吧。</div>
+<div class="qsub">Before you arrived, six questions were carved into the stone of B612. Every answer you give lights up another line. Begin.</div>
 <div class="qz-track">
-<button data-t="shen" style="border-color:rgba(255,214,130,.7);background:rgba(230,170,60,.14)">神 话 卷<small>昆仑灵鉴 · 判后附正解与解析</small></button>
+<button data-t="shen" style="border-color:rgba(255,214,130,.7);background:rgba(230,170,60,.14)">神 话 卷<small>B612 · 判后附正解与解析</small></button>
 <button data-t="li">理 科 卷<small>语文 · 数学 · 英语 · 物理 · 化学 · 生物</small></button>
 <button data-t="wen">文 科 卷<small>语文 · 数学 · 英语 · 历史 · 政治 · 地理</small></button>
 </div>`;
@@ -462,7 +462,7 @@ function renderQuiz(d) {
         // C3 半程轻反馈(2026-07-28,设计文档钦定防流失):答满 5 题提示一次,不打断节奏
         if (!window._qzHalfTold && Object.keys(judgedQ).filter((k) => judgedQ[k]).length >= 5) {
           window._qzHalfTold = true;
-          ctx.modeToast && ctx.modeToast('你已经完成了一半的女娲问心。');
+          ctx.modeToast && ctx.modeToast('你已经完成了一半的心象共鸣。');
         }
       } catch (e) {
         judgedQ[q] = false;
@@ -522,15 +522,15 @@ async function submitQuiz() {
 
 function renderResult(d) {
   ov.dataset.stage = 'result';
-  skyTo(Math.max(0.15, (d.total || 0) / 100), true); // 成绩定纹:满分→金光填满,昆仑山巅显现
+  skyTo(Math.max(0.15, (d.total || 0) / 100), true); // 成绩定纹:满分→金光填满,B612山巅显现
   const passCls = d.passed ? 'ok' : 'no';
-  // 三档反馈(2026-07-26《昆仑灵鉴》):满分全通 / ≥60 放行 / <60 邀请函仍可进(镜框回应慢一些)
+  // 三档反馈(2026-07-26《B612灵鉴》):满分全通 / ≥60 放行 / <60 邀请函仍可进(镜框回应慢一些)
   const passTxt =
     d.total === 100
-      ? '十问皆通。女娲的遗问，你全接住了。你的灵蕴已被昆仑认可，展厅的门为你而开。——欢迎你，藏梦人。'
+      ? '十问皆通。你接住了 B612 留给你的每一问。星屑已被认可，展厅的门为你而开。——Welcome home.'
       : d.passed
-        ? '十问过其六，灵蕴已生。虽未尽通，但昆仑从不拒真心。推门进去吧——你带来的记忆，足够点亮一面墙。'
-        : '十问未尽，灵蕴未满。但山不拒来者——接受下方的邀请函，你仍然可以进去看看。只是初次挂画时，镜框回应得会慢一些。多凝视几秒就好。';
+        ? '十问过其六，星屑已生。虽未尽通，但B612从不拒真心。推门进去吧——你带来的记忆，足够点亮一面墙。'
+        : '十问未尽，星屑未满。但山不拒来者——接受下方的邀请函，你仍然可以进去看看。只是初次挂画时，镜框回应得会慢一些。多凝视几秒就好。';
   const qaInfo =
     d.qaBy === 'ai'
       ? `AI 阅卷评语:${escH(d.qaComment || '—')}`
@@ -563,10 +563,10 @@ function renderResult(d) {
     const prev = ctx.store.num('quiz');
     const nq = prev + gain;
     ctx.store.setNum('quiz', nq);
-    window.quizToast && window.quizToast('灵蕴 +' + gain + '（已入天穹）', true);
+    window.quizToast && window.quizToast('星屑 +' + gain + '（已入天穹）', true);
     // TTS 频次:首次必播,之后每答对 5 题播一次(避免疲劳)
     if (ctx.ui.kunlunSpeak && (nq === 1 || Math.floor(prev / 5) < Math.floor(nq / 5)))
-      ctx.ui.kunlunSpeak('灵蕴归位。');
+      ctx.ui.kunlunSpeak('星屑归位。');
     ctx.kunlun.checkSkyMs && ctx.kunlun.checkSkyMs();
   }
   if (d.passed) {
@@ -584,8 +584,8 @@ function renderResult(d) {
   box.innerHTML = html;
   box.scrollTop = 0;
   if (d.total === 100)
-    ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('十问皆通。欢迎你，藏梦人。'); // 满分:昆仑亲迎
-  else if (d.passed) ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('十问过其六，灵蕴已生。推门进去吧。'); // ≥60:昆仑放行
+    ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('十问皆通。欢迎你，藏梦人。'); // 满分:B612亲迎
+  else if (d.passed) ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('十问过其六，星屑已生。推门进去吧。'); // ≥60:B612放行
   if (d.passed) {
     unlockGallery(true);
     box.querySelector('#qzEnter').addEventListener('click', () => {
@@ -603,7 +603,7 @@ function renderResult(d) {
           if (!r.ok || !dd.passed) throw new Error(dd.error || '失败');
           unlockGallery(true);
           ctx.ui.kunlunSpeak &&
-            ctx.ui.kunlunSpeak('十问未尽，灵蕴未满。但山不拒来者。进去看看吧。');
+            ctx.ui.kunlunSpeak('十问未尽，星屑未满。但山不拒来者。进去看看吧。');
           box.innerHTML = '<div class="qz-spin">🎉 邀请函已生效,欢迎进入画廊</div>';
           setTimeout(() => {
             quizOvApi.close();

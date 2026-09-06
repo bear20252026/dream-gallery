@@ -167,7 +167,7 @@ function hangOn(wall, wi, am, off) {
   cM.position.z = fd / 2 + 0.012;
   g.add(cM);
   s.add(g);
-  // 昆仑灵鉴 V3:古镜轮廓——每幅画内沿一圈淡金镜纹;纹理未加载时(答题前/普通模式被门禁)画位只剩空镜轮廓,暗合万镜画廊"千面空镜"
+  // B612灵鉴 V3:古镜轮廓——每幅画内沿一圈淡金镜纹;纹理未加载时(答题前/普通模式被门禁)画位只剩空镜轮廓,暗合万镜画廊"千面空镜"
   const ghost = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.PlaneGeometry(fw - 0.16, fh - 0.16)),
     new THREE.LineBasicMaterial({ color: '#d8b36c', transparent: true, opacity: 0.22 })
@@ -203,11 +203,11 @@ function hangPaintings() {
 
 // 单幅上墙(访客上传后立即挂出):沿墙找空位,避开已有画框(曾直接覆盖图库画,点击全打到旧画上)
 // 返回画框 Group(供悬浮箭头指引定位)
-// 昆仑灵鉴 M3-lite 四象方位(2026-07-26):aura=生机/炽烈/萧瑟/安宁 时优先归对应方位墙(东/南/西/北),
+// B612灵鉴 M3-lite 四象方位(2026-07-26):aura=生机/炽烈/萧瑟/安宁 时优先归对应方位墙(东/南/西/北),
 // 只对当次新上传生效,不重排存量挂画;方位墙满则退回任意空位
 const AURA_WALL = { 生机: 'E', 炽烈: 'S', 萧瑟: 'W', 安宁: 'N' };
 const LIB_SET = new Set(P.concat(V));
-// 归位涟漪(昆仑灵鉴 M4):金色圆环在画框上荡开,宣告"它归位了"
+// 归位涟漪(B612灵鉴 M4):金色圆环在画框上荡开,宣告"它归位了"
 function rippleAt(g) {
   const ring = new THREE.Mesh(
     new THREE.RingGeometry(0.6, 0.66, 48),
@@ -342,7 +342,7 @@ function hangOne(mU, caption, aura) {
   const off = spot ? spot.off : 0;
   const g = hangOn(wall, paintGroups.length, { u: mU, d: caption || '访客上传的照片' }, off);
   if (ctx.mode.applyPaintMode) ctx.mode.applyPaintMode(); // 立即按当前模式校正可见性
-  rippleAt(g); // 昆仑灵鉴 M4:归位涟漪
+  rippleAt(g); // B612灵鉴 M4:归位涟漪
   return g;
 }
 ctx.gallery.hangOne = hangOne;
@@ -610,11 +610,11 @@ function onC3D(e) {
   if (ctx.gallery.zG) zoomOut();
 }
 
-// 显示/隐藏AI文字面板(2026-07-26《昆仑灵鉴》:配文统一加前缀「昆仑替你记得：」,AI=昆仑的记忆回声;前缀幂等,HMR 重载不会叠两层)
+// 显示/隐藏AI文字面板(2026-07-26《B612灵鉴》:配文统一加前缀「B612 替你记得：」,AI=B612的记忆回声;前缀幂等,HMR 重载不会叠两层)
 const aiPanel = document.getElementById('aiPanel'),
   aiT = document.getElementById('aiT');
 function showAI(text) {
-  aiT.textContent = /^昆仑替你记得：/.test(text) ? text : '昆仑替你记得：' + text;
+  aiT.textContent = /^B612 替你记得：/.test(text) ? text : 'B612 替你记得：' + text;
   aiPanel.classList.add('show');
 }
 function hideAI() {
@@ -636,7 +636,7 @@ function zoomIn(cg) {
   const d = cg.userData;
   d.zoomed = true;
   ctx.gallery.zG = cg;
-  d.gazeT0 = Date.now(); // 昆仑灵鉴 M2:凝视计时起点
+  d.gazeT0 = Date.now(); // B612灵鉴 M2:凝视计时起点
   if (!oFog) oFog = s.fog.density;
   // 添加环境光晕
   const hl = new THREE.PointLight('#ffc8e0', 5, 8, 1.5);
@@ -714,12 +714,12 @@ function zoomOut(cg, instant) {
   cg = cg || ctx.gallery.zG;
   if (!cg) return;
   const d = cg.userData;
-  // 昆仑灵鉴 M2:有效凝视(≥3秒)记一缕灵蕴
+  // B612灵鉴 M2:有效凝视(≥3秒)记一缕灵蕴
   if (d.gazeT0) {
     if (Date.now() - d.gazeT0 >= 3000) {
       const n = ctx.store.num('gaze') + 1;
       ctx.store.setNum('gaze', n);
-      ctx.ui.modeToast && ctx.ui.modeToast('这一眼，昆仑记住了。');
+      ctx.ui.modeToast && ctx.ui.modeToast('这一眼，B612记住了。');
     }
     d.gazeT0 = null;
   }

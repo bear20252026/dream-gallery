@@ -1,7 +1,7 @@
 // letgo.js — 永恒展厅·放下与召回(二期⑤,2026-07-27 主人定稿+数据铁律落地)
 // 长按晨光画 3s(环形进度条+边缘变暗)→ 照片化为暖色光尘消解(3s,边缩边散)→ 空画框:
 // 暖白空面+原图灰影(0.1)+小匾「此处曾有过——日期」。上限 3 张(语气温和不责备)。
-// 召回:罗盘「✦ 六灵蕴」页→已放下的照片→点召回 → 光尘聚回、照片重新长出。
+// 召回:罗盘「✦ 六星屑」页→已放下的照片→点召回 → 光尘聚回、照片重新长出。
 // 铁律:放下=不呈现,**照片文件永留服务器**,主展厅墙也不受影响;状态仅 localStorage,可逆。
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
@@ -98,7 +98,7 @@ function removeEmpty(g){
 let anim=null; // {g,plane,t0,kind:'out'|'in'}
 function doLetGo(g){
   const name=g.userData.eternalName;
-  if(state.length>=MAX_LETGO){ctx.ui.modeToast&&ctx.ui.modeToast('昆仑已替你放下了足够多的过去。');return;}
+  if(state.length>=MAX_LETGO){ctx.ui.modeToast&&ctx.ui.modeToast('B612已替你放下了足够多的过去。');return;}
   if(state.includes(name)||anim)return;
   state.push(name);save();
   g.userData.letGo=true;
@@ -192,7 +192,7 @@ function down(e){
   const p=e.touches?e.touches[0]:e;
   const g=rayHitFrame(p.clientX,p.clientY);
   if(!g)return;
-  if(state.length>=MAX_LETGO){ctx.ui.modeToast&&ctx.ui.modeToast('昆仑已替你放下了足够多的过去。');return;}
+  if(state.length>=MAX_LETGO){ctx.ui.modeToast&&ctx.ui.modeToast('B612已替你放下了足够多的过去。');return;}
   hold={g,t0:performance.now(),x:p.clientX,y:p.clientY};
   ring.style.display='block';dim.style.opacity='1';
 }

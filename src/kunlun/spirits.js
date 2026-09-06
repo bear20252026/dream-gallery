@@ -1,6 +1,6 @@
-// spirits.js — 六合灵蕴收集系统(2026-07-26 主人定,借鉴 Poolrooms 光珀机制)
-// 触发:天穹进度 100% 后,残镜浮现第二卷文字 → 六枚灵蕴逐颗解锁(金光柱指引)
-// 流程:走近当前灵蕴光柱 → 点「拾取」→ 专属文案+TTS+边缘色光 → 解锁下一颗 → 六齐触发终章
+// spirits.js — 六颗星屑收集系统(2026-07-26 主人定,借鉴 Poolrooms 光珀机制)
+// 触发:天穹进度 100% 后,残镜浮现第二卷文字 → 六枚星屑逐颗解锁(金光柱指引)
+// 流程:走近当前星屑光柱 → 点「拾取」→ 专属文案+TTS+边缘色光 → 解锁下一颗 → 六齐触发终章
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
@@ -9,9 +9,9 @@ import { chime as blipChime } from '../shared/audio-blip.js';
 const bag = hotBegin('spirits');
 const { s, onTick } = ctx;
 
-// ===================== 六灵蕴数据(文案=主人终版) =====================
+// ===================== 六星屑数据(文案=主人终版) =====================
 const KX = 800,
-  KZ = 600; // 昆仑坐标(与 desert.js 一致)
+  KZ = 600; // B612坐标(与 desert.js 一致)
 const SPIRITS = [
   {
     key: 'sprout',
@@ -20,9 +20,9 @@ const SPIRITS = [
     emotion: '希望',
     color: '#7ddb7a',
     pos: [KX - 150, KZ],
-    place: '昆仑东麓·初阳坡',
+    place: 'B612东麓·初阳坡',
     popup: '你找到了「春生之芽」。',
-    tts: '春生之芽。它藏在昆仑最早照到阳光的那道石缝里。你曾在无数个清晨醒来，却很少留意窗台上那盆植物长出了第几片新叶。但希望从来不需要被注视——它只管生长。就像你决定上传第一张照片时那样。',
+    tts: '春生之芽。它藏在B612最早照到阳光的那道石缝里。你曾在无数个清晨醒来，却很少留意窗台上那盆植物长出了第几片新叶。但希望从来不需要被注视——它只管生长。就像你决定上传第一张照片时那样。',
   },
   {
     key: 'flame',
@@ -31,9 +31,9 @@ const SPIRITS = [
     emotion: '热爱',
     color: '#ff5a4a',
     pos: [KX - 60, KZ - 20],
-    place: '昆仑之巅·望天石下',
+    place: 'B612之巅·望天石下',
     popup: '你找到了「夏炽之焰」。',
-    tts: '夏炽之焰。它沉睡在昆仑最高处的一块岩石之下。你或许已经忘了那个夏天——汗流浃背却不肯放下相机的那天。但昆仑记得。记得你胸口那团滚烫的、想把一切都记录下来的冲动。那就是灵蕴最初的形状。',
+    tts: '夏炽之焰。它沉睡在B612最高处的一块岩石之下。你或许已经忘了那个夏天——汗流浃背却不肯放下相机的那天。但B612记得。记得你胸口那团滚烫的、想把一切都记录下来的冲动。那就是星屑最初的形状。',
   },
   {
     key: 'leaf',
@@ -42,9 +42,9 @@ const SPIRITS = [
     emotion: '眷恋',
     color: '#e8a03c',
     pos: [KX + 80, KZ - 140],
-    place: '昆仑北麓·枯草坡',
+    place: 'B612北麓·枯草坡',
     popup: '你找到了「秋思之叶」。',
-    tts: '秋思之叶。它飘落在昆仑北坡的一片枯草地上。你大概已经不太记得，最后一次见到那个人是什么季节。但每一次秋风吹起来的时候，你心里都会泛起同样的涟漪。眷恋是另一种记忆——它不用照片，只用心跳。',
+    tts: '秋思之叶。它飘落在B612北坡的一片枯草地上。你大概已经不太记得，最后一次见到那个人是什么季节。但每一次秋风吹起来的时候，你心里都会泛起同样的涟漪。眷恋是另一种记忆——它不用照片，只用心跳。',
   },
   {
     key: 'snow',
@@ -53,9 +53,9 @@ const SPIRITS = [
     emotion: '沉静',
     color: '#dfeaf5',
     pos: [KX - 60, KZ + 170],
-    place: '昆仑深处·暗河源头',
+    place: 'B612深处·暗河源头',
     popup: '你找到了「冬藏之雪」。',
-    tts: '冬藏之雪。它沉在昆仑深处一条暗河的源头。你生命中有过一些时刻，什么话都不想说，什么人都不愿见。但那些沉默并不是空白——它们是雪的质地。安静、缓慢、却厚重。等你回头再碰它时，已经化成了水，滋养了下一季。',
+    tts: '冬藏之雪。它沉在B612深处一条暗河的源头。你生命中有过一些时刻，什么话都不想说，什么人都不愿见。但那些沉默并不是空白——它们是雪的质地。安静、缓慢、却厚重。等你回头再碰它时，已经化成了水，滋养了下一季。',
   },
   {
     key: 'dawn',
@@ -64,9 +64,9 @@ const SPIRITS = [
     emotion: '新生',
     color: '#7cc8e8',
     pos: [KX - 110, KZ - 80],
-    place: '昆仑东崖·草叶尖端',
+    place: 'B612东崖·草叶尖端',
     popup: '你找到了「朝露之珠」。',
-    tts: '朝露之珠。它凝结在昆仑东崖的一片草叶尖端。黎明前的光总是最轻的。你那些重新开始的念头——换了新工作、搬了新城市、删了旧照片——都像朝露。它们只出现一次，只在最安静的时刻。但你抓住了。',
+    tts: '朝露之珠。它凝结在B612东崖的一片草叶尖端。黎明前的光总是最轻的。你那些重新开始的念头——换了新工作、搬了新城市、删了旧照片——都像朝露。它们只出现一次，只在最安静的时刻。但你抓住了。',
   },
   {
     key: 'dusk',
@@ -75,19 +75,19 @@ const SPIRITS = [
     emotion: '释然',
     color: '#f0a860',
     pos: [KX + 170, KZ + 60],
-    place: '昆仑西麓·霞光台',
+    place: 'B612西麓·霞光台',
     popup: '你找到了「暮光之尘」。',
-    tts: '暮光之尘。它悬浮在昆仑西侧的一片晚霞里。你曾经有多少次看见夕阳，却没有停下来看它？那些错过的黄昏都变成了尘埃——飘在空中，等着有人抬头。而你终于抬头了。这就是最后一枚灵蕴。它告诉你：所有未完成的，都可以在日暮时被原谅。',
+    tts: '暮光之尘。它悬浮在B612西侧的一片晚霞里。你曾经有多少次看见夕阳，却没有停下来看它？那些错过的黄昏都变成了尘埃——飘在空中，等着有人抬头。而你终于抬头了。这就是最后一枚星屑。它告诉你：所有未完成的，都可以在日暮时被原谅。',
   },
 ];
 const INTRO_TTS =
-  '天可补，心难全。昆仑之下，六合之间，散落着六枚心象灵蕴。它们藏于昆仑的六个角落，每一枚都对应一种凡人最珍贵的情感。寻回六枚，万镜画廊的真正面目，才会向你打开。';
-const FINAL_POPUP = '六灵蕴齐聚。万镜画廊的门，重新打开了。';
+  '天可补，心难全。B612之下，六颗之间，散落着六枚心象星屑。它们藏于B612的六个角落，每一枚都对应一种凡人最珍贵的情感。寻回六枚，万镜画廊的真正面目，才会向你打开。';
+const FINAL_POPUP = '六星屑齐聚。万镜画廊的门，重新打开了。';
 const FINAL_TTS =
-  '六灵蕴齐聚。你已穿越昆仑的春夏秋冬，拾回了希望、热爱、眷恋、沉静、新生与释然。你以为你一直在补天。其实，你一直在补自己。从今往后，愿你继续记住。';
+  '六星屑齐聚。你已穿越B612的春夏秋冬，拾回了希望、热爱、眷恋、沉静、新生与释然。你以为你一直在补天。其实，你一直在补自己。从今往后，愿你继续记住。';
 
 // ===================== 状态 =====================
-// 乱序提前拾取(2026-07-27,设计文档):玩家可先拾取未揭示的灵蕴,系统按收集进度调序,结局不变。
+// 乱序提前拾取(2026-07-27,设计文档):玩家可先拾取未揭示的星屑,系统按收集进度调序,结局不变。
 // 库存 spiritsKeys=已收集 key 数组(顺序无关);兼容数量键由 store.addSpirit 同步写(2026-07-28 收编 store.js)。
 // 旧档迁移(顺序收集时代只有数量键)也在 store.getSpirits 内完成。
 function gotKeys() {
@@ -115,7 +115,7 @@ function questActive() {
 
 // ===================== 光柱(仅当前目标可见;无 PointLight,手机灯光账户不动) =====================
 // 夏炽之焰位置(2026-07-27 地形探测修正):原位 [KX,KZ] 峰顶 2m 内坡度 6.8m(刃脊,根本上不去),
-// 移至 [KX-60,KZ-20] 峰肩(海拔 55.6m,坡度 1.7m,可站立可达),「昆仑之巅·望天石下」意境不变。
+// 移至 [KX-60,KZ-20] 峰肩(海拔 55.6m,坡度 1.7m,可站立可达),「B612之巅·望天石下」意境不变。
 function pillarTexture() {
   const c = document.createElement('canvas');
   c.width = 16;
@@ -136,7 +136,7 @@ let pillar = null,
 let hud = null,
   hudArrow = null,
   hudText = null;
-// 悬浮名牌(设计文档:近距离光柱顶部浮现灵蕴名称;这里 60m 内常显,远近都看得见目标)
+// 悬浮名牌(设计文档:近距离光柱顶部浮现星屑名称;这里 60m 内常显,远近都看得见目标)
 let nameSpr = null,
   nameCanvas = null,
   nameCtx = null,
@@ -207,7 +207,7 @@ function buildPillar() {
     'position:fixed;left:50%;bottom:160px;transform:translateX(-50%);z-index:60;display:none;padding:12px 30px;border-radius:24px;border:1px solid rgba(255,214,130,.7);background:rgba(40,26,12,.8);color:#ffe9c4;font-size:16px;letter-spacing:4px;cursor:pointer;font-family:inherit';
   document.body.appendChild(pickBtn);
   pickBtn.onclick = collect;
-  // 野灵感应微光(乱序提前拾取):未揭示的灵蕴在 25m 内浮现柔光团——玩家路过能"感应"到这里有东西
+  // 野灵感应微光(乱序提前拾取):未揭示的星屑在 25m 内浮现柔光团——玩家路过能"感应"到这里有东西
   const wcv = document.createElement('canvas');
   wcv.width = wcv.height = 64;
   const wctx2 = wcv.getContext('2d');
@@ -245,9 +245,9 @@ function placePillar(i) {
   if (i < 0) return;
   const sp = SPIRITS[i];
   const y = groundY(sp.pos[0], sp.pos[1]);
-  // 实心山铁律:灵蕴必须落在地表之上(2026-07-27)
+  // 实心山铁律:星屑必须落在地表之上(2026-07-27)
   if (ctx.media.desert.assertAboveGround)
-    ctx.media.desert.assertAboveGround(sp.pos[0], y + 0.15, sp.pos[1], '灵蕴·' + sp.name);
+    ctx.media.desert.assertAboveGround(sp.pos[0], y + 0.15, sp.pos[1], '星屑·' + sp.name);
   pillar.position.set(sp.pos[0], y + 7, sp.pos[1]);
   pillarRing.position.set(sp.pos[0], y + 0.15, sp.pos[1]);
   nameSpr.position.set(sp.pos[0], y + 16, sp.pos[1]);
@@ -410,7 +410,7 @@ onTick(function () {
     hud.style.display = ctx.kunlun.flightLock ? 'none' : 'flex';
     nameSpr.visible = dist < 60; // 名牌只在 60m 内浮现(远处靠光柱+HUD)
   }
-  // 走近提示拾取(3m 内任意未收集灵蕴——含未揭示的,乱序提前拾取;系统调序,结局不变)
+  // 走近提示拾取(3m 内任意未收集星屑——含未揭示的,乱序提前拾取;系统调序,结局不变)
   const keys = gotKeys();
   let pi = -1;
   for (let j = 0; j < 6; j++) {
@@ -433,7 +433,7 @@ onTick(function () {
     pickBtn.style.display = 'none';
   }
   nearT = pi >= 0 ? 1 : 0;
-  // 野灵感应微光:25m 内最近的未揭示灵蕴浮现柔光团(不剧透名字,只提示"这里有东西")
+  // 野灵感应微光:25m 内最近的未揭示星屑浮现柔光团(不剧透名字,只提示"这里有东西")
   let wi = -1,
     wd = 25;
   for (let j = 0; j < 6; j++) {
@@ -462,7 +462,7 @@ onTick(function () {
   }
 });
 
-// ===================== 罗盘页数据(供 settings.js 六灵蕴页读取) =====================
+// ===================== 罗盘页数据(供 settings.js 六星屑页读取) =====================
 function spiritsState() {
   const keys = gotKeys(),
     ti = nextIdx();
@@ -478,7 +478,7 @@ function spiritsState() {
 function refreshSpiritsPage() {
   if (window.__refreshSpirits) window.__refreshSpirits();
 }
-// 小地图灵蕴标记(player.js drawMap 读取):返回当前目标 {x,z,name,color},无目标返回 null
+// 小地图星屑标记(player.js drawMap 读取):返回当前目标 {x,z,name,color},无目标返回 null
 function spiritMark() {
   // 星球章节模式:交给 planets.js(星门/当前岛星屑)
   if (ctx.kunlun.planetsMode && ctx.kunlun.planetsMark) return ctx.kunlun.planetsMark();
@@ -498,7 +498,7 @@ Object.assign(ctx.kunlun, {
   spiritMark,
   spiritsCollectExternal: collect, // planets.js 星球岛星屑拾取入口(2026-09-05)
   spiritsNextKey: () => (nextIdx() >= 0 ? SPIRITS[nextIdx()].key : null),
-}); // spiritsTTS 供 finale.js 灵蕴归位重听
+}); // spiritsTTS 供 finale.js 星屑归位重听
 bag.custom.push(() => {
   if (pickBtn) pickBtn.remove();
   if (hud) hud.remove();

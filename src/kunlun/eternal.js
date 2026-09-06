@@ -1,5 +1,5 @@
-// eternal.js — 空中永恒展厅·二期①(2026-07-27 主人定稿:六灵蕴+空中永恒展厅融合方案)
-// ①晨光留影:主展厅东北角金门(六灵蕴集齐才可开)→ 传送至昆仑上空 400m 六边形浮空展厅
+// eternal.js — 空中永恒展厅·二期①(2026-07-27 主人定稿:六星屑+空中永恒展厅融合方案)
+// ①晨光留影:主展厅东北角金门(六星屑集齐才可开)→ 传送至B612上空 400m 六边形浮空展厅
 //   东墙三幅「你最早挂上的画」+ 体积光晨光;南侧平台金拱门返程
 // 可见性铁律:/api/files 服务端已按设备过滤(演示照片全员/本人上传仅本人/图库仅特殊模式),
 //   本模块直接消费其返回,客户端不做二次判断——图库永不泄密
@@ -10,11 +10,11 @@ import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片即刷新晨光(2026-08-29)
 const bag = hotBegin('eternal');
-// 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
+// 星屑收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
 const { s, onTick, loadTexCapped, iG, bounds } = ctx;
 
 // ===================== 位置与地基 =====================
-// 展厅悬浮在昆仑正上方(800,600),地板步行面 y=400(相机远平面 2000,地面远眺在射程内;
+// 展厅悬浮在B612正上方(800,600),地板步行面 y=400(相机远平面 2000,地面远眺在射程内;
 // 雾密度 0.006 下实体天然隐形,集齐后点亮的六色光束(fog:false)就是"隐约浮现的光点")
 const HX = 800,
   HZ = 600,
@@ -553,7 +553,7 @@ function buildImportFrames() {
 buildImportFrames();
 ctx.kunlun.rebuildEternalPicks = buildImportFrames; // C2:选片保存后由设置页调用,刷新西墙
 
-// ===================== 金门(地面·主展厅东北角 x=15 z=-12,两面可点;六灵蕴集齐才开) =====================
+// ===================== 金门(地面·主展厅东北角 x=15 z=-12,两面可点;六星屑集齐才开) =====================
 const doorG = new THREE.Group();
 doorG.position.set(15, 0, -12);
 for (const p of [-1, 1]) {
@@ -595,7 +595,7 @@ const seal = (function () {
   x.fillStyle = '#ffd98a';
   x.font = 'bold 64px serif';
   x.textAlign = 'center';
-  '六合封印'.split('').forEach((ch, i) => x.fillText(ch, 64, 90 + i * 110));
+  'B612封印'.split('').forEach((ch, i) => x.fillText(ch, 64, 90 + i * 110));
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   const m = new THREE.Mesh(
@@ -694,7 +694,7 @@ ctx.kunlun.eternalClick = function (cg) {
     if (!(ctx.kunlun.isDone && ctx.kunlun.isDone())) {
       const n = ctx.kunlun.spiritsGot ? ctx.kunlun.spiritsGot() : 0;
       ctx.ui.modeToast &&
-        ctx.ui.modeToast('六灵蕴未齐（' + n + '/6）——万镜画廊的门，还不会为你打开。');
+        ctx.ui.modeToast('六星屑未齐（' + n + '/6）——万镜画廊的门，还不会为你打开。');
       return;
     }
     teleport(true);
@@ -713,8 +713,8 @@ function setUnlocked(announce) {
   seal.visible = false;
   doorGlow.visible = true;
   beamsG.visible = true;
-  halo.visible = true; // 昆仑上空浮现六色光点
-  if (announce) ctx.ui.modeToast && ctx.ui.modeToast('万镜画廊的门，开了。昆仑上空，有光在等你。');
+  halo.visible = true; // B612上空浮现六色光点
+  if (announce) ctx.ui.modeToast && ctx.ui.modeToast('万镜画廊的门，开了。B612上空，有光在等你。');
 }
 onTick(function () {
   const t = performance.now() * 0.001;

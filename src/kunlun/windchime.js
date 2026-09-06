@@ -60,7 +60,7 @@ function ring(times){
   swingT0=performance.now();
   if(!ctx.store.flag('chimeTts')){
     ctx.store.mark('chimeTts');
-    ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('秋思之叶化作了这枚风铃。你每一次走进来，它都会替昆仑问候你。');
+    ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('秋思之叶化作了这枚风铃。你每一次走进来，它都会替B612问候你。');
   }
 }
 // 点击再响(eternal.js 钩子分发)

@@ -144,7 +144,7 @@
       <button id="ab" aria-label="开启音乐" aria-pressed="false">开启音乐</button>
       <!-- AI文字介绍面板 -->
       <div id="aiPanel">
-        <div class="aiTag">昆仑记忆回声</div>
+        <div class="aiTag">B612 记忆回声</div>
         <div class="aiLine"></div>
         <div class="aiText" id="aiT"></div>
         <div class="aiLine"></div>
@@ -280,10 +280,10 @@
         if (e.key === 'Escape') closePanel();
       });
 
-      // 昆仑灵鉴:退出告别——关闭/刷新页面前,淡出一句「昆仑留着你的光。」(不是弹窗,不拦退出)
+      // B612:退出告别——关闭/刷新页面前,淡出一句「昆仑留着你的光。」(不是弹窗,不拦退出)
       window.addEventListener('beforeunload', function () {
         var d = document.createElement('div');
-        d.textContent = '你带走的不只是记忆。昆仑留着你的光。';
+        d.textContent = '你带走的不只是记忆。B612 留着你的光。';
         d.style.cssText =
           'position:fixed;inset:0;z-index:99998;display:flex;align-items:center;justify-content:center;background:rgba(16,8,14,0.92);color:rgba(255,220,190,0.9);font-size:16px;letter-spacing:4px;pointer-events:none;opacity:0;transition:opacity .6s';
         document.body.appendChild(d);

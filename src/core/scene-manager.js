@@ -104,7 +104,7 @@ export class SceneManager {
     // 旧版隐藏 #mapWrap/#mapCanvas/#miniMap —— 三个 id 在页面里都不存在,隐藏从未生效。
     // 真实元素:小地图 #m(index.html:128)、任务册 #questHud、操作提示 #hp、
     // AI 配文 #aiPanel、残镜 #prologueMirror、沙漠昼夜钟/地形/准星/热浪(desert/atmosphere.js)、
-    // 昆仑语录 #skyNote(audio-manager.js)、⌂ 回归出生点(#homeBtn,2026-09-06 主人定:
+    // B612语录 #skyNote(audio-manager.js)、⌂ 回归出生点(#homeBtn,2026-09-06 主人定:
     // 小世界不需要回家键,回画廊走传送石台)。跳/滑翔钮 #jumpBtnGlide 刻意保留(太空=升空推进)。
     const MAIN_ONLY_UI = [
       '#m', '#questHud', '#hp', '#aiPanel', '#prologueMirror',

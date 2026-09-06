@@ -1,7 +1,7 @@
 // finale.js — 永恒展厅·终章三件套(二期⑥,2026-07-27 主人定稿)
 // ①俯瞰天穹:走到南平台边缘自动进入——镜头俯压、雾退见地面、"这就是你补完的天";动键/转视角即退出
-// ②心象投影:站上中央平台抬头看镜 1s→旅途剪影回放(~14s 残影蒙太奇;无录屏能力,用首照+灵蕴静态卡)
-// ③灵蕴归位:六墙印记点击重听灵蕴 TTS;全部点过→六色闪光+「六合藏梦人·雅号」+自动冠前缀
+// ②心象投影:站上中央平台抬头看镜 1s→旅途剪影回放(~14s 残影蒙太奇;无录屏能力,用首照+星屑静态卡)
+// ③星屑归位:六墙印记点击重听星屑 TTS;全部点过→六色闪光+「六颗藏梦人·雅号」+自动冠前缀
 // 零 PointLight;DOM 弹层守三铁律(投影:✕跳过/点击即走/仅播放期存在)
 import * as THREE from 'three';
 import {ctx} from '../ctx.js';
@@ -100,11 +100,11 @@ function playProjection(){
   const gems=SPIRIT_COLORS.map((c,i)=>'<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:'+c+';margin:0 6px;box-shadow:0 0 10px '+c+'"></span>').join('');
   let dead=false;
   (async()=>{
-    await T('<div style="'+P+'">心象共鸣</div><div style="'+S+'">你以真意作答，女娲问心，十问皆通</div>',1600,0);if(dead)return;
+    await T('<div style="'+P+'">心象共鸣</div><div style="'+S+'">你以真意作答，心象共鸣，十问皆通</div>',1600,0);if(dead)return;
     if(src){await T('<img src="/'+src+'" style="max-width:min(70vw,420px);max-height:46vh;border-radius:10px;opacity:.92"><div style="'+S+'">你带来的第一片光</div>',2400,1);if(dead)return;}
-    await T('<div style="'+P+'">补天 · 天穹已合</div><div style="'+S+'">你带来的每一片灵蕴，都回到了它该在的地方</div>',1800,2);if(dead)return;
-    await T('<div>'+gems+'</div><div style="'+P+';margin-top:14px">六灵蕴</div><div style="'+S+'">希望 · 热爱 · 眷恋 · 沉静 · 新生 · 释然</div>',2800,3);if(dead)return;
-    await T('<div style="'+P+'">灵蕴飞舟</div><div style="'+S+'">昆仑的风，曾为你让路</div>',1600,4);if(dead)return;
+    await T('<div style="'+P+'">补天 · 天穹已合</div><div style="'+S+'">你带来的每一片星屑，都回到了它该在的地方</div>',1800,2);if(dead)return;
+    await T('<div>'+gems+'</div><div style="'+P+';margin-top:14px">六星屑</div><div style="'+S+'">希望 · 热爱 · 眷恋 · 沉静 · 新生 · 释然</div>',2800,3);if(dead)return;
+    await T('<div style="'+P+'">星屑飞舟</div><div style="'+S+'">B612的风，曾为你让路</div>',1600,4);if(dead)return;
     await T('<div style="'+P+'">六航路</div><div style="'+S+'">朝霞 · 炽阳 · 暮色 · 寒夜 · 破晓 · 合光</div>',2000,5);if(dead)return;
     await T('<div style="'+P+'">永恒展厅</div><div style="'+S+'">你终于到了</div>',1600,6);if(dead)return;
     card.style.opacity='0';
@@ -124,7 +124,7 @@ function projTick(){
   else gazeAcc=0;
 }
 
-// ===================== ③ 灵蕴归位(六墙印记) =====================
+// ===================== ③ 星屑归位(六墙印记) =====================
 const marksDone=ctx.store.json('marks',[]);
 const WALL_MID=[[806.06,600],[803.03,605.25],[796.97,605.25],[793.94,600],[796.97,594.75],[803.03,594.75]];
 const markGems=[];
@@ -165,15 +165,15 @@ function finale(){
   bell(523,0.2,3);
   const nick=ctx.store.str('nick')||'藏梦人';
   // B4 称号解锁卡片(2026-07-28,设计文档第六卷):正式卡片取代大字一闪
-  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('六合藏梦人。这是昆仑能给你的，最完整的名字。天穹已经合上了，六灵蕴已经归位了。你不再需要修补任何东西。你只需要——继续记住，继续凝视。','title'); // B6 称号音色
-  // 自动冠以「六合藏梦人·」前缀(saveNick 机制已认 kunlunPrefix,主人再保存一次昵称即生效)
-  if(ctx.store.str('prefix')!=='六合藏梦人·'){
-    ctx.store.setStr('prefix','六合藏梦人·');
+  ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('六颗藏梦人。这是B612能给你的，最完整的名字。天穹已经合上了，六星屑已经归位了。你不再需要修补任何东西。你只需要——继续记住，继续凝视。','title'); // B6 称号音色
+  // 自动冠以「六颗藏梦人·」前缀(saveNick 机制已认 kunlunPrefix,主人再保存一次昵称即生效)
+  if(ctx.store.str('prefix')!=='六颗藏梦人·'){
+    ctx.store.setStr('prefix','六颗藏梦人·');
   }
   setTimeout(()=>showTitleCard(nick),1000);
 }
 
-// 称号卡片:✦六合归位✦ / 六合藏梦人·雅号 / 昆仑给你的完整名字;[确认][稍后修改]
+// 称号卡片:✦六颗归位✦ / 六颗藏梦人·雅号 / B612给你的完整名字;[确认][稍后修改]
 // 弹层三铁律走 overlay 注册处(✕+点外圈+Esc);雅号经 textContent 注入(防 XSS)
 function showTitleCard(nick){
   const d=document.createElement('div');
@@ -186,13 +186,13 @@ function showTitleCard(nick){
     +'<div style="position:relative">'
     +'<div style="font-size:15px;letter-spacing:8px;color:#ffd9a8;margin-bottom:16px">✦ 六 合 归 位 ✦</div>'
     +'<div id="tcName" style="font-size:clamp(22px,5.6vw,34px);letter-spacing:3px;color:#ffe9c4;text-shadow:0 0 26px rgba(255,200,100,.5);line-height:1.5"></div>'
-    +'<div style="margin-top:12px;font-size:13px;letter-spacing:3px;color:rgba(255,226,196,.65)">—— 昆仑给你的完整名字 ——</div>'
+    +'<div style="margin-top:12px;font-size:13px;letter-spacing:3px;color:rgba(255,226,196,.65)">—— B612给你的完整名字 ——</div>'
     +'<div style="margin-top:24px;display:flex;gap:12px;justify-content:center">'
     +'<button id="tcOk" style="padding:10px 26px;border:none;border-radius:12px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;font-size:14px;letter-spacing:2px;cursor:pointer">确 认</button>'
     +'<button id="tcLater" style="padding:10px 18px;border:1px solid rgba(255,255,255,.3);border-radius:12px;background:transparent;color:#dcc;font-size:14px;letter-spacing:2px;cursor:pointer">稍后修改</button>'
     +'</div></div></div>';
   document.body.appendChild(d);
-  d.querySelector('#tcName').textContent='六合藏梦人 · '+nick;
+  d.querySelector('#tcName').textContent='六颗藏梦人 · '+nick;
   const api=ctx.overlay.register(d,{x:'#tcX',
     onClose(){api.unregister();d.remove();},
   });
@@ -200,7 +200,7 @@ function showTitleCard(nick){
   const done=(toSettings)=>{
     api.close();
     if(toSettings)ctx.ui.modeToast&&ctx.ui.modeToast('在右下角 ⚙ 设置里，随时可以改雅号。');
-    else ctx.ui.modeToast&&ctx.ui.modeToast('前缀「六合藏梦人·」已备好，再保存一次昵称即生效。');
+    else ctx.ui.modeToast&&ctx.ui.modeToast('前缀「六颗藏梦人·」已备好，再保存一次昵称即生效。');
   };
   d.querySelector('#tcOk').onclick=()=>done(false);
   d.querySelector('#tcLater').onclick=()=>done(true);

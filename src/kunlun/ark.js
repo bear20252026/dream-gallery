@@ -1,8 +1,8 @@
-// ark.js — 灵蕴飞舟·二期②(2026-07-27 主人定稿:六灵蕴+空中永恒展厅融合方案)
+// ark.js — 星屑飞舟·二期②(2026-07-27 主人定稿:六星屑+空中永恒展厅融合方案)
 // 2026-07-31:替换为草莓牛奶飞船 GLTF 模型(CC-BY-4.0 · Eleanore Falck)
-// 飞舟泊于昆仑山巅北侧平台(灵蕴≥1 可见,形态随收集进度进化;六齐才可登舟)
+// 飞舟泊于B612山巅北侧平台(星屑≥1 可见,形态随收集进度进化;六齐才可登舟)
 // 首飞=电影化自动航线:66 秒穿越六条航路(每段变色+粒子+短诗 TTS)→ 停靠永恒展厅南平台
-// 之后罗盘「✦ 六灵蕴」页可传送往返(返回展厅 / 山巅登舟);重登飞舟可再飞一遍
+// 之后罗盘「✦ 六星屑」页可传送往返(返回展厅 / 山巅登舟);重登飞舟可再飞一遍
 // 手机灯光账户:全船零 PointLight——发光件全部 MeshBasicMaterial;粒子单套 Points 复用
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -18,7 +18,7 @@ import { createFlightHUD } from './ark-freeflight-hud.js'; // 自由飞 HUD/摇�
 import { stepFlight } from './freeflight-physics.js'; // 自由飞纯物理核(终审 TOP1 可单测)
 const gs = getGameState();
 const bag = hotBegin('ark');
-// 灵蕴收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
+// 星屑收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
 // ⚠️ 2026-08-29 修:此处曾被误写成 `() => spiritCount()`(无限自递归 → Maximum call stack
 //    size exceeded,一进飞舟可见性判定即栈溢出)。原语义(见 git 146a721^):
 //   ark.visible=(ctx.kunlun.spiritsGot?ctx.kunlun.spiritsGot():0)>=1,与下文 804/956 行一致。
@@ -39,9 +39,9 @@ const BASE_Y = groundY(KX, 585);
 const PARK = { x: KX, y: BASE_Y + 1.5, z: 585 }; // 山巅北侧平台
 // 实心山铁律:泊位必须落在地表之上(2026-07-27)
 if (ctx.media.desert.assertAboveGround)
-  ctx.media.desert.assertAboveGround(PARK.x, BASE_Y, PARK.z, '灵蕴飞舟泊位');
+  ctx.media.desert.assertAboveGround(PARK.x, BASE_Y, PARK.z, '星屑飞舟泊位');
 
-// ===================== 飞舟本体(草莓牛奶飞船 GLTF 模型 + 六灵蕴环 + 光粒) =====================
+// ===================== 飞舟本体(草莓牛奶飞船 GLTF 模型 + 六星屑环 + 光粒) =====================
 const ark = new THREE.Group();
 ark.position.set(PARK.x, PARK.y, PARK.z);
 ark.visible = false;
@@ -51,7 +51,7 @@ s.add(ark);
 let shipModel = null;
 let shipMats = []; // 模型材质列表(形态进化用)
 
-// 六灵蕴环(船底六枚灵蕴印记,逐颗点亮)
+// 六星屑环(船底六枚星屑印记,逐颗点亮)
 const haloG = new THREE.Group();
 haloG.position.y = -1.2;
 ark.add(haloG);
@@ -127,7 +127,7 @@ gltfLoader.load(
 );
 
 // ===================== B3 飞舟结界(2026-07-30) =====================
-// 六灵蕴未齐:泊位四周升起半透明灵能穹顶+光环地纹,靠近即被柔和推开(绝不让访客误登沉睡飞舟);
+// 六星屑未齐:泊位四周升起半透明灵能穹顶+光环地纹,靠近即被柔和推开(绝不让访客误登沉睡飞舟);
 // 六齐(ctx.kunlun.isDone)瞬间穹顶消融(淡出),开放登舟。"按E登上飞舟"提示由 boardBtn 负责。
 const BAR_R = 8.5;
 const barrier = new THREE.Group();
@@ -205,7 +205,7 @@ function barTick() {
     pl.p.x = PARK.x + (dx / d) * BAR_R;
     pl.p.z = PARK.z + (dz / d) * BAR_R;
     if (btnT % 15 === 0)
-      ctx.ui.modeToast && ctx.ui.modeToast('灵蕴未满，结界仍在。集齐六灵蕴，飞舟自启。');
+      ctx.ui.modeToast && ctx.ui.modeToast('星屑未满，结界仍在。集齐六星屑，飞舟自启。');
   }
 }
 
@@ -414,7 +414,7 @@ tintOv.style.cssText =
 document.body.appendChild(tintOv);
 
 // ===================== 自由飞(飞机骨·2026-07-27:首飞后再登舟进入;配方来自两套飞机参考码,温和无失速) =====================
-// 物理:四元数姿态;灵蕴自动油门,速度向往巡航值(侧向自然阻尼,轨迹跟机头);
+// 物理:四元数姿态;星屑自动油门,速度向往巡航值(侧向自然阻尼,轨迹跟机头);
 // 控制权限随速度缩放;倾斜联动转向(协调转弯);撞地钳制不死;疆域/天顶软限制。
 const freeFlight = {
   on: false,
@@ -577,11 +577,11 @@ function freeTick() {
   }
   if (flags.groundHit && now - ffToastT > 3000) {
     ffToastT = now;
-    ctx.ui.modeToast && ctx.ui.modeToast('灵蕴护体，飞舟轻轻掠过地面。');
+    ctx.ui.modeToast && ctx.ui.modeToast('星屑护体，飞舟轻轻掠过地面。');
   }
   if (flags.boundaryHit && now - ffToastT > 3000) {
     ffToastT = now;
-    ctx.ui.modeToast && ctx.ui.modeToast('再远，昆仑就托不住你了。');
+    ctx.ui.modeToast && ctx.ui.modeToast('再远，B612就托不住你了。');
   }
   const spd = freeFlight.vel.length();
   // 渲染:飞舟姿态(QMODEL 对齐模型船头 +x 与物理船头 +z)
@@ -642,7 +642,7 @@ document.body.appendChild(boardBtn);
 boardBtn.onclick = () => {
   if (!(ctx.kunlun.isDone && ctx.kunlun.isDone())) {
     const n = ctx.kunlun.spiritsGot ? ctx.kunlun.spiritsGot() : 0;
-    ctx.ui.modeToast && ctx.ui.modeToast('六灵蕴未齐（' + n + '/6）——飞舟还在沉睡。');
+    ctx.ui.modeToast && ctx.ui.modeToast('六星屑未齐（' + n + '/6）——飞舟还在沉睡。');
     return;
   }
   if (ctx.store.flag('arkFlew'))
@@ -696,8 +696,8 @@ function startFlight() {
   routeVisible = true;
   routeOpacity = 1;
   applyRouteOpacity();
-  bigText('灵蕴飞舟 · 六航路巡礼', { hold: 2600, small: true });
-  ctx.ui.modeToast && ctx.ui.modeToast('坐稳了——昆仑的风在为你让路。');
+  bigText('星屑飞舟 · 六航路巡礼', { hold: 2600, small: true });
+  ctx.ui.modeToast && ctx.ui.modeToast('坐稳了——B612的风在为你让路。');
 }
 function enterSeg(k) {
   flySeg = k;
@@ -788,7 +788,7 @@ function applyForm(n) {
   for (let k = 0; k < 6; k++) {
     gems[k].material.color.set(k < n ? SPIRIT_COLORS[k] : '#554a3a');
   }
-  // GLTF 模型形态进化:灵蕴越多,模型发光越强
+  // GLTF 模型形态进化:星屑越多,模型发光越强
   const ei = n >= 3 ? 0.25 + n * 0.1 : 0; // 3 颗起发光,6 颗最强
   shipMats.forEach((m) => {
     if (m.emissiveIntensity !== undefined) m.emissiveIntensity = ei;

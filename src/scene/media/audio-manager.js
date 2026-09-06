@@ -7,7 +7,7 @@ import { onMediaChanged } from '../../media-push.js'; // 服务端主动推送:�
 // ===================== 昆仑灵鉴:氛围小字 =====================
 const skyNote = document.createElement('div');
 skyNote.id = 'skyNote'; // 多世界切割:主世界专属语录,切世界由 scene-manager 统一隐藏
-skyNote.textContent = '昆仑没有日夜。你来了，天就亮了。';
+skyNote.textContent = 'B612 在这里等你。你来了，星星就亮了。';
 skyNote.style.cssText =
   'position:fixed;right:12px;bottom:12px;z-index:15;color:rgba(255,200,220,0.35);font-size:10px;letter-spacing:2px;pointer-events:none;font-family:inherit';
 document.body.appendChild(skyNote);
@@ -60,7 +60,7 @@ document.addEventListener('click', function () {
     localStorage.setItem('kunlunWelcomed', String(now));
   } catch (e) {}
   // 用 click 而非 pointerdown,避免消费手势导致画廊音乐 play() 被拦截
-  ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('凡人一念，可扑天缺。欢迎来到梦幻画廊·昆仑灵鉴。');
+  ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('Welcome to B612 — a gallery for unfinished drawings.');
 });
 
 ctx.ui.kunlunSpeak = kunlunSpeak;

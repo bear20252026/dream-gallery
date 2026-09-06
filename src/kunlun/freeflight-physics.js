@@ -7,7 +7,7 @@ import * as THREE from 'three';
 export const FLIGHT_PARAMS = {
   CRUISE: 24, // 巡航速度 m/s
   YMAX: 480, // 天顶
-  BOUND_R: 720, // 疆域半径(昆仑托底)
+  BOUND_R: 720, // 疆域半径(远方托底)
   GROUND_CLEAR: 3, // 撞地钳制离地间隙
   P_LIM: 1.05, // 俯仰限幅 ±60°
   R_LIM: 1.3, // 滚转限幅 ±75°
@@ -115,7 +115,7 @@ export function stepFlight(state, input, dt) {
     s.pos.y = P.YMAX;
     if (s.vel.y > 0) s.vel.y = 0;
   }
-  // 疆域(昆仑托底)
+  // 疆域(远方托底)
   const dx = s.pos.x - input.centerX,
     dz = s.pos.z - input.centerZ,
     r = Math.hypot(dx, dz);

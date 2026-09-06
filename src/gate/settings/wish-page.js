@@ -94,7 +94,7 @@ function renderWish() {
   const intro = document.createElement('div');
   intro.style.cssText = 'font-size:12px;line-height:1.9;color:rgba(255,233,196,.85)';
   intro.textContent =
-    '凡人一念，可补天缺。写下你此刻最想留给昆仑的一句话——它将化作一粒光，飞向天穹。';
+    '凡人一念，可补天缺。写下你此刻最想留给B612的一句话——它将化作一粒光，飞向天穹。';
   wCard.appendChild(intro);
 
   const ta = document.createElement('textarea');
@@ -150,7 +150,7 @@ function renderWish() {
       wishDust();
       if (!ctx.store.flag('wishTts')) {
         ctx.store.mark('wishTts');
-        ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('凡人一念，可补天缺。昆仑听见了。');
+        ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('凡人一念，可补天缺。B612听见了。');
       }
       const skyBefore = Math.min(
         ctx.store.num('quiz') + ctx.store.num('up') * 5 + ctx.store.num('wishN') * 5,
@@ -163,7 +163,7 @@ function renderWish() {
         ctx.ui.modeToast && ctx.ui.modeToast('灵蕴 +5。你的念想已飞上天穹。');
         ctx.kunlun.checkSkyMs && ctx.kunlun.checkSkyMs();
       } else {
-        ctx.ui.modeToast && ctx.ui.modeToast('天穹已合。昆仑仍收下了这一念。');
+        ctx.ui.modeToast && ctx.ui.modeToast('天穹已合。B612仍收下了这一念。');
       }
       ta.value = '';
       counter.textContent = '0 / 60 · 每天可写三念';

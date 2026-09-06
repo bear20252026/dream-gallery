@@ -93,7 +93,7 @@ async function startWorld() {
   try { window.__worldPhase = '沙漠'; await import('./scene/desert.js'); } catch (e) { window.__worldPhase = '失败:沙漠'; console.error('[startWorld] 沙漠 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/desert.js ' + e.message); throw e; }
   try { window.__worldPhase = '玩家'; await import('./scene/player.js'); } catch (e) { window.__worldPhase = '失败:玩家'; console.error('[startWorld] 玩家 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/player.js ' + e.message); throw e; }
   try { window.__worldPhase = '答题门'; await import('./gate/quizgate.js'); } catch (e) { window.__worldPhase = '失败:答题门'; console.error('[startWorld] 答题门 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gate/quizgate.js ' + e.message); throw e; }
-  try { window.__worldPhase = '昆仑巅'; await import('./kunlun/peaks.js'); } catch (e) { window.__worldPhase = '失败:昆仑巅'; console.error('[startWorld] 昆仑巅 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/peaks.js ' + e.message); throw e; }
+  try { window.__worldPhase = '远方山巅'; await import('./kunlun/peaks.js'); } catch (e) { window.__worldPhase = '失败:远方山巅'; console.error('[startWorld] 昆仑巅 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/peaks.js ' + e.message); throw e; }
   try { window.__worldPhase = '灵蕴'; await import('./kunlun/spirits.js'); } catch (e) { window.__worldPhase = '失败:灵蕴'; console.error('[startWorld] 灵蕴 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/spirits.js ' + e.message); throw e; }
   try { window.__worldPhase = '永恒厅'; await import('./kunlun/eternal.js'); } catch (e) { window.__worldPhase = '失败:永恒厅'; console.error('[startWorld] 永恒厅 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/eternal.js ' + e.message); throw e; }
   try { window.__worldPhase = '飞舟'; await import('./kunlun/ark.js'); } catch (e) { window.__worldPhase = '失败:飞舟'; console.error('[startWorld] 飞舟 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/ark.js ' + e.message); throw e; }
@@ -455,9 +455,9 @@ import('./gate/entrygate.js')
 // C6 退出文案(2026-07-28):切走/关闭页面前留一句(不打断)
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
-  const crowned = ctx.store && ctx.store.str('prefix') === '六合藏梦人·';
+  const crowned = ctx.store && ctx.store.str('prefix') === 'B612 旅人·';
   ctx.ui.modeToast &&
     ctx.ui.modeToast(
-      '你带走的不只是记忆。昆仑留着你的光。' + (crowned ? ' 六合藏梦人，天穹与心象皆已完整。' : '')
+      '你带走的不只是记忆。B612 留着你的光。' + (crowned ? ' 你的旅程，天穹与心象皆已完整。' : '')
     );
 });

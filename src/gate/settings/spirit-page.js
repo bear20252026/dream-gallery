@@ -1,4 +1,4 @@
-// spirit-page.js — 六灵蕴收集页(独立三级页,展示收集进度、召回、传送、前缀)
+// spirit-page.js — 六星屑收集页(独立三级页,展示收集进度、召回、传送、前缀)
 import { ctx } from '../../ctx.js';
 import { eventBus } from '../../event-bus.js';
 import { expose } from '../../debug-hooks.js';
@@ -18,7 +18,7 @@ function renderSpirits() {
   const list = ctx.kunlun.spiritsState ? ctx.kunlun.spiritsState() : [];
   const n = list.filter((x) => x.state === 'got').length;
   let html =
-    '<div style="display:flex;align-items:center;margin-bottom:10px"><b style="letter-spacing:2px;font-size:15px">六灵蕴</b><span style="font-size:11px;color:rgba(255,217,168,.55);margin-left:8px">' +
+    '<div style="display:flex;align-items:center;margin-bottom:10px"><b style="letter-spacing:2px;font-size:15px">六星屑</b><span style="font-size:11px;color:rgba(255,217,168,.55);margin-left:8px">' +
     n +
     ' / 6</span><span id="spX" style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.55);padding:2px 8px">✕</span></div>';
   html +=
@@ -77,9 +77,9 @@ function renderSpirits() {
       '<button id="spGoHall" style="flex:1;padding:9px;border:none;border-radius:9px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;cursor:pointer;font-size:12px">⇪ 返回永恒展厅</button>' +
       '<button id="spGoPeak" style="flex:1;padding:9px;border:1px solid rgba(255,214,170,.5);border-radius:9px;background:transparent;color:#ffe2c4;cursor:pointer;font-size:12px">⇣ 山巅登飞舟</button></div>';
     html +=
-      '<div style="margin-top:10px;padding:10px;border:1px dashed rgba(255,214,170,.5);border-radius:12px;font-size:11px;line-height:1.9;color:#ffe9c4">六灵蕴齐聚。雅号可冠前缀：<br>' +
+      '<div style="margin-top:10px;padding:10px;border:1px dashed rgba(255,214,170,.5);border-radius:12px;font-size:11px;line-height:1.9;color:#ffe9c4">六星屑齐聚。雅号可冠前缀：<br>' +
       '<select id="spPrefix" style="margin-top:6px;width:100%;padding:7px;border-radius:8px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2)">' +
-      '<option value="">无前缀</option><option value="六合藏梦人·">六合藏梦人·</option><option value="心象行者·">心象行者·</option><option value="昆仑回响·">昆仑回响·</option></select>' +
+      '<option value="">无前缀</option><option value="B612 旅人·">B612 旅人·</option><option value="心象行者·">心象行者·</option><option value="B612回响·">B612回响·</option></select>' +
       '<div style="opacity:.6;margin-top:4px">选好后,再保存一次昵称即生效(聊天与访客记录中显示)。</div></div>';
   } else {
     const next = list.find((x) => x.state === 'open');

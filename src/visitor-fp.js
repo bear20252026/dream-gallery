@@ -63,7 +63,7 @@
       cx.fillStyle = '#f60';
       cx.fillRect(0, 0, 100, 30);
       cx.fillStyle = '#069';
-      cx.fillText('梦幻画廊·fp', 2, 4);
+      cx.fillText('B612·fp', 2, 4);
       cx.strokeStyle = 'rgba(120,60,200,0.7)';
       cx.arc(150, 15, 10, 0, Math.PI * 2);
       cx.stroke();

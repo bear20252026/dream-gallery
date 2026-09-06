@@ -1,11 +1,16 @@
 {
-  "name": "梦幻画廊",
-  "short_name": "梦幻画廊",
+  "name": "B612 — a gallery for unfinished drawings",
+  "short_name": "B612",
   "start_url": "/",
   "display": "fullscreen",
-  "background_color": "#1a0a20",
-  "theme_color": "#2a1030",
+  "background_color": "#f4eedd",
+  "theme_color": "#c99b4a",
   "icons": [
-    { "src": "/photos/201.jpg", "sizes": "512x512", "type": "image/jpeg", "purpose": "any" }
+    {
+      "src": "/photos/201.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any"
+    }
   ]
 }

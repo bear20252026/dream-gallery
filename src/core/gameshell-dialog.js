@@ -18,7 +18,7 @@ export function createDialogSystem() {
     const textEl = dialogEl.querySelector('.gs-text');
     const chEl = dialogEl.querySelector('.gs-choices');
     const hintEl = dialogEl.querySelector('.gs-hint');
-    nameEl.textContent = dlg.speaker || '昆仑';
+    nameEl.textContent = dlg.speaker || 'B612';
     chEl.innerHTML = '';
     hintEl.style.display = 'none';
     typeLine(dlg.lines[dlg.idx] || '');
@@ -102,7 +102,7 @@ export function createDialogSystem() {
     if (!lines.length) lines.push('');
     closeDialog();
     dlg = {
-      speaker: opts.speaker || '昆仑',
+      speaker: opts.speaker || 'B612',
       lines,
       idx: 0,
       choices: opts.choices || null,
@@ -118,8 +118,8 @@ export function createDialogSystem() {
   function speakerFor(voice) {
     if (voice === 'ark') return '飞舟';
     if (voice === 'hall') return '展厅';
-    if (voice === 'title') return '昆仑';
-    return '昆仑';
+    if (voice === 'title') return 'B612';
+    return 'B612';
   }
 
   return { attach, open: openDialog, close: closeDialog, advance, speakerFor };

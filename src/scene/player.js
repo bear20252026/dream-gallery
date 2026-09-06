@@ -74,7 +74,7 @@ function mv(wx, wz, dt) {
   // 主世界碰撞体照常解算会在小世界里形成"隐形墙"(B612 出生点恰在主世界建筑脚印内)
   if ((ctx.scene.activeWorld || 'main') !== 'main') return;
   let spd = 3.2 * dt; // 固定速度
-  // 滑翔乘风(西域原版):提速1.6倍 + 朝昆仑方向的导向风加成(dot²*0.6);抬头再按俯仰角加成
+  // 滑翔乘风(西域原版):提速1.6倍 + 朝B612方向的导向风加成(dot²*0.6);抬头再按俯仰角加成
   if (pl.gliding) {
     let boost = 1.6;
     if (ctx.media.desert && ctx.media.desert.kunlun) {
@@ -640,7 +640,7 @@ document.body.appendChild(homeBtn);
 Object.assign(ctx.player, { pl, jD, ks, mv, drawMap, tickPhysics });
 ctx.kunlun.fadeTeleport = fadeTeleport;
 
-// 昆仑灵鉴:行走氛围——「山记得你的每一步。」(已进展厅后,每 4 分钟至多浮现一次)
+// B612灵鉴:行走氛围——「山记得你的每一步。」(已进展厅后,每 4 分钟至多浮现一次)
 setInterval(() => {
   if (ctx.player.quizPassed && ctx.ui.modeToast) {
     ctx.ui.modeToast('山记得你的每一步。');

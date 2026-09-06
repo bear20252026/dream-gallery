@@ -51,7 +51,7 @@ const sandMat = new THREE.PointsMaterial({
 const sand = new THREE.Points(sandGeo, sandMat);
 s.add(sand);
 
-// ===================== 昆仑灯塔 + 环绕光尘 =====================
+// ===================== 远方高地灯塔 + 环绕光尘 =====================
 const peakY = getH(KX, KZ);
 const beacon = new THREE.Mesh(
   new THREE.SphereGeometry(2.5, 16, 16),
@@ -85,10 +85,10 @@ const dustMat = new THREE.PointsMaterial({
 const dust = new THREE.Points(dustGeo, dustMat);
 s.add(dust);
 
-// ===================== 昆仑罗盘 =====================
+// ===================== 远方高地罗盘 =====================
 const compass = document.createElement('div');
 compass.id = 'kunlunCompass';
-compass.title = '昆仑罗盘(点击打开设置)';
+compass.title = '远方高地罗盘(点击打开设置)';
 compass.style.cssText =
   'position:fixed;top:16px;left:16px;width:64px;height:64px;z-index:10;pointer-events:auto;cursor:pointer';
 compass.innerHTML =
@@ -96,7 +96,7 @@ compass.innerHTML =
   '<div style="position:absolute;left:6px;top:6px;right:6px;bottom:6px;border-radius:50%;border:1px solid rgba(160,120,60,0.25)"></div>' +
   '<div class="cp-needle" style="position:absolute;left:50%;top:50%;width:3px;height:22px;margin-left:-1.5px;margin-top:-22px;background:linear-gradient(to bottom,rgba(230,200,130,0.95) 0%,rgba(180,140,70,0.85) 55%,rgba(160,60,40,0.9) 100%);border-radius:40% 40% 50% 50%;transform-origin:50% 22px;box-shadow:0 0 8px rgba(200,160,90,0.25)"></div>' +
   '<div style="position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:radial-gradient(circle at 35% 35%,rgba(220,190,130,0.9),rgba(140,100,50,0.9))"></div>' +
-  '<div style="position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);color:rgba(200,170,120,0.5);font-size:9px;letter-spacing:3px;white-space:nowrap">昆仑</div>';
+  '<div style="position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);color:rgba(200,170,120,0.5);font-size:9px;letter-spacing:3px;white-space:nowrap">远方高地</div>';
 document.body.appendChild(compass);
 const cpNeedle = compass.querySelector('.cp-needle');
 
@@ -330,9 +330,9 @@ function terrainType(h) {
   if (h < 12) return '雅丹';
   if (h < 20) return '岩崖';
   if (h < 35) return '碎石坡';
-  if (h < 60) return '昆仑岩';
+  if (h < 60) return '远方高地岩';
   if (h < 90) return '雪线';
-  return '昆仑巅';
+  return '远方高地巅';
 }
 
 // ===================== 大气更新函数 =====================
@@ -391,7 +391,7 @@ function updateClouds(dt) {
   }
 }
 
-// 风行粒子 + 滑翔迎风粒子 + 昆仑导向变色(尾部记录 lastPX/lastPZ 供下一帧差分)
+// 风行粒子 + 滑翔迎风粒子 + 远方高地导向变色(尾部记录 lastPX/lastPZ 供下一帧差分)
 function updateWind(dt) {
   // 风行粒子
   if (ctx.player.pl) {
@@ -477,7 +477,7 @@ function updateBeacon(dt, time) {
   dustMat.opacity = 0.5 + Math.sin(time * 2) * 0.2;
 }
 
-// 罗盘指针(指向昆仑)
+// 罗盘指针(指向远方高地)
 function updateCompass() {
   // 罗盘指针
   if (ctx.player.pl) {

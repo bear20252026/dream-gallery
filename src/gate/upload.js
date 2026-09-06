@@ -228,7 +228,7 @@ function playUploadHint(onEnd) {
   }
 }
 
-// ===== 昆仑灵鉴:上传成功金色微尘(2 秒,灵蕴归位的视觉化;DOM 粒子零依赖) =====
+// ===== B612灵鉴:上传成功金色微尘(2 秒,灵蕴归位的视觉化;DOM 粒子零依赖) =====
 function goldDust() {
   const box = document.createElement('div');
   box.style.cssText = 'position:fixed;inset:0;z-index:9999;pointer-events:none;overflow:hidden';
@@ -253,7 +253,7 @@ function goldDust() {
 }
 
 // ===== 照片/视频上传 =====
-// 四象气质归类(昆仑灵鉴 M3-lite,仅图片):按 AI 配文关键词判 生机/炽烈/萧瑟/安宁,
+// 四象气质归类(B612灵鉴 M3-lite,仅图片):按 AI 配文关键词判 生机/炽烈/萧瑟/安宁,
 // 判不准无伤大雅——它只是新画归墙的"讲究",不是硬规则
 const AURA_KWS = {
   生机: ['花', '春', '绿', '阳', '海', '笑', '草', '晴', '蓝', '光'],
@@ -291,7 +291,7 @@ $('doUp').onclick = async () => {
       .toLowerCase()
       .replace(/[^a-z0-9]/g, '') || (isVid ? 'mp4' : 'jpg');
   const name = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) + '.' + ext;
-  prog('女娲碎了一颗石…(可关闭本页,上传不会断)');
+  prog('你的照片正在飞往 B612…(可关闭本页,上传不会断)');
   // 分片上传(2026-07-28 晚高峰应急):CF 回源限流,>384KB 的文件按 256KB 切片逐片传,
   // 每片几秒内完成,绕开 Cloudflare 100s 超时(524);小文件仍直传
   const CHUNK = 256 * 1024;
@@ -353,9 +353,9 @@ $('doUp').onclick = async () => {
       ctx.mode.myUploadTokens[name] = d.mt;
     } // 媒体令牌:本张图片以后走 ?mt= 过图片代理
     playUploadHint(() => {
-      ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('女娲碎了一颗石。你收回了一片光。');
+      ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('你的照片已飞抵 B612。');
     }); // 提示音先播,TTS 排队等播完再开口(不混音)
-    goldDust(); // 昆仑灵鉴:灵蕴归位,金色微尘 2 秒
+    goldDust(); // B612灵鉴:灵蕴归位,金色微尘 2 秒
     prog(isVid ? '你收回了一片光。正在上墙…' : '你收回了一片光。AI 配文中…(可先去逛)');
     picked = null;
     $('drop').textContent = '点这里选择照片/视频';
@@ -462,8 +462,8 @@ $('doLk').onclick = async () => {
     });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || '失败');
-    prog('你召来了一件凡间的造物。昆仑收下了。');
-    ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('你召来了一件凡间的造物。昆仑收下了。');
+    prog('你召来了一件凡间的造物。B612收下了。');
+    ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('你召来了一件凡间的造物。B612收下了。');
     $('lkName').value = '';
     $('lkUrl').value = '';
     if (ctx.mode.refreshMode) await ctx.mode.refreshMode();

@@ -97,7 +97,7 @@ function trackClick(link,url){
         const cv=document.createElement('canvas');cv.width=200;cv.height=30;
         const cx=cv.getContext('2d');
         cx.textBaseline='top';cx.font='14px Arial';cx.fillStyle='#f60';cx.fillRect(0,0,100,30);
-        cx.fillStyle='#069';cx.fillText('梦幻画廊·fp',2,4);
+        cx.fillStyle='#069';cx.fillText('B612·fp',2,4);
         cx.strokeStyle='rgba(120,60,200,0.7)';cx.arc(150,15,10,0,Math.PI*2);cx.stroke();
         const durl=cv.toDataURL();let h=0;
         for(let i=0;i<durl.length;i++){h=((h<<5)-h+durl.charCodeAt(i))|0;}

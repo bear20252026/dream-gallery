@@ -1,5 +1,5 @@
 // minimap.js — 小地图渲染(2026-08-30 从 scene/player.js 拆出,职责单一化)
-// 职责:画布/静态底图/建筑区静态图 + 沙漠区地形网格/兴趣点/昆仑与灵蕴方位指示。
+// 职责:画布/静态底图/建筑区静态图 + 沙漠区地形网格/兴趣点/B612与灵蕴方位指示。
 // 交互:放大按钮 + 阻止地图上的鼠标/触摸事件冒泡到场景。
 // 不负责:点地图传送(耦合物理/传送遮罩,留在 scene/player.js,经本模块导出的度量反算坐标)。
 import { ctx } from '../ctx.js';
@@ -23,7 +23,7 @@ mBigBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   mBig = !mBig;
   const mDiv = document.getElementById('m');
-  // 丝滑切换:尺寸变化走 CSS transition,昆仑指示位置两态一致不再"到处跑"
+  // 丝滑切换:尺寸变化走 CSS transition,B612指示位置两态一致不再"到处跑"
   mDiv.style.transition = 'width .35s ease,height .35s ease,opacity .35s ease';
   mDiv.style.opacity = '0.35';
   setTimeout(() => {
@@ -218,7 +218,7 @@ export function drawMap() {
     mapCtx.moveTo(px, pz);
     mapCtx.lineTo(px - Math.sin(pl.y) * 6, pz - Math.cos(pl.y) * 6);
     mapCtx.stroke();
-    // 昆仑方位指示(静态图模式也恒显:玩家点旁指向昆仑的黄点+标注)
+    // B612方位指示(静态图模式也恒显:玩家点旁指向B612的黄点+标注)
     if (ctx.media.desert && ctx.media.desert.kunlun) {
       const K = ctx.media.desert.kunlun;
       const a = Math.atan2(K.z - pl.p.z, K.x - pl.p.x);
@@ -232,7 +232,7 @@ export function drawMap() {
       mapCtx.fill();
       mapCtx.font = '7px sans-serif';
       mapCtx.textAlign = 'center';
-      mapCtx.fillText('昆仑', ex, ey - 5);
+      mapCtx.fillText('B612', ex, ey - 5);
     }
     mapCtx.setTransform(1, 0, 0, 1, 0, 0);
     return;
@@ -269,7 +269,7 @@ export function drawMap() {
       mapCtx.fillText(p[3], gx, gy - 5);
     }
   }
-  // 昆仑:在视野内画点,视野外在边缘画方位指示(加大加亮,带描边)
+  // B612:在视野内画点,视野外在边缘画方位指示(加大加亮,带描边)
   if (ctx.media.desert && ctx.media.desert.kunlun) {
     const K = ctx.media.desert.kunlun;
     const gx = W / 2 + (K.x - pl.p.x) * k,
@@ -283,7 +283,7 @@ export function drawMap() {
       mapCtx.fill();
       mapCtx.stroke();
       mapCtx.font = '8px sans-serif';
-      mapCtx.fillText('昆仑', gx, gy - 7);
+      mapCtx.fillText('B612', gx, gy - 7);
     } else {
       const a = Math.atan2(gy - H / 2, gx - W / 2);
       const ex = W / 2 + Math.cos(a) * (W / 2 - 8),
@@ -293,7 +293,7 @@ export function drawMap() {
       mapCtx.fill();
       mapCtx.stroke();
       mapCtx.font = '8px sans-serif';
-      mapCtx.fillText('昆仑', ex, ey - 6);
+      mapCtx.fillText('B612', ex, ey - 6);
     }
   }
   // 灵蕴目标标记(spirits.js ctx.kunlun.spiritMark):视野内画脉动金点+名字,视野外在边缘画方位指示

@@ -68,7 +68,7 @@ function startShow(){
   plane.material.emissiveIntensity=0.4;
   if(!ctx.store.flag('resetTts')){
     ctx.store.mark('resetTts');
-    ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('朝露之珠让最旧的照片重新发光。无论你走了多远，昆仑会让你记得来处。');
+    ctx.ui.kunlunSpeak&&ctx.ui.kunlunSpeak('朝露之珠让最旧的照片重新发光。无论你走了多远，B612会让你记得来处。');
   }
 }
 function startBack(){
