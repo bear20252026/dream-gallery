@@ -1,4 +1,11 @@
-// main.js — 入口模块：按原始执行顺序导入各副作用模块，最后启动动画循环
+// main.js — 入口模块(2026-09-06 主人定:启动顺序彻底重排)
+// ============================================================
+// 【引导阶段】本文件顶部只保留轻量静态导入(闸门/电影/加载屏/UI 轻件),
+//   页面加载即执行:加载屏 → 入口闸门 → 纸飞机电影。
+// 【世界阶段】全部 3D 世界模块(scene/desert/player/paintings/kunlun...)
+//   改为 startWorld() 内按原 import 顺序动态加载 + 执行原构建代码,
+//   startWorld 由 watchOpening 的 finishIntro 调用(电影 skip/播完/失败三路)。
+//   ——世界不再"随页面加载启动",是真正的启动顺序后置,不是视觉遮盖。
 expose('BUILD', '2026-07-28-r9'); // 部署序号(诊断+刷新产物哈希,绕开边缘节点缓存的 404)
 import { ctx } from './ctx.js';
 import './error-report.js'; // 客户端报错反馈(2026-08-30):尽早挂载才能捕获启动期错误
@@ -6,80 +13,14 @@ import './shared/audio-guard.js'; // 全站 AudioParam 时间参数守卫,静默
 
 import './ui/overlay.js'; // 弹层注册处(冷核心,必须最先 import:Esc 栈优先级靠监听器注册顺序)
 import './state/store.js'; // 存档登记处(冷核心,紧随 overlay:全站 localStorage 唯一入口 ctx.store)
-import './scene/scene.js'; // 场景/相机/渲染器 + 墙壁/地板/屋顶 + 天空 + 灯光
-// 烟花 + 漂浮粒子:原 scene/effects.js 改为 core/effects-system.js(阶段3 切片),
-// 不再副作用挂 ctx.media,改经组合根注入 deps 注册(见下方 createEffectsSystem 注册处)
-import './scene/media.js'; // 2D音乐演奏器 + 视频墙 + HTML5音乐
-import './gallery/signs.js'; // 户外牌子/音乐入口(白板入口 2026-09-03 已移除)
-import './gallery/fountains.js'; // 户外四座 Zsolnay 喷泉(取代已移除的白板区)
-import './gallery/markers.js'; // YES/奕彤爱心/Adorable标记 + 地板照片
-import './gallery/links.js'; // 超链接图标/卷轴/花园入口/滚动古文
-import './gallery/paintings.js'; // 挂画系统 + 白板作品墙 + 3D放大系统
-import './gallery/mode.js'; // 展示区模式(普通/特殊)+ 链接模型系统
-import './gallery/dome-towers.js'; // Yazd 穹顶塔楼群(6 座围圆环绕画廊,按需异步加载)
-// 2026-08-31:动态 import 强制 vite/rolldown 把 museum 模块打进 bundle,
-// 否则静态 import 会被 tree-shake 当 dead code 完全删掉(museum.js 无顶层副作用调用)
-softImport(() => import('./museum/museum.js')); // 万镜博物馆:大堂+贵族房间世界(方案A试点)
-// 花瓣画廊 v2(2026-09-02):东侧空地 (60,8) 按验收模板 1:1 建造。
-// 必须动态 import:主线程灯光预算清扫在 main.js 同步执行,静态 import 的点光源会被清掉
-// 2026-09-06:动态导入加静默重试——Windows 下偶发文件锁瞬断会让 import 抛
-// 「Failed to fetch dynamically imported module」,未处理拒绝会打上左下角报错条吓到访客。
-// 字面量 import 保留在闭包里(Vite 才能解析哈希 chunk),失败 1.5s 后重试一次,再失败仅 info。
-function softImport(load) {
-  load().catch(() => setTimeout(() => load().catch(() => console.info('[main] 可选模块暂未加载(不影响进馆)')), 1500));
-}
-softImport(() => import('./gallery/gallery-v2.js'));
-// 玫瑰花瓣展馆(2026-09-02):东南空地 (144,-60),参考 Tripo 玫瑰模型等高线描摹建造。
-// 同样必须动态 import(灯光预算清扫)
-softImport(() => import('./gallery/rose-gallery.js'));
-// 塔尖光弧汇聚光球(2026-09-02):6 座穹顶塔塔尖弧形光带 → 中心上空巨大光球。
-// 动态 import 同上(新增 1 盏 PointLight,避开主线程灯光预算清扫)
-softImport(() => import('./gallery/tower-orb.js'));
-import './gate/settings.js'; // 昵称双渠道(进馆 5 秒弹窗 + ⚙设置)
-import './gate/upload.js'; // 访客上传(照片/我的链接)+ AI 配文 + 悬浮路标
-import './gate/housecolor.js'; // 房屋分组换色(墙壁/天花板/腰线/踢脚线,仅自己可见)
-import './gate/quiz.js'; // 温柔度测试（弹窗 + 3D墙面板）
-import './scene/desert.js'; // 西域沙海(无限区块地形/昆仑/水波/飞鸟/沙暴)
-import './scene/player.js'; // 玩家/键盘/鼠标/触摸/小地图/跳跃滑翔
-import './gate/quizgate.js'; // 入馆答题系统(悬浮答题屏 + 答题面板 + 门禁)
-// 2026-09-06 主人定:开场收敛为「闸门→电影→游戏」,昆仑残镜序章(prologue.js)与旧开屏
-// (opening-bg.js)退出开场链——文件保留备查,不再引入(其兜底线程/握手标志随之失效)。
-import './kunlun/peaks.js'; // 昆仑巅彩蛋(90m 登飞来峰语音 / 100m 彩蛋视频)
-import './kunlun/spirits.js'; // 六合灵蕴收集(天穹100%后开启:光柱指引/拾取/六齐终章)
-import './kunlun/eternal.js'; // 空中永恒展厅·二期①(金门/六边形浮空展厅/晨光留影)
-import './kunlun/ark.js'; // 灵蕴飞舟·二期②(山巅登舟/六航路首飞/罗盘往返)
-import './kunlun/windchime.js'; // 风铃回响·二期③(西墙风铃/入场自鸣/24h三响/点击再响)
-import './kunlun/fireplace.js'; // 暖色壁炉·二期③(西南墙壁炉/火焰粒子/灵蕴染色/靠近暖意)
-import './kunlun/snowwin.js'; // 飘雪之窗·二期④(拱窗开闭/窗外飞雪/画上雪纱/风声)
-import './kunlun/planets.js'; // B612 六星章节(2026-09-05:星门+六座悬浮岛+章节流;须在 eternal 之后,groundOverride 链)
-import './kunlun/story-dialogs.js'; // 小世界情景对话(2026-09-06:小王子/玫瑰/国王英文手写气泡,CSS2D 思路,须在 planets 之后)
-import './kunlun/resetview.js'; // 重置视角·二期④(中央平台/最旧晨光画悬浮展演)
-
-// 神话层延迟加载(非首屏必需，等场景就绪后异步加载，减小初始包体积 ~30%)
-// 这些模块在首帧渲染后才触发，不影响首次加载速度
-setTimeout(function () {
-  softImport(() => import('./kunlun/peaks.js')); // 昆仑巅彩蛋
-  softImport(() => import('./kunlun/spirits.js')); // 六合灵蕴收集
-  softImport(() => import('./kunlun/eternal.js')); // 空中永恒展厅·二期①
-  softImport(() => import('./kunlun/ark.js')); // 灵蕴飞舟·二期②
-  softImport(() => import('./kunlun/windchime.js')); // 风铃回响·二期③
-  softImport(() => import('./kunlun/fireplace.js')); // 暖色壁炉·二期③
-  softImport(() => import('./kunlun/snowwin.js')); // 飘雪之窗·二期④
-  softImport(() => import('./kunlun/avatar.js')); // FBX 角色(第三人称玩家模型, 异步加载)
-}, 2000);
-import './kunlun/letgo.js'; // 放下与召回·二期⑤(长按消解成光尘/空画框/罗盘召回;软删除铁律)
-import './kunlun/finale.js'; // 终章三件套·二期⑥(俯瞰天穹/心象投影/灵蕴归位·六合藏梦人)
-import { IdleState } from './player/states/PlayerStates.js'; // 移动状态机(2026-08-01)
-import {
-  initPostProcessing,
-  renderPostProcessing,
-  resizePostProcessing,
-} from './scene/postprocessing.js'; // 后处理管线(2026-08-22)
-import { initSentry } from './shared/sentry.js'; // Sentry 错误追踪(2026-08-22)
+import { initSentry } from './shared/sentry.js'; // Sentry 错误追踪(2026-08-22,无 3D 依赖,引导期初始化)
 import { compositionRoot } from './core/composition-root.js'; // 组合根(阶段1,2026-08-27)
+import { setLoop, createLoopSystem, register } from './core/loop.js'; // 单一主循环 facade(阶段1)
+import { LoopManager } from './loop-manager.js'; // 循环管理器(构造轻量:仅存 ctx/event-bus/常量)
+import { expose } from './debug-hooks.js';
+import './visitor-fp.js'; // 访客身份采集+踢出通知(轻量 IIFE,含 SSE 踢出监听,不依赖 3D)
 import { createToastSystem } from './core/toast-system.js'; // 示范积木:事件驱动 toast
 import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外壳:手绘对话框+任务栏+系统菜单(2026-08-29)
-import { setLoop, createLoopSystem, register } from './core/loop.js'; // 单一主循环 facade(阶段1)
 import { createInputSystem } from './core/input.js'; // 统一输入 facade(阶段1·P1-3)
 import { createAudioSystem } from './core/audio-system.js'; // 阶段2 垂直切片:空间音频积木(依赖注入,取代冻结 ctx 写)
 import { createPerfMonitorSystem } from './core/perf-monitor-system.js'; // 阶段3 切片:性能监控积木(单循环驱动,删死 ctx import)
@@ -89,191 +30,28 @@ import { createStateSystem } from './core/state-system.js'; // 阶段3 切片:�
 import { createUiSystem } from './core/ui-system.js'; // 阶段3 切片:UI 域生命周期收口(组合根拥有 overlay 关闭/销毁出口)
 import { getGameState } from './core/game-state.js'; // 单例状态库(阶段3 store 真正化)
 
-const { L, s, cam, rnd, pls, WH, skyUniforms, groundUniforms } = ctx;
-const { jD, ks, pl, mv, drawMap } = ctx.player; // 玩家簇经命名空间取(别名=活委托,player.js Object.assign 后此处读到真值)
-// 注意:updateFireworks/pG/pC 不在此解构——effects.js 支持热更新,重载后 ctx 上的引用会换新,
-// 主循环必须在调用时从 ctx 读取(见下方粒子循环与烟花调用)
-
-// ===================== 灯光限额(性能) =====================
-// 光源总数直接决定着色器体积:实测单程序编译 59盏≈822ms / 24盏≈208ms / 13盏≈103ms。
-// 每个片元着色器要为**所有**光源做循环,光源数是最贵的一项——比网格/贴图都贵。
-//
-// 2026-08-30 修复(实测场景 87 盏 → 卡顿 FPS 0.8):
-//   1) 原第 98 行 `if (isMobile || o.userData.deco) rm.push(o)` 在电脑端恒为 false
-//      —— `userData.deco` 全项目只在 gallery/links.js 赋值过(links 经 main.js:14 导入、modules.js 注册在跑),
-//      实测 deco 灯数为 0。结果:电脑端**一盏灯都不移除**,限额形同虚设。
-//   2) 原逻辑只处理 `o.isPointLight`,完全漏掉 40 盏 SpotLight
-//      (每幅画一个射灯,paintings.js `wi < 40`),而 SpotLight 比 PointLight 更贵
-//      (多方向/角度/penumbra 计算)。
-// 现改为:走到 traverse 末尾的灯一律移除(即"不在保留名单内就删");
-//   并新增 SpotLight 限额,只保留前 SPOT_KEEP 盏画框射灯。
-// 保留名单:命中的吊顶灯(每 N 留 1) + 高空钻石灯(y>30) + 远方昆仑信标(|x|>500)。
-{
-  const isMobile = 'ontouchstart' in window && Math.min(screen.width, screen.height) < 768;
-  const keepEvery = isMobile ? 3 : 2;
-  const SPOT_KEEP = isMobile ? 4 : 10; // 画框射灯保留数(其余画作靠环境光)
-  const ceil = new Set(pls.filter((p, i) => i % keepEvery === 0).map((p) => p.l));
-  const rm = [];
-  let spotSeen = 0;
-  s.traverse((o) => {
-    if (o.isSpotLight) {
-      // 前 SPOT_KEEP 盏画框射灯保留,其余连 target 一起移除(target 也是场景节点)
-      if (spotSeen < SPOT_KEEP) spotSeen++;
-      else {
-        rm.push(o);
-        if (o.target && o.target.parent) rm.push(o.target);
-      }
-      return;
-    }
-    if (!o.isPointLight) return;
-    if (ceil.has(o)) return; // 保留:命中的吊顶灯
-    if (o.position.y > 30 || Math.abs(o.position.x) > 500) return; // 保留:钻石灯(高空)/昆仑信标(远方)
-    rm.push(o); // 其余一律移除(不再依赖从未生效的 userData.deco)
-  });
-  rm.forEach((l) => l.parent && l.parent.remove(l));
-  // 保留的吊顶灯同步削弱 pls 闪烁列表,避免对已移除灯的无效更新
-  for (let i = pls.length - 1; i >= 0; i--) if (!ceil.has(pls[i].l)) pls.splice(i, 1);
-  if (typeof window !== 'undefined') {
-    expose('lightBudget', { removed: rm.length, keepEvery, spotKeep: SPOT_KEEP });
-  }
-}
-
-// ===================== 后处理管线初始化(2026-08-22) =====================
-initPostProcessing(rnd, s, cam);
-// 关键接线:组合根唯一循环(loop-manager._executeRenderPhase)只认 ctx.scene.renderPostProcessing
-// 来绘制 3D 场景。若此处不挂上,场景永远不被渲染——表现为「地图空白,但 HUD/对话框正常」。
-ctx.scene.renderPostProcessing = renderPostProcessing;
-ctx.scene.resizePostProcessing = resizePostProcessing;
-// 阶段3 切片:性能监控改为 PerfMonitorSystem,由唯一组合根单循环驱动(原文件在 ?perf 下自起第二条 rAF,已消除)
-compositionRoot.register(createPerfMonitorSystem({ renderer: rnd }));
-initSentry(); // Sentry 错误追踪(需配置 DSN)
-// 阶段2 垂直切片:空间音频作为 AudioSystem 接入组合根(经 deps 注入相机,绝不直接写冻结 ctx)
-// 旧 initSpatialAudio()/exposeToCtx() 已移除 —— 这正是首页崩溃补丁的根因,现已用 DI 取代。
-compositionRoot.register(
-  createAudioSystem({
-    scene: ctx.scene,
-    getCamera: () => ctx.scene.cam, // 防腐适配:阶段3 相机迁移后改由 deps 直接提供
-    eventBus: ctx.events,
-  })
-);
-// 阶段3 切片:烟花 + 漂浮粒子作为 EffectsSystem 接入组合根(engine/animate 相位)。
-// 原逻辑嵌在 LoopManager._executeUpdatePhase 里直接读 ctx.media.updateFireworks/pG/pC（上帝渲染器散点读取），
-// 现改为 deps 注入 scene 与场景常量,由唯一单循环驱动;LoopManager 不再持有该逻辑。
-compositionRoot.register(
-  createEffectsSystem({
-    scene: ctx.scene,
-    floorW: ctx.floorW,
-    floorD: ctx.floorD,
-    IL: ctx.IL,
-    IR: ctx.IR,
-    IRT: ctx.IRT,
-    IRB: ctx.IRB,
-    OT: ctx.OT,
-    OBR: ctx.OBR,
-    WH: ctx.WH,
-    bW: ctx.bW,
-    bD: ctx.bD,
-    pyrHeight: ctx.pyrHeight,
-  })
-);
-// 阶段3 切片:媒体逐帧逻辑(音乐画布 drawMusicCanvas + 视频墙纹理 needsUpdate)作为 MediaSystem 接入组合根(presentation/render 相位)。
-// 原逻辑散落在 LoopManager._executeUpdatePhase / _executeRenderPhase 直接读 ctx.media.*（上帝渲染器散点读取），
-// 现改为 deps 注入 ctx.media,由唯一单循环驱动;LoopManager 不再持有该逻辑。
-// 2026-09-06 多世界切割:增注入 scene 依赖(读 activeWorld,小世界暂停画布重绘/纹理上传)。
-compositionRoot.register(createMediaSystem({ media: ctx.media, scene: ctx.scene }));
-// 阶段3 切片:单向状态库 StateSystem(platform/bootstrap)订阅事件总线,把命名空间状态镜像进 game-state,
-// 使 game-state 成为系统可读/可订阅的统一状态源(读模型);写者/读者零改动。Stage 4 可把写路径也收归此处,关闭 ctx 直写。
-compositionRoot.register(
-  createStateSystem({ eventBus: ctx.events, gameState: getGameState(), ctx })
-);
-// 阶段3 切片:UI 域生命周期收口 UiSystem(platform/bootstrap):overlay.js 全局 Esc 监听仍在 main.js 最先 import 以保证栈优先级,
-// 但本 System.dispose 正式拥有关闭全部弹层/移除 Esc 监听的出口,使 ui 成为组合根可管理的生命周期单元。
-compositionRoot.register(createUiSystem({ ctx }));
-window.addEventListener('resize', () => {
-  const w = innerWidth,
-    h = innerHeight;
-  rnd.setSize(w, h);
-  cam.aspect = w / h;
-  cam.updateProjectionMatrix();
-  resizePostProcessing(w, h);
-});
-
-// ===================== 动画（使用统一循环管理器）=====================
-import { LoopManager } from './loop-manager.js';
-import { expose } from './debug-hooks.js';
-const loopManager = new LoopManager(ctx);
+// ===================== 主画布视觉保险 + 加载屏交接 =====================
+// 主画布开机隐藏:闸门/电影期间世界不可见——不是遮盖,startWorld 时才显形,
+// 配合世界模块整体后置,构成"电影落定 → 世界才构建+渲染"的硬顺序。
+const loopManager = new LoopManager(ctx); // 构造轻量,引导期即可;start() 在 startWorld 才调
 ctx.loopManager = loopManager;
-setLoop(loopManager); // 注入唯一主循环到 core/loop facade(新积木经 deps.loop 获取)
+setLoop(loopManager); // 注入唯一主循环 facade(新积木经 deps.loop 获取)
 
-// D4 低画质手动开关(2026-07-30):开启后强制最低 pixelRatio(最流畅),自适应只降不升
-const lowQuality = !!ctx.store.json('lowQuality', false);
-if (lowQuality) {
-  loopManager.setLowQuality(true);
-}
-ctx.setLowQuality = (on) => loopManager.setLowQuality(on); // 供设置页罗盘调用
-
-// 组合根:装载新架构积木(阶段1,2026-08-27)。toast-system 订阅 'ui:toast' 事件渲染提示,
-// 全站 ctx.ui.modeToast(...) 经 mode.js 防腐转发层 emit 该事件 —— event-bus 首次被业务消费。
-// 阶段1 补:loop-system(单一主循环 facade) + input-system(统一输入 facade,每帧镜像到总线)。
-compositionRoot.register(createToastSystem());
-compositionRoot.register(createGameShellSystem()); // 手绘游戏外壳(对话框/任务栏/菜单)
-compositionRoot.register(createLoopSystem());
-compositionRoot.register(createInputSystem(ctx.input));
-compositionRoot.init();
-// 可观测:浏览器控制台 / 验证脚本可打印确定性装配顺序(window.__compositionRoot.list())
-expose('compositionRoot', compositionRoot);
-// 可观测:单向状态库实例(配合 __compositionRoot,验证 store 真正化)
-expose('gameState', getGameState());
-// 把组合根每帧 update 注册进唯一主循环(经 core/loop facade,不再散点 ctx.onTick / 自起 rAF)
-register((dt) => compositionRoot.update(dt));
-
-// 启动统一循环管理器(唯一主循环)。旧 ctx.loop 不再自起 rAF,避免每帧双执行。
-// 2026-09-06 主人定(开场顺序修正):3D 世界**不再随模块加载启动**——
-// 开场顺序 = 闸门 → 纸飞机电影(画帽子→蛇吞象→掷飞机) → 电影落定后才启动 3D 世界。
-// startWorld() 由 watchOpening 的 finishIntro 调用(电影 skip/播完/加载失败三路都走它)。
-let worldStarted = false;
-function startWorld() {
-  if (worldStarted) return;
-  worldStarted = true;
-  window.__worldStarted = true;
-  // 主画布此时才可见(2026-09-06 视觉保险:开机即隐藏,杜绝任何回归让世界在电影期间闪现)
-  const c3d = document.getElementById('c');
-  if (c3d) c3d.style.visibility = 'visible';
-  // 着色器预编译一并挪到此处:编译成本发生在电影之后,不再与开场抢主线程
-  if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
-  loopManager.start();
-}
-ctx.startWorld = startWorld;
-expose('startWorld', startWorld);
-
-// 玩家状态机:启动时初始化为空闲状态
-ctx._playerSM.change(new IdleState());
-// 每帧更新状态机(在统一循环管理器的 tickers 中,紧随物理之后执行)
-ctx.onTick(function (dt) {
-  ctx._playerSM.tick(dt);
-});
-
-// 世界坐标读数栏(2026-09-03):左上角实时显示 X/Y/Z + 朝向 + FPS,F3 开关,
-// 一键复制坐标 —— 远程沟通"我在哪 / 哪里被挡住"时直接用它报点。
-import { mountCoordHUD } from './ui/coord-hud.js';
-mountCoordHUD(ctx);
-
-// 启动时预编译全部着色器(异步):把编译成本集中到加载屏期间,消灭运行时的编译卡顿
+const _c3d = document.getElementById('c');
+if (_c3d) _c3d.style.visibility = 'hidden';
 function fadeLoad() {
-  L.style.opacity = '0';
-  setTimeout(() => (L.style.display = 'none'), 800);
+  const l = document.getElementById('l');
+  if (!l) return;
+  l.style.opacity = '0';
+  setTimeout(() => (l.style.display = 'none'), 800);
 }
-// 加载屏交接(2026-09-06 首屏顺序修正):不再固定 1.2s 淡出——冷缓存下闸门晚于
-// 加载屏就绪会造成空白间隙。改为「闸门就绪后 400ms」交接,保底 8s 兜底。
+// 加载屏交接:闸门就绪后 400ms 淡出(保底 8s 兜底)
 let _loadFaded = false;
 function fadeLoadOnce() {
   if (_loadFaded) return;
   _loadFaded = true;
   fadeLoad();
 }
-// 主画布开机隐藏(2026-09-06 视觉保险):闸门/电影期间世界不可见,startWorld 时才显形
-const _c3d = document.getElementById('c');
-if (_c3d) _c3d.style.visibility = 'hidden';
 (function waitGateReady() {
   const t = setInterval(() => {
     if (document.getElementById('b612Gate') || window.__gateFailed) {
@@ -286,9 +64,175 @@ if (_c3d) _c3d.style.visibility = 'hidden';
     fadeLoadOnce();
   }, 8000);
 })();
-// 《元素共鸣准则》阅读卡(2026-07-25 主人修订):与昵称弹窗同规则——
-// 只在未起名时出现,每次重进都弹;前 10 秒不可删;写过雅号后,本卡与昵称弹窗都不再出现
-// 协议门控(2026-07-26):《用户协议》《隐私保护指引》未签署前,本卡不弹
+
+// ===================== 世界阶段:startWorld =====================
+// 按原 main.js import 顺序动态加载全部世界模块,随后执行原顶层构建代码
+// (灯光限额/后处理接线/组合根系统注册/状态机/坐标 HUD)。加载完成才启动主循环。
+let worldStarted = false;
+async function startWorld() {
+  if (worldStarted) return;
+  worldStarted = true;
+  window.__worldStarted = true;
+
+  // —— 世界模块按原 import 顺序加载(顺序即依赖顺序,不可调换) ——
+  await import('./scene/scene.js'); // 场景/相机/渲染器 + 墙壁/地板/屋顶 + 天空 + 灯光
+  await import('./scene/media.js'); // 2D音乐演奏器 + 视频墙 + HTML5音乐
+  await import('./gallery/signs.js'); // 户外牌子/音乐入口
+  await import('./gallery/fountains.js'); // 户外四座 Zsolnay 喷泉
+  await import('./gallery/markers.js'); // YES/奕彤爱心/Adorable标记 + 地板照片
+  await import('./gallery/links.js'); // 超链接图标/卷轴/花园入口/滚动古文
+  await import('./gallery/paintings.js'); // 挂画系统 + 白板作品墙 + 3D放大系统
+  await import('./gallery/mode.js'); // 展示区模式 + 链接模型系统
+  await import('./gallery/dome-towers.js'); // Yazd 穹顶塔楼群
+  await import('./gate/settings.js'); // 昵称双渠道(进馆 5 秒弹窗 + ⚙设置)
+  await import('./gate/upload.js'); // 访客上传(照片/我的链接)+ AI 配文 + 悬浮路标
+  await import('./gate/housecolor.js'); // 房屋分组换色
+  await import('./gate/quiz.js'); // 温柔度测试(弹窗 + 3D墙面板)
+  await import('./scene/desert.js'); // 西域沙海(无限区块地形/昆仑/水波/飞鸟/沙暴)
+  await import('./scene/player.js'); // 玩家/键盘/鼠标/触摸/小地图/跳跃滑翔
+  await import('./gate/quizgate.js'); // 入馆答题系统(悬浮答题屏 + 答题面板 + 门禁)
+  await import('./kunlun/letgo.js'); // 放下与召回·二期⑤
+  await import('./kunlun/finale.js'); // 终章三件套·二期⑥
+  await import('./player/states/PlayerStates.js'); // 移动状态机
+  const pp = await import('./scene/postprocessing.js'); // 后处理管线
+
+  // —— 以下为原 main.js 顶层构建代码(依赖上述模块的副作用,顺序不可调换) ——
+  const { s, cam, rnd, pls } = ctx;
+
+  // ===================== 灯光限额(性能) =====================
+  // 光源总数直接决定着色器体积:实测单程序编译 59盏≈822ms / 24盏≈208ms / 13盏≈103ms。
+  // 保留名单:命中的吊顶灯(每 N 留 1) + 高空钻石灯(y>30) + 远方昆仑信标(|x|>500)。
+  {
+    const isMobile = 'ontouchstart' in window && Math.min(screen.width, screen.height) < 768;
+    const keepEvery = isMobile ? 3 : 2;
+    const SPOT_KEEP = isMobile ? 4 : 10; // 画框射灯保留数(其余画作靠环境光)
+    const ceil = new Set(pls.filter((p, i) => i % keepEvery === 0).map((p) => p.l));
+    const rm = [];
+    let spotSeen = 0;
+    s.traverse((o) => {
+      if (o.isSpotLight) {
+        if (spotSeen < SPOT_KEEP) spotSeen++;
+        else {
+          rm.push(o);
+          if (o.target && o.target.parent) rm.push(o.target);
+        }
+        return;
+      }
+      if (!o.isPointLight) return;
+      if (ceil.has(o)) return; // 保留:命中的吊顶灯
+      if (o.position.y > 30 || Math.abs(o.position.x) > 500) return; // 保留:钻石灯/昆仑信标
+      rm.push(o); // 其余一律移除
+    });
+    rm.forEach((l) => l.parent && l.parent.remove(l));
+    for (let i = pls.length - 1; i >= 0; i--) if (!ceil.has(pls[i].l)) pls.splice(i, 1);
+    expose('lightBudget', { removed: rm.length, keepEvery, spotKeep: SPOT_KEEP });
+  }
+
+  // ===================== 后处理管线初始化(2026-08-22) =====================
+  pp.initPostProcessing(rnd, s, cam);
+  ctx.scene.renderPostProcessing = pp.renderPostProcessing;
+  ctx.scene.resizePostProcessing = pp.resizePostProcessing;
+  compositionRoot.register(createPerfMonitorSystem({ renderer: rnd }));
+  initSentry();
+  compositionRoot.register(
+    createAudioSystem({
+      scene: ctx.scene,
+      getCamera: () => ctx.scene.cam,
+      eventBus: ctx.events,
+    })
+  );
+  compositionRoot.register(
+    createEffectsSystem({
+      scene: ctx.scene,
+      floorW: ctx.floorW,
+      floorD: ctx.floorD,
+      IL: ctx.IL,
+      IR: ctx.IR,
+      IRT: ctx.IRT,
+      IRB: ctx.IRB,
+      OT: ctx.OT,
+      OBR: ctx.OBR,
+      WH: ctx.WH,
+      bW: ctx.bW,
+      bD: ctx.bD,
+      pyrHeight: ctx.pyrHeight,
+    })
+  );
+  compositionRoot.register(createMediaSystem({ media: ctx.media, scene: ctx.scene }));
+  compositionRoot.register(
+    createStateSystem({ eventBus: ctx.events, gameState: getGameState(), ctx })
+  );
+  compositionRoot.register(createUiSystem({ ctx }));
+  window.addEventListener('resize', () => {
+    const w = innerWidth,
+      h = innerHeight;
+    rnd.setSize(w, h);
+    cam.aspect = w / h;
+    cam.updateProjectionMatrix();
+    pp.resizePostProcessing(w, h);
+  });
+
+  // ===================== 动画(统一循环管理器,构造在引导期/startWorld 只启动) =====================
+  const lowQuality = !!ctx.store.json('lowQuality', false);
+  if (lowQuality) loopManager.setLowQuality(true);
+  ctx.setLowQuality = (on) => loopManager.setLowQuality(on);
+
+  compositionRoot.register(createToastSystem());
+  compositionRoot.register(createGameShellSystem()); // 手绘游戏外壳(对话框/任务栏/菜单)
+  compositionRoot.register(createLoopSystem());
+  compositionRoot.register(createInputSystem(ctx.input));
+  compositionRoot.init();
+  expose('compositionRoot', compositionRoot);
+  expose('gameState', getGameState());
+  register((dt) => compositionRoot.update(dt));
+
+  // 玩家状态机:世界就绪后初始化为空闲状态
+  const { IdleState } = await import('./player/states/PlayerStates.js');
+  ctx._playerSM.change(new IdleState());
+  ctx.onTick(function (dt) {
+    ctx._playerSM.tick(dt);
+  });
+
+  // 世界坐标读数栏(F3 开关,一键复制)
+  const { mountCoordHUD } = await import('./ui/coord-hud.js');
+  mountCoordHUD(ctx);
+
+  // 性别配色(老档案兼容):等 housecolor.js 就绪后应用
+  const savedGender = ctx.store.str('gender');
+  if (savedGender) applyGenderColor(savedGender);
+
+  // 可选装饰模块(失败静默重试,不影响进馆)
+  softImport(() => import('./museum/museum.js'));
+  softImport(() => import('./gallery/gallery-v2.js'));
+  softImport(() => import('./gallery/rose-gallery.js'));
+  softImport(() => import('./gallery/tower-orb.js'));
+  // 神话层延迟 2s(世界首帧之后)
+  setTimeout(function () {
+    softImport(() => import('./kunlun/peaks.js'));
+    softImport(() => import('./kunlun/spirits.js'));
+    softImport(() => import('./kunlun/eternal.js'));
+    softImport(() => import('./kunlun/ark.js'));
+    softImport(() => import('./kunlun/windchime.js'));
+    softImport(() => import('./kunlun/fireplace.js'));
+    softImport(() => import('./kunlun/snowwin.js'));
+    softImport(() => import('./kunlun/avatar.js'));
+  }, 2000);
+
+  // 着色器预编译 + 主画布显形 + 主循环启动(世界此刻才第一次渲染)
+  if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
+  const c3d = document.getElementById('c');
+  if (c3d) c3d.style.visibility = 'visible';
+  loopManager.start();
+}
+ctx.startWorld = startWorld;
+expose('startWorld', startWorld);
+
+// ===================== 引导期:UI 轻件与开场链路 =====================
+function softImport(load) {
+  load().catch(() => setTimeout(() => load().catch(() => console.info('[main] 可选模块暂未加载(不影响进馆)')), 1500));
+}
+
+// 《元素共鸣准则》阅读卡(settings.js 4s 后调用)
 function showGuideCard() {
   if (document.getElementById('guideCard')) return;
   if (
@@ -297,7 +241,7 @@ function showGuideCard() {
     !sessionStorage.getItem('communityConsented')
   )
     return;
-  if (ctx.store.str('nick')) return; // 已起名:不再显现
+  if (ctx.store.str('nick')) return;
   const c = document.createElement('div');
   c.id = 'guideCard';
   c.setAttribute('role', 'dialog');
@@ -326,7 +270,6 @@ function showGuideCard() {
   c.appendChild(a);
   c.appendChild(b);
   document.body.appendChild(c);
-  // 前 10 秒只锁「先逛逛」(关闭键);「读一读」立即可点(2026-07-26 主人修订:冻结是请人读,不是拦人读)
   let left = 10;
   b.disabled = true;
   b.style.opacity = '0.5';
@@ -343,29 +286,23 @@ function showGuideCard() {
 }
 ctx.showGuideCard = showGuideCard;
 
-// ===================== 性别选择(2026-09-06 主人定:开场门槛删除) =====================
-// showGenderSelect 弹窗流程已整体移除;保留配色应用——老档案里存过 gender=male 的
-// 仍生效(蓝色墙壁),新访客不再被问性别,统一默认暖色。
+// 性别配色(老档案兼容;新访客无性别门槛)——世界阶段应用(houseMats 由 housecolor.js 挂载)
 function applyGenderColor(gender) {
   if (gender !== 'male') return;
-  // 男生:建筑墙壁调成蓝色(黛蓝 #3a5a8c)
   const blueHex = '#3a5a8c';
-  // 延迟执行,等 housecolor.js 加载完成;多轮重试直到 houseMats 就绪
   let tries = 0;
   (function tryApply() {
     tries++;
-    if (tries > 20) return; // 最多重试 20 次(40秒)
+    if (tries > 20) return;
     if (!(ctx.gallery && ctx.gallery.houseMats && ctx.gallery.houseMats.wall)) {
       setTimeout(tryApply, 2000);
       return;
     }
-    const houseMats = ctx.gallery.houseMats;
-    const mats = houseMats.wall;
-    // 直接用材质自带的 color API 改色(不依赖 THREE 全局引用)
+    const mats = ctx.gallery.houseMats.wall;
     try {
       mats.forEach((m) => {
         if (m && m.color && m.color.set) {
-          m.color.set(blueHex); // THREE.Color.set 接受 hex 字符串
+          m.color.set(blueHex);
           if (m.needsUpdate) m.needsUpdate = true;
         }
       });
@@ -376,16 +313,8 @@ function applyGenderColor(gender) {
     }
   })();
 }
-// 启动时应用已保存的性别颜色(老档案兼容;新访客不再有性别选择门槛)
-const savedGender = ctx.store.str('gender');
-if (savedGender) applyGenderColor(savedGender);
-
-// 快速进馆交接已改为 waitGateReady(2026-09-06 首屏顺序修正):
-// 加载屏在闸门就绪后 400ms 淡出(保底 8s),不再固定 1.2s——消除冷缓存下的空白间隙;
-// 着色器仍在后台编译(startWorld 在电影落定后统一预编译),不阻塞任何阶段
 
 // ===================== 协议文档配乐(2026-07-31) =====================
-// 浏览3个协议文档时循环播放00001.m4a,进入画廊后立即停止
 const agreementMusic = new Audio('https://cdn.cloudbear.cloud/music/00001.m4a');
 agreementMusic.loop = true;
 agreementMusic.volume = 0.4;
@@ -401,22 +330,14 @@ function stopAgreementMusic() {
   agreementMusic.pause();
   agreementMusic.currentTime = 0;
 }
-// 导出给 prologue.js 使用(序章结束时停止协议配乐)
 ctx.stopAgreementMusic = stopAgreementMusic;
 
-// 入口闸门(2026-09-05,B612 定稿):一屏英文开场,点 ENTER 即视为同意三份协议
-// (写会话标记+永久标记);协议全文由闸门底行链接随时点开、可返回。取代三连读强制签署。
-// 同时预热开幕电影代码块:ENTER 后电影即刻开播,消除「闸门已退、电影未上」的空档
-// (此前空档期会露出正在加载的 3D 世界——2026-09-06 主人报的启动顺序问题)。
+// ===================== 入口闸门 + 电影预热 =====================
 import('./gate/openfilm.js').catch(function () {});
 import('./gate/entrygate.js')
   .then(function (m) {
     m.setupEntryGate({
-      // 加载屏交接(见 waitGateReady):闸门 DOM 就绪即淡出加载屏
       onGateReady: function () {},
-      // ENTER 信号(2026-09-06 首屏顺序修正):电影必须等闸门通过——
-      // 旧逻辑只看 sessionStorage 同意键,同标签页刷新后键残留,电影会
-      // 盖住未作答的闸门直接开播(z-580 > z-150)
       onEnter: function () {
         startAgreementMusic();
         window.__gatePassed = true;
@@ -424,19 +345,14 @@ import('./gate/entrygate.js')
     });
   })
   .catch(function (e) {
-    // 闸门加载失败兜底:补齐标记直接放行,不让任何人卡在门外
     sessionStorage.setItem('agreementConsented', '1');
     sessionStorage.setItem('privacyConsented', '1');
     sessionStorage.setItem('communityConsented', '1');
-    window.__gateFailed = true; // watchOpening 不再等闸门
+    window.__gateFailed = true;
     console.warn('[gate] 入口闸门初始化失败,已放行:', e.message);
   });
-// 着色器预编译已并入 startWorld()(2026-09-06:开场顺序修正,世界启动整体推迟到电影落定后)
 
-// ===================== 开场流程(2026-09-06 主人定:收敛为唯一链路) =====================
-// 每次进入完全一致:入口闸门(勾选同意→ENTER) → 纸飞机电影(每次都播,skip/Esc 可跳) → 游戏。
-// 旧版五路分叉(?oldintro/序章兜底/prologueDone 跳过)已拆除;prologue.js/opening-bg.js 不再引入。
-// ?noopening / ?noprologue / ?nofilm / sessionStorage.skipOpening 统一=跳过电影直接进馆(探针/测试用)。
+// ===================== 开场流程(唯一链路:闸门 → 电影 → startWorld) =====================
 (function watchOpening() {
   const skipFilm =
     /noopening|noprologue|nofilm/.test(location.search) ||
@@ -444,18 +360,14 @@ import('./gate/entrygate.js')
   let done = false;
   function tick() {
     if (done) return;
-    // ① 等「闸门通过」信号(ENTER 置 __gatePassed):电影必须等闸门,不看会话键——
-    //    同标签页刷新后键残留,旧逻辑会让电影盖住未作答的闸门直接开播。
-    //    闸门加载失败兜底:__gateFailed 置位后直接放行(键已由 catch 补齐)。
+    // 等「闸门通过」信号(ENTER 置 __gatePassed);闸门加载失败走 __gateFailed 兜底
     if (!window.__gatePassed && !window.__gateFailed) {
       setTimeout(tick, 300);
       return;
     }
     done = true;
-    // 收束:停协议配乐 + 记档(兼容旧消费方) + 起大屏轮播;deferMedia=首次交互/4s 兜底再起播
     function finishIntro(deferMedia) {
-      window.__introFired = (window.__introFired||0)+1;
-      // 开场顺序修正(2026-09-06):电影落定后才启动 3D 世界(主循环+着色器编译)
+      window.__introFired = (window.__introFired || 0) + 1;
       if (ctx.startWorld) ctx.startWorld();
       if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
       ctx.store.mark('prologueDone');
@@ -471,12 +383,10 @@ import('./gate/entrygate.js')
         setTimeout(go, 4000);
       } else if (ctx.startVidSeq) ctx.startVidSeq();
     }
-    // ② 测试/探针旁路:统一跳过电影
     if (skipFilm) {
       finishIntro(true);
       return;
     }
-    // ③ 每次进入都播纸飞机电影(可跳过);加载失败直接进馆
     import('./gate/openfilm.js')
       .then(function (m) {
         m.playOpeningFilm(function () {
@@ -491,11 +401,7 @@ import('./gate/entrygate.js')
   setTimeout(tick, 1200);
 })();
 
-import './visitor-fp.js'; // 访客身份采集+踢出通知(2026-08-30 权限精简):持久ID三处冗余+多维指纹+SSE踢出监听
-// 梦幻画廊 展厅+回字大厅 已启动
-
-// C6 退出文案(2026-07-28,设计文档第 19 步):切走/关闭页面时留一句;切回时即见
-// (已冠前缀的六合藏梦人追加一行;modeToast 轻提示,不打断)
+// C6 退出文案(2026-07-28):切走/关闭页面前留一句(不打断)
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) return;
   const crowned = ctx.store && ctx.store.str('prefix') === '六合藏梦人·';

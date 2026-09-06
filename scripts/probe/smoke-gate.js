@@ -77,7 +77,11 @@ const { BASE_URL, launch } = require('./browser');
 
   // ② 等世界真正启动:主循环 FPS>0(startWorld 在 finishIntro 时调用)
   await page.waitForFunction(
-    () => window.__ctx && window.__ctx.loopManager && window.__ctx.loopManager.getFPS() > 0,
+    () =>
+      window.__ctx &&
+      window.__ctx.loopManager &&
+      window.__ctx.loopManager.getFPS &&
+      window.__ctx.loopManager.getFPS() > 0,
     null,
     { timeout: 90000 }
   );
