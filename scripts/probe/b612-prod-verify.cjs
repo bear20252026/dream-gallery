@@ -24,7 +24,7 @@ const { launch } = require('./browser.js');
   }, null, { timeout: 15000 });
   await page.waitForTimeout(1800);
   await page.screenshot({ path: path.join(art, 'prod-2-agreement.png') });
-  const dateOk = await page.frameLocator('#panelFrame').locator('text=2026 年 9 月 5 日').first().isVisible();
+  const dateOk = await page.frameLocator('#panelFrame').locator('text=2026 年 9 月 6 日').first().isVisible();
   await page.frameLocator('#panelFrame').locator('button:has-text("‹ 返回")').click();
   await page.waitForFunction(() => {
     const g = document.getElementById('b612Gate');
