@@ -27,10 +27,23 @@ npm test                          # = 下面三条(test-store + test.js + test-m
 node scripts/test/test-store.js   # 存档原子写 4 项(并发保存/截断恢复/tmp 残留)
 node scripts/test/test.js         # 后端 125 项(数据校验/API/安全边界/审批门/上传限制/邀请)
 node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色器错误/JS异常/空屏)
-npx vitest run                    # 前端单测 82 项(collision/EntityRegistry/GameLoop/StateMachine/events/SpatialIndex/store)
+npx vitest run                    # 前端单测 228 项(collision/EntityRegistry/GameLoop/StateMachine/events/SpatialIndex/store/planet-logic/light-budget/film-gate)
+npm run test:scene                # 场景截图回归 4 检查点(主世界/B612/国王星球/返回;见「场景自动化测试」节)
 ```
 
 两个全绿才能部署。前端改动用 `node --input-type=module --check < src/某文件` 查语法;`node --check server.js` 查后端。
+
+## 场景自动化测试(2026-09-07,三层防线)
+
+3D 场景文件(planets/scene/openfilm)是"拍戏"代码,产出是画面,没有尺子量对错。三层补救:
+
+- **第一层 纯逻辑拆出(能算账的交给机器人算账)**:场景文件里纯计算的部分拆成零依赖模块,vitest 直测——
+  - `src/kunlun/planet-logic.mjs`:六星章节数据/岛面几何/石门武装状态机(gateStep)/返回落点外推(exitGateNudge,含 2026-09-06 零向量回归用例)。planets.js 只做场景接线,**改数值、改规则去这里**。
+  - `src/core/light-budget.js`:灯光限额选择算法(selectLightsToRemove,手机/桌面/豁免名单)。main.js 只执行删除。
+  - `src/gate/film-gate.mjs`:开场电影收束状态机(三路 finish 幂等/skip 幂等/dead 守卫/收束定时器后来居上)。openfilm.js 只管 DOM 表现。
+  - **改这三块的行为必须同步改对应测试**;`scripts/test/test-mobile.js` 的静态检查盯 main.js↔light-budget 的接线存在。
+- **第二层 专项探针(关键路径剧本化)**:`scripts/probe/` 下按用户真实路径写断言脚本——smoke-gate(开机健康)、b612-return-black(返回主世界防回弹+像素亮度+后处理/avatar 断言,支持 BASE_URL 直测线上)、b612-preload-film(电影期预加载零渲染)、b612-world-probe(六世界导航链)。
+- **第三层 截图回归(拍照对比兜底)**:`npm run test:scene` = `scripts/probe/scene-visual-regression.cjs`。四检查点各断言三层:activeWorld 语义 → 亮度非黑非白 → 与基线(`scripts/probe/baselines/vr-*.png`,已入库)的**归一化块签名**对比(昼夜/曝光漂移被抵消,构图变化保留)。阈值/裁剪窗在探针头部常量;同机噪声实测 <1%,WARN 10%,VR_STRICT=1 时超 25% 硬失败。**有意改画面后跑 `VR_UPDATE=1 npm run test:scene` 重建基线**。局限:整帧对比抓构图级变化(建筑/门/星球消失),小物件回归靠第二层专项探针。CI 已接(非严格模式:语义硬门禁+像素警告)。
 
 ## 构建与效率(2026-07-25 Vite 升级)
 

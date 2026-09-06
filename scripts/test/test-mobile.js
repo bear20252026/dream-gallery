@@ -33,9 +33,17 @@ function startServer(port) {
 (async () => {
   // ---------- 静态防回归:手机端灯光限额代码必须存在 ----------
   console.log('\n[静态检查]');
+  // 2026-09-07 灯光预算选择算法拆到 core/light-budget.js(纯逻辑,vitest 单测),
+  // main.js 保留触屏判定与执行删除——两处都在才算防线完整
   const mainCode = fs.readFileSync(path.join(ROOT, 'src', 'main.js'), 'utf8');
-  ok(mainCode.includes('ontouchstart') && mainCode.includes('isPointLight'),
-    'main.js 存在手机端灯光限额(防止 too many uniforms 回归)');
+  const budgetCode = fs.readFileSync(path.join(ROOT, 'src', 'core', 'light-budget.js'), 'utf8');
+  ok(
+    mainCode.includes('ontouchstart') &&
+      mainCode.includes('selectLightsToRemove') &&
+      budgetCode.includes('isPointLight') &&
+      budgetCode.includes('keepEvery'),
+    'main.js+light-budget.js 存在手机端灯光限额(防止 too many uniforms 回归)'
+  );
 
   // ---------- 动态:模拟 iPhone 加载页面 ----------
   console.log('\n[模拟 iPhone 12 加载]');

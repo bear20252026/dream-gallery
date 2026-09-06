@@ -2,6 +2,7 @@
 // 真实路径:主世界石门自动传送进 B612 → 点「返回主世界」导航按钮 →
 // 连续采样 activeWorld 5 秒(抓“下一帧被石门回弹”)+ 截图像素亮度(抓黑屏)。
 // 用法:node scripts/probe/b612-return-black-probe.cjs  (自起临时服务器)
+//      BASE_URL=https://cloudbear.cloud node ... (跳过自起服务器,直测线上)
 const path = require('path'), fs = require('fs'), os = require('os'), zlib = require('zlib');
 const { spawn } = require('child_process');
 const { launch } = require('./browser.js');
@@ -61,12 +62,14 @@ function pngBrightness(buf) {
 }
 
 (async () => {
-  const child = await startServer();
+  const EXTERNAL = process.env.BASE_URL;
+  const child = EXTERNAL ? null : await startServer();
+  const ORIGIN = EXTERNAL || 'http://localhost:' + PORT;
   const b = await launch();
   const page = await b.newPage({ viewport: { width: 1280, height: 800 } });
   const errs = [];
   page.on('pageerror', (e) => { if (!/dynamically imported module/.test(e.message)) errs.push(String(e).slice(0, 200)); });
-  await page.goto('http://localhost:' + PORT + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.goto(ORIGIN + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
   await page.evaluate(() => {
     const c = document.getElementById('gAgreeChk');
@@ -136,7 +139,8 @@ function pngBrightness(buf) {
   ok('无未捕获页面异常', errs.length === 0);
   if (errs.length) console.log('页面异常:\n' + errs.slice(0, 6).join('\n'));
   fs.writeFileSync(path.join(__dirname, '..', 'artifacts', 'b612-return-last.png'), shot);
-  await b.close(); child.kill();
+  await b.close();
+  if (child) child.kill();
   setTimeout(() => { try { fs.rmSync(TMP, { recursive: true, force: true }); } catch {} }, 500);
   process.exit(fail ? 1 : 0);
 })().catch((e) => { console.error('探针失败:', e && e.message); process.exit(1); });

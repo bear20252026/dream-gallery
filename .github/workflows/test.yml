@@ -91,3 +91,6 @@ jobs:
 
       - name: 冒烟门禁(canvas/ctx/灯光预算/页面异常)
         run: BASE_URL=http://127.0.0.1:3311 PW_BROWSER=chromium node scripts/probe/smoke-gate.js
+
+      - name: 场景截图回归(四检查点:主世界/B612/国王星球/返回;语义断言硬门禁,像素差异仅警告)
+        run: BASE_URL=http://127.0.0.1:3311 PW_BROWSER=chromium node scripts/probe/scene-visual-regression.cjs

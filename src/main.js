@@ -112,33 +112,15 @@ async function preloadWorld() {
   // —— 以下为原 main.js 顶层构建代码(依赖上述模块的副作用,顺序不可调换) ——
   const { s, cam, rnd, pls } = ctx;
 
-  // ===================== 灯光限额(性能) =====================
+  // ===================== 灯光限额(性能;选择算法在 core/light-budget.js 纯逻辑) =====================
   // 光源总数直接决定着色器体积:实测单程序编译 59盏≈822ms / 24盏≈208ms / 13盏≈103ms。
-  // 保留名单:命中的吊顶灯(每 N 留 1) + 高空钻石灯(y>30) + 远方昆仑信标(|x|>500)。
   {
     const isMobile = 'ontouchstart' in window && Math.min(screen.width, screen.height) < 768;
-    const keepEvery = isMobile ? 3 : 2;
-    const SPOT_KEEP = isMobile ? 4 : 10; // 画框射灯保留数(其余画作靠环境光)
-    const ceil = new Set(pls.filter((p, i) => i % keepEvery === 0).map((p) => p.l));
-    const rm = [];
-    let spotSeen = 0;
-    s.traverse((o) => {
-      if (o.isSpotLight) {
-        if (spotSeen < SPOT_KEEP) spotSeen++;
-        else {
-          rm.push(o);
-          if (o.target && o.target.parent) rm.push(o.target);
-        }
-        return;
-      }
-      if (!o.isPointLight) return;
-      if (ceil.has(o)) return; // 保留:命中的吊顶灯
-      if (o.position.y > 30 || Math.abs(o.position.x) > 500) return; // 保留:钻石灯/昆仑信标
-      rm.push(o); // 其余一律移除
-    });
+    const { selectLightsToRemove } = await import('./core/light-budget.js');
+    const { remove: rm, ceil } = selectLightsToRemove((cb) => s.traverse(cb), pls, { isMobile });
     rm.forEach((l) => l.parent && l.parent.remove(l));
     for (let i = pls.length - 1; i >= 0; i--) if (!ceil.has(pls[i].l)) pls.splice(i, 1);
-    expose('lightBudget', { removed: rm.length, keepEvery, spotKeep: SPOT_KEEP });
+    expose('lightBudget', { removed: rm.length, keepEvery: isMobile ? 3 : 2, spotKeep: isMobile ? 4 : 10 });
   }
 
   // ===================== 后处理管线初始化(2026-08-22) =====================

@@ -18,6 +18,7 @@
 // 跳过:skip 按钮 / Esc → 直落定 → 短停 → 交棒。
 import * as THREE from 'three';
 import { Z } from '../shared/z-layers.mjs';
+import { createFilmGate } from './film-gate.mjs';
 
 let active = false;
 
@@ -195,7 +196,7 @@ export function playOpeningFilm(onDone) {
       if (window.__reportError)
         window.__reportError('webgl', 'film WebGL context lost,已降级收束');
       later(function () {
-        finish();
+        gate.finish(); // 上下文丢失收束:与 skip/自然播完同口,幂等只放一次
       }, 400);
     });
   }
@@ -681,7 +682,7 @@ export function playOpeningFilm(onDone) {
         renderer = null;
         if (window.__reportError)
           window.__reportError('webgl', 'film flight render threw,已降级收束: ' + e.message);
-        finish();
+        gate.finish(); // 渲染抛错立即收束:幂等,若 skip 已收过则静默
         return;
       }
     }
@@ -860,13 +861,15 @@ export function playOpeningFilm(onDone) {
   }
 
   /* ================= 总控 ================= */
-  let running = false,
-    choseBoa = false,
-    skipped = false;
+  // 收束状态机(film-gate.mjs 纯逻辑):running/skipped/幂等 finish/后来居上的收束定时器
+  let choseBoa = false;
+  const gate = createFilmGate(function () {
+    root.style.transition = 'opacity 1.6s ease';
+    root.style.opacity = '0';
+    setTimeout(done, 1700);
+  });
   function skip() {
-    if (skipped || !running) return;
-    skipped = true;
-    running = false;
+    if (!gate.skip()) return; // 幂等+播放中才有效(原 skipped||!running 判断内聚进状态机)
     root.classList.add('act2');
     ['fT0', 'fTq', 'fReply', 'fMind'].forEach((i) => $(i).classList.remove('show'));
     $('fChoice').classList.remove('show');
@@ -885,11 +888,10 @@ export function playOpeningFilm(onDone) {
     res();
   }
   async function play() {
-    if (running) return;
-    running = true;
+    if (!gate.begin()) return;
     // skip 后 play 的 async 序列不会自动取消,done() 会移除 DOM——
-    // 每个 await 后必须检查 skipped,否则摸到已删元素报 null.classList(2026-09-06 线上抓获)
-    const dead = () => skipped || !running;
+    // 每个 await 后必须检查 dead,否则摸到已删元素报 null.classList(2026-09-06 线上抓获)
+    const dead = () => gate.dead;
     ['fT0', 'fTq', 'fReply', 'fMind'].forEach((i) => $(i).classList.remove('show'));
     $('fChoice').classList.remove('show');
     $('fPlaneDom').classList.remove('show');
@@ -961,17 +963,12 @@ export function playOpeningFilm(onDone) {
     if (dead()) return;
     $('tFly1').classList.remove('ftshow');
     $('tFly2').classList.remove('ftshow');
-    running = false;
+    gate.endRun();
   }
   // 落定收束:推镜与尾字站稳 2.2s,整层淡出交棒
-  // 收束调度唯一入口(三路汇合:自然播完/skip/降级;done 幂等防重)
+  // 收束调度唯一入口(三路汇合:自然播完/skip/降级;状态机幂等防重)
   function scheduleFinish(ms) {
-    later(finish, ms);
-  }
-  function finish() {
-    root.style.transition = 'opacity 1.6s ease';
-    root.style.opacity = '0';
-    setTimeout(done, 1700);
+    gate.schedule(ms);
   }
   $('fSkip').onclick = function (e) {
     e.stopPropagation();

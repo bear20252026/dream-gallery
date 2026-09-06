@@ -12,6 +12,18 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { Z } from '../shared/z-layers.mjs';
 import { initSceneManager } from '../core/scene-manager.js';
+import {
+  PLANETS,
+  ISLAND_R as R,
+  GATE_RADIUS,
+  planetByNum,
+  islandTopAt,
+  worldForIsland,
+  spawnFor,
+  kingSpawnPoint,
+  gateStep,
+  exitGateNudge,
+} from './planet-logic.mjs';
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -61,16 +73,10 @@ function addStarfield(scene) {
 
 // 独立世界容器:main 保留现有画廊,B612 独立注册;六星世界在 PLANETS 数据定义后按序注册。
 
-// ===================== 常量登记(2026-09-06 审计 P2:此前散落 2~3 份) =====================
-const B612_SPAWN = { pos: [-1.5, 2, -8.5], yaw: Math.PI }; // 天幕壳内、星球正前方
-const KING_SPAWN_Y = () => R * 0.42 + 1.6; // 星球岛面站立高度
-const GATE_RADIUS = 4;   // 主世界石门自动传送半径(m)
+// ===================== 常量登记(数值/几何/状态机全在 planet-logic.mjs,此处只引) =====================
 // 石门武装标记(2026-09-06 主人报「返回主世界黑屏」根因):自动传送触发即解除,
 // 走出半径才重新武装——否则从 B612 返回时快照把玩家放回圈内,下一帧又被弹回。
 let gateArmed = true;
-const PAD_RADIUS = 3;    // 石台触发半径(m)
-const DOOR_RADIUS = 2.5; // 岛上回程门半径(m)
-const PICK_RADIUS = 3;   // 星屑拾取半径(m)
 
 const worldManager = initSceneManager({
   renderer: ctx.scene.rnd,
@@ -113,96 +119,6 @@ function loadWorldAsset(url, world, opts = {}) {
     (err) => console.warn('[planets] world asset unavailable:', url, err.message)
   );
 }
-/* ===================== 六星章节数据(key 与 spirits SPIRITS 同序同键) ===================== */
-// 剧情权限:完成当前星球后解锁下一颗;已解锁世界之间互相直达。顺序=原著行星(方案A)。
-const WORLD_UNLOCK = [
-  { world: 'king326', key: 'flame', num: '326', name: '虚荣之星', done: 'flameDone' },
-  { world: 'king327', key: 'leaf', num: '327', name: '酒鬼之星', done: 'leafDone' },
-  { world: 'king328', key: 'snow', num: '328', name: '商人之星', done: 'snowDone' },
-  { world: 'king329', key: 'dawn', num: '329', name: '点灯人之星', done: 'dawnDone' },
-  { world: 'king330', key: 'dusk', num: '330', name: '地理学家之星', done: 'duskDone' },
-];
-function unlockedWorldIds() {
-  return ['main', 'b612', 'king'].concat(
-    WORLD_UNLOCK.slice(0, Math.max(0, chapter - 1)).map((w) => w.world)
-  );
-}
-const R = 13; // 岛半径
-const PLANETS = [
-  {
-    key: 'sprout',
-    num: '325',
-    name: '国王之星',
-    color: '#d9a441',
-    veil: 'rgba(180,140,70,.14)',
-    pos: [120, 58, -70],
-    place: '325 号小行星 · 国王',
-    tts: '国王的星球一无所有,他却统治一切。他命令太阳落下——只在日落允许的时刻。他说:审判自己,比审判别人难得多。能做到的人,寥寥无几。',
-    popup: '拾获星屑 · 国王',
-    en: 'The King',
-  },
-  {
-    key: 'flame',
-    num: '326',
-    name: '虚荣之星',
-    color: '#e8b8c8',
-    veil: 'rgba(220,160,190,.13)',
-    pos: [-240, 66, -150],
-    place: '326 号小行星 · 爱虚荣的人',
-    tts: '他听不见别的,只听得见赞美。你鼓一次掌,他敬一次礼。掌声给了他一顶帽子似的快乐,却从没给过他一个朋友。',
-    popup: '拾获星屑 · 爱虚荣的人',
-    en: 'The Conceited Man',
-  },
-  {
-    key: 'leaf',
-    num: '327',
-    name: '酒鬼之星',
-    color: '#9ab87a',
-    veil: 'rgba(120,160,90,.14)',
-    pos: [330, 74, 110],
-    place: '327 号小行星 · 酒鬼',
-    tts: '酒鬼坐在空荡荡的星球上喝酒。喝酒为了什么?为了忘记。忘记什么?忘记羞愧。羞愧什么?羞愧喝酒。有些被忘掉的,其实一直等着被找回来。',
-    popup: '拾获星屑 · 酒鬼',
-    en: 'The Tippler',
-  },
-  {
-    key: 'snow',
-    num: '328',
-    name: '商人之星',
-    color: '#c8a86a',
-    veil: 'rgba(170,130,60,.15)',
-    pos: [-400, 82, 90],
-    place: '328 号小行星 · 商人',
-    tts: '商人一辈子在数星星,数了五亿零一百万颗,把数字锁进抽屉,说星星都归他了。可他从来没有抬头看过它们一眼。拥有和看见,原来是两件事。',
-    popup: '拾获星屑 · 商人',
-    en: 'The Businessman',
-  },
-  {
-    key: 'dawn',
-    num: '329',
-    name: '点灯人之星',
-    color: '#a8c8e0',
-    veil: 'rgba(140,170,210,.14)',
-    pos: [200, 90, 330],
-    place: '329 号小行星 · 点灯人',
-    tts: '点灯人的星球一分钟自转一圈。他点亮,熄灭,再点亮,不敢停。他是唯一不为自己忙的人——小王子说,那是唯一可以交朋友的人。',
-    popup: '拾获星屑 · 点灯人',
-    en: 'The Lamplighter',
-  },
-  {
-    key: 'dusk',
-    num: '330',
-    name: '地理学家之星',
-    color: '#d0b090',
-    veil: 'rgba(190,160,120,.15)',
-    pos: [-190, 96, 400],
-    place: '330 号小行星 · 地理学家',
-    tts: '地理学家写厚厚的书,却从不出门。他说,花是转瞬即逝的,不能写进书里。小王子忽然心疼起来——他的玫瑰,也是转瞬即逝的。最后一根光柱,在天上。',
-    popup: '拾获星屑 · 地理学家',
-    en: 'The Geographer',
-  },
-];
-
 /* ===================== 状态 ===================== */
 let chapter = ctx.store.num('planetsChapter'); // 0..6(6=全部完成)
 if (chapter > 6) chapter = 6;
@@ -214,17 +130,10 @@ ctx.kunlun.groundOverride = function (x, z) {
   const active = ctx.scene.activeWorld;
   if (active === 'b612') return 0;
   if (active && /^king\d+$/.test(active)) {
-    const num = active.replace('king', '');
-    const cfg = PLANETS.find((p) => p.num === num);
-    if (cfg) return R * 0.42;
-    return 0;
+    return planetByNum(active.replace('king', '')) ? R * 0.42 : 0;
   }
-  for (let i = 0; i < PLANETS.length; i++) {
-    const isl = PLANETS[i];
-    const dx = x - isl.pos[0],
-      dz = z - isl.pos[2];
-    if (dx * dx + dz * dz < R * R) return isl.pos[1] + R * 0.42; // 球顶表面(压扁后)
-  }
+  const top = islandTopAt(x, z); // 浮空岛顶面(命中返回 y,未命中 null)
+  if (top !== null) return top;
   return prevOverride ? prevOverride.call(this, x, z) : undefined;
 };
 bag.custom.push(function () {
@@ -671,28 +580,24 @@ const goMainWorld = function () {
     gateArmed = false; // 返回落点就在石门旁,先解除自动传送(走出半径后重新武装)
     const pp = ctx.player.pl && ctx.player.pl.p;
     if (!pp) return;
-    // 顺手把落点推出石门半径(沿原方向推到圈外 2m):玩家回来即看到「✦ 进入 B612」
-    const EXIT = GATE_RADIUS + 2;
-    const dx = pp.x - 0.1,
-      dz = pp.z - 56.0;
-    const d = Math.sqrt(dx * dx + dz * dz);
-    let ux = d > 0.01 ? dx / d : 0,
-      uz = d > 0.01 ? dz / d : -1; // 与石门完全重叠时默认往画廊方向(-z)退
-    if (d < EXIT) {
-      pp.x = 0.1 + ux * EXIT;
-      pp.z = 56.0 + uz * EXIT;
+    // 顺手把落点推出石门半径:玩家回来即看到「✦ 进入 B612」(纯几何在 planet-logic)
+    const np = exitGateNudge(pp.x, pp.z, GATE_RADIUS + 2);
+    if (np.moved) {
+      pp.x = np.x;
+      pp.z = np.z;
       const gy = ctx.desert && ctx.desert.getH && ctx.desert.getH(pp.x, pp.z);
       if (typeof gy === 'number') pp.y = gy + 1.6;
     }
   });
 };
 const goKing325 = function () {
+  const sp = kingSpawnPoint();
   worldManager.enter('king325', {
     snapshot: {
       camera: null,
       player: {
-        position: new THREE.Vector3(0, KING_SPAWN_Y(), 4),
-        yaw: 0,
+        position: new THREE.Vector3(sp.x, sp.y, sp.z),
+        yaw: sp.yaw,
         pitch: 0,
         vy: 0,
         onGround: true,
@@ -710,12 +615,13 @@ padBtn.style.cssText =
   'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:'+Z.navBtn+';display:none;padding:14px 36px;border-radius:24px;border:2px solid rgba(255,214,130,.9);background:rgba(30,18,8,.92);color:#ffe9c4;font-size:18px;letter-spacing:4px;cursor:pointer;font-family:inherit';
 padBtn.onclick = function () {
   padBtn.style.display = 'none';
+  const sp = spawnFor('b612');
   worldManager.enter('b612', {
     snapshot: {
       camera: null,
       player: {
-        position: new THREE.Vector3(...B612_SPAWN.pos),
-        yaw: B612_SPAWN.yaw,
+        position: new THREE.Vector3(sp.position.x, sp.position.y, sp.position.z),
+        yaw: sp.yaw,
         pitch: 0,
         vy: 0,
         onGround: true,
@@ -734,27 +640,22 @@ function travelTo(idx) {
   const isl = islands[idx];
   if (!isl || !worldManager) return;
   // 新入口顺序:主世界石门 → B612 小王子之家;B612 内再进入对应星球世界。
-  const targetWorld = ctx.scene.activeWorld === 'main' ? 'b612' : 'king' + isl.cfg.num;
+  const targetWorld = worldForIsland(ctx.scene.activeWorld, isl.cfg.num);
   // 每个世界有自己的出生坐标(独立坐标系,和主世界无关)
-  const spawn =
-    targetWorld === 'b612'
-      ? {
-          position: new THREE.Vector3(...B612_SPAWN.pos),
-          yaw: B612_SPAWN.yaw,
-          pitch: 0,
-          vy: 0,
-          onGround: true,
-          gliding: false,
-        }
-      : {
-          position: new THREE.Vector3(0, 2, 12),
-          yaw: 0,
-          pitch: 0,
-          vy: 0,
-          onGround: true,
-          gliding: false,
-        };
-  worldManager.enter(targetWorld, { snapshot: { camera: null, player: spawn } });
+  const sp = spawnFor(targetWorld);
+  worldManager.enter(targetWorld, {
+    snapshot: {
+      camera: null,
+      player: {
+        position: new THREE.Vector3(sp.position.x, sp.position.y, sp.position.z),
+        yaw: sp.yaw,
+        pitch: 0,
+        vy: 0,
+        onGround: true,
+        gliding: false,
+      },
+    },
+  });
   if (ctx.ui.modeToast)
     ctx.ui.modeToast(targetWorld === 'b612' ? "B612 · The Little Prince's Home" : isl.cfg.place);
 }
@@ -900,22 +801,20 @@ onTick(function (dt) {
   // ==== 主世界:靠近石门自动传送 + 远处显示按钮 ====
   if (activeWorld === 'main') {
     setNav(false); // 主世界导航隐藏(进 B612 走石门 padBtn)
-    const dgx = p.x - 0.1,
-      dgz = p.z - 56.0;
-    const nearGate = dgx * dgx + dgz * dgz < GATE_RADIUS * GATE_RADIUS; // 石门自动传送半径
-    if (nearGate) {
-      if (gateArmed) {
-        gateArmed = false; // 返回落点在圈内不再回弹;走出半径后由下方重新武装
-        padBtn.style.display = 'none';
-        hud.style.display = 'none';
-        travelTo(0);
-      }
+    const step = gateStep(gateArmed, p.x, p.z); // 武装状态机(纯逻辑在 planet-logic)
+    if (!step.near) {
+      gateArmed = true;
+      // 不在门旁:显示按钮
+      padBtn.style.display = 'block';
+      hud.style.display = 'none';
       return;
     }
-    gateArmed = true;
-    // 不在门旁:显示按钮
-    padBtn.style.display = 'block';
-    hud.style.display = 'none';
+    if (step.fire) {
+      gateArmed = false; // 触发即解除;返回落点在圈内不再回弹,走出半径后重新武装
+      padBtn.style.display = 'none';
+      hud.style.display = 'none';
+      travelTo(0);
+    }
     return;
   }
   setNav(false);
