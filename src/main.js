@@ -19,16 +19,22 @@ import './gallery/mode.js'; // 展示区模式(普通/特殊)+ 链接模型系�
 import './gallery/dome-towers.js'; // Yazd 穹顶塔楼群(6 座围圆环绕画廊,按需异步加载)
 // 2026-08-31:动态 import 强制 vite/rolldown 把 museum 模块打进 bundle,
 // 否则静态 import 会被 tree-shake 当 dead code 完全删掉(museum.js 无顶层副作用调用)
-import('./museum/museum.js'); // 万镜博物馆:大堂+贵族房间世界(方案A试点)
+softImport(() => import('./museum/museum.js')); // 万镜博物馆:大堂+贵族房间世界(方案A试点)
 // 花瓣画廊 v2(2026-09-02):东侧空地 (60,8) 按验收模板 1:1 建造。
 // 必须动态 import:主线程灯光预算清扫在 main.js 同步执行,静态 import 的点光源会被清掉
-import('./gallery/gallery-v2.js');
+// 2026-09-06:动态导入加静默重试——Windows 下偶发文件锁瞬断会让 import 抛
+// 「Failed to fetch dynamically imported module」,未处理拒绝会打上左下角报错条吓到访客。
+// 字面量 import 保留在闭包里(Vite 才能解析哈希 chunk),失败 1.5s 后重试一次,再失败仅 info。
+function softImport(load) {
+  load().catch(() => setTimeout(() => load().catch(() => console.info('[main] 可选模块暂未加载(不影响进馆)')), 1500));
+}
+softImport(() => import('./gallery/gallery-v2.js'));
 // 玫瑰花瓣展馆(2026-09-02):东南空地 (144,-60),参考 Tripo 玫瑰模型等高线描摹建造。
 // 同样必须动态 import(灯光预算清扫)
-import('./gallery/rose-gallery.js');
+softImport(() => import('./gallery/rose-gallery.js'));
 // 塔尖光弧汇聚光球(2026-09-02):6 座穹顶塔塔尖弧形光带 → 中心上空巨大光球。
 // 动态 import 同上(新增 1 盏 PointLight,避开主线程灯光预算清扫)
-import('./gallery/tower-orb.js');
+softImport(() => import('./gallery/tower-orb.js'));
 import './gate/settings.js'; // 昵称双渠道(进馆 5 秒弹窗 + ⚙设置)
 import './gate/upload.js'; // 访客上传(照片/我的链接)+ AI 配文 + 悬浮路标
 import './gate/housecolor.js'; // 房屋分组换色(墙壁/天花板/腰线/踢脚线,仅自己可见)
@@ -52,14 +58,14 @@ import './kunlun/resetview.js'; // 重置视角·二期④(中央平台/最旧�
 // 神话层延迟加载(非首屏必需，等场景就绪后异步加载，减小初始包体积 ~30%)
 // 这些模块在首帧渲染后才触发，不影响首次加载速度
 setTimeout(function () {
-  import('./kunlun/peaks.js'); // 昆仑巅彩蛋
-  import('./kunlun/spirits.js'); // 六合灵蕴收集
-  import('./kunlun/eternal.js'); // 空中永恒展厅·二期①
-  import('./kunlun/ark.js'); // 灵蕴飞舟·二期②
-  import('./kunlun/windchime.js'); // 风铃回响·二期③
-  import('./kunlun/fireplace.js'); // 暖色壁炉·二期③
-  import('./kunlun/snowwin.js'); // 飘雪之窗·二期④
-  import('./kunlun/avatar.js'); // FBX 角色(第三人称玩家模型, 异步加载)
+  softImport(() => import('./kunlun/peaks.js')); // 昆仑巅彩蛋
+  softImport(() => import('./kunlun/spirits.js')); // 六合灵蕴收集
+  softImport(() => import('./kunlun/eternal.js')); // 空中永恒展厅·二期①
+  softImport(() => import('./kunlun/ark.js')); // 灵蕴飞舟·二期②
+  softImport(() => import('./kunlun/windchime.js')); // 风铃回响·二期③
+  softImport(() => import('./kunlun/fireplace.js')); // 暖色壁炉·二期③
+  softImport(() => import('./kunlun/snowwin.js')); // 飘雪之窗·二期④
+  softImport(() => import('./kunlun/avatar.js')); // FBX 角色(第三人称玩家模型, 异步加载)
 }, 2000);
 import './kunlun/letgo.js'; // 放下与召回·二期⑤(长按消解成光尘/空画框/罗盘召回;软删除铁律)
 import './kunlun/finale.js'; // 终章三件套·二期⑥(俯瞰天穹/心象投影/灵蕴归位·六合藏梦人)
