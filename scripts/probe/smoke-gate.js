@@ -51,6 +51,7 @@ const { BASE_URL, launch } = require('./browser');
       .catch((e) => 'fetch-err: ' + e.message);
     console.error('闸门 60s 未出现,诊断转储:\n' + JSON.stringify(dump, null, 1));
     console.error('服务端直取 /src/core/game-state.js → ' + probeMod);
+    if (errs.length) console.error('页面异常:\n' + errs.slice(0, 8).join('\n'));
     if (diag.length) console.error('网络/控制台诊断:\n' + diag.slice(0, 20).join('\n'));
     throw e;
   }

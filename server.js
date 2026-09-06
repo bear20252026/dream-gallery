@@ -157,7 +157,12 @@ const handler = (req, res) => {
   //   入口 HTML 读盘后在 </head> 前注入一次性脚本 → 每个浏览器首次进入清 Cache Storage + 强制 reload。
   //   HTML 本身 no-store,避免 Cloudflare/浏览器把带脚本的页面缓存成"永久刷新循环"。
   //   注入窗口过后(cached-bust.js 的 INJECT_UNTIL)自动停止,代码留着无害。
-  if ((rel === 'index.html' || rel === 'landing/index.html') && cacheBust.shouldInject()) {
+  //   SMOKE=1(CI 冒烟)跳过注入:强刷 reload 会中止无头浏览器首轮全部模块请求。
+  if (
+    (rel === 'index.html' || rel === 'landing/index.html') &&
+    process.env.SMOKE !== '1' &&
+    cacheBust.shouldInject()
+  ) {
     try {
       let html = fs.readFileSync(filePath, 'utf8');
       html = html.includes('</head>')
