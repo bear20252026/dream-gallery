@@ -76,6 +76,7 @@ function build(opts) {
   }
   </style>`;
   document.body.appendChild(ov);
+  if (opts.onGateReady) opts.onGateReady(); // 加载屏就此交接(避免固定延时造成的空白间隙)
 
   const chk = ov.querySelector('#gAgreeChk');
   const enterBtn = ov.querySelector('.gEnter');

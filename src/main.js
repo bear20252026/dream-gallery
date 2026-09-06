@@ -235,6 +235,7 @@ let worldStarted = false;
 function startWorld() {
   if (worldStarted) return;
   worldStarted = true;
+  window.__worldStarted = true;
   // 着色器预编译一并挪到此处:编译成本发生在电影之后,不再与开场抢主线程
   if (rnd.compileAsync) rnd.compileAsync(s, cam).catch(() => {});
   loopManager.start();
@@ -259,6 +260,26 @@ function fadeLoad() {
   L.style.opacity = '0';
   setTimeout(() => (L.style.display = 'none'), 800);
 }
+// 加载屏交接(2026-09-06 首屏顺序修正):不再固定 1.2s 淡出——冷缓存下闸门晚于
+// 加载屏就绪会造成空白间隙。改为「闸门就绪后 400ms」交接,保底 8s 兜底。
+let _loadFaded = false;
+function fadeLoadOnce() {
+  if (_loadFaded) return;
+  _loadFaded = true;
+  fadeLoad();
+}
+(function waitGateReady() {
+  const t = setInterval(() => {
+    if (document.getElementById('b612Gate') || window.__gateFailed) {
+      clearInterval(t);
+      setTimeout(fadeLoadOnce, 400);
+    }
+  }, 100);
+  setTimeout(() => {
+    clearInterval(t);
+    fadeLoadOnce();
+  }, 8000);
+})();
 // 《元素共鸣准则》阅读卡(2026-07-25 主人修订):与昵称弹窗同规则——
 // 只在未起名时出现,每次重进都弹;前 10 秒不可删;写过雅号后,本卡与昵称弹窗都不再出现
 // 协议门控(2026-07-26):《用户协议》《隐私保护指引》未签署前,本卡不弹
@@ -353,9 +374,9 @@ function applyGenderColor(gender) {
 const savedGender = ctx.store.str('gender');
 if (savedGender) applyGenderColor(savedGender);
 
-// 快速进馆(2026-07-25 主人定):加载屏 1.2s 即退场,着色器在后台继续编译,
-// 物体编译好一个出现一个(并行编译不阻塞主线程),不再整屏等待
-setTimeout(fadeLoad, 1200);
+// 快速进馆交接已改为 waitGateReady(2026-09-06 首屏顺序修正):
+// 加载屏在闸门就绪后 400ms 淡出(保底 8s),不再固定 1.2s——消除冷缓存下的空白间隙;
+// 着色器仍在后台编译(startWorld 在电影落定后统一预编译),不阻塞任何阶段
 
 // ===================== 协议文档配乐(2026-07-31) =====================
 // 浏览3个协议文档时循环播放00001.m4a,进入画廊后立即停止
@@ -385,8 +406,14 @@ import('./gate/openfilm.js').catch(function () {});
 import('./gate/entrygate.js')
   .then(function (m) {
     m.setupEntryGate({
+      // 加载屏交接(见 waitGateReady):闸门 DOM 就绪即淡出加载屏
+      onGateReady: function () {},
+      // ENTER 信号(2026-09-06 首屏顺序修正):电影必须等闸门通过——
+      // 旧逻辑只看 sessionStorage 同意键,同标签页刷新后键残留,电影会
+      // 盖住未作答的闸门直接开播(z-580 > z-150)
       onEnter: function () {
         startAgreementMusic();
+        window.__gatePassed = true;
       },
     });
   })
@@ -395,6 +422,7 @@ import('./gate/entrygate.js')
     sessionStorage.setItem('agreementConsented', '1');
     sessionStorage.setItem('privacyConsented', '1');
     sessionStorage.setItem('communityConsented', '1');
+    window.__gateFailed = true; // watchOpening 不再等闸门
     console.warn('[gate] 入口闸门初始化失败,已放行:', e.message);
   });
 // 着色器预编译已并入 startWorld()(2026-09-06:开场顺序修正,世界启动整体推迟到电影落定后)
@@ -404,27 +432,23 @@ import('./gate/entrygate.js')
 // 旧版五路分叉(?oldintro/序章兜底/prologueDone 跳过)已拆除;prologue.js/opening-bg.js 不再引入。
 // ?noopening / ?noprologue / ?nofilm / sessionStorage.skipOpening 统一=跳过电影直接进馆(探针/测试用)。
 (function watchOpening() {
-  function allConsented() {
-    return (
-      sessionStorage.getItem('agreementConsented') &&
-      sessionStorage.getItem('privacyConsented') &&
-      sessionStorage.getItem('communityConsented')
-    );
-  }
   const skipFilm =
     /noopening|noprologue|nofilm/.test(location.search) ||
     !!sessionStorage.getItem('skipOpening');
   let done = false;
   function tick() {
     if (done) return;
-    // ① 闸门未过(会话标记未写):一律等待(入口闸门每次显示,勾选同意后 ENTER 写标记)
-    if (!allConsented()) {
-      setTimeout(tick, 1000);
+    // ① 等「闸门通过」信号(ENTER 置 __gatePassed):电影必须等闸门,不看会话键——
+    //    同标签页刷新后键残留,旧逻辑会让电影盖住未作答的闸门直接开播。
+    //    闸门加载失败兜底:__gateFailed 置位后直接放行(键已由 catch 补齐)。
+    if (!window.__gatePassed && !window.__gateFailed) {
+      setTimeout(tick, 300);
       return;
     }
     done = true;
     // 收束:停协议配乐 + 记档(兼容旧消费方) + 起大屏轮播;deferMedia=首次交互/4s 兜底再起播
     function finishIntro(deferMedia) {
+      window.__introFired = (window.__introFired||0)+1;
       // 开场顺序修正(2026-09-06):电影落定后才启动 3D 世界(主循环+着色器编译)
       if (ctx.startWorld) ctx.startWorld();
       if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
