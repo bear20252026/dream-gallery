@@ -895,23 +895,7 @@ onTick(function (dt) {
   setNav(false);
   padBtn.style.display = 'none';
 
-  // HUD(8Hz)
-  if (t - hudT > 0.12) {
-    hudT = t;
-    if (hudTarget && chapter < 6) {
-      const hx = hudTarget.x - p.x,
-        hz = hudTarget.z - p.z;
-      const tAng = Math.atan2(hx, hz),
-        fAng = Math.atan2(-Math.sin(ctx.player.pl.y), -Math.cos(ctx.player.pl.y));
-      let rel = tAng - fAng;
-      while (rel > Math.PI) rel -= Math.PI * 2;
-      while (rel < -Math.PI) rel += Math.PI * 2;
-      hudArrow.style.transform = 'rotate(' + ((-rel * 180) / Math.PI).toFixed(1) + 'deg)';
-      hudArrow.style.color = pending && !onIsland ? pending.cfg.color : '#ffd88a';
-      hudText.textContent = hudName;
-      hud.style.display = ctx.kunlun.flightLock ? 'none' : 'flex';
-    } else hud.style.display = 'none';
-  }
+  hud.style.display = 'none'; // 章节指引 HUD 已随拾取玩法退役(2026-09-06 审计 P3 死代码清理)
 });
 /* ===================== 拾取 → 章节推进 ===================== */
 
