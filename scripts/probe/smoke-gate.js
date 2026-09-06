@@ -24,6 +24,14 @@ const { BASE_URL, launch } = require('./browser');
   page.on('response', (r) => {
     if (r.status() >= 400) diag.push('[http ' + r.status() + '] ' + r.url().slice(0, 140));
   });
+  // 未完成请求追踪:模块图静默卡住时,找出响应永不结束的那个请求
+  const pending = new Map();
+  page.on('request', (r) => {
+    if (/\/(src|vendor)\//.test(r.url())) pending.set(r.url(), Date.now());
+  });
+  const settle = (r) => pending.delete(r.url());
+  page.on('requestfinished', settle);
+  page.on('requestfailed', settle);
   await page.goto(BASE_URL + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   // ① 过闸门:勾选同意 → ENTER(每次进入都显示,勾选后 ENTER 才点亮)
@@ -51,6 +59,9 @@ const { BASE_URL, launch } = require('./browser');
       .catch((e) => 'fetch-err: ' + e.message);
     console.error('闸门 60s 未出现,诊断转储:\n' + JSON.stringify(dump, null, 1));
     console.error('服务端直取 /src/core/game-state.js → ' + probeMod);
+    const now = Date.now();
+    const pend = [...pending.entries()].map(([u, t]) => 'PENDING ' + ((now - t) / 1000).toFixed(1) + 's ' + u.slice(-90));
+    if (pend.length) console.error('未完成请求:\n' + pend.slice(0, 12).join('\n'));
     if (errs.length) console.error('页面异常:\n' + errs.slice(0, 8).join('\n'));
     if (diag.length) console.error('网络/控制台诊断:\n' + diag.slice(0, 20).join('\n'));
     throw e;
