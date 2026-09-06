@@ -6,9 +6,13 @@
 // - 勾选后 ENTER 才可用;点 ENTER 写 3 个会话标记(下游大屏轮播/指引卡只认会话键)。
 //   取代 2026-07-27 的三连读强制签署。
 import { ctx } from '../ctx.js';
+import * as bootState from '../core/boot-state.js';
+import { Z } from '../shared/z-layers.mjs';
 
 export function setupEntryGate(opts) {
   opts = opts || {};
+  // 审计 P1-R2:引导期 60s 超时已放行的话,迟到的闸门不再构建
+  if (bootState.get('gateFailed')) return;
   build(opts);
 }
 
@@ -43,7 +47,7 @@ function build(opts) {
   </div>
   <style>
   @import url('https://fonts.googleapis.com/css2?family=Satisfy&display=swap');
-  #b612Gate{position:fixed;inset:0;z-index:150;display:flex;align-items:center;justify-content:center;
+  #b612Gate{position:fixed;inset:0;z-index:${Z.gate};display:flex;align-items:center;justify-content:center;
     font-family:Georgia,'Times New Roman',serif;transition:opacity 1.2s ease;overflow:hidden;
     background:
       repeating-linear-gradient(63deg, rgba(90,72,50,.028) 0 1px, transparent 1px 9px),

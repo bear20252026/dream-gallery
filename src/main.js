@@ -29,6 +29,8 @@ import { createMediaSystem } from './core/media-system.js'; // 阶段3 切片:�
 import { createStateSystem } from './core/state-system.js'; // 阶段3 切片:单向状态库(订阅事件总线,镜像命名空间状态进 game-state)
 import { createUiSystem } from './core/ui-system.js'; // 阶段3 切片:UI 域生命周期收口(组合根拥有 overlay 关闭/销毁出口)
 import { getGameState } from './core/game-state.js'; // 单例状态库(阶段3 store 真正化)
+import * as bootState from './core/boot-state.js';
+import { Z } from './shared/z-layers.mjs'; // 开场链路状态登记册(审计 P2:收编 window.__* 标志)
 
 // ===================== 主画布视觉保险 + 加载屏交接 =====================
 // 主画布开机隐藏:闸门/电影期间世界不可见——不是遮盖,startWorld 时才显形,
@@ -72,41 +74,39 @@ let worldStarted = false;
 async function startWorld() {
   if (worldStarted) return;
   worldStarted = true;
-  window.__worldStarted = true;
+  bootState.markWorldStarted();
 
-  // —— 世界模块按原 import 顺序加载(顺序即依赖顺序,不可调换) ——
-  await import('./scene/scene.js'); // 场景/相机/渲染器 + 墙壁/地板/屋顶 + 天空 + 灯光
-  await import('./scene/media.js'); // 2D音乐演奏器 + 视频墙 + HTML5音乐
-  await import('./gallery/signs.js'); // 户外牌子/音乐入口
-  await import('./gallery/fountains.js'); // 户外四座 Zsolnay 喷泉
-  await import('./gallery/markers.js'); // YES/奕彤爱心/Adorable标记 + 地板照片
-  await import('./gallery/links.js'); // 超链接图标/卷轴/花园入口/滚动古文
-  await import('./gallery/paintings.js'); // 挂画系统 + 白板作品墙 + 3D放大系统
-  await import('./gallery/mode.js'); // 展示区模式 + 链接模型系统
-  await import('./gallery/dome-towers.js'); // Yazd 穹顶塔楼群
-  await import('./gate/settings.js'); // 昵称双渠道(进馆 5 秒弹窗 + ⚙设置)
-  await import('./gate/upload.js'); // 访客上传(照片/我的链接)+ AI 配文 + 悬浮路标
-  await import('./gate/housecolor.js'); // 房屋分组换色
-  await import('./gate/quiz.js'); // 温柔度测试(弹窗 + 3D墙面板)
-  await import('./scene/desert.js'); // 西域沙海(无限区块地形/昆仑/水波/飞鸟/沙暴)
-  await import('./scene/player.js'); // 玩家/键盘/鼠标/触摸/小地图/跳跃滑翔
-  await import('./gate/quizgate.js'); // 入馆答题系统(悬浮答题屏 + 答题面板 + 门禁)
-  // 昆仑层(二期):peaks→spirits→eternal→ark→windchime→fireplace→snowwin,
-  // 然后 planets(石门/传送台/六星世界;须在 eternal 之后,groundOverride 链)→story-dialogs→resetview
-  await import('./kunlun/peaks.js'); // 昆仑巅彩蛋(90m 登飞来峰语音 / 100m 彩蛋视频)
-  await import('./kunlun/spirits.js'); // 六合灵蕴收集
-  await import('./kunlun/eternal.js'); // 空中永恒展厅·二期①
-  await import('./kunlun/ark.js'); // 灵蕴飞舟·二期②
-  await import('./kunlun/windchime.js'); // 风铃回响·二期③
-  await import('./kunlun/fireplace.js'); // 暖色壁炉·二期③
-  await import('./kunlun/snowwin.js'); // 飘雪之窗·二期④
-  await import('./kunlun/planets.js'); // B612 六星章节:星门+传送石台都在此构建(漏载=石门消失,2026-09-06)
-  await import('./kunlun/story-dialogs.js'); // 小世界情景对话(须在 planets 之后)
-  await import('./kunlun/resetview.js'); // 重置视角·二期④
-  await import('./kunlun/letgo.js'); // 放下与召回·二期⑤
-  await import('./kunlun/finale.js'); // 终章三件套·二期⑥
-  await import('./player/states/PlayerStates.js'); // 移动状态机
-  const pp = await import('./scene/postprocessing.js'); // 后处理管线
+  // —— 世界模块按原 import 顺序加载(逐模块进度可观测,失败上报) ——
+  try { window.__worldPhase = '场景'; await import('./scene/scene.js'); } catch (e) { window.__worldPhase = '失败:场景'; console.error('[startWorld] 场景 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/scene.js ' + e.message); throw e; }
+  try { window.__worldPhase = '媒体'; await import('./scene/media.js'); } catch (e) { window.__worldPhase = '失败:媒体'; console.error('[startWorld] 媒体 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/media.js ' + e.message); throw e; }
+  try { window.__worldPhase = '牌子'; await import('./gallery/signs.js'); } catch (e) { window.__worldPhase = '失败:牌子'; console.error('[startWorld] 牌子 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/signs.js ' + e.message); throw e; }
+  try { window.__worldPhase = '喷泉'; await import('./gallery/fountains.js'); } catch (e) { window.__worldPhase = '失败:喷泉'; console.error('[startWorld] 喷泉 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/fountains.js ' + e.message); throw e; }
+  try { window.__worldPhase = '标记'; await import('./gallery/markers.js'); } catch (e) { window.__worldPhase = '失败:标记'; console.error('[startWorld] 标记 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/markers.js ' + e.message); throw e; }
+  try { window.__worldPhase = '链接'; await import('./gallery/links.js'); } catch (e) { window.__worldPhase = '失败:链接'; console.error('[startWorld] 链接 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/links.js ' + e.message); throw e; }
+  try { window.__worldPhase = '挂画'; await import('./gallery/paintings.js'); } catch (e) { window.__worldPhase = '失败:挂画'; console.error('[startWorld] 挂画 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/paintings.js ' + e.message); throw e; }
+  try { window.__worldPhase = '模式'; await import('./gallery/mode.js'); } catch (e) { window.__worldPhase = '失败:模式'; console.error('[startWorld] 模式 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/mode.js ' + e.message); throw e; }
+  try { window.__worldPhase = '塔楼'; await import('./gallery/dome-towers.js'); } catch (e) { window.__worldPhase = '失败:塔楼'; console.error('[startWorld] 塔楼 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/dome-towers.js ' + e.message); throw e; }
+  try { window.__worldPhase = '设置'; await import('./gate/settings.js'); } catch (e) { window.__worldPhase = '失败:设置'; console.error('[startWorld] 设置 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gate/settings.js ' + e.message); throw e; }
+  try { window.__worldPhase = '上传'; await import('./gate/upload.js'); } catch (e) { window.__worldPhase = '失败:上传'; console.error('[startWorld] 上传 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gate/upload.js ' + e.message); throw e; }
+  try { window.__worldPhase = '房屋色'; await import('./gate/housecolor.js'); } catch (e) { window.__worldPhase = '失败:房屋色'; console.error('[startWorld] 房屋色 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gate/housecolor.js ' + e.message); throw e; }
+  try { window.__worldPhase = '温柔度'; await import('./gate/quiz.js'); } catch (e) { window.__worldPhase = '失败:温柔度'; console.error('[startWorld] 温柔度 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gate/quiz.js ' + e.message); throw e; }
+  try { window.__worldPhase = '沙漠'; await import('./scene/desert.js'); } catch (e) { window.__worldPhase = '失败:沙漠'; console.error('[startWorld] 沙漠 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/desert.js ' + e.message); throw e; }
+  try { window.__worldPhase = '玩家'; await import('./scene/player.js'); } catch (e) { window.__worldPhase = '失败:玩家'; console.error('[startWorld] 玩家 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/player.js ' + e.message); throw e; }
+  try { window.__worldPhase = '答题门'; await import('./gate/quizgate.js'); } catch (e) { window.__worldPhase = '失败:答题门'; console.error('[startWorld] 答题门 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gate/quizgate.js ' + e.message); throw e; }
+  try { window.__worldPhase = '昆仑巅'; await import('./kunlun/peaks.js'); } catch (e) { window.__worldPhase = '失败:昆仑巅'; console.error('[startWorld] 昆仑巅 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/peaks.js ' + e.message); throw e; }
+  try { window.__worldPhase = '灵蕴'; await import('./kunlun/spirits.js'); } catch (e) { window.__worldPhase = '失败:灵蕴'; console.error('[startWorld] 灵蕴 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/spirits.js ' + e.message); throw e; }
+  try { window.__worldPhase = '永恒厅'; await import('./kunlun/eternal.js'); } catch (e) { window.__worldPhase = '失败:永恒厅'; console.error('[startWorld] 永恒厅 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/eternal.js ' + e.message); throw e; }
+  try { window.__worldPhase = '飞舟'; await import('./kunlun/ark.js'); } catch (e) { window.__worldPhase = '失败:飞舟'; console.error('[startWorld] 飞舟 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/ark.js ' + e.message); throw e; }
+  try { window.__worldPhase = '风铃'; await import('./kunlun/windchime.js'); } catch (e) { window.__worldPhase = '失败:风铃'; console.error('[startWorld] 风铃 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/windchime.js ' + e.message); throw e; }
+  try { window.__worldPhase = '壁炉'; await import('./kunlun/fireplace.js'); } catch (e) { window.__worldPhase = '失败:壁炉'; console.error('[startWorld] 壁炉 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/fireplace.js ' + e.message); throw e; }
+  try { window.__worldPhase = '雪窗'; await import('./kunlun/snowwin.js'); } catch (e) { window.__worldPhase = '失败:雪窗'; console.error('[startWorld] 雪窗 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/snowwin.js ' + e.message); throw e; }
+  try { window.__worldPhase = '星球世界'; await import('./kunlun/planets.js'); } catch (e) { window.__worldPhase = '失败:星球世界'; console.error('[startWorld] 星球世界 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/planets.js ' + e.message); throw e; }
+  try { window.__worldPhase = '对话'; await import('./kunlun/story-dialogs.js'); } catch (e) { window.__worldPhase = '失败:对话'; console.error('[startWorld] 对话 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/story-dialogs.js ' + e.message); throw e; }
+  try { window.__worldPhase = '重置视角'; await import('./kunlun/resetview.js'); } catch (e) { window.__worldPhase = '失败:重置视角'; console.error('[startWorld] 重置视角 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/resetview.js ' + e.message); throw e; }
+  try { window.__worldPhase = '放下'; await import('./kunlun/letgo.js'); } catch (e) { window.__worldPhase = '失败:放下'; console.error('[startWorld] 放下 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/letgo.js ' + e.message); throw e; }
+  try { window.__worldPhase = '终章'; await import('./kunlun/finale.js'); } catch (e) { window.__worldPhase = '失败:终章'; console.error('[startWorld] 终章 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/finale.js ' + e.message); throw e; }
+  try { window.__worldPhase = '状态机'; await import('./player/states/PlayerStates.js'); } catch (e) { window.__worldPhase = '失败:状态机'; console.error('[startWorld] 状态机 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: player/states/PlayerStates.js ' + e.message); throw e; }
+  try { window.__worldPhase = '后处理'; await import('./scene/postprocessing.js'); } catch (e) { window.__worldPhase = '失败:后处理'; console.error('[startWorld] 后处理 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/postprocessing.js ' + e.message); throw e; }
 
   // —— 以下为原 main.js 顶层构建代码(依赖上述模块的副作用,顺序不可调换) ——
   const { s, cam, rnd, pls } = ctx;
@@ -141,6 +141,7 @@ async function startWorld() {
   }
 
   // ===================== 后处理管线初始化(2026-08-22) =====================
+  const pp = await import('./scene/postprocessing.js'); // 已在上方链加载,此处取缓存
   pp.initPostProcessing(rnd, s, cam);
   ctx.scene.renderPostProcessing = pp.renderPostProcessing;
   ctx.scene.resizePostProcessing = pp.resizePostProcessing;
@@ -196,6 +197,7 @@ async function startWorld() {
   compositionRoot.init();
   expose('compositionRoot', compositionRoot);
   expose('gameState', getGameState());
+  expose('bootState', bootState.default); // 可观测:开场链路状态(gatePassed/worldStarted/introFired)
   register((dt) => compositionRoot.update(dt));
 
   // 玩家状态机:世界就绪后初始化为空闲状态
@@ -231,6 +233,8 @@ async function startWorld() {
 }
 ctx.startWorld = startWorld;
 expose('startWorld', startWorld);
+expose('bootState', bootState.default); // 引导期即暴露:生产诊断可见世界加载进度
+expose('worldPhase', () => window.__worldPhase || '(未开始)');
 
 // ===================== 引导期:UI 轻件与开场链路 =====================
 function softImport(load) {
@@ -253,7 +257,7 @@ function showGuideCard() {
   c.setAttribute('aria-modal', 'false');
   c.setAttribute('aria-label', '初见指引');
   c.style.cssText =
-    'position:fixed;left:50%;top:64%;transform:translateX(-50%);z-index:75;background:rgba(30,18,28,0.95);border:1px solid rgba(255,214,170,0.35);border-radius:16px;padding:20px 26px;text-align:center;color:#ffe2c4';
+    'position:fixed;left:50%;top:64%;transform:translateX(-50%);z-index:' + Z.guideCard + ';background:rgba(30,18,28,0.95);border:1px solid rgba(255,214,170,0.35);border-radius:16px;padding:20px 26px;text-align:center;color:#ffe2c4';
   c.innerHTML =
     '<div style="font-size:15px;letter-spacing:2px;margin-bottom:10px">三千年来，第一个带着真意推开这扇门的，是你。<br>墙已经空了太久——挂上你的第一幅画吧。</div><div style="font-size:12px;letter-spacing:2px;margin-bottom:12px;opacity:.7">初见画廊,不妨先读《元素共鸣准则》</div>';
   const a = document.createElement('button');
@@ -339,21 +343,41 @@ ctx.stopAgreementMusic = stopAgreementMusic;
 
 // ===================== 入口闸门 + 电影预热 =====================
 import('./gate/openfilm.js').catch(function () {});
+// 审计 P1-R2:动态 import 无超时语义——挂起时 __gateFailed 永不置位,
+// watchOpening 空转、用户停在空屏。60s 未就绪即超时放行。
+let gateSettled = false;
+const gateTimeout = setTimeout(function () {
+  if (gateSettled) return;
+  gateSettled = true;
+  if (!document.getElementById('b612Gate')) {
+    bootState.markGateFailed();
+    sessionStorage.setItem('agreementConsented', '1');
+    sessionStorage.setItem('privacyConsented', '1');
+    sessionStorage.setItem('communityConsented', '1');
+    console.warn('[gate] 60s 未就绪,超时放行');
+  }
+}, 60000);
 import('./gate/entrygate.js')
   .then(function (m) {
+    if (gateSettled) return; // 超时已放行:迟到的闸门不再构建
+    gateSettled = true;
+    clearTimeout(gateTimeout);
     m.setupEntryGate({
       onGateReady: function () {},
       onEnter: function () {
         startAgreementMusic();
-        window.__gatePassed = true;
+        bootState.markGatePassed();
       },
     });
   })
   .catch(function (e) {
+    if (gateSettled) return;
+    gateSettled = true;
+    clearTimeout(gateTimeout);
     sessionStorage.setItem('agreementConsented', '1');
     sessionStorage.setItem('privacyConsented', '1');
     sessionStorage.setItem('communityConsented', '1');
-    window.__gateFailed = true;
+    bootState.markGateFailed();
     console.warn('[gate] 入口闸门初始化失败,已放行:', e.message);
   });
 
@@ -365,28 +389,50 @@ import('./gate/entrygate.js')
   let done = false;
   function tick() {
     if (done) return;
-    // 等「闸门通过」信号(ENTER 置 __gatePassed);闸门加载失败走 __gateFailed 兜底
-    if (!window.__gatePassed && !window.__gateFailed) {
+    // 等「闸门通过」信号(ENTER 置 gatePassed);闸门加载失败/超时走 gateFailed 兜底
+    if (!bootState.get('gatePassed') && !bootState.get('gateFailed')) {
       setTimeout(tick, 300);
       return;
     }
     done = true;
     function finishIntro(deferMedia) {
-      window.__introFired = (window.__introFired || 0) + 1;
+      bootState.bumpIntroFired();
       if (ctx.startWorld) ctx.startWorld();
       if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
       ctx.store.mark('prologueDone');
+      // 大屏轮播启动(审计 P1-R1 完整版):skip/播完/旁路三条路都可能先于
+      // video-wall.js 就绪到达——统一轮询等待 startVidSeq 出现(最多 30s)。
+      // deferMedia 仅控制布防时机(先等首次交互/4s),不是只试一次。
+      let started = false;
+      const tryStart = function () {
+        if (started) return true;
+        if (!ctx.startVidSeq) return false;
+        started = true;
+        ctx.startVidSeq();
+        return true;
+      };
+      const armPoll = function () {
+        const poll = setInterval(function () {
+          if (tryStart()) clearInterval(poll);
+        }, 300);
+        setTimeout(function () {
+          clearInterval(poll);
+          if (!started) console.warn('[main] startVidSeq 30s 未就绪,大屏轮播本轮放弃');
+        }, 30000);
+      };
       if (deferMedia) {
-        let started = false;
-        const go = function () {
-          if (started) return;
-          started = true;
-          if (ctx.startVidSeq) ctx.startVidSeq();
+        let armed = false;
+        const arm = function () {
+          if (armed) return;
+          armed = true;
+          armPoll();
         };
-        document.addEventListener('click', go, { once: true });
-        document.addEventListener('touchstart', go, { once: true });
-        setTimeout(go, 4000);
-      } else if (ctx.startVidSeq) ctx.startVidSeq();
+        document.addEventListener('click', arm, { once: true });
+        document.addEventListener('touchstart', arm, { once: true });
+        setTimeout(arm, 4000);
+      } else {
+        armPoll();
+      }
     }
     if (skipFilm) {
       finishIntro(true);

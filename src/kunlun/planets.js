@@ -10,6 +10,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
+import { Z } from '../shared/z-layers.mjs';
 import { initSceneManager } from '../core/scene-manager.js';
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
@@ -59,6 +60,15 @@ function addStarfield(scene) {
 }
 
 // 独立世界容器:main 保留现有画廊,B612 独立注册;六星世界在 PLANETS 数据定义后按序注册。
+
+// ===================== 常量登记(2026-09-06 审计 P2:此前散落 2~3 份) =====================
+const B612_SPAWN = { pos: [-1.5, 2, -8.5], yaw: Math.PI }; // 天幕壳内、星球正前方
+const KING_SPAWN_Y = () => R * 0.42 + 1.6; // 星球岛面站立高度
+const GATE_RADIUS = 4;   // 主世界石门自动传送半径(m)
+const PAD_RADIUS = 3;    // 石台触发半径(m)
+const DOOR_RADIUS = 2.5; // 岛上回程门半径(m)
+const PICK_RADIUS = 3;   // 星屑拾取半径(m)
+
 const worldManager = initSceneManager({
   renderer: ctx.scene.rnd,
   camera: ctx.scene.cam,
@@ -600,22 +610,6 @@ refreshGate();
 loadPortalPad(worldManager.getWorld('main'), { x: 0.1, y: mainGateY + 0.03, z: 56.0 }, 'b612');
 loadPortalPad(worldManager.getWorld('king325'), { x: 0, y: 0, z: 0 }, 'b612');
 
-/* ===================== 天幕色罩(每章进入时淡入的 DOM 渐变) ===================== */
-let veil = null;
-function veilOn(cfg) {
-  veilOff();
-  veil = document.createElement('div');
-  veil.style.cssText = `position:fixed;inset:0;z-index:8;pointer-events:none;opacity:0;transition:opacity 1.6s ease;background:radial-gradient(120% 100% at 50% 0%, ${cfg.veil}, transparent 70%)`;
-  document.body.appendChild(veil);
-  requestAnimationFrame(() => (veil.style.opacity = '1'));
-}
-function veilOff() {
-  if (!veil) return;
-  const v = veil;
-  veil = null;
-  v.style.opacity = '0';
-  setTimeout(() => v.remove(), 1700);
-}
 
 /* ===================== 指引 HUD(屏顶箭头, spirits 同款自建) ===================== */
 const hud = document.createElement('div');
@@ -632,12 +626,6 @@ hud.appendChild(hudArrow);
 hud.appendChild(hudText);
 document.body.appendChild(hud);
 
-/* ===================== 拾取/回程按钮 ===================== */
-const pickBtn = document.createElement('button');
-pickBtn.style.cssText =
-  'position:fixed;left:50%;bottom:95px;transform:translateX(-50%);z-index:60;display:none;padding:12px 30px;border-radius:24px;border:1px solid rgba(255,214,130,.7);background:rgba(40,26,12,.8);color:#ffe9c4;font-size:16px;letter-spacing:4px;cursor:pointer;font-family:inherit';
-pickBtn.textContent = '拾取星屑';
-document.body.appendChild(pickBtn);
 /* ===================== 导航按钮(2026-09-06 主人定:单列上下文式,杜绝重叠与混乱) =====================
    主世界:石门旁「✦ 进入 B612」(padBtn)
    B612:  [返回主世界] [前往 325 国王星球 →]   双按钮纵排,常驻
@@ -655,7 +643,7 @@ const navA = mkNavBtn('');
 const navB = mkNavBtn('');
 const worldNav = document.createElement('div');
 worldNav.style.cssText =
-  'position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:60;display:none;flex-direction:column;gap:10px;align-items:center';
+  'position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:'+Z.navBtn+';display:none;flex-direction:column;gap:10px;align-items:center';
 worldNav.appendChild(navA);
 worldNav.appendChild(navB);
 document.body.appendChild(worldNav);
@@ -681,7 +669,7 @@ const goKing325 = function () {
     snapshot: {
       camera: null,
       player: {
-        position: new THREE.Vector3(0, R * 0.42 + 1.6, 4),
+        position: new THREE.Vector3(0, KING_SPAWN_Y(), 4),
         yaw: 0,
         pitch: 0,
         vy: 0,
@@ -697,16 +685,15 @@ const goB612Back = function () {
 const padBtn = document.createElement('button');
 padBtn.textContent = '✦ 进入 B612';
 padBtn.style.cssText =
-  'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:60;display:none;padding:14px 36px;border-radius:24px;border:2px solid rgba(255,214,130,.9);background:rgba(30,18,8,.92);color:#ffe9c4;font-size:18px;letter-spacing:4px;cursor:pointer;font-family:inherit';
+  'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:'+Z.navBtn+';display:none;padding:14px 36px;border-radius:24px;border:2px solid rgba(255,214,130,.9);background:rgba(30,18,8,.92);color:#ffe9c4;font-size:18px;letter-spacing:4px;cursor:pointer;font-family:inherit';
 padBtn.onclick = function () {
   padBtn.style.display = 'none';
   worldManager.enter('b612', {
     snapshot: {
       camera: null,
       player: {
-        // 天幕壳内、星球正前方(-z 侧),yaw=π 正对星球——第一眼即 SceneFull2 构图
-        position: new THREE.Vector3(-1.5, 2, -8.5),
-        yaw: Math.PI,
+        position: new THREE.Vector3(...B612_SPAWN.pos),
+        yaw: B612_SPAWN.yaw,
         pitch: 0,
         vy: 0,
         onGround: true,
@@ -730,9 +717,8 @@ function travelTo(idx) {
   const spawn =
     targetWorld === 'b612'
       ? {
-          // 天幕壳内、星球正前方,yaw=π 正对星球(与石台入口一致)
-          position: new THREE.Vector3(-1.5, 2, -8.5),
-          yaw: Math.PI,
+          position: new THREE.Vector3(...B612_SPAWN.pos),
+          yaw: B612_SPAWN.yaw,
           pitch: 0,
           vy: 0,
           onGround: true,
@@ -751,7 +737,6 @@ function travelTo(idx) {
     ctx.ui.modeToast(targetWorld === 'b612' ? "B612 · The Little Prince's Home" : isl.cfg.place);
 }
 function backToGallery() {
-  veilOff();
   ctx.scene.toMainWorld(); // 管理器方法是 toMain,toMainWorld 是 ctx 包装器(2026-09-06 修复 TypeError)
 }
 function pl() {
@@ -887,7 +872,6 @@ onTick(function (dt) {
       setNav(true, '← 返回 B612', goB612Back, '返回主世界', goMainWorld);
     } else setNav(false);
     hud.style.display = 'none';
-    pickBtn.style.display = 'none';
     return;
   }
 
@@ -896,7 +880,7 @@ onTick(function (dt) {
     setNav(false); // 主世界导航隐藏(进 B612 走石门 padBtn)
     const dgx = p.x - 0.1,
       dgz = p.z - 56.0;
-    const nearGate = dgx * dgx + dgz * dgz < 16; // 4m 范围自动传送
+    const nearGate = dgx * dgx + dgz * dgz < GATE_RADIUS * GATE_RADIUS; // 石门自动传送半径
     if (nearGate) {
       padBtn.style.display = 'none';
       hud.style.display = 'none';
@@ -906,64 +890,10 @@ onTick(function (dt) {
     // 不在门旁:显示按钮
     padBtn.style.display = 'block';
     hud.style.display = 'none';
-    pickBtn.style.display = 'none';
     return;
   }
   setNav(false);
   padBtn.style.display = 'none';
-  // ==== B612 世界(后备路径,正常被上方太空分支接管) ====
-  if (activeWorld === 'b612') {
-    pickBtn.style.display = 'none';
-    hud.style.display = 'none';
-    setNav(true, '返回主世界', goMainWorld, '前往 325 国王星球 →', goKing325);
-    return;
-  }
-  if (/^king\d+$/.test(activeWorld)) {
-    setNav(true, '← 返回 B612', goB612Back, '返回主世界', goMainWorld);
-  }
-  const curWorldNum = /^king(\d+)$/.test(activeWorld) ? activeWorld.replace('king', '') : null;
-  const onIsland = curWorldNum ? islands.find((isl) => isl.cfg.num === curWorldNum) : null;
-  // 只有当前章节星球才可拾取,回到完成态星球时不重复计算
-  if (onIsland) onIsland.active = onIsland.idx === chapter;
-  let pending = islands[chapter]; // 当前章节岛
-  let hudTarget = null,
-    hudName = '';
-
-  if (chapter < 6) {
-    // 画廊侧:走向星门
-    const dgx = p.x - gateGrp.position.x,
-      dgz = p.z - gateGrp.position.z;
-    const atGate = dgx * dgx + dgz * dgz < 9;
-    pickBtn.style.display = 'none';
-    if (!onIsland) {
-      hudTarget = gateGrp.position;
-      hudName = pending.cfg.place + ' · ' + Math.round(Math.hypot(dgx, dgz)) + 'm';
-      if (atGate) {
-        hud.style.display = 'none';
-        travelTo(chapter);
-        return;
-      }
-    } else if (onIsland.idx === chapter) {
-      // 在本章岛上:走近星屑拾取(世界坐标判定)
-      const m = onIsland.moteW;
-      const dm2 = (p.x - m.x) * (p.x - m.x) + (p.z - m.z) * (p.z - m.z);
-      const near = dm2 < 9 && Math.abs(p.y - onIsland.topY) < 4;
-      if (near) {
-        pickBtn.style.display = 'block';
-        pickBtn.textContent = '拾取星屑 · ' + onIsland.cfg.name;
-        hud.style.display = 'none';
-      } else pickBtn.style.display = 'none';
-      hudTarget = m;
-      hudName = onIsland.cfg.name + ' 的星屑';
-    } else {
-      pickBtn.style.display = 'none';
-      hudTarget = gateGrp.position;
-      hudName = '回到画廊 · 星门';
-    }
-  } else {
-    pickBtn.style.display = 'none';
-    hud.style.display = 'none';
-  }
 
   // HUD(8Hz)
   if (t - hudT > 0.12) {
@@ -983,28 +913,7 @@ onTick(function (dt) {
     } else hud.style.display = 'none';
   }
 });
-function hookedDoor() {
-  backToGallery();
-}
-
 /* ===================== 拾取 → 章节推进 ===================== */
-pickBtn.onclick = function () {
-  if (chapter >= 6) return;
-  const isl = islands[chapter];
-  const cfg = isl.cfg;
-  isl.mote.visible = false;
-  isl.door.visible = true;
-  pickBtn.style.display = 'none';
-  // 复用 spirits 反馈/库存/终章(key 同序同键;台词用本章星球版)
-  ctx.kunlun.spiritsCollectExternal(cfg.key, {
-    popup: cfg.popup,
-    tts: cfg.tts,
-    toast: cfg.name + ' · 已收入罗盘',
-  });
-  chapter += 1;
-  ctx.store.setNum('planetsChapter', chapter);
-  refreshGate();
-};
 
 /* ===================== 对外接口(spirits/罗盘页/小地图) ===================== */
 // 罗盘页:覆盖 spiritsState 的 place/name(星球版);顺序与 SPIRITS 一致
@@ -1045,10 +954,8 @@ ctx.kunlun.planetsMark = function () {
 
 bag.custom.push(function () {
   hud.remove();
-  pickBtn.remove();
   worldNav.remove();
   padBtn.remove();
-  veilOff();
 });
 hotEnd('planets');
 if (import.meta.hot) import.meta.hot.accept();

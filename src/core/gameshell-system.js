@@ -127,12 +127,12 @@ function createGameShellSystem() {
     const spirits = (ctx.kunlun && ctx.kunlun.spiritsGot) ? ctx.kunlun.spiritsGot() : (ctx.store.getSpirits ? ctx.store.getSpirits().length : 0);
     const picks = (ctx.store.json('eternalPicks', []) || []).length;
     let ark = '尚未启程';
-    if (spirits >= 6) ark = '六灵蕴归位';
+    if (spirits >= 6) ark = '六颗星屑归位';
     else if (spirits >= 1) ark = '飞舟已现';
     let main;
-    if (spirits < 6) main = '集齐六合灵蕴';
+    if (spirits < 6) main = '收集六颗星屑';
     else if (picks < 1) main = '在永恒展厅挂上你的画';
-    else main = '昆仑已亮，慢慢逛';
+    else main = 'B612 已亮，慢慢逛';
     return { spirits, picks, ark, main };
   }
   function refreshQuest() {
@@ -140,7 +140,7 @@ function createGameShellSystem() {
     const p = readProgress();
     questEl.querySelector('.q-main').textContent = '◈ ' + p.main;
     const rows = [
-      ['灵蕴', p.spirits + ' / 6'],
+      ['星屑', p.spirits + ' / 6'],
       ['展厅挂画', p.picks + ' / 20'],
       ['飞舟', p.ark],
     ];
@@ -157,8 +157,8 @@ function createGameShellSystem() {
     menuEl.setAttribute('aria-modal', 'true');
     menuEl.innerHTML = `
       <div class="gs-menu-card">
-        <div class="m-title">昆 仑 灵 鉴</div>
-        <div class="m-sub">藏梦人手札</div>
+        <div class="m-title">B 6 1 2</div>
+        <div class="m-sub">a gallery for unfinished drawings</div>
         <button class="m-btn" data-act="ask">问 昆 仑</button>
         <button class="m-btn" data-act="help">操 作 指 引</button>
         <button class="m-btn" data-act="quest">任 务 册</button>
@@ -168,20 +168,20 @@ function createGameShellSystem() {
     menuEl.querySelector('[data-act="ask"]').onclick = () => {
       menuApi.close();
       ctx.openDialog && ctx.openDialog({
-        speaker: '昆仑',
+        speaker: 'B612',
         lines: [
-          '凡人一念，可补天缺。你推开这扇门时，昆仑就亮了。',
-          '去拾六合灵蕴罢——天、地、风、火、水、心。集齐了，飞舟自会来接你。',
+          'Welcome to B612 — a gallery for unfinished drawings.',
+          '收集六颗星屑罢——天、地、风、火、水、心。集齐了，飞舟自会来接你。',
         ],
       });
     };
     menuEl.querySelector('[data-act="help"]').onclick = () => {
       menuApi.close();
       ctx.openDialog && ctx.openDialog({
-        speaker: '昆仑',
+        speaker: 'B612',
         lines: [
           'W A S D 行走，鼠标转望，空格起跳。',
-          '走近发光的光柱即可拾取灵蕴；登上山巅的飞舟可巡游天穹。',
+          '走近发光的光柱即可拾取星屑；登上山巅的飞舟可巡游天穹。',
           '右上那枚朱印，随时唤出这本手札。',
         ],
       });
@@ -193,7 +193,7 @@ function createGameShellSystem() {
         speaker: '当前任务',
         lines: [
           '主线 · ' + p.main,
-          '灵蕴 ' + p.spirits + ' / 6　·　展厅挂画 ' + p.picks + ' / 20　·　飞舟 ' + p.ark,
+          '星屑 ' + p.spirits + ' / 6　·　展厅挂画 ' + p.picks + ' / 20　·　飞舟 ' + p.ark,
         ],
       });
     };
@@ -217,7 +217,7 @@ function createGameShellSystem() {
       dialogEl.setAttribute('role', 'dialog');
       dialogEl.setAttribute('aria-live', 'polite');
       dialogEl.innerHTML = `
-        <div class="gs-name">昆仑</div>
+        <div class="gs-name">B612</div>
         <div class="gs-text"></div>
         <div class="gs-choices"></div>
         <div class="gs-hint">▷ 点击继续</div>`;
@@ -229,7 +229,7 @@ function createGameShellSystem() {
       questEl.id = 'questHud';
       questEl.innerHTML = `
         <div class="q-title">任 务 册</div>
-        <div class="q-main">◈ 集齐六合灵蕴</div>
+        <div class="q-main">◈ 收集六颗星屑</div>
         <div class="q-rows"></div>`;
       document.body.appendChild(questEl);
       refreshQuest();

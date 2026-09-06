@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { ctx } from '../ctx.js';
 import { hotBegin } from '../hot.js';
+import { Z } from '../shared/z-layers.mjs';
 
 const bag = hotBegin('story-dialogs');
 
@@ -54,7 +55,7 @@ const ACTORS = [
 // ===================== CSS2DRenderer 层 =====================
 const labelRenderer = new CSS2DRenderer();
 labelRenderer.domElement.style.cssText =
-  'position:fixed;inset:0;z-index:12;pointer-events:none;display:none;overflow:hidden';
+  'position:fixed;inset:0;z-index:' + Z.worldFx + ';pointer-events:none;display:none;overflow:hidden';
 labelRenderer.domElement.innerHTML = `
 <style>
 #storyDialogLayer .b612-bubble{

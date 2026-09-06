@@ -1,4 +1,15 @@
 // openfilm.js — B612 开幕电影(2026-09-05 定稿,自 dev/b612-opening-full.html 移植)
+// 开场电影时间轴总览(2026-09-06 审计 P3:节拍集中登记,改节奏先看这里)
+//   第一幕 手绘:纸张登场 0.4s → 画帽子 3s+0.9s → 选择题出现(等用户)
+//   选择后:画真相 slow 绘制 ~40s → 折纸 6×0.6s → act2 揭幕
+//   第二幕 飞行:DUR=19s 沿曲线飞行 → startImpact 落定
+//   收束(三路汇合,唯一出口 finish→done→onDone):
+//     自然播完  startImpact +5.6s
+//     skip      later(finish,1.6s)
+//     WebGL降级 startFlight 内 +2.6s
+//   done 之后:main.js onDone → finishIntro → startWorld(3D 世界才启动)
+// ============================================================
+
 // 约 60 秒连续开场:黑场画帽→选择→蛇腹大象→真折纸→纸飞机→古地图俯视→
 // 翻转入 3D→挣扎坠落→撞击→推镜「B612 Gallery」木牌→淡出交棒给游戏本体。
 // 取代旧「开屏层+残镜序章」(?oldintro 回滚通道仍走旧链)。
@@ -6,6 +17,7 @@
 // 音画分工:配乐=协议配乐(入口闸门 Enter 起,onDone 侧停止);音效=铅笔/折纸/风/撞地。
 // 跳过:skip 按钮 / Esc → 直落定 → 短停 → 交棒。
 import * as THREE from 'three';
+import { Z } from '../shared/z-layers.mjs';
 
 let active = false;
 
@@ -62,7 +74,7 @@ export function playOpeningFilm(onDone) {
   root.innerHTML = `
   <style>
   @import url('https://fonts.googleapis.com/css2?family=Satisfy&display=swap');
-  #b612film{position:fixed;inset:0;z-index:580;background:#0d0b09;overflow:hidden;
+  #b612film{position:fixed;inset:0;z-index:${Z.film};background:#0d0b09;overflow:hidden;
     font-family:'Satisfy',cursive;user-select:none}
   #b612film #fc{position:absolute;inset:0;opacity:0;transition:opacity 1.4s ease}
   #b612film.act2 #fc{opacity:1}
@@ -509,7 +521,7 @@ export function playOpeningFilm(onDone) {
       $('tLand').classList.add('ftshow');
       $('fEnd').classList.add('ftshow');
       $('fSkip').style.display = 'none';
-      later(finish, 2600);
+      scheduleFinish(2600);
       return;
     }
     u = 0;
@@ -546,7 +558,7 @@ export function playOpeningFilm(onDone) {
     }, 1900);
     // 自然收束(2026-09-06 修复:此前落定后 skip 自动隐藏却无人调用 finish,
     // 影片永远停在落定画面——访客视角即「飞机之后动画消失,页面卡死」)
-    later(finish, 5600);
+    scheduleFinish(5600);
   }
   function forceLand() {
     if (landed) return;
@@ -862,7 +874,7 @@ export function playOpeningFilm(onDone) {
     $('fPaper').style.opacity = '0';
     ['tFly1', 'tFly2'].forEach((i) => $(i).classList.remove('ftshow'));
     forceLand();
-    later(finish, 1600);
+    scheduleFinish(1600);
   }
   function answer(text, res, boa) {
     choseBoa = boa;
@@ -952,6 +964,10 @@ export function playOpeningFilm(onDone) {
     running = false;
   }
   // 落定收束:推镜与尾字站稳 2.2s,整层淡出交棒
+  // 收束调度唯一入口(三路汇合:自然播完/skip/降级;done 幂等防重)
+  function scheduleFinish(ms) {
+    later(finish, ms);
+  }
   function finish() {
     root.style.transition = 'opacity 1.6s ease';
     root.style.opacity = '0';
