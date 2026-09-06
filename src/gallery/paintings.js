@@ -195,7 +195,7 @@ function hangPaintings() {
     [hW[si], hW[sj]] = [hW[sj], hW[si]];
   }
   hW.forEach((wall, wi) => {
-    if (mi >= aM.length) mi = 0;
+    if (mi >= aM.length) return; // 内容填完即止(2026-09-06:仅 5 张演示照片,不再绕圈重复挂同一张)
     hangOn(wall, wi, aM[mi++]);
   });
   if (ctx.mode.applyPaintMode) ctx.mode.applyPaintMode(); // 挂完立即按当前模式校正可见性(普通模式隐藏图库)

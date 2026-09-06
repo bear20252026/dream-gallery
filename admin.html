@@ -2188,10 +2188,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         const sc = DATA.siteConfig || { mode: 'normal', customLinks: [], demoPhotos: [] };
         // 模式卡
         $('modeCard').innerHTML =
-          `全局默认模式:<b style="color:${sc.mode === 'special' ? '#d97706' : '#16a34a'}">${sc.mode === 'special' ? '特殊模式(全展示)' : '普通模式(默认)'}</b>
-    <button class="btn-day" onclick="setMode('normal')">切到普通</button>
-    <button class="btn-day" onclick="setMode('special')">切到特殊</button>
-    <div style="opacity:.6;font-size:12px;margin-top:6px">「特殊访问」按访客单独授予:在「审批」页对应设备上点「授特殊」;访客自己无法申请</div>`;
+          `全局默认模式:<b style="color:#16a34a">普通模式(2026-09-06 起特殊模式已删除)</b>`;
         // 挂载下拉
         $('clIcon').innerHTML =
           '<option value="">不挂原图案(新建模型)</option>' +
@@ -2333,18 +2330,6 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           toast('删除失败', 1);
         }
         loadBigscreen();
-      }
-      async function setMode(mode) {
-        const r = await fetch('/api/admin/mode' + tk(), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mode }),
-        });
-        if (r.ok) {
-          toast('已切换');
-          DATA.siteConfig.mode = mode;
-          loadDisplay();
-        } else toast('失败', 1);
       }
       async function addCustomLink() {
         const name = $('clName').value.trim(),

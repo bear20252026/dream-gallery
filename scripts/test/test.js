@@ -44,7 +44,7 @@ async function testData() {
   ok(P.every(p => /^photos\/.+\.(jpe?g|png|webp|gif)$/i.test(p)), 'P 全部是 photos/ 下的图片路径');
   ok(P.every(p => fs.existsSync(path.join(ROOT, p))), 'P 引用的文件全部存在于磁盘');
 
-  ok(Array.isArray(V) && V.length > 0, `视频列表 V 非空 (${V.length} 个)`);
+  ok(Array.isArray(V), `视频列表 V 为数组(2026-09-06 非大屏视频退役,允许为空,当前 ${V.length} 个)`);
   ok(V.every(v => /^videos\/.+\.(mp4|webm)$/i.test(v)), 'V 全部是 videos/ 下的视频路径');
   // 视频文件可能不在本地仓库中（部署在服务器上），跳过存在性检查
   const vMissing = V.filter(v => !fs.existsSync(path.join(ROOT, v)));

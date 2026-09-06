@@ -13,10 +13,10 @@
 - `admin.html` — 后台(审批/统计/历史/答题记录/展示区/文件管理)。`guide.html` — 《元素共鸣准则》访客说明书。`whiteboard.html`/`music.html`/`agreement.html`/`privacy.html`/`community.html` — 子页,全部纳入 Vite 多页构建(产物仍在 dist 根,部署路径不变)。
 - `official.html` — **B612 官网**(2026-09-06 上线,取代 www 旧 React 官网):绘本式单页,默认英文 + sessionStorage 切中文,零依赖零 3D,字体自托管 `official-assets/fonts/`(国内不依赖 Google CDN),图片 `official-assets/*.webp`(主人的 Dola AI 生成图,水印已由 `dev/process-official-art.py` 去除:垂直克隆/水平镜像克隆两法)。部署见「生产部署」官网条;验收探针 `dev/official-site-probe.cjs`。
 
-## 展示区模式(2026-07-25 主人定,详见 ADMIN_GUIDE.md)
+## 展示区模式(2026-07-25 主人定;2026-09-06 特殊模式整体删除)
 
-- 判定:`GET /api/siteconfig` 按设备指纹返回 mode;「特殊访问」= `applicants[].special`,只能后台 `POST /api/admin/decide {action:'special'}` 授予,前台不可申请。
-- 普通模式:图库照片/视频**框留下、内容面拿掉**(paintGroups 按 src 分级:演示/本人上传全显,图库白卡空框,他人上传整框隐藏;新上传优先换芯空框)、isLink2~13/isGarden 外链由 `ctx.linkGuard` 接管(挂自定义链接可复活)、isLink 卷轴改写为 guide.html、纹理按 `ctx.texAllowed` 逐个放行。
+- **2026-09-06 主人定:特殊模式删除**——`/api/siteconfig` 恒返 `mode:'normal'`(设备 special/全局 special 不再参与决策),admin 后台模式切换 UI 移除,`mediarules.mjs` 决策表按普通模式单轨:演示/本人上传可见,其余(图库/他人)整框隐藏,下载门禁同理拒绝。
+- **照片全库退役**:data.js P 仅剩 5 张演示照片(201~205),其余 69 张已从 data.js/photos/服务器全部删除(挂画循环改为内容填完即止,不再绕圈重复挂);非大屏视频退役:data.js V/VIDEO_WALL_SOURCES 清空,服务器 videos/ 根目录仅剩 户外大屏/(大屏 1~5 号轮播走 /api/bigscreen + R2,完全不受影响)。访客上传仍可动态上墙。
 - 链接模型:`mode.js` `spawnLinkModel`(10 种),后台链接(icon=挂原图案/model=新建)、访客链接(gateData.userLinks 按 dk,出现在眼前,pos 由前端传)。
 
 ## 上线前必跑(自动化测试)

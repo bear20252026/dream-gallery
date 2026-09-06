@@ -75,10 +75,10 @@ describe('canServeMedia 门禁矩阵', () => {
     expect(canServeMedia(req, 'photos', 'mine.jpg')).toBe(true);
   });
 
-  it('全局 special 模式全展示', () => {
-    gateData.siteConfig.mode = 'special';
-    expect(canServeMedia(mockReq(), 'photos', 'theirs.jpg')).toBe(true);
-    expect(canServeMedia(mockReq(), 'photos', 'nobody.jpg')).toBe(true);
+  it('特殊模式已删除:他人/无归属媒体一律拒绝(2026-09-06)', () => {
+    gateData.siteConfig.mode = 'special'; // 即使残留脏数据也不生效
+    expect(canServeMedia(mockReq(), 'photos', 'theirs.jpg')).toBe(false);
+    expect(canServeMedia(mockReq(), 'photos', 'nobody.jpg')).toBe(false);
   });
 
   it('公开媒体标记 _mediaPublic(允许 CDN 边缘缓存),隐私媒体不标记', () => {
