@@ -94,6 +94,7 @@ const bubbleOf = (() => {
     wrap.className = 'b612-anchor';
     const inner = document.createElement('div');
     inner.className = 'b612-bubble';
+    inner.dataset.actor = actor.id; // 探针可按 data-actor 精确定位
     wrap.appendChild(inner);
     root.appendChild(wrap);
     const obj = new CSS2DObject(root);
@@ -134,23 +135,26 @@ function resolveAnchor(actor) {
     g.getWorldPosition(c);
     c.y += actor.off;
   } else {
-    // 王子:蒙皮网格集合的包围盒
-    const box = new THREE.Box3();
-    const tmp = new THREE.Box3();
-    let hit = false;
+    // 王子:蒙皮网格的 geometry 包围盒是"绑定姿态"(bind pose),×matrixWorld 后是错误坐标。
+    // 改从星球顶面(PlanetLP)推算王子站位:王子就立在绿星球顶上,锚在顶面中心的上前方。
+    let top = -1e9,
+      cx = 0,
+      cz = 0,
+      hit = false;
     root.traverse((o) => {
       if (!o.isMesh || !o.geometry) return;
-      if (!o.isSkinnedMesh) return;
+      if (!/PlanetLP/i.test(o.name || '')) return;
       o.geometry.computeBoundingBox();
-      tmp.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
-      if (!hit) {
-        box.copy(tmp);
+      const b = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
+      if (b.max.y > top) {
+        top = b.max.y;
+        cx = (b.min.x + b.max.x) / 2;
+        cz = (b.min.z + b.max.z) / 2;
         hit = true;
-      } else box.union(tmp);
+      }
     });
     if (!hit) return null;
-    box.getCenter(c);
-    c.y = box.max.y + actor.off;
+    c.set(cx, top + actor.off, cz - 1.5); // 面朝玩家站立的方向,略前移
   }
   const st = bubbleOf(actor);
   st.obj.position.copy(c);
