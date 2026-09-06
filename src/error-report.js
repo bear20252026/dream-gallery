@@ -42,6 +42,8 @@ function ctxInfo() {
 
 function push(item) {
   try {
+    // 已知可选资源(有优雅回退,如飞舟装饰 GLB)不再上报,避免日志噪音
+    if (/models\/strawberry_ship\//.test(String(item.message || ''))) return;
     // 节流:同类(类型+消息)在窗口内只收一次
     const key = item.type + '|' + String(item.message || '').slice(0, 120);
     const now = Date.now();
@@ -49,7 +51,19 @@ function push(item) {
     if (now - last < THROTTLE_MS) return;
     lastSent.set(key, now);
 
-    buf.push(Object.assign({ t: now, ua: navigator.userAgent }, ctxInfo(), item));
+    // 规范字段(2026-09-06):每条必带 页面 URL / UA / 当前世界,后台可直接定位
+    buf.push(
+      Object.assign(
+        {
+          t: now,
+          ua: navigator.userAgent,
+          url: String(location.href).slice(0, 200),
+          world: (window.__ctx && window.__ctx.scene && window.__ctx.scene.activeWorld) || 'main',
+        },
+        ctxInfo(),
+        item
+      )
+    );
     if (buf.length > MAX_BUFFER) buf.splice(0, buf.length - MAX_BUFFER);
     schedule();
   } catch (e) {

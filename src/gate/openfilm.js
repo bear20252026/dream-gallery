@@ -22,6 +22,7 @@ export function playOpeningFilm(onDone) {
   if (active) return;
   active = true;
   let renderer = null;
+  let noGL = false; // WebGL 不可用降级标志:play() 在 startFlight 后须立即返回
   function done() {
     if (!active) return;
     active = false;
@@ -142,13 +143,37 @@ export function playOpeningFilm(onDone) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   /* ================= 第二幕:古地图俯冲(Three.js) ================= */
+  // WebGL 上下文创建失败的重试与降级(2026-09-06 主人报「飞行段无法呈现」):
+  // 页面已有一个 WebGL 上下文时,部分设备/内嵌浏览器再建第二个会失败。
+  // 尝试两次(第二次关抗锯齿+低功耗偏好);仍失败进入「无 GL 降级」——
+  // 手绘各幕照常播放,飞行段以落定文字收束,不再卡死黑屏。
   try {
     renderer = new THREE.WebGLRenderer({ canvas: $('fc'), antialias: true });
+  } catch (e1) {
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas: $('fc'),
+        antialias: false,
+        powerPreference: 'low-power',
+      });
+    } catch (e2) {
+      console.warn('[film] WebGL 不可用,飞行段降级为文字落定:', e2.message);
+      if (window.__reportError)
+        window.__reportError('webgl', 'film WebGL 不可用,已降级跳过飞行段: ' + e2.message);
+    }
+  }
+  if (renderer) {
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
     renderer.setSize(innerWidth, innerHeight);
-  } catch (e) {
-    done();
-    return;
+    // 飞行中上下文丢失:不再渲染,优雅收束进游戏(而非冻结黑屏)
+    $('fc').addEventListener('webglcontextlost', function (e) {
+      e.preventDefault();
+      if (window.__reportError)
+        window.__reportError('webgl', 'film WebGL context lost,已降级收束');
+      later(function () {
+        finish();
+      }, 400);
+    });
   }
   const scene = new THREE.Scene();
   const PAPER = '#f3ead2';
@@ -464,6 +489,16 @@ export function playOpeningFilm(onDone) {
     T = new THREE.Vector3(),
     UP = new THREE.Vector3(0, 1, 0);
   function startFlight() {
+    // 降级路径(无 WebGL 渲染器):跳过 3D 飞行,以落定文字收束进游戏
+    if (!renderer) {
+      noGL = true;
+      $('fc').style.background = '#f3ead2'; // 无渲染器时画布是黑的,垫纸色保住落定文字可读
+      $('tLand').classList.add('ftshow');
+      $('fEnd').classList.add('ftshow');
+      $('fSkip').style.display = 'none';
+      later(finish, 2600);
+      return;
+    }
     u = 0;
     flying = true;
     landed = false;
@@ -496,6 +531,9 @@ export function playOpeningFilm(onDone) {
     later(() => {
       $('fSkip').style.display = 'none';
     }, 1900);
+    // 自然收束(2026-09-06 修复:此前落定后 skip 自动隐藏却无人调用 finish,
+    // 影片永远停在落定画面——访客视角即「飞机之后动画消失,页面卡死」)
+    later(finish, 5600);
   }
   function forceLand() {
     if (landed) return;
@@ -612,7 +650,8 @@ export function playOpeningFilm(onDone) {
     }
     renderer.render(scene, cam);
   }
-  requestAnimationFrame(tick);
+  // 降级模式(无渲染器)不启动渲染循环:手绘幕由 DOM/CSS 驱动,不依赖此循环
+  if (renderer) requestAnimationFrame(tick);
 
   /* ================= 第一幕:手绘 ================= */
   const HAT = [
@@ -865,6 +904,7 @@ export function playOpeningFilm(onDone) {
     if (dead()) return;
     root.classList.add('act2'); // 黑幕揭开:古地图已在头顶,DOM 纸飞机交给 3D 纸飞机
     startFlight();
+    if (noGL) return; // 降级:startFlight 已排定落定文字与收束,后续 DOM 动画全部跳过
     await wait(300);
     if (dead()) return;
     const pd = $('fPlaneDom');
