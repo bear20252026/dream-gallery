@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import { ctx } from '../ctx.js';
-import { hotBegin } from './hot.js';
+import { hotBegin } from '../hot.js';
 
 const bag = hotBegin('story-dialogs');
 
