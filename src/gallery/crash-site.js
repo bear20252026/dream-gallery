@@ -16,7 +16,7 @@ const getH = (x, z) => ctx.media.desert.getH(x, z);
 // ===================== 选址(2026-09-07 地形探针实测) =====================
 // 石门南侧洼地,16×14m 内高差仅 0.73m,缓坡可达;残骸机头朝北(朝画廊方向滑停)。
 const WRECK = { x: -9, z: 76, yaw: -0.35 }; // yaw: 机头大致朝北偏东
-const SPAWN_DIR = { x: -5.5, z: 72.8 }; // 出生点(与 player.js SPAWN 常量一致)
+const SPAWN_DIR = { x: -3.5, z: 70.5 }; // 出生点(与 player.js SPAWN 常量一致;残骸碰撞盒外)
 const DUNE = { x: -11.8, z: 72.2 }; // 小王子初见位(玩家睁眼即可见的西南沙地,走出时不穿残骸)
 const PRINCE_DEST = { x: -9.3, z: 72.8 }; // 叫醒站位(相机投影实测:屏幕 84%/75%,对话框右侧空地)
 const PRINCE_H = 3.2; // chibi 王子目标身高(m)(2026-09-07 主人定:放大 3~5 倍,取 4 倍)
@@ -48,8 +48,8 @@ loader.load(
     wrap.updateMatrixWorld(true);
     const bb = new THREE.Box3().setFromObject(wrap);
     addBox({
-      mnX: bb.min.x + 0.3,
-      mxX: bb.max.x - 0.3,
+      mnX: bb.min.x + 2.6, // 只保留机身段(座舱),机翼下可穿行——否则整个翼展圈住出生点
+      mxX: bb.max.x - 2.6,
       mnZ: bb.min.z + 0.6,
       mxZ: bb.max.z - 0.6,
     });
@@ -71,28 +71,45 @@ function makeSign() {
   x.strokeRect(8, 8, 496, 304);
   x.fillStyle = '#4e4237';
   x.textAlign = 'center';
-  x.font = 'italic 26px Georgia, serif';
-  const signText = tt(STORY.wreckSign);
-  const zhSign = STORY.wreckSign.zh;
-  const words = signText.split(' ');
-  let line = '',
-    y = 66;
-  for (const w of words) {
-    if (x.measureText(line + w).width > 440) {
-      x.fillText(line, 256, y);
-      y += 34;
-      line = '';
+  const zhFont = '"Zhi Mang Xing", "Microsoft YaHei", sans-serif';
+  function draw() {
+    x.clearRect(0, 0, 512, 320);
+    x.fillStyle = '#f3ead2';
+    x.fillRect(0, 0, 512, 320);
+    x.strokeStyle = '#6b4f37';
+    x.lineWidth = 10;
+    x.strokeRect(8, 8, 496, 304);
+    x.fillStyle = '#4e4237';
+    x.textAlign = 'center';
+    x.font = 'italic 26px Georgia, serif';
+    const signText = STORY.wreckSign.en;
+    const words = signText.split(' ');
+    let line = '';
+    let y = 66;
+    for (const w of words) {
+      if (x.measureText(line + w).width > 440) {
+        x.fillText(line, 256, y);
+        y += 34;
+        line = '';
+      }
+      line += w + ' ';
     }
-    line += w + ' ';
-  }
-  x.fillText(line, 256, y);
-  y += 46;
-  x.font = '22px "Microsoft YaHei", sans-serif';
-  for (const seg of STORY.wreckSign.zh.split('\n')) {
-    x.fillText(seg, 256, y);
-    y += 34;
+    x.fillText(line, 256, y);
+    y += 46;
+    x.font = '30px ' + zhFont; // 中文行书(字体就绪后经 fonts.ready 重绘)
+    for (const seg of STORY.wreckSign.zh.split('\n')) {
+      x.fillText(seg, 256, y);
+      y += 40;
+    }
+    tex.needsUpdate = true;
   }
   const tex = new THREE.CanvasTexture(cnv);
+  draw();
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function () {
+      draw(); // 行书子集加载完成后重绘牌面中文
+    });
+  }
   const board = new THREE.Mesh(
     new THREE.BoxGeometry(1.7, 1.06, 0.06),
     [
@@ -139,9 +156,11 @@ loader.load(
     wrap.position.set(DUNE.x, gh, DUNE.z); // bottom 贴地(min.y 在归一化后已近 0)
     wrap.name = 'littlePrince';
     wrap.traverse((o) => {
-      if (o.isMesh) {
-        o.frustumCulled = false; // 无骨骼动画的静态人偶,防误剔除
-      }
+      if (!o.isMesh) return;
+      o.frustumCulled = false; // 无骨骼动画的静态人偶,防误剔除
+      // Layer_1 = 模型自带的金色星星装饰层(0.8m 时是点缀,3.2m 后挡脸)——移除
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      if (mats.some((mm) => /Layer_1/i.test(mm.name || ''))) o.visible = false;
     });
     s.add(wrap);
     prince = wrap;

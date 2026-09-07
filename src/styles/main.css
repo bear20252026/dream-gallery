@@ -1,5 +1,24 @@
 /* 梦幻画廊主样式 — 由 index.html 内嵌 <style> 抽离(2026-07-27 Vite 结构整改) */
 /* 经 <link rel=stylesheet> 引入:本地原生直跑可读,Vite 构建自动压缩+hash */
+
+/* ===================== 剧情双语字体(2026-09-07 主人定:中文用志莽行书,OFL 子集 71KB) ===================== */
+@font-face{
+  font-family:'Zhi Mang Xing';
+  src:url('/fonts/ZhiMangXing-sub.woff2') format('woff2');
+  font-display:swap;
+}
+/* 中文态:剧情/对白文字用行书(英文态保持 Georgia 衬线) */
+body[data-script-lang='zh'] #fTq,
+body[data-script-lang='zh'] #fReply,
+body[data-script-lang='zh'] #fSleep,
+body[data-script-lang='zh'] .ffline,
+body[data-script-lang='zh'] #gDed,
+body[data-script-lang='zh'] #loadQuote,
+body[data-script-lang='zh'] #gameDialog .gs-text{
+  font-family:'Zhi Mang Xing','Microsoft YaHei',sans-serif;
+  font-style:normal;
+  letter-spacing:.06em;
+}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-touch-callout:none}
 body{background:#1a0a14;overflow:hidden;touch-action:none;overscroll-behavior:none;font-family:'Courier New',monospace;height:100vh;width:100vw;position:fixed}
 /* 触摸兼容(2026-08-30 移动端卡死修复):body touch-action:none 由 CSS 承担
