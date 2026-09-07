@@ -168,7 +168,7 @@ function startServer() {
 
   // ① 主世界开世界(等场景/后处理稳定;昼夜钉正午保跨环境可比)
   await page.waitForTimeout(1200);
-  await page.evaluate(() => { try { window.__ctx.store.str('nick', 'vr'); } catch (e) {} }); // 灭指引卡
+  await page.evaluate(() => { try { window.__ctx.store.str('nick', 'vr'); window.__ctx.store.mark('scene2'); } catch (e) {} }); // 灭指引卡+画板标记(VR 不测画板)
   await freezeDayNoon();
   await checkpoint('main-boot', /^main$/, 4000);
   // ② 石门 → B612

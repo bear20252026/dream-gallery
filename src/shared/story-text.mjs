@@ -82,3 +82,50 @@ export const DIALOG_LINES = {
     'I command you to enjoy your stay. It will happen anyway.',
   ],
 };
+
+// 第 2 场·画羊四笔(2026-09-07;台词照 Woods,中文据《中文文学译本》/《定稿全本》)
+// who 亦是 {en,zh}(对话框说话人随语言)。four rounds + 满意对话 + 羊初声。
+const PRINCE = { en: 'The Little Prince', zh: '小王子' };
+const PILOT = { en: 'The Pilot', zh: '飞行员' };
+const SHEEP = { en: 'The Sheep (in the box)', zh: '箱子里的羊' };
+export const SCENE2 = {
+  who: { prince: PRINCE, pilot: PILOT, sheep: SHEEP },
+  hint: {
+    en: 'Trace the grey lines, then tap the button.',
+    zh: '照着淡灰线稿画，画好了点右下角',
+  },
+  doneBtn: { en: 'Done', zh: '画好了' },
+  round1: {
+    who: PRINCE,
+    en: 'No, no, no! I do not want an elephant inside a boa constrictor. A boa constrictor is a very dangerous creature, and an elephant is very cumbersome. Where I live, everything is very small. What I need is a sheep. Draw me a sheep.',
+    zh: '不不不！我不要蟒蛇肚子里的大象。\n蟒蛇太危险，大象太笨重。\n我住的地方，什么都很小。\n我要的是一只羊。给我画一只羊。',
+  },
+  round2: {
+    who: PRINCE,
+    en: 'No. This sheep is already very sickly. Make me another.',
+    zh: '不行。\n这只羊病得很重。再画一只。',
+  },
+  round3: {
+    who: PRINCE,
+    en: 'You see yourself that this is not a sheep. This is a ram. It has horns.',
+    zh: '你自己看看，这不是羊。\n这是公羊。它有角。',
+  },
+  round4: {
+    who: PRINCE,
+    en: 'This is only his box. The sheep you asked for is inside.',
+    zh: '这只是箱子。\n你要的那只羊，就在里面。',
+  },
+  after: [
+    { who: PRINCE, en: 'That is exactly the way I wanted it! Do you think that this sheep will have to have a great deal of grass?', zh: '这正是我想要的！\n你看这只羊要吃很多草吗？' },
+    { who: PILOT, en: 'Why?', zh: '为什么？' },
+    { who: PRINCE, en: 'Because where I live everything is very small...', zh: '因为我住的地方，什么都很小……' },
+    { who: PILOT, en: 'There will surely be enough grass for him. It is a very small sheep that I have given you.', zh: '肯定有足够的草给它。\n我给了你一只很小很小的羊。' },
+    { who: PRINCE, en: 'Not so small that-- Look! He has gone to sleep...', zh: '没有那么小——瞧！\n他睡着了……' },
+  ],
+  voice: [
+    { who: SHEEP, en: '...Hello? Is it morning already?', zh: '……喂？天亮了吗？' },
+    { who: SHEEP, en: 'You drew me. That makes me yours.', zh: '你画了我。所以我是你的。' },
+    { who: SHEEP, en: 'It is dark in here, but it is a good dark.', zh: '里面很黑。\n不过黑得挺舒服。' },
+    { who: SHEEP, en: 'Wake me when the stars come out.', zh: '星星出来的时候，叫醒我。' },
+  ],
+};

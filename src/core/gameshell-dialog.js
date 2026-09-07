@@ -91,10 +91,19 @@ export function createDialogSystem() {
     });
   }
   function closeDialog() {
-    if (dlg && dlg.typeTimer) clearInterval(dlg.typeTimer);
-    if (dlg && dlg.hideTimer) clearTimeout(dlg.hideTimer);
+    const d = dlg;
+    if (d && d.typeTimer) clearInterval(d.typeTimer);
+    if (d && d.hideTimer) clearTimeout(d.hideTimer);
     dlg = null;
     dialogEl.style.display = 'none';
+    // 收束回调(2026-09-07):此前 onDone 只存不调,依赖它的链式对话(剧本第2场)会断链
+    if (d && d.onDone) {
+      try {
+        d.onDone();
+      } catch (e) {
+        console.warn('[gameshell] onDone 异常:', e.message);
+      }
+    }
   }
   function openDialog(opts) {
     if (!opts) return;

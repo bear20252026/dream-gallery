@@ -218,9 +218,16 @@ ctx.onTick(function crashTick(dt) {
           autoHide: 9000,
           onDone: function () {
             window.__crashWakeDone = true; // settings.js 等此标记再弹雅号/指引卡,不盖开场对白
+            // 叫醒词说完 → 第 2 场·画羊四笔(gate/scene2-draw.js 经事件解耦启动)
+            setTimeout(function () {
+              ctx.events.emit('story:scene2');
+            }, 900);
           },
         });
-      } else window.__crashWakeDone = true;
+      } else {
+        window.__crashWakeDone = true;
+        ctx.events.emit('story:scene2');
+      }
     }
   } else if (princeState === 'idle') {
     prince.position.y = getH(prince.position.x, prince.position.z) + Math.abs(Math.sin(now * 0.003)) * 0.03; // 待机轻息
