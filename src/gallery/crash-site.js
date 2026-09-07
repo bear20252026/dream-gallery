@@ -154,6 +154,7 @@ loader.load(
 // ===================== 睁眼 + 王子走近叫醒 =====================
 let bootT = null;
 let wakePlayed = false;
+let wakePitchDone = false;
 setTimeout(function () {
   window.__crashWakeDone = true; // 兜底:对话链路异常时 16s 后照常放行开场弹窗
 }, 16000);
@@ -163,10 +164,14 @@ ctx.onTick(function crashTick(dt) {
   if (bootT === null) bootT = now;
   const t = (now - bootT) / 1000;
 
-  // 睁眼:出生瞬间仰望天空,1.8s 缓缓回正(电影黑场交棒过来的"醒")
+  // 睁眼:出生瞬间仰望天空,1.8s 缓缓回正——只在窗口内调 pitch,之后放手交还鼠标,
+  // 否则每帧 pl.pi=0 会把玩家俯仰永久锁零("进画廊后无法行动"根因,2026-09-07)
   const pl = ctx.player.pl;
   if (t < 1.8) pl.pi = 0.85 * (1 - t / 1.8);
-  else pl.pi = 0;
+  else if (!wakePitchDone) {
+    wakePitchDone = true;
+    pl.pi = 0;
+  }
 
   // 王子未就绪/未到出场时刻:只处理待机呼吸
   if (!prince || t < 1.4) return;
@@ -183,14 +188,14 @@ ctx.onTick(function crashTick(dt) {
     prince.position.x = px;
     prince.position.z = pz;
     prince.position.y = getH(px, pz) + Math.abs(Math.sin(k * Math.PI * 5)) * 0.16; // 跳步
-    prince.rotation.y = Math.atan2(-(princeAt.x - DUNE.x), -(princeAt.z - DUNE.z)); // 行进朝向
+    prince.rotation.y = Math.atan2(-(princeAt.x - DUNE.x), -(princeAt.z - DUNE.z)) + Math.PI; // 行进朝向(模型前向补 π)
     if (k >= 1) {
       princeState = 'idle';
-      // 叫醒词(书内原句):第一句对话即主线发令枪
+      // 叫醒词(书内原句):第一句对话即主线发令枪(单语,随语言切换)
       if (ctx.openDialog) {
         ctx.openDialog({
           speaker: STORY.princeWake.speaker,
-          lines: [STORY.princeWake.en + '\n' + STORY.princeWake.zh], // 单行双语,自动收束不抢拍
+          lines: [tt(STORY.princeWake)],
           autoHide: 9000,
           onDone: function () {
             window.__crashWakeDone = true; // settings.js 等此标记再弹雅号/指引卡,不盖开场对白
@@ -200,6 +205,14 @@ ctx.onTick(function crashTick(dt) {
     }
   } else if (princeState === 'idle') {
     prince.position.y = getH(prince.position.x, prince.position.z) + Math.abs(Math.sin(now * 0.003)) * 0.03; // 待机轻息
+    // 面向玩家(不背对):随玩家缓慢转身
+    const tx = pl.p.x - prince.position.x;
+    const tz = pl.p.z - prince.position.z;
+    const targetYaw = Math.atan2(-tx, -tz) + Math.PI; // 模型视觉前向补 π
+    let dy = targetYaw - prince.rotation.y;
+    while (dy > Math.PI) dy -= Math.PI * 2;
+    while (dy < -Math.PI) dy += Math.PI * 2;
+    prince.rotation.y += dy * Math.min(1, dt * 4); // 平滑转体
   }
 });
 
