@@ -8,6 +8,7 @@
 // 纯表现层(presentation/ui),经组合根装配,与 toast/overlay 同通道。无业务逻辑。
 import { ctx } from '../ctx.js';
 import { eventBus } from './event-bus.js';
+import { GLOBAL, tt } from '../shared/story-text.mjs';
 import { defineSystem } from './system.js';
 import { createDialogSystem } from './gameshell-dialog.js'; // 对话框状态机(B5 外迁)
 
@@ -130,7 +131,7 @@ function createGameShellSystem() {
     if (spirits >= 6) ark = '六颗星屑归位';
     else if (spirits >= 1) ark = '飞舟已现';
     let main;
-    if (spirits < 6) main = '把这本书，写完。 Finish the book.';
+    if (spirits < 6) main = tt(GLOBAL.questMain);
     else if (picks < 1) main = '在永恒展厅挂上你的画';
     else main = 'B612 已亮，慢慢逛';
     return { spirits, picks, ark, main };
@@ -245,6 +246,7 @@ questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 
 
       // 对话事件总线:其他模块可 ctx.events.emit('ui:dialog', {...})
       unsub = eventBus.on('ui:dialog', (o) => dialogApi.open(o));
+      window.addEventListener('script:lang', refreshQuest);
 
       // 升级昆仑开口:既播 TTS,又落进手绘框(所有现有 kunlunSpeak 调用自动生效)
       prevKunlunSpeak = ctx.ui.kunlunSpeak;

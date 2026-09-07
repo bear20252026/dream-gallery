@@ -20,7 +20,8 @@ import * as THREE from 'three';
 import { Z } from '../shared/z-layers.mjs';
 import { createFilmGate } from './film-gate.mjs';
 import { HAT, TRUTH } from './film-strokes.mjs';
-import { FILM } from '../shared/story-text.mjs';
+import { FILM, tt, scriptLang } from '../shared/story-text.mjs';
+import { makeLangToggle } from '../ui/lang-toggle.js';
 
 let active = false;
 
@@ -37,6 +38,17 @@ export function playOpeningFilm(onDone) {
   if (active) return;
   active = true;
   let renderer = null;
+  // 双语可切换:字幕单语显示,切语言即时重绘(2026-09-07 主人定)
+  const capKey = { q: null, reply: null, sleep: null, fly1: null, fly2: null };
+  function applyFilmLang() {
+    if (capKey.q && $('fTq') && $('fTq').classList.contains('show')) $('fTq').textContent = tt(capKey.q);
+    if (capKey.reply && $('fReply') && $('fReply').classList.contains('show')) $('fReply').textContent = tt(capKey.reply);
+    if (capKey.sleep && $('fSleep') && $('fSleep').classList.contains('show')) $('fSleep').textContent = tt(capKey.sleep);
+    if (capKey.fly1 && $('tFly1') && $('tFly1').classList.contains('ftshow')) $('tFly1').textContent = tt(capKey.fly1);
+    if (capKey.fly2 && $('tFly2') && $('tFly2').classList.contains('ftshow')) $('tFly2').textContent = tt(capKey.fly2);
+  }
+  window.addEventListener('script:lang', applyFilmLang);
+
   let noGL = false; // WebGL 不可用降级标志:play() 在 startFlight 后须立即返回
   function done() {
     if (!active) return;
@@ -132,7 +144,7 @@ export function playOpeningFilm(onDone) {
   <div id="fDark"></div>
   <div id="fPaper">
     <svg id="fSketch" viewBox="0 0 720 460" fill="none" stroke-linecap="round" stroke-linejoin="round"></svg>
-    <div class="ftline" id="fTq">${FILM.question}</div>
+    <div class="ftline" id="fTq"></div>
     <div class="ftline" id="fReply"></div>
     <div class="ftline" id="fSleep"></div>
     <div id="fChoice">
@@ -149,10 +161,15 @@ export function playOpeningFilm(onDone) {
     <path d="M12,84 L288,20 L196,96 Z"/><path d="M196,96 L178,138 L150,102"/>
     <path d="M12,84 L150,102"/><path d="M96,64 C104,58 116,58 124,64" opacity=".55"/>
   </svg>
-  <div class="ffline" id="tFly1">${FILM.fly1}</div>
-  <div class="ffline" id="tFly2">${FILM.fly2}</div>
+  <div class="ffline" id="tFly1"></div>
+  <div class="ffline" id="tFly2"></div>
   <button id="fSkip" type="button">skip ▸</button>`;
   document.body.appendChild(root);
+  // 影片内语言切换钮(右上角,与闸门/HUD 共用 makeLangToggle;root 完整后才挂)
+  {
+    const fT = makeLangToggle({ placement: 'top:14px;right:14px', z: 20 });
+    root.appendChild(fT);
+  }
   document.addEventListener('keydown', onEsc);
   const $ = (id) => document.getElementById(id);
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -520,7 +537,8 @@ export function playOpeningFilm(onDone) {
       renderer = null;
       noGL = true;
       $('fc').style.background = '#f3ead2'; // 无渲染器时画布是黑的,垫纸色保住落定文字可读
-      $('fSleep').textContent = FILM.crash;
+      capKey.sleep = FILM.crash;
+      $('fSleep').textContent = tt(FILM.crash);
       $('fSleep').classList.add('show');
       $('fSkip').style.display = 'none';
       scheduleFinish(4200);
@@ -569,7 +587,8 @@ export function playOpeningFilm(onDone) {
       $('fSleep').classList.remove('show');
     }, 5500);
     later(() => {
-      $('fSleep').textContent = FILM.sleep;
+      capKey.sleep = FILM.sleep;
+      $('fSleep').textContent = tt(FILM.sleep);
       $('fSleep').classList.add('show'); // 黑场上落「睡去」一行
     }, 6300);
     later(() => {
@@ -850,13 +869,15 @@ export function playOpeningFilm(onDone) {
   }
   function answer(text, quote, res, boa) {
     choseBoa = boa;
-    $('fReply').textContent = text; // 答案句先出
+    capKey.reply = text;
+    $('fReply').textContent = tt(text); // 答案句先出
     $('fReply').classList.add('show');
     $('fChoice').classList.remove('show');
     $('fTq').classList.remove('show');
     later(function () {
       if (gate.dead) return;
-      $('fReply').textContent = quote; // 1.7s 后切旁白字幕(文学译本)
+      capKey.reply = quote;
+      $('fReply').textContent = tt(quote); // 1.7s 后切旁白字幕(文学译本)
     }, 1700);
     res();
   }
@@ -883,6 +904,7 @@ export function playOpeningFilm(onDone) {
     await drawGroup(HAT, false);
     await wait(900);
     if (dead()) return;
+    $('fTq').textContent = tt(FILM.question); capKey.q = FILM.question;
     $('fTq').classList.add('show');
     $('fChoice').classList.add('show');
     await new Promise((res) => {
@@ -919,9 +941,11 @@ export function playOpeningFilm(onDone) {
     );
     await wait(1200);
     if (dead()) return;
+    $('tFly1').textContent = tt(FILM.fly1); capKey.fly1 = FILM.fly1;
     $('tFly1').classList.add('ftshow');
     await wait(3600);
     if (dead()) return;
+    $('tFly2').textContent = tt(FILM.fly2); capKey.fly2 = FILM.fly2;
     $('tFly2').classList.add('ftshow');
     await wait(4200);
     if (dead()) return;

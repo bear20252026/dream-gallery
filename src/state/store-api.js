@@ -32,6 +32,7 @@ const SCHEMA = {
   nick: { key: 'galleryNick', type: 'str' }, // 访客昵称
   prefix: { key: 'kunlunPrefix', type: 'str' }, // 昵称前缀(六合藏梦人·)
   roomName: { key: 'roomName', type: 'str' }, // 大厅:上次使用的房间昵称(lobby.html 独立入口预填用)
+  lang: { key: 'scriptLang', type: 'str' }, // 剧情语言 en/zh(2026-09-07 主人定双语可切换)
   // JSON
   spiritsKeys: { key: 'kunlunSpiritsKeys', type: 'json' }, // 已集灵蕴 key 数组(乱序拾取后为权威存档)
   upHash: { key: 'kunlunUpHash', type: 'json' }, // 已传照片哈希(防重)

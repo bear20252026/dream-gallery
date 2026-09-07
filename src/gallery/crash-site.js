@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
-import { STORY } from '../shared/story-text.mjs';
+import { STORY, tt } from '../shared/story-text.mjs';
 
 const bag = hotBegin('crash-site');
 const { s } = ctx;
@@ -72,7 +72,9 @@ function makeSign() {
   x.fillStyle = '#4e4237';
   x.textAlign = 'center';
   x.font = 'italic 26px Georgia, serif';
-  const words = STORY.wreckSign.en.split(' ');
+  const signText = tt(STORY.wreckSign);
+  const zhSign = STORY.wreckSign.zh;
+  const words = signText.split(' ');
   let line = '',
     y = 66;
   for (const w of words) {

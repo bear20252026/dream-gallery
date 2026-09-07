@@ -31,7 +31,8 @@ import { createUiSystem } from './core/ui-system.js'; // 阶段3 切片:UI 域�
 import { getGameState } from './core/game-state.js'; // 单例状态库(阶段3 store 真正化)
 import * as bootState from './core/boot-state.js';
 import { Z } from './shared/z-layers.mjs';
-import { GLOBAL } from './shared/story-text.mjs'; // 剧本台词/全局文案单一源(2026-09-07 对稿)
+import { GLOBAL, tt } from './shared/story-text.mjs'; // 剧本台词/全局文案单一源(2026-09-07 对稿)
+import { applySavedLang, makeLangToggle } from './ui/lang-toggle.js'; // 剧情语言切换(en/zh,单位置切换
 
 // ===================== 主画布视觉保险 + 加载屏交接 =====================
 // 主画布开机隐藏:闸门/电影期间世界不可见——不是遮盖,startWorld 时才显形,
@@ -40,11 +41,19 @@ const loopManager = new LoopManager(ctx); // 构造轻量,引导期即可;start(
 ctx.loopManager = loopManager;
 setLoop(loopManager); // 注入唯一主循环 facade(新积木经 deps.loop 获取)
 
+// 早按存档载入剧情语言(双语可切换)
+applySavedLang();
+// 主世界常驻语言切换钮:同一位置只显示当前语言标签(EN/中文)
+{
+  const tb = makeLangToggle({ placement: 'top:14px;right:14px', z: Z.navBtn });
+  tb.style.position = 'fixed';
+  document.body.appendChild(tb);
+}
 // 加载屏引言(2026-09-07 对稿《中文文学译本》全局文案件)
 {
   const lq = document.getElementById('loadQuote');
   if (lq) {
-    lq.textContent = GLOBAL.loading;
+    lq.textContent = tt(GLOBAL.loading);
     lq.style.cssText =
       'margin-top:18px;font-style:italic;font-size:14px;line-height:1.9;letter-spacing:1px;color:rgba(84,70,58,.6);white-space:pre-line;text-align:center';
   }
