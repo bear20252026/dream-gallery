@@ -33,9 +33,14 @@ export function createDialogSystem() {
     caret.className = 'gs-caret';
     caret.textContent = '✎';
     textEl.appendChild(caret);
-    dlg.typeTimer = setInterval(() => {
+    const timerId = setInterval(() => {
+      // 打字过程中对话可能已被关闭/切换(onDone 链会立刻开下一条)——空手而归
+      if (!dlg) {
+        clearInterval(timerId);
+        return;
+      }
       if (i >= str.length) {
-        clearInterval(dlg.typeTimer);
+        clearInterval(timerId);
         dlg.typing = false;
         textEl.textContent = str;
         onLineDone();
@@ -44,6 +49,7 @@ export function createDialogSystem() {
       textEl.textContent = str.slice(0, ++i);
       textEl.appendChild(caret);
     }, 38);
+    dlg.typeTimer = timerId;
   }
   function onLineDone() {
     clearTimeout(dlg.hideTimer);

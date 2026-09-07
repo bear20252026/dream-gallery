@@ -33,6 +33,7 @@ const SCHEMA = {
   prefix: { key: 'kunlunPrefix', type: 'str' }, // 昵称前缀(六合藏梦人·)
   roomName: { key: 'roomName', type: 'str' }, // 大厅:上次使用的房间昵称(lobby.html 独立入口预填用)
   scene2: { key: 'b612Scene2', type: 'flag' }, // 画羊四笔完成标记(B612 剧本第2场)
+  page1: { key: 'b612Page1', type: 'flag' }, // 书页一完成(第3场 B612 回忆夜)
   lang: { key: 'scriptLang', type: 'str' }, // 剧情语言 en/zh(2026-09-07 主人定双语可切换)
   // JSON
   spiritsKeys: { key: 'kunlunSpiritsKeys', type: 'json' }, // 已集灵蕴 key 数组(乱序拾取后为权威存档)

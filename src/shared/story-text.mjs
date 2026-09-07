@@ -68,6 +68,12 @@ export const STORY = {
 // 小世界情景对话(故事书小王子/玫瑰/国王;逐条轮播,全英文 Satisfy 手写体;
 // 待第 3 场迁移成 {en,zh} 后随语言切换)
 export const DIALOG_LINES = {
+  princeIdle: [
+    { en: 'Where I live, everything is very small.', zh: '在我的星球上，什么都很小。' },
+    { en: 'The thing that is so good about the box you have given me is that at night he can use it as his house.', zh: '这箱子最好的一点：到了夜里，羊可以拿它当房子。' },
+    { en: 'Straight ahead of him, nobody can go very far…', zh: '一直朝前走，谁也走不远……' },
+    { en: 'If some one loves a flower, of which just one single blossom grows in all the millions and millions of stars, it is enough to make him happy just to look at the stars.', zh: '若有人爱着一朵花，在千万颗星星里，她只开这一朵——那么他只要抬头望望星空，心里就已是幸福的。' },
+  ],
   prince: [
     'Welcome to B612, little visitor.',
     'A hat is only a hat — unless you look with your heart.',
@@ -128,4 +134,45 @@ export const SCENE2 = {
     { who: SHEEP, en: 'It is dark in here, but it is a good dark.', zh: '里面很黑。\n不过黑得挺舒服。' },
     { who: SHEEP, en: 'Wake me when the stars come out.', zh: '星星出来的时候，叫醒我。' },
   ],
+};
+
+// 第 3 场·书页一(B612 家与日常;2026-09-07,台词照 Woods/文学译本)
+export const SCENE3 = {
+  counting: { en: 'One... two... three...', zh: '一……二……三……' },
+  countingWho: { en: 'The Sheep (in the box)', zh: '箱子里的羊' },
+  doorGlowHint: {
+    en: 'In the night, the stone door begins to glow...',
+    zh: '夜色里，石门亮了起来。',
+  },
+  arrival: [
+    { who: PRINCE, en: 'What! You dropped down from the sky?', zh: '什么！你从天上掉下来的？' },
+    { who: PRINCE, en: 'Oh! That is funny!', zh: '哦！那可真有趣！' },
+    { who: PRINCE, en: 'So you, too, come from the sky! Which is your planet?', zh: '这么说，你也是从天上来的！\n你的星球是哪一颗？' },
+    { who: PRINCE, en: 'The thing that is so good about the box you have given me is that at night he can use it as his house.', zh: '你给我的这箱子，\n好在夜里羊可以拿它当房子。' },
+  ],
+  volcanoes: {
+    who: PRINCE,
+    en: 'I have three volcanoes. Two volcanoes are active and the other is extinct. But one never knows.',
+    zh: '我有三座火山。\n两座是活的，一座熄灭了。\n不过，谁知道呢。',
+  },
+  baobab: [
+    { who: PRINCE, en: "It is true, isn't it, that sheep eat little bushes?", zh: '羊吃小灌木，是真的吧？' },
+    { who: SHEEP, en: 'I eat little bushes. I would never eat a whole planet.', zh: '我吃小灌木。\n可不会吃掉一整个星球。' },
+    { who: PRINCE, en: 'Then it follows that they also eat baobabs?', zh: '那么，它们也吃猴面包树喽？' },
+    { who: PRINCE, en: 'We would have to put them one on top of the other.', zh: '那得让大象一只叠一只才行。' },
+    { who: PRINCE, en: 'Before they grow so big, the baobabs start out by being little.', zh: '猴面包树长到那么大之前，\n也是从小树苗开始的。' },
+    { who: PRINCE, en: "It is a question of discipline. When you've finished your own toilet in the morning, then it is time to attend to the toilet of your planet, just so, with the greatest care.", zh: '这是个规矩的问题。\n早晨梳洗完了，\n就该给星球梳洗——\n要仔细，再仔细。' },
+  ],
+  sunset: [
+    { who: PRINCE, en: 'I am very fond of sunsets. Come, let us go look at a sunset now.', zh: '我很喜欢日落。\n走，我们现在就去看一次日落。' },
+    { who: PRINCE, en: 'One day, I saw the sunset forty-four times!', zh: '有一天，我看了四十四次日落！' },
+    { who: PILOT, en: 'You know-- one loves the sunset, when one is so sad...', zh: '你知道的——\n人难过的时候，\n就会爱上日落……' },
+    { who: SHEEP, en: 'If you count them, I will count them with you.', zh: '你要数的话，\n我陪你一起数。' },
+  ],
+  exitBridge: {
+    who: PRINCE,
+    en: 'There you are. You were far away— did you see it too?',
+    zh: '你在这儿呀。\n你刚才走了好远——你也看见了吗？',
+  },
+  questPage: { en: 'Pages of the book', zh: '书页' },
 };

@@ -97,7 +97,10 @@ function fadeLoadOnce() {
 let worldStarted = false;
 let worldBooting = null;
 let worldBooted = false;
+let preloadPromise = null; // 预加载记忆化:并发调用(onEnter 与 startWorld)共享同一次加载
 async function preloadWorld() {
+  if (preloadPromise) return preloadPromise; // 2026-09-07 修复:重复调用曾让组合根 init 多跑,系统全量重复装配
+  preloadPromise = (async () => {
   // —— 世界模块按原 import 顺序加载(逐模块进度可观测,失败上报) ——
   try { window.__worldPhase = '场景'; await import('./scene/scene.js'); } catch (e) { window.__worldPhase = '失败:场景'; console.error('[startWorld] 场景 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/scene.js ' + e.message); throw e; }
   try { window.__worldPhase = '媒体'; await import('./scene/media.js'); } catch (e) { window.__worldPhase = '失败:媒体'; console.error('[startWorld] 媒体 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: scene/media.js ' + e.message); throw e; }
@@ -127,6 +130,8 @@ async function preloadWorld() {
   try { window.__worldPhase = '石门'; await import('./gallery/portal.js'); } catch (e) { window.__worldPhase = '失败:石门'; console.error('[startWorld] 石门 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/portal.js ' + e.message); throw e; }
   try { window.__worldPhase = '坠机点'; await import('./gallery/crash-site.js'); } catch (e) { window.__worldPhase = '失败:坠机点'; console.error('[startWorld] 坠机点 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gallery/crash-site.js ' + e.message); throw e; }
   try { window.__worldPhase = '画羊'; await import('./gate/scene2-draw.js'); } catch (e) { window.__worldPhase = '失败:画羊'; console.error('[startWorld] 画羊 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gate/scene2-draw.js ' + e.message); throw e; }
+  try { window.__worldPhase = '书页一'; await import('./gate/scene3-night.js'); } catch (e) { window.__worldPhase = '失败:书页一'; console.error('[startWorld] 书页一 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: gate/scene3-night.js ' + e.message); throw e; }
+  try { window.__worldPhase = '回忆层'; await import('./kunlun/scene3-memory.js'); } catch (e) { window.__worldPhase = '失败:回忆层'; console.error('[startWorld] 回忆层 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/scene3-memory.js ' + e.message); throw e; }
   try { window.__worldPhase = '重置视角'; await import('./kunlun/resetview.js'); } catch (e) { window.__worldPhase = '失败:重置视角'; console.error('[startWorld] 重置视角 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/resetview.js ' + e.message); throw e; }
   try { window.__worldPhase = '放下'; await import('./kunlun/letgo.js'); } catch (e) { window.__worldPhase = '失败:放下'; console.error('[startWorld] 放下 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/letgo.js ' + e.message); throw e; }
   try { window.__worldPhase = '终章'; await import('./kunlun/finale.js'); } catch (e) { window.__worldPhase = '失败:终章'; console.error('[startWorld] 终章 加载失败:', e.message); if (window.__reportError) window.__reportError('boot', 'startWorld 模块失败: kunlun/finale.js ' + e.message); throw e; }
@@ -258,10 +263,18 @@ async function preloadWorld() {
     console.error('[startWorld] 启动自检缺项(模块漏载或初始化失败):', missing.join(', '));
 
   worldBooted = true; // 预加载完成:模块与场景构建全部就绪(揭幕由 startWorld 负责)
+  })().catch(function (e) {
+    preloadPromise = null; // 失败清空记忆,允许 startWorld 重试
+    throw e;
+  });
+  return preloadPromise;
 }
 
 async function startWorld() {
-  if (worldStarted) return;
+  if (worldStarted) {
+    console.warn('[startWorld] 重入被拦截', new Error().stack.slice(0, 500));
+    return;
+  }
   worldStarted = true;
   bootState.markWorldStarted();
   await preloadWorld(); // 闸门期已预加载则瞬间完成;迟到(直开/noopening 抢跑)则在此等齐

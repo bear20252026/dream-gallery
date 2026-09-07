@@ -130,17 +130,22 @@ function createGameShellSystem() {
     let ark = '尚未启程';
     if (spirits >= 6) ark = '六颗星屑归位';
     else if (spirits >= 1) ark = '飞舟已现';
+    let pages = 0;
+    try { if (ctx.store.flag('page1')) pages = 1; } catch (e) {}
     let main;
     if (spirits < 6) main = tt(GLOBAL.questMain);
     else if (picks < 1) main = '在永恒展厅挂上你的画';
     else main = 'B612 已亮，慢慢逛';
-    return { spirits, picks, ark, main };
+    return { spirits, picks, ark, main, pages };
   }
   function refreshQuest() {
     if (!questEl) return;
     const p = readProgress();
     questEl.querySelector('.q-main').textContent = '◈ ' + p.main;
+    const pr = questEl.querySelector('.q-rows');
+    const prFirst = pr ? pr.firstChild : null;
     const rows = [
+      ['书页', p.pages + ' / 9'],
       ['星屑', p.spirits + ' / 6'],
       ['展厅挂画', p.picks + ' / 20'],
       ['飞舟', p.ark],
@@ -209,6 +214,8 @@ function createGameShellSystem() {
     phase: 'ui',
     order: 6,
     init() {
+      window.__gsInitN = (window.__gsInitN || 0) + 1;
+      if (window.__gsInitN > 1) console.warn('[gameshell] init 重复装配 #' + window.__gsInitN, new Error().stack);
       styleEl = document.createElement('style');
       styleEl.textContent = STYLE;
       document.head.appendChild(styleEl);
