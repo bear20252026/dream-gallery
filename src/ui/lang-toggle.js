@@ -11,6 +11,7 @@ export function toggleLang() {
     ctx.store.setStr('lang', next);
   } catch (e) {}
   setScriptLang(next);
+  document.body.dataset.scriptLang = next;
   window.dispatchEvent(new CustomEvent('script:lang', { detail: { lang: next } }));
   return next;
 }

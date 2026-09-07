@@ -42,7 +42,8 @@ ctx.loopManager = loopManager;
 setLoop(loopManager); // 注入唯一主循环 facade(新积木经 deps.loop 获取)
 
 // 早按存档载入剧情语言(双语可切换)
-applySavedLang();
+const _sl = applySavedLang();
+document.body.dataset.scriptLang = _sl;
 // 主世界常驻语言切换钮:同一位置只显示当前语言标签(EN/中文)
 {
   const tb = makeLangToggle({ placement: 'top:14px;right:14px', z: Z.navBtn });
