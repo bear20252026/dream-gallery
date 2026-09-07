@@ -154,7 +154,7 @@ function startServer() {
       blockSignature(shot, CROP, GRID)
     );
     const verdict =
-      diff.changedRatio > STRICT_RATIO ? 'FAIL' : diff.changedRatio > WARN_RATIO ? 'WARN' : 'OK';
+      diff.changedRatio > STRICT_RATIO ? (STRICT ? 'FAIL' : 'WARN') : diff.changedRatio > WARN_RATIO ? 'WARN' : 'OK';
     console.log(
       `  ⤷ 像素对比 ${verdict}: changedRatio=${(diff.changedRatio * 100).toFixed(1)}% maxΔ=${diff.maxDelta}`
     );
