@@ -119,6 +119,10 @@ function open() {
   doneBtn.onclick = function () {
     submit(); // 画好了:停笔定稿(玩家可画可不画,零输入也能推进)
   };
+  // 停笔 6s 自动提交(画板不给卡死机会;玩家随时可点「画好了」提前)
+  submitTimer = setTimeout(function () {
+    if (document.getElementById('scene2Done')) submit();
+  }, 6000);
   root.appendChild(doneBtn);
   document.body.appendChild(root);
   requestAnimationFrame(() => (root.style.opacity = '1'));
@@ -142,6 +146,11 @@ function round() {
   busy = false;
   drawing = true;
   setRoundUi();
+  // 每轮重挂 6s 自动提交(零输入也不卡死;玩家随时可点「画好了」提前)
+  if (submitTimer) clearTimeout(submitTimer);
+  submitTimer = setTimeout(function () {
+    if (document.getElementById('scene2Done')) submit();
+  }, 6000);
   // 常驻淡灰线稿:定稿路径先以浅灰完整铺底
   guidePaths = [];
   for (const st of ROUNDS[roundIdx].strokes) {
@@ -208,6 +217,7 @@ function scheduleSubmit() {
 
 // —— 定稿:玩家笔迹淡为浅底,深色定稿线逐笔生长 ——
 async function submit() {
+  console.log('[scene2] submit r=' + (roundIdx + 1));
   if (busy) return;
   busy = true;
   drawing = false;
@@ -232,7 +242,9 @@ async function submit() {
   await Promise.all(anims).catch(() => {});
   await new Promise((r) => setTimeout(r, 500));
   const line = ROUNDS[roundIdx].line;
+  console.log('[scene2] 提交定稿 r=' + (roundIdx + 1));
   speakOne(line, function () {
+    console.log('[scene2] 台词收束 r=' + (roundIdx + 1) + ' → 下一轮');
     roundIdx++;
     if (roundIdx < ROUNDS.length) {
       clearPaper();
@@ -240,6 +252,17 @@ async function submit() {
     } else {
       finale();
     }
+  });
+}
+
+// 单条王子台词:按句长自动停留(长句更久),点按可提前收束
+function speakOne(line, done) {
+  const stay = Math.max(4600, (line.en || '').length * 90);
+  ctx.openDialog({
+    speaker: tt(SCENE2.who.prince),
+    lines: [tt(line)],
+    autoHide: stay,
+    onDone: done,
   });
 }
 
@@ -273,22 +296,36 @@ function speakSeq(seq, i, done) {
     },
   });
 }
-function speakOne(line, done) {
-  speakSeq([line], 0, done);
-}
-
-// —— 第四笔后:满意对话 + 羊初声 → 存档 → 画板淡出 ——
+// —— 第四笔后:满意对话 + 羊初声 → 存档 → 画板淡出 → 广播完成(转夜等后续场景就绪) ——
 function finale() {
   const seq = SCENE2.after.concat(SCENE2.voice);
-  speakSeq(seq, 0, function () {
-    try {
-      ctx.store.mark('scene2');
-    } catch (e) {}
-    root.style.opacity = '0';
-    setTimeout(function () {
-      root.remove();
-      root = null;
-      active = false;
-    }, 1300);
-  });
+  // autoHide 按句长计算(短句 4s,长句最多 11s):点按可提前,不点也必然前进
+  const total = seq.length;
+  let idx = 0;
+  function next() {
+    if (idx >= total) {
+      try {
+        ctx.store.mark('scene2');
+        ctx.events.emit('story:scene2done'); // scene3-night 收到后才转夜+羊箱计数
+      } catch (e) {
+        console.error('[scene2] 收束异常:', e.message);
+      }
+      root.style.opacity = '0';
+      setTimeout(function () {
+        root.remove();
+        root = null;
+        active = false;
+      }, 1300);
+      return;
+    }
+    const item = seq[idx++];
+    const stay = Math.max(4000, ((item.en || '').length * 65) | 0);
+    ctx.openDialog({
+      speaker: tt(item.who),
+      lines: [tt(item)],
+      autoHide: stay,
+      onDone: next,
+    });
+  }
+  next();
 }
