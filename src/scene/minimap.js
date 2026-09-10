@@ -1,347 +1,612 @@
-// minimap.js — 小地图渲染(2026-08-30 从 scene/player.js 拆出,职责单一化)
-// 职责:画布/静态底图/建筑区静态图 + 沙漠区地形网格/兴趣点/B612与灵蕴方位指示。
-// 交互:放大按钮 + 阻止地图上的鼠标/触摸事件冒泡到场景。
-// 不负责:点地图传送(耦合物理/传送遮罩,留在 scene/player.js,经本模块导出的度量反算坐标)。
+// minimap.js — 小地图「羊皮纸罗盘」(2026-09-10 主人定圆形罗盘方案;前身 2026-08-30 自 player.js 拆出)
+// 艺术语言:与全站手绘 UI(对话框/任务册/画板)统一——纸底/墨线/朱砂印章/BOTW 式极简。
+// 结构:圆形画布(⌀150/放大⌀260,墨环+刻度+北针画在 bezel 层);
+//   建筑区 = 260² 静态纸质底图(S=2.6px/m,zone 外沿正好内切于圆)按档缩放;
+//   沙漠区 = 启动时一次性预渲染的全沙漠等高线纸图图集(1600×1400,1px=1m,
+//     22k 采样 + marching-squares 等高线,替代旧版每帧 1200+ 次 getH 网格重绘),
+//     每帧只 drawImage 取玩家视窗 + 画标记。
+// 交互:放大按钮 + 阻止地图事件冒泡。点图传送在 scene/player.js(经 bMap/bUnmap 反算,圆形命中)。
 import { ctx } from '../ctx.js';
+import { Z } from '../shared/z-layers.mjs';
 
 const { OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
 // ⚠️ 不要在模块顶层捕获 ctx.player.pl —— 本模块经 import 提升,求值早于
 //    player.js 挂载 pl(实测报 "reading 'p'" 每帧异常);必须在 drawMap() 内现取。
 
+// ===================== 画布与两档尺寸 =====================
 export const mapCanvas = document.getElementById('mc');
 const mapCtx = mapCanvas.getContext('2d');
-mapCanvas.width = 150;
-mapCanvas.height = 140;
-// 放大态(建筑区静态图等比放大 / 沙漠区视野半径 45→150m)
+const SMALL = 150,
+  BIG = 260;
 let mBig = false;
+mapCanvas.width = SMALL;
+mapCanvas.height = SMALL;
+
+// 放大按钮(纸片小方章风;必须落在圆形命中区内——border-radius:50% 会把圆外点击裁掉)
 const mBigBtn = document.createElement('button');
 mBigBtn.textContent = '⤢';
 mBigBtn.title = '放大小地图';
 mBigBtn.style.cssText =
-  'position:absolute;left:4px;bottom:4px;z-index:25;width:22px;height:22px;border-radius:5px;border:1px solid rgba(255,150,180,0.4);background:rgba(20,10,16,0.7);color:#ffb6c8;font-size:12px;line-height:1;cursor:pointer;pointer-events:auto';
+  'position:absolute;left:50%;bottom:9px;transform:translateX(-50%);z-index:2;width:22px;height:22px;border-radius:6px;' +
+  'border:1px solid rgba(74,53,38,.5);background:rgba(248,241,223,.88);color:#4e4237;' +
+  "font-size:12px;line-height:1;cursor:pointer;pointer-events:auto;font-family:'Kaiti SC','STKaiti','KaiTi',serif";
 mBigBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   mBig = !mBig;
   const mDiv = document.getElementById('m');
-  // 丝滑切换:尺寸变化走 CSS transition,B612指示位置两态一致不再"到处跑"
-  mDiv.style.transition = 'width .35s ease,height .35s ease,opacity .35s ease';
-  mDiv.style.opacity = '0.35';
-  setTimeout(() => {
-    mDiv.style.opacity = '1';
-  }, 180);
-  if (mBig) {
-    mapCanvas.width = 280;
-    mapCanvas.height = 280;
-    mDiv.style.width = '280px';
-    mDiv.style.height = '280px';
-  } else {
-    mapCanvas.width = 150;
-    mapCanvas.height = 140;
-    mDiv.style.width = '150px';
-    mDiv.style.height = '140px';
-  }
+  mDiv.style.transition = 'width .35s ease,height .35s ease';
+  const s = mBig ? BIG : SMALL;
+  mapCanvas.width = s;
+  mapCanvas.height = s;
+  mDiv.style.width = s + 'px';
+  mDiv.style.height = s + 'px';
+  ensureBezel();
 });
 document.getElementById('m').appendChild(mBigBtn);
-// 地图比例尺:覆盖 x±34m / z=-13~50m(含室外白板区),三处(静态层/玩家点/传送)必须一致
-export const mapScale = 2.2,
-  mapOffX = 75,
-  mapOffZ = 29;
+
 export function isBig() {
   return mBig;
 }
-// 静态地图层:墙体/标签不变,预渲染一次,每帧只需 drawImage + 玩家点
-const mapBaseCanvas = document.createElement('canvas');
-mapBaseCanvas.width = 150;
-mapBaseCanvas.height = 140;
-const mapBaseCtx = mapBaseCanvas.getContext('2d');
-(function drawStaticMap() {
-  // 防御断言(2026-08-30 复查建议):本模块依赖 main.js 的导入顺序(scene.js 先于
-  // player.js→minimap.js);若未来有人重排为动态/先行导入,这里会拿到 undefined。
+
+// ===================== 建筑区坐标变换(传送反算共用,玩家坐标 ↔ 图面像素) =====================
+// zone(x∈[-34,34], z∈[-13,60] 中心 z=23.5)的外沿角正好落在圆周上:S=w/100。
+// 旧版导出 mapScale/mapOffX/mapOffZ 已废:传送与绘制统一走这两个函数,永不再各写一份。
+const ZONE_CZ = 23.5;
+export function bMap(w, x, z) {
+  const S = w / 100;
+  return [w / 2 + x * S, w / 2 + (z - ZONE_CZ) * S];
+}
+export function bUnmap(w, px, py) {
+  const S = w / 100;
+  return [(px - w / 2) / S, (py - w / 2) / S + ZONE_CZ];
+}
+
+// ===================== 调色板(全站羊皮纸语言) =====================
+const INK = '#4e4237',
+  INK_SOFT = 'rgba(78,66,55,.42)',
+  CINNABAR = '#a04a35',
+  PAPER = '#f3ead2',
+  GOLD = '#d9a441';
+
+// ===================== 建筑区静态底图(260²,S=2.6,纸质重画;旧粉霓虹退役) =====================
+const B_BASE = 260;
+const buildBase = document.createElement('canvas');
+buildBase.width = B_BASE;
+buildBase.height = B_BASE;
+let buildBaseReady = false;
+function drawBuildingBase() {
   if (typeof OL !== 'number' || typeof OBR !== 'number') {
     console.error(
       '[minimap] 场馆常量未就绪(OL=' + OL + ',OBR=' + OBR + ')—— 导入顺序被重排?静态底图绘制中止'
     );
     return;
   }
-  const mapCtx = mapBaseCtx; // 以下静态绘制代码与原逐帧版本一致,只是画到离屏层
-  const w = 150,
-    h = 140,
-    sc = mapScale,
-    ox = mapOffX,
-    oz = mapOffZ;
-  // 背景
-  mapCtx.fillStyle = 'rgba(12,5,10,0.85)';
-  mapCtx.fillRect(0, 0, w, h);
-  // --- 上方展厅区（z=-12~6）---
-  // 展厅外墙
-  mapCtx.strokeStyle = 'rgba(255,150,180,0.5)';
-  mapCtx.lineWidth = 1.5;
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox + OL * sc, oz + OT * sc);
-  mapCtx.lineTo(ox + OR * sc, oz + OT * sc);
-  mapCtx.lineTo(ox + OR * sc, oz + OBE * sc);
-  mapCtx.lineTo(ox + OL * sc, oz + OBE * sc);
-  mapCtx.closePath();
-  mapCtx.stroke();
-  // 展厅内部隔墙
-  mapCtx.strokeStyle = 'rgba(255,150,180,0.2)';
-  mapCtx.lineWidth = 0.8;
-  // 走廊x=-4
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox - 4 * sc, oz + OT * sc);
-  mapCtx.lineTo(ox - 4 * sc, oz + (OBE - 1) * sc);
-  mapCtx.stroke();
-  // 走廊x=4
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox + 4 * sc, oz + OT * sc);
-  mapCtx.lineTo(ox + 4 * sc, oz + (OBE - 1) * sc);
-  mapCtx.stroke();
-  // E厅南墙(z=6)
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox - 4 * sc, oz + OBE * sc);
-  mapCtx.lineTo(ox - 1 * sc, oz + OBE * sc);
-  mapCtx.moveTo(ox + 1 * sc, oz + OBE * sc);
-  mapCtx.lineTo(ox + 4 * sc, oz + OBE * sc);
-  mapCtx.stroke();
-  // 展厅标签
-  mapCtx.fillStyle = 'rgba(255,200,220,0.5)';
-  mapCtx.font = 'bold 6px sans-serif';
-  mapCtx.textAlign = 'center';
-  mapCtx.fillText('A', ox - 11 * sc, oz - 9 * sc);
-  mapCtx.fillText('B', ox + 11 * sc, oz - 9 * sc);
-  mapCtx.fillText('C', ox - 11 * sc, oz - 1 * sc);
-  mapCtx.fillText('D', ox + 11 * sc, oz - 1 * sc);
-  mapCtx.fillText('E', ox, oz + 3.5 * sc);
-  mapCtx.fillText('F', ox - 11 * sc, oz + 4 * sc);
-  mapCtx.fillText('G', ox + 11 * sc, oz + 4 * sc);
-  // --- 下方回字大厅（z=6~28）---
-  // 回字外墙（南+东西延长）
-  mapCtx.strokeStyle = 'rgba(255,150,180,0.6)';
-  mapCtx.lineWidth = 1.8;
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox + OL * sc, oz + OBE * sc);
-  mapCtx.lineTo(ox + OL * sc, oz + OBR * sc);
-  mapCtx.lineTo(ox + OR * sc, oz + OBR * sc);
-  mapCtx.lineTo(ox + OR * sc, oz + OBE * sc);
-  mapCtx.stroke();
-  // 回字内墙（四段带门洞）
-  mapCtx.strokeStyle = 'rgba(255,120,160,0.55)';
-  mapCtx.lineWidth = 1.8;
-  // 内北墙(z=11)
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox + IL * sc, oz + IRT * sc);
-  mapCtx.lineTo(ox + -2 * sc, oz + IRT * sc);
-  mapCtx.moveTo(ox + 2 * sc, oz + IRT * sc);
-  mapCtx.lineTo(ox + IR * sc, oz + IRT * sc);
-  mapCtx.stroke();
-  // 内南墙(z=23)
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox + IL * sc, oz + IRB * sc);
-  mapCtx.lineTo(ox + -2 * sc, oz + IRB * sc);
-  mapCtx.moveTo(ox + 2 * sc, oz + IRB * sc);
-  mapCtx.lineTo(ox + IR * sc, oz + IRB * sc);
-  mapCtx.stroke();
-  // 内西墙(x=-7)
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox + IL * sc, oz + IRT * sc);
-  mapCtx.lineTo(ox + IL * sc, oz + 15.5 * sc);
-  mapCtx.moveTo(ox + IL * sc, oz + 18.5 * sc);
-  mapCtx.lineTo(ox + IL * sc, oz + IRB * sc);
-  mapCtx.stroke();
-  // 内东墙(x=7)
-  mapCtx.beginPath();
-  mapCtx.moveTo(ox + IR * sc, oz + IRT * sc);
-  mapCtx.lineTo(ox + IR * sc, oz + 15.5 * sc);
-  mapCtx.moveTo(ox + IR * sc, oz + 18.5 * sc);
-  mapCtx.lineTo(ox + IR * sc, oz + IRB * sc);
-  mapCtx.stroke();
-  // 门洞标记
-  mapCtx.fillStyle = 'rgba(255,200,150,0.5)';
-  mapCtx.font = '5px sans-serif';
-  mapCtx.fillText('门', ox, oz + (IRT - 0.4) * sc);
-  mapCtx.fillText('门', ox, oz + (IRB + 0.6) * sc);
-  // --- 四座喷泉标记(2026-09-03 取代原「白板区」标记;与 fountains.js SPOTS 同源) ---
-  // 南(0,42)=原画板址 / 北(0,-26) / 东(32,8) / 西(-32,8),各距建筑边缘 14m
+  const c = buildBase.getContext('2d');
+  const S = B_BASE / 100,
+    ox = B_BASE / 2,
+    oz = B_BASE / 2;
+  const px = (x) => ox + x * S,
+    pz = (z) => oz + (z - ZONE_CZ) * S;
+  c.clearRect(0, 0, B_BASE, B_BASE);
+  // 纸底
+  c.fillStyle = PAPER;
+  c.fillRect(0, 0, B_BASE, B_BASE);
+  // 展厅群淡彩洗(上区 z=-12~6 一片,回字大厅 z=6~28 一片)
+  c.fillStyle = 'rgba(213,178,110,.14)';
+  c.fillRect(px(OL), pz(OT), (OR - OL) * S, (OBE - OT) * S);
+  c.fillStyle = 'rgba(190,120,90,.10)';
+  c.fillRect(px(OL), pz(OBE), (OR - OL) * S, (OBR - OBE) * S);
+  // --- 展厅外墙(墨线) ---
+  c.strokeStyle = INK;
+  c.lineWidth = 2;
+  c.lineCap = 'round';
+  c.strokeRect(px(OL), pz(OT), (OR - OL) * S, (OBE - OT) * S);
+  // 走廊隔墙 x=±4
+  c.strokeStyle = INK_SOFT;
+  c.lineWidth = 1.2;
+  c.beginPath();
+  c.moveTo(px(-4), pz(OT));
+  c.lineTo(px(-4), pz(OBE - 1));
+  c.moveTo(px(4), pz(OT));
+  c.lineTo(px(4), pz(OBE - 1));
+  // E 厅南墙(z=OBE,留中门)
+  c.moveTo(px(-4), pz(OBE));
+  c.lineTo(px(-1), pz(OBE));
+  c.moveTo(px(1), pz(OBE));
+  c.lineTo(px(4), pz(OBE));
+  c.stroke();
+  // --- 回字大厅外墙(南+东西) ---
+  c.strokeStyle = INK;
+  c.lineWidth = 2.2;
+  c.beginPath();
+  c.moveTo(px(OL), pz(OBE));
+  c.lineTo(px(OL), pz(OBR));
+  c.lineTo(px(OR), pz(OBR));
+  c.lineTo(px(OR), pz(OBE));
+  c.stroke();
+  // 回字内墙(四段带门洞)
+  c.lineWidth = 2;
+  c.beginPath();
+  c.moveTo(px(IL), pz(IRT));
+  c.lineTo(px(-2), pz(IRT));
+  c.moveTo(px(2), pz(IRT));
+  c.lineTo(px(IR), pz(IRT));
+  c.moveTo(px(IL), pz(IRB));
+  c.lineTo(px(-2), pz(IRB));
+  c.moveTo(px(2), pz(IRB));
+  c.lineTo(px(IR), pz(IRB));
+  c.moveTo(px(IL), pz(IRT));
+  c.lineTo(px(IL), pz(15.5));
+  c.moveTo(px(IL), pz(18.5));
+  c.lineTo(px(IL), pz(IRB));
+  c.moveTo(px(IR), pz(IRT));
+  c.lineTo(px(IR), pz(15.5));
+  c.moveTo(px(IR), pz(18.5));
+  c.lineTo(px(IR), pz(IRB));
+  c.stroke();
+  // 门洞:朱砂小菱形(旧「门」字退役)
+  c.fillStyle = CINNABAR;
+  for (const dz of [IRT, IRB + 0.6]) {
+    c.save();
+    c.translate(px(0), pz(dz));
+    c.rotate(Math.PI / 4);
+    c.fillRect(-2.6, -2.6, 5.2, 5.2);
+    c.restore();
+  }
+  // 展厅标签(楷体,墨色淡)
+  c.fillStyle = 'rgba(74,53,38,.62)';
+  c.font = "13px 'Kaiti SC','STKaiti','KaiTi',serif";
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  const rooms = [
+    ['A', -11, -9],
+    ['B', 11, -9],
+    ['C', -11, -1],
+    ['D', 11, -1],
+    ['E', 0, 3.5],
+    ['F', -11, 4],
+    ['G', 11, 4],
+  ];
+  for (const [t, rx, rz] of rooms) c.fillText(t, px(rx), pz(rz));
+  // --- 四座喷泉:青墨圈 + 水波(南泉盖「泉」印章) ---
   const FOUNTAIN_SPOTS = [
     [0, 42],
     [0, -26],
     [32, 8],
     [-32, 8],
   ];
-  mapCtx.strokeStyle = 'rgba(150,220,255,0.75)';
-  mapCtx.fillStyle = 'rgba(120,200,255,0.28)';
-  mapCtx.lineWidth = 1;
   for (const [fx, fz] of FOUNTAIN_SPOTS) {
-    mapCtx.beginPath();
-    mapCtx.arc(ox + fx * sc, oz + fz * sc, 1.6 * sc, 0, Math.PI * 2);
-    mapCtx.fill();
-    mapCtx.stroke();
+    c.strokeStyle = 'rgba(70,120,130,.65)';
+    c.fillStyle = 'rgba(70,120,130,.16)';
+    c.lineWidth = 1.4;
+    c.beginPath();
+    c.arc(px(fx), pz(fz), 1.7 * S, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+    c.beginPath();
+    c.arc(px(fx), pz(fz), 0.7 * S, 0.2, Math.PI - 0.2);
+    c.stroke();
   }
-  mapCtx.fillStyle = 'rgba(150,220,255,0.7)';
-  mapCtx.fillText('泉', ox + 1.2 * sc, oz + 43.6 * sc);
-})();
-
-// 地形色(与 desert.js getColor 同阈值,但去掉随机噪点,避免地图闪烁)
-function terrainColor(h) {
-  if (h < -2) return 'rgb(222,216,206)';
-  if (h < 0.5) return 'rgb(191,165,114)';
-  if (h < 3) return 'rgb(209,183,127)';
-  if (h < 7) return 'rgb(178,153,107)';
-  if (h < 12) return 'rgb(140,114,89)';
-  if (h < 20) return 'rgb(114,102,97)';
-  if (h < 35) return 'rgb(140,132,122)';
-  if (h < 60) return 'rgb(165,158,147)';
-  if (h < 90) return 'rgb(191,186,178)';
-  return 'rgb(242,244,249)';
+  seal(c, px(0), pz(42) + 12, '泉', 20);
+  buildBaseReady = true;
 }
+
+// 朱砂印章(圆角方 + 白楷体字)
+function seal(c, x, y, ch, size) {
+  c.save();
+  c.fillStyle = CINNABAR;
+  const s = size || 13;
+  const r = s * 0.28;
+  c.beginPath();
+  c.roundRect(x - s / 2, y - s / 2, s, s, r);
+  c.fill();
+  c.fillStyle = '#f8f1df';
+  c.font = "bold " + Math.round(s * 0.72) + "px 'Kaiti SC','STKaiti','KaiTi',serif";
+  c.textAlign = 'center';
+  c.textBaseline = 'middle';
+  c.fillText(ch, x, y + s * 0.04);
+  c.restore();
+}
+
+// ===================== 沙漠等高线纸图图集(一次性预渲染) =====================
+// 覆盖画廊(0,0)+B612(800,600)+空中展厅(800,600):x∈[-450,1150] z∈[-450,950],1px=1m。
+// 采样网格 10m/格(22.4k 次 getH,一次性 ~15ms);等高线 marchingsquares;西北光山影。
+const ATLAS = { x0: -450, z0: -450, w: 1600, h: 1400, cell: 10 };
+const atlas = document.createElement('canvas');
+atlas.width = ATLAS.w;
+atlas.height = ATLAS.h;
+let atlasReady = false;
+let atlasBuilding = false;
+function buildAtlas() {
+  if (atlasReady || atlasBuilding || !ctx.media.desert) return;
+  atlasBuilding = true;
+  try {
+    const t0 = performance.now();
+    const c = atlas.getContext('2d');
+    const GX = Math.ceil(ATLAS.w / ATLAS.cell),
+      GZ = Math.ceil(ATLAS.h / ATLAS.cell);
+    const H = new Float32Array((GX + 1) * (GZ + 1));
+    for (let j = 0; j <= GZ; j++)
+      for (let i = 0; i <= GX; i++)
+        H[j * (GX + 1) + i] = ctx.media.desert.getH(ATLAS.x0 + i * ATLAS.cell, ATLAS.z0 + j * ATLAS.cell);
+    // 纸底
+    c.fillStyle = PAPER;
+    c.fillRect(0, 0, ATLAS.w, ATLAS.h);
+    // 沙色水彩洗(按格均高调色,向纸色褪)
+    for (let j = 0; j < GZ; j++)
+      for (let i = 0; i < GX; i++) {
+        const h = (H[j * (GX + 1) + i] + H[j * (GX + 1) + i + 1] + H[(j + 1) * (GX + 1) + i] + H[(j + 1) * (GX + 1) + i + 1]) / 4;
+        c.fillStyle = washColor(h);
+        c.fillRect(i * ATLAS.cell, j * ATLAS.cell, ATLAS.cell + 1, ATLAS.cell + 1);
+        // 山影:西北光,坡向差 ±10%
+        const dh = H[(j + 1) * (GX + 1) + i + 1] - H[j * (GX + 1) + i];
+        const a = Math.max(-0.1, Math.min(0.1, -dh * 0.012));
+        if (Math.abs(a) > 0.015) {
+          c.fillStyle = a > 0 ? 'rgba(255,252,240,' + a.toFixed(3) + ')' : 'rgba(70,50,30,' + (-a).toFixed(3) + ')';
+          c.fillRect(i * ATLAS.cell, j * ATLAS.cell, ATLAS.cell + 1, ATLAS.cell + 1);
+        }
+      }
+    // 等高线(marching squares;每第三条为计曲线,加粗)
+    const bands = [-2, 0, 3, 6, 10, 15, 21, 28, 36, 46, 60, 80, 100];
+    c.lineCap = 'round';
+    for (let b = 0; b < bands.length; b++) {
+      c.strokeStyle = b % 3 === 0 ? 'rgba(78,66,55,.46)' : 'rgba(78,66,55,.28)';
+      c.lineWidth = b % 3 === 0 ? 1.7 : 1.1;
+      c.beginPath();
+      const t = bands[b];
+      for (let j = 0; j < GZ; j++)
+        for (let i = 0; i < GX; i++) {
+          const a = H[j * (GX + 1) + i],
+            bb = H[j * (GX + 1) + i + 1],
+            cc = H[(j + 1) * (GX + 1) + i + 1],
+            d = H[(j + 1) * (GX + 1) + i];
+          const idx = (a > t ? 8 : 0) | (bb > t ? 4 : 0) | (cc > t ? 2 : 0) | (d > t ? 1 : 0);
+          if (idx === 0 || idx === 15) continue;
+          const x0 = i * ATLAS.cell,
+            y0 = j * ATLAS.cell;
+          // 四边交点(线性插值):T 上边 / B 下边 / L 左边 / R 右边
+          const T = [x0 + ATLAS.cell * ((a - t) / (bb - a || 1e-6)), y0];
+          const B = [x0 + ATLAS.cell * ((d - t) / (cc - d || 1e-6)), y0 + ATLAS.cell];
+          const L = [x0, y0 + ATLAS.cell * ((a - t) / (d - a || 1e-6))];
+          const R = [x0 + ATLAS.cell, y0 + ATLAS.cell * ((bb - t) / (cc - bb || 1e-6))];
+          seg(idx, T, R, B, L, c);
+        }
+      c.stroke();
+    }
+    // B612 山巅小标记(峰顶平台)
+    seal(c, 800 - ATLAS.x0, 600 - ATLAS.z0 - 14, '巅', 22);
+    atlasReady = true;
+    console.log('[minimap] 沙漠纸图图集预渲染完成 ' + Math.round(performance.now() - t0) + 'ms');
+  } catch (e) {
+    console.error('[minimap] 图集预渲染失败:', e.message);
+  }
+  atlasBuilding = false;
+}
+// 16 案例:返回该格内等值线段(T上/R右/B下/L左交点)
+function seg(idx, T, R, B, L, c) {
+  const mv = (p, q) => {
+    c.moveTo(p[0], p[1]);
+    c.lineTo(q[0], q[1]);
+  };
+  switch (idx) {
+    case 1: case 14: mv(L, B); break;
+    case 2: case 13: mv(B, R); break;
+    case 3: case 12: mv(L, R); break;
+    case 4: case 11: mv(T, R); break;
+    case 6: case 9: mv(T, B); break;
+    case 7: case 8: mv(L, T); break;
+    case 5: mv(T, L); mv(B, R); break;
+    case 10: mv(T, R); mv(L, B); break;
+  }
+}
+function washColor(h) {
+  if (h < -2) return '#efe9dc';
+  if (h < 3) return '#ece1c8';
+  if (h < 8) return '#e3d5b4';
+  if (h < 15) return '#d8c6a0';
+  if (h < 24) return '#c9b48d';
+  if (h < 40) return '#b9a179';
+  if (h < 60) return '#a98f6f';
+  if (h < 90) return '#9d8a74';
+  return '#cfc8bd';
+}
+
+// ===================== 罗盘 bezel(墨环+刻度+北针+纸缘晕影,静态一次) =====================
+const bezels = {};
+function ensureBezel() {
+  const s = mBig ? BIG : SMALL;
+  if (bezels[s]) return bezels[s];
+  const b = document.createElement('canvas');
+  b.width = s;
+  b.height = s;
+  const c = b.getContext('2d');
+  const r = s / 2;
+  // 纸缘晕影
+  const g = c.createRadialGradient(r, r, r * 0.72, r, r, r);
+  g.addColorStop(0, 'rgba(90,70,45,0)');
+  g.addColorStop(1, 'rgba(90,70,45,.26)');
+  c.fillStyle = g;
+  c.fillRect(0, 0, s, s);
+  // 墨环(内细外粗,画布边缘留 2px 给 CSS 圆裁剪)
+  c.strokeStyle = INK;
+  c.lineWidth = 2.5;
+  c.beginPath();
+  c.arc(r, r, r - 3.5, 0, Math.PI * 2);
+  c.stroke();
+  c.strokeStyle = 'rgba(74,53,38,.45)';
+  c.lineWidth = 1;
+  c.beginPath();
+  c.arc(r, r, r - 8, 0, Math.PI * 2);
+  c.stroke();
+  // 刻度:每 15° 短线,正交方位加粗
+  for (let a = 0; a < 360; a += 15) {
+    const rad = (a * Math.PI) / 180,
+      major = a % 90 === 0;
+    c.strokeStyle = major ? INK : 'rgba(74,53,38,.35)';
+    c.lineWidth = major ? 2 : 1;
+    const r1 = r - 10,
+      r2 = r - (major ? 20 : 15);
+    c.beginPath();
+    c.moveTo(r + Math.sin(rad) * r1, r - Math.cos(rad) * r1);
+    c.lineTo(r + Math.sin(rad) * r2, r - Math.cos(rad) * r2);
+    c.stroke();
+  }
+  // 北针:墨三角插朱砂北尖,指向图心
+  c.fillStyle = CINNABAR;
+  c.beginPath();
+  c.moveTo(r, r - 12);
+  c.lineTo(r - 4.5, r - 24);
+  c.lineTo(r + 4.5, r - 24);
+  c.closePath();
+  c.fill();
+  c.fillStyle = INK;
+  c.beginPath();
+  c.moveTo(r, r - 12 + 12 * 0.4);
+  c.lineTo(r - 4.5, r - 24 + 12 * 0.4);
+  c.lineTo(r + 4.5, r - 24 + 12 * 0.4);
+  c.closePath();
+  c.fill();
+  if (s === BIG) {
+    c.fillStyle = 'rgba(74,53,38,.7)';
+    c.font = "12px 'Kaiti SC','STKaiti','KaiTi',serif";
+    c.textAlign = 'center';
+    c.fillText('北', r, r - 32);
+    // 比例尺(R=150m 视野):60m 线段
+    const k = s / 300,
+      len = 60 * k;
+    c.strokeStyle = INK;
+    c.lineWidth = 1.5;
+    c.beginPath();
+    c.moveTo(r - len / 2, s - 16);
+    c.lineTo(r + len / 2, s - 16);
+    c.moveTo(r - len / 2, s - 19);
+    c.lineTo(r - len / 2, s - 13);
+    c.moveTo(r + len / 2, s - 19);
+    c.lineTo(r + len / 2, s - 13);
+    c.stroke();
+    c.fillStyle = INK;
+    c.font = "10px 'Kaiti SC','STKaiti','KaiTi',serif";
+    c.fillText('60m', r, s - 24);
+  }
+  bezels[s] = b;
+  return b;
+}
+
+// ===================== 动态绘制 =====================
+// 墨色小箭头(玩家,随朝向旋转;纸色描边保对比)
+function drawArrow(c, x, y, ang, s) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(-ang);
+  c.scale(s, s);
+  c.beginPath();
+  c.moveTo(0, -6.5);
+  c.lineTo(4.6, 5.2);
+  c.lineTo(0, 2.6);
+  c.lineTo(-4.6, 5.2);
+  c.closePath();
+  c.fillStyle = INK;
+  c.strokeStyle = 'rgba(248,241,223,.92)';
+  c.lineWidth = 1.6 / s;
+  c.fill();
+  c.stroke();
+  c.restore();
+}
+// 四芒星屑(B612 指示)
+function drawStar(c, x, y, r, label) {
+  c.save();
+  c.translate(x, y);
+  c.fillStyle = GOLD;
+  c.strokeStyle = 'rgba(248,241,223,.9)';
+  c.lineWidth = 1;
+  c.beginPath();
+  for (let i = 0; i < 4; i++) {
+    const a = (i * Math.PI) / 2;
+    c.lineTo(Math.sin(a) * r, -Math.cos(a) * r);
+    c.lineTo(Math.sin(a + Math.PI / 4) * r * 0.32, -Math.cos(a + Math.PI / 4) * r * 0.32);
+  }
+  c.closePath();
+  c.fill();
+  c.stroke();
+  if (label) {
+    c.fillStyle = 'rgba(74,53,38,.75)';
+    c.font = "10px 'Kaiti SC','STKaiti','KaiTi',serif";
+    c.textAlign = 'center';
+    c.fillText('B612', 0, -r - 5);
+  }
+  c.restore();
+}
+
+let lastMs = 0;
+let lastKeepOut = false;
 export function drawMap() {
+  const t0 = performance.now();
   const pl = ctx.player.pl; // 每帧现取(模块求值早于 player.js 挂载)
+  const W = mapCanvas.width;
   const inZone = Math.abs(pl.p.x) < 34 && pl.p.z > -13 && pl.p.z < 60;
-  if (inZone) {
-    // 建筑区:静态图(放大态等比缩放)
-    const sc = mapCanvas.width / 150;
-    mapCtx.setTransform(sc, 0, 0, sc, 0, 0);
-    mapCtx.drawImage(mapBaseCanvas, 0, 0);
-    const px = mapOffX + pl.p.x * mapScale,
-      pz = mapOffZ + pl.p.z * mapScale;
-    mapCtx.fillStyle = '#ff5090';
-    mapCtx.beginPath();
-    mapCtx.arc(px, pz, 3, 0, Math.PI * 2);
-    mapCtx.fill();
-    mapCtx.fillStyle = '#fff';
-    mapCtx.font = 'bold 7px sans-serif';
-    mapCtx.textAlign = 'center';
-    mapCtx.fillText('我', px, pz - 5);
-    mapCtx.strokeStyle = '#ffb0c0';
-    mapCtx.lineWidth = 1.2;
-    mapCtx.beginPath();
-    mapCtx.moveTo(px, pz);
-    mapCtx.lineTo(px - Math.sin(pl.y) * 6, pz - Math.cos(pl.y) * 6);
-    mapCtx.stroke();
-    // B612方位指示(静态图模式也恒显:玩家点旁指向B612的黄点+标注)
-    if (ctx.media.desert && ctx.media.desert.kunlun) {
-      const K = ctx.media.desert.kunlun;
-      const a = Math.atan2(K.z - pl.p.z, K.x - pl.p.x);
-      let ex = px + Math.cos(a) * 30,
-        ey = pz + Math.sin(a) * 30;
-      ex = Math.max(6, Math.min(144, ex));
-      ey = Math.max(6, Math.min(134, ey));
-      mapCtx.fillStyle = '#ffdd88';
-      mapCtx.beginPath();
-      mapCtx.arc(ex, ey, 3.5, 0, Math.PI * 2);
-      mapCtx.fill();
-      mapCtx.font = '7px sans-serif';
-      mapCtx.textAlign = 'center';
-      mapCtx.fillText('B612', ex, ey - 5);
-    }
-    mapCtx.setTransform(1, 0, 0, 1, 0, 0);
-    return;
-  }
-  const W = mapCanvas.width,
-    H = mapCanvas.height,
-    R = mBig ? 150 : 45,
-    k = W / (2 * R);
-  const cell = Math.max(2, Math.round(W / 36));
-  for (let gy = 0; gy < H; gy += cell)
-    for (let gx = 0; gx < W; gx += cell) {
-      const wx = pl.p.x + (gx - W / 2) / k,
-        wz = pl.p.z + (gy - H / 2) / k;
-      const h = ctx.media.desert ? ctx.media.desert.getH(wx, wz) : 0;
-      mapCtx.fillStyle = terrainColor(h);
-      mapCtx.fillRect(gx, gy, cell, cell);
-    }
-  // 兴趣点:画廊建筑/希沃白板/心象共鸣屏
-  const poi = [
-    [0, 8, '#ff88aa', '馆'],
-    [0, 44, '#a0e0ff', '板'],
-    [39, 14, '#feca57', '考'],
-  ];
-  mapCtx.font = '8px sans-serif';
-  mapCtx.textAlign = 'center';
-  for (const p of poi) {
-    const gx = W / 2 + (p[0] - pl.p.x) * k,
-      gy = H / 2 + (p[1] - pl.p.z) * k;
-    if (gx > 5 && gx < W - 5 && gy > 5 && gy < H - 5) {
-      mapCtx.fillStyle = p[2];
-      mapCtx.beginPath();
-      mapCtx.arc(gx, gy, 3.5, 0, Math.PI * 2);
-      mapCtx.fill();
-      mapCtx.fillText(p[3], gx, gy - 5);
-    }
-  }
-  // B612:在视野内画点,视野外在边缘画方位指示(加大加亮,带描边)
+  mapCtx.clearRect(0, 0, W, W);
+  // 圆形裁剪(与 CSS 圆裁剪双保险;bezel 环内才是图)
+  mapCtx.save();
+  mapCtx.beginPath();
+  mapCtx.arc(W / 2, W / 2, W / 2 - 3, 0, Math.PI * 2);
+  mapCtx.clip();
+  if (inZone) drawBuilding(pl, W);
+  else drawDesert(pl, W);
+  mapCtx.restore();
+  mapCtx.drawImage(ensureBezel(), 0, 0);
+  lastMs = performance.now() - t0;
+}
+
+// —— 建筑区:静态纸质底图缩放 + 动态标记 ——
+function drawBuilding(pl, W) {
+  if (!buildBaseReady) drawBuildingBase();
+  mapCtx.drawImage(buildBase, 0, 0, B_BASE, B_BASE, 0, 0, W, W);
+  const [px, pz] = bMap(W, pl.p.x, pl.p.z);
+  drawArrow(mapCtx, px, pz, pl.y, W / BIG);
+  // B612 星屑方位(静态图模式恒显;贴边钳制)
   if (ctx.media.desert && ctx.media.desert.kunlun) {
     const K = ctx.media.desert.kunlun;
-    const gx = W / 2 + (K.x - pl.p.x) * k,
-      gy = H / 2 + (K.z - pl.p.z) * k;
-    mapCtx.fillStyle = '#ffdd88';
-    mapCtx.strokeStyle = '#fff';
-    mapCtx.lineWidth = 1.2;
-    if (gx > 7 && gx < W - 7 && gy > 7 && gy < H - 7) {
+    const a = Math.atan2(K.z - pl.p.z, K.x - pl.p.x);
+    let ex = px + Math.cos(a) * W * 0.28,
+      ey = pz + Math.sin(a) * W * 0.28;
+    const rMax = W / 2 - 16;
+    const dx = ex - W / 2,
+      dy = ey - W / 2,
+      d = Math.hypot(dx, dy);
+    if (d > rMax) {
+      ex = W / 2 + (dx / d) * rMax;
+      ey = W / 2 + (dy / d) * rMax;
+    }
+    drawStar(mapCtx, ex, ey, W === BIG ? 7 : 5, false);
+  }
+}
+
+// —— 沙漠区:图集视窗 + 印章/星屑/禁区/灵蕴 ——
+function drawDesert(pl, W) {
+  if (!atlasReady) buildAtlas();
+  const R = mBig ? 150 : 45; // 视野半径(米)
+  mapCtx.fillStyle = PAPER;
+  mapCtx.fillRect(0, 0, W, W);
+  if (atlasReady) {
+    const sw = 2 * R; // 图集 1px=1m
+    let sx = pl.p.x - ATLAS.x0 - R,
+      sy = pl.p.z - ATLAS.z0 - R;
+    sx = Math.max(0, Math.min(ATLAS.w - sw, sx));
+    sy = Math.max(0, Math.min(ATLAS.h - sw, sy));
+    mapCtx.drawImage(atlas, sx, sy, sw, sw, 0, 0, W, W);
+  }
+  const k = W / (2 * R); // 屏幕像素/米
+  const gx = (wx) => W / 2 + (wx - pl.p.x) * k,
+    gy = (wz) => W / 2 + (wz - pl.p.z) * k;
+  const vis = (x, y, m) => x > m && x < W - m && y > m && y < W - m;
+  // 万镜画廊禁区(hatch + 镜印章;800,600)
+  lastKeepOut = false;
+  {
+    const hx = gx(800),
+      hz = gy(600),
+      hr = 9 * k;
+    if (vis(hx, hz, hr + 6)) {
+      lastKeepOut = true;
+      mapCtx.save();
+      mapCtx.strokeStyle = 'rgba(120,90,160,.55)';
+      mapCtx.fillStyle = 'rgba(120,90,160,.12)';
+      mapCtx.lineWidth = 1.2;
+      mapCtx.setLineDash([4, 3]);
       mapCtx.beginPath();
-      mapCtx.arc(gx, gy, 5, 0, Math.PI * 2);
+      mapCtx.arc(hx, hz, hr, 0, Math.PI * 2);
       mapCtx.fill();
       mapCtx.stroke();
-      mapCtx.font = '8px sans-serif';
-      mapCtx.fillText('B612', gx, gy - 7);
-    } else {
-      const a = Math.atan2(gy - H / 2, gx - W / 2);
-      const ex = W / 2 + Math.cos(a) * (W / 2 - 8),
-        ey = H / 2 + Math.sin(a) * (H / 2 - 8);
-      mapCtx.beginPath();
-      mapCtx.arc(ex, ey, 4, 0, Math.PI * 2);
-      mapCtx.fill();
-      mapCtx.stroke();
-      mapCtx.font = '8px sans-serif';
-      mapCtx.fillText('B612', ex, ey - 6);
+      mapCtx.setLineDash([]);
+      mapCtx.clip();
+      mapCtx.strokeStyle = 'rgba(120,90,160,.28)';
+      for (let o = -hr; o < hr; o += 5) {
+        mapCtx.beginPath();
+        mapCtx.moveTo(hx + o, hz - hr);
+        mapCtx.lineTo(hx + o + 2 * hr, hz + hr);
+        mapCtx.stroke();
+      }
+      mapCtx.restore();
+      seal(mapCtx, hx, hz, '镜', 12);
     }
   }
-  // 灵蕴目标标记(spirits.js ctx.kunlun.spiritMark):视野内画脉动金点+名字,视野外在边缘画方位指示
+  // 兴趣点印章:馆/板/考
+  const poi = [
+    [0, 8, '馆'],
+    [0, 44, '板'],
+    [39, 14, '考'],
+  ];
+  for (const [wx, wz, ch] of poi) {
+    const x = gx(wx),
+      y = gy(wz);
+    if (vis(x, y, 8)) seal(mapCtx, x, y, ch, W === BIG ? 14 : 11);
+  }
+  // B612 星屑:视野内画星,视野外贴边指示
+  if (ctx.media.desert && ctx.media.desert.kunlun) {
+    const K = ctx.media.desert.kunlun;
+    const x = gx(K.x),
+      y = gy(K.z);
+    if (vis(x, y, 14)) drawStar(mapCtx, x, y, W === BIG ? 8 : 6, mBig);
+    else {
+      const a = Math.atan2(y - W / 2, x - W / 2);
+      drawStar(mapCtx, W / 2 + Math.cos(a) * (W / 2 - 14), W / 2 + Math.sin(a) * (W / 2 - 14), W === BIG ? 7 : 5, false);
+    }
+  }
+  // 灵蕴目标(脉动金点;视野外贴边)
   if (ctx.kunlun.spiritMark) {
     const mk = ctx.kunlun.spiritMark();
     if (mk) {
-      const gx = W / 2 + (mk.x - pl.p.x) * k,
-        gy = H / 2 + (mk.z - pl.p.z) * k;
+      const x = gx(mk.x),
+        y = gy(mk.z);
       const pulse = 3.5 + Math.sin(performance.now() * 0.005) * 1.2;
-      mapCtx.fillStyle = mk.color;
-      mapCtx.strokeStyle = '#fff';
-      mapCtx.lineWidth = 1;
-      if (gx > 7 && gx < W - 7 && gy > 7 && gy < H - 7) {
+      if (vis(x, y, 12)) {
+        mapCtx.fillStyle = mk.color;
+        mapCtx.strokeStyle = 'rgba(248,241,223,.9)';
+        mapCtx.lineWidth = 1.2;
         mapCtx.beginPath();
-        mapCtx.arc(gx, gy, pulse, 0, Math.PI * 2);
+        mapCtx.arc(x, y, pulse, 0, Math.PI * 2);
         mapCtx.fill();
         mapCtx.stroke();
-        mapCtx.font = '8px sans-serif';
-        mapCtx.fillText(mk.name, gx, gy - 6);
+        if (mBig) {
+          mapCtx.fillStyle = 'rgba(74,53,38,.75)';
+          mapCtx.font = "10px 'Kaiti SC','STKaiti','KaiTi',serif";
+          mapCtx.textAlign = 'center';
+          mapCtx.fillText(mk.name, x, y - 8);
+        }
       } else {
-        const a = Math.atan2(gy - H / 2, gx - W / 2);
-        const ex = W / 2 + Math.cos(a) * (W / 2 - 8),
-          ey = H / 2 + Math.sin(a) * (H / 2 - 8);
+        const a = Math.atan2(y - W / 2, x - W / 2);
+        mapCtx.fillStyle = mk.color;
+        mapCtx.strokeStyle = 'rgba(248,241,223,.9)';
+        mapCtx.lineWidth = 1;
         mapCtx.beginPath();
-        mapCtx.arc(ex, ey, 4, 0, Math.PI * 2);
+        mapCtx.arc(W / 2 + Math.cos(a) * (W / 2 - 12), W / 2 + Math.sin(a) * (W / 2 - 12), 3.5, 0, Math.PI * 2);
         mapCtx.fill();
         mapCtx.stroke();
-        mapCtx.font = '7px sans-serif';
-        mapCtx.fillText('灵蕴', ex, ey - 6);
       }
     }
   }
-  // 玩家(恒在中心,标"我"便于识别)
-  mapCtx.fillStyle = '#ff5090';
-  mapCtx.beginPath();
-  mapCtx.arc(W / 2, H / 2, 4, 0, Math.PI * 2);
-  mapCtx.fill();
-  mapCtx.fillStyle = '#fff';
-  mapCtx.font = 'bold 9px sans-serif';
-  mapCtx.textAlign = 'center';
-  mapCtx.fillText('我', W / 2, H / 2 - 7);
-  mapCtx.strokeStyle = '#ffb0c0';
-  mapCtx.lineWidth = 1.4;
-  mapCtx.beginPath();
-  mapCtx.moveTo(W / 2, H / 2);
-  mapCtx.lineTo(W / 2 - Math.sin(pl.y) * 8, H / 2 - Math.cos(pl.y) * 8);
-  mapCtx.stroke();
+  drawArrow(mapCtx, W / 2, W / 2, pl.y, W / BIG);
 }
+
+// ===================== 探针钩子 + 收尾 =====================
+window.__minimap = {
+  get atlasReady() {
+    return atlasReady;
+  },
+  atlas,
+  buildBase,
+  get lastMs() {
+    return lastMs;
+  },
+  get lastKeepOut() {
+    return lastKeepOut;
+  },
+  sizes: { SMALL, BIG },
+  // 探针专用:同步试画箭头(loop 每帧重绘会盖掉,只在同一次 JS 任务内读数有效)
+  drawArrowAt: (x, y, ang, s) => drawArrow(mapCtx, x, y, ang, s),
+};
+// 启动空闲期提前预渲染图集(desert.js 已挂载时);否则首次进沙漠当帧同步构建
+if (typeof requestIdleCallback === 'function') requestIdleCallback(() => buildAtlas(), { timeout: 8000 });
+else setTimeout(buildAtlas, 4000);
 
 // 阻止小地图上的鼠标/触摸事件冒泡到场景(避免点地图时误转视角/误点画框)
 ['mousedown', 'mouseup', 'mousemove', 'touchstart', 'touchend', 'touchmove'].forEach((ev) =>

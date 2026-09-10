@@ -29,7 +29,8 @@ body{background:#1a0a14;overflow:hidden;touch-action:none;overscroll-behavior:no
 #c{position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
 #o{position:fixed;top:0;left:0;width:100%;height:100%;z-index:10;pointer-events:none}
 #t{color:rgba(255,200,220,0.9);font-size:14px;letter-spacing:4px;text-shadow:0 0 12px rgba(255,150,180,0.5);position:absolute;top:16px;left:50%;transform:translateX(-50%);text-align:center}
-#m{position:absolute;top:12px;right:12px;width:150px;height:140px;background:rgba(10,5,8,0.8);border:1px solid rgba(255,150,180,0.25);border-radius:6px;pointer-events:auto;cursor:pointer;overflow:hidden}
+/* 小地图:羊皮纸罗盘(2026-09-10 圆形改造;墨环/刻度/北针画在 minimap.js bezel 层,CSS 只管纸卡圆底) */
+#m{position:absolute;top:12px;right:12px;width:150px;height:150px;border-radius:50%;background:radial-gradient(120% 90% at 50% 40%,#f8f1df 0%,#f3ead2 55%,#eadfc2 100%);box-shadow:0 6px 22px rgba(0,0,0,.35);pointer-events:auto;cursor:pointer;overflow:hidden;z-index:20}
 #m canvas{width:100%;height:100%;display:block}
 /* 内嵌面板(白板/音乐等分支页) */
 #panelOv{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;background:rgba(10,5,10,0.92)}

@@ -9,6 +9,8 @@ export const Z = {
 
   // —— 主世界 HUD ——
   hudLow: 20,       // 音乐开关/底部提示
+  mapPanel: 20,     // 小地图 #m(羊皮纸罗盘,2026-09-10 自裸 DOM 顺序收编)
+  mapBtn: 21,       // 小地图放大钮(面板内相对层级)
   hudPanel: 30,     // AI 配文面板
   hudBtn: 35,       // 跳跃/人称/回归/下降按钮
   quizPanel: 401,   // 答题面板(高于常规 HUD)

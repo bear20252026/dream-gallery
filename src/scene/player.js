@@ -5,7 +5,7 @@ import { EYE_HEIGHT } from '../shared/constants.js';
 import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
 const gs = getGameState();
 const { cam, rnd, bounds, jT, jB, onC3D, zoomOut, OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
-import { mapCanvas, mapScale, mapOffX, mapOffZ, isBig, drawMap } from './minimap.js';
+import { mapCanvas, bUnmap, isBig, drawMap } from './minimap.js';
 
 // ===================== 移动状态机(2026-08-01) =====================
 import { StateMachine } from '../player/StateMachine.js';
@@ -574,13 +574,15 @@ mapCanvas.addEventListener('pointerdown', (e) => {
     return;
   } // ark.js:飞行中禁传送
   const r = mapCanvas.getBoundingClientRect();
+  // 圆形罗盘:出圆即忽略(border-radius 已裁命中区,此为防御;2026-09-10 罗盘改造)
+  const ddx = e.clientX - (r.left + r.width / 2),
+    ddy = e.clientY - (r.top + r.height / 2);
+  if (ddx * ddx + ddy * ddy > (r.width / 2) * (r.width / 2)) return;
   const inZone = Math.abs(pl.p.x) < 34 && pl.p.z > -13 && pl.p.z < 60;
   let wx, wz;
   if (inZone) {
-    // 建筑区:静态图坐标(放大态先归一化)
-    const sc = mapCanvas.width / 150;
-    wx = ((e.clientX - r.left) / sc - mapOffX) / mapScale;
-    wz = ((e.clientY - r.top) / sc - mapOffZ) / mapScale;
+    // 建筑区:罗盘坐标反算(bMap/bUnmap 与绘制共用同一变换,永不再各写一份)
+    [wx, wz] = bUnmap(mapCanvas.width, e.clientX - r.left, e.clientY - r.top);
     if (wx < -32 || wx > 32 || wz < OT - 10 + 0.3 || wz > 60) return; // 建筑区:可传送范围外(建筑外空地四向各扩10米)
   } else {
     // 沙漠区:以玩家为中心反算世界坐标,地图视野内任意点可传送
