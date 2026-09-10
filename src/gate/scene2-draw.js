@@ -192,6 +192,12 @@ function bindDraw() {
   };
   svg.onpointerdown = function (e) {
     if (!drawing || busy) return;
+    // 落笔即取消挂起的定稿倒计时(2026-09-10 主人报「无法画羊」):
+    // 否则上一笔收笔的 1.6s 倒计时会在第二笔画到一半时炸响,把羊拦腰收走
+    if (submitTimer) {
+      clearTimeout(submitTimer);
+      submitTimer = null;
+    }
     ptActive = true;
     const p = toSvg(e);
     curStroke = document.createElementNS(SVG_NS, 'path');

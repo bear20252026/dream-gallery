@@ -97,12 +97,42 @@ function startServer() {
   await page.waitForSelector('#scene2Board', { timeout: 20000 });
   ok('[第2场] 画板淡入', true);
 
-  // ③ 四轮:每轮点「画好了」→ 王子台词(prince)→ 点按推进 → 下一轮
-  //    (r4 台词点按收束后满意链同步开下一条,对话框不出现空窗,故 r4 不断言推进)
+  // ③ 四轮:r1 用真实指针手绘(两笔,笔间 0.8s)驱动,r2~r4 点「画好了」
+  //    回归(2026-09-10 主人报「无法画羊」):落笔不清定稿倒计时 → 第二笔画到一半
+  //    被上一笔的 1.6s 停笔倒计时拦腰截断,多笔画羊永远画不完
   for (let r = 1; r <= 4; r++) {
-    await page.click('#scene2Done');
-    await waitForDialog('prince', 15000);
-    ok(`[第2场 r${r}] 台词 spk=prince`, true);
+    if (r === 1) {
+      const bb = await page.locator('#scene2Board svg').boundingBox();
+      const cx = bb.x + bb.width / 2;
+      const cy = bb.y + bb.height / 2;
+      const drag = async (x1, y1, x2, y2, stepMs) => {
+        await page.mouse.move(x1, y1);
+        await page.mouse.down();
+        for (let i = 1; i <= 8; i++) {
+          await page.mouse.move(x1 + ((x2 - x1) * i) / 8, y1 + ((y2 - y1) * i) / 8);
+          if (stepMs) await page.waitForTimeout(stepMs);
+        }
+        await page.mouse.up();
+      };
+      await drag(cx - 120, cy - 60, cx + 120, cy + 60); // 第一笔(快笔)
+      await page.waitForTimeout(800); // 0.8s 后落第二笔(<1.6s 停笔窗,故意踩倒计时)
+      await drag(cx - 100, cy + 80, cx + 100, cy - 70, 250); // 第二笔拖 ~2s:旧代码此处会被炸断
+      const ink = await page.evaluate(
+        () => document.querySelectorAll('#scene2Board svg g:nth-of-type(2) path').length
+      );
+      ok('[画羊 r1] 真实手绘出墨(≥2 笔)', ink >= 2, 'ink=' + ink);
+      const cut = await page.evaluate(() => {
+        const d = document.getElementById('gameDialog');
+        return (d && d.style.display !== 'none') || !document.getElementById('scene2Board');
+      });
+      ok('[画羊 r1] 第二笔画完仍未被定稿截断', !cut);
+      await waitForDialog('prince', 15000); // 停笔 1.6s 后自动定稿进王子台词
+      ok(`[第2场 r${r}] 台词 spk=prince`, true);
+    } else {
+      await page.click('#scene2Done');
+      await waitForDialog('prince', 15000);
+      ok(`[第2场 r${r}] 台词 spk=prince`, true);
+    }
     if (r < 4) {
       ok(`[第2场 r${r}] 点按推进`, await clickThrough(4));
       await page.waitForFunction(
