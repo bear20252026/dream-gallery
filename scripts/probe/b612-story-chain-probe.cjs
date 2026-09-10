@@ -171,10 +171,72 @@ function startServer() {
   ok('[互斥] 打断者不带 spk 时清视觉类型', lockTest.spkKept && lockTest.spkCleared);
   ok('[容错] 非 lock 可打断', lockTest.interrupted);
   ok('[容错] 被打断链 onDone 补发', lockTest.log.includes('done1'), 'log=' + JSON.stringify(lockTest.log));
-  await clickThrough(6);
+  await clickThrough(1); // 只关 C(intruder-free);B 在锁空后 60ms 补播,先等它现身再清
 
-  ok('无未捕获页面异常', errs.length === 0, errs.slice(0, 3).join(' || '));
-  console.log(fail ? 'FAIL ' + fail : 'PASS 全部通过');
+  // ⑥b 排队补播:⑥里被 lock 挡下的 intruder-lock 应在锁空后补播(而非丢弃)
+  await page.waitForFunction(() => {
+    const d = document.getElementById('gameDialog');
+    return d && d.style.display !== 'none' && d.querySelector('.gs-text').textContent === 'intruder-lock';
+  }, null, { timeout: 15000 });
+  ok('[衔接] 被挡 lock 对话排队补播', true);
+  await clickThrough(4);
+
+  // ===== 场景二:旧档开机(b612Scene2+b612Page1 已标记)= 主人报「无衔接无触发」的存档形态 =====
+  // 断言:叫醒词与桥段台词(转夜链)两段都出现(排队补播而非相丢);画板被进度守卫跳过
+  const page2 = await b.newPage({ viewport: { width: 1280, height: 800 } });
+  const errs2 = [];
+  page2.on('pageerror', (e) => errs2.push(String(e).slice(0, 200)));
+  await page2.addInitScript(() => {
+    sessionStorage.setItem('nickPopOff', '1');
+    try {
+      localStorage.setItem('kunlunWelcomed', String(Date.now()));
+      localStorage.setItem('b612Scene2', '1'); // store SCHEMA: scene2 → b612Scene2
+      localStorage.setItem('b612Page1', '1'); // store SCHEMA: page1 → b612Page1
+    } catch (e) {}
+  });
+  await page2.goto(ORIGIN + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page2.waitForSelector('#b612Gate', { timeout: 90000 });
+  await page2.evaluate(() => {
+    const c = document.getElementById('gAgreeChk');
+    c.checked = true;
+    c.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  await page2.click('#b612Gate .gEnter');
+  await page2.waitForFunction(() => window.__ctx && window.__ctx.loopManager && window.__ctx.loopManager.getFPS() > 0, null, { timeout: 90000 });
+
+  const texts2 = await page2.evaluate(
+    () =>
+      new Promise((res) => {
+        const seen = [];
+        let last = '';
+        const t0 = Date.now();
+        const iv = setInterval(() => {
+          const d = document.getElementById('gameDialog');
+          if (d && d.style.display !== 'none') {
+            const t = d.querySelector('.gs-text').textContent;
+            if (t && t !== last) {
+              seen.push(t);
+              last = t;
+            }
+            d.click(); // 点按加速链推进
+          } else {
+            last = '';
+          }
+          if (Date.now() - t0 > 30000) {
+            clearInterval(iv);
+            res(seen);
+          }
+        }, 350);
+      })
+  );
+  const all2 = texts2.join(' § ');
+  ok('[旧档] 叫醒词出现', /draw me a sheep|画一只羊/.test(all2), all2.slice(0, 120));
+  ok('[旧档] 桥段台词补播(不再被吞)', /There you are|走了好远/.test(all2));
+  const board2 = await page2.evaluate(() => !!document.getElementById('scene2Board'));
+  ok('[旧档] 画板被进度守卫跳过', !board2);
+  ok('[旧档] 无页面异常', errs2.length === 0, errs2.slice(0, 3).join(' || '));
+
+  console.log(fail ? 'FAIL ' + fail : 'PASS 全部通过(两场景)');
   await b.close();
   child.kill();
   process.exit(fail ? 1 : 0);

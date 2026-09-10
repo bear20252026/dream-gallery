@@ -61,6 +61,13 @@ let curStroke = null;
 let submitTimer = null;
 let busy = false;
 
+// 剧情重置入口(?storyreset,2026-09-10):清剧本进度标记,重走画羊→回忆夜全链。
+// 验收/演示用——正式玩家的存档不受影响(不带参数时本模块零行为)。
+if (new URLSearchParams(location.search).has('storyreset')) {
+  ctx.store.unmark('scene2');
+  ctx.store.unmark('page1');
+}
+
 function el(tag, css, parent) {
   const e = document.createElement(tag);
   if (css) e.style.cssText = css;

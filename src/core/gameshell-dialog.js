@@ -4,6 +4,7 @@
 export function createDialogSystem() {
   let dlg = null; // {speaker, lines, idx, choices, onDone, typeTimer, hideTimer, typing}
   let dialogEl = null;
+  let lockQueue = []; // lock 占用时的剧本对话排队(2026-09-10 衔接修复:丢弃=断链)
 
   function attach(element) {
     dialogEl = element;
@@ -111,12 +112,23 @@ export function createDialogSystem() {
         console.warn('[gameshell] onDone 异常:', e.message);
       }
     }
+    // 锁空且有排队的剧本对话 → 补播(2026-09-10 衔接修复)
+    // 经 openDialog 重入:若 onDone 链已抢先开新锁,这里会自动回队,不硬抢
+    if (!suppressDone && !dlg && lockQueue.length) {
+      const next = lockQueue.shift();
+      setTimeout(() => openDialog(next), 60); // 小让位:给 onDone 链的开窗留一拍
+    }
   }
   function openDialog(opts) {
     if (!opts) return;
-    // lock 互斥(2026-09-07 剧本对话容错):带 lock 的 openDialog 在上一条 lock 对话
-    // 尚未关闭时静默忽略,防止多系统 speakSeq 互相覆盖导致对话链断裂
-    if (opts.lock && dlg && dlg.lock) return;
+    // lock 互斥(2026-09-07 剧本对话容错;2026-09-10 由丢弃改排队):
+    // 上一条 lock 对话未收束时,后来的 lock 对话进 FIFO 队尾等锁空补播——
+    // 静默丢弃会让该链永远停在这一步(旧档叫醒词吞掉桥段台词/chainBusy 死锁的根因)
+    if (opts.lock && dlg && dlg.lock) {
+      if (lockQueue.length > 20) lockQueue.shift(); // 封顶防积压
+      lockQueue.push(opts);
+      return;
+    }
     const lines = Array.isArray(opts.lines) ? opts.lines : [opts.lines != null ? String(opts.lines) : ''];
     if (!lines.length) lines.push('');
     // 打断式换对话(2026-09-09 容错):旧 onDone 延后到新对话装好后再收束——

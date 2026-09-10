@@ -277,10 +277,6 @@ ctx.onTick(function scene3MemoryTick(dt) {
   }
   const pl = ctx.player.pl;
 
-  if (!scene3MemoryTick._diag || performance.now() - scene3MemoryTick._diag > 5000) {
-    scene3MemoryTick._diag = performance.now();
-    console.log('[scene3] step=' + curStep + ' pos=(' + pl.p.x.toFixed(1) + ',' + pl.p.z.toFixed(1) + ') busy=' + chainBusy + ' built=' + built);
-  }
   // 到达演出(1.2s 延迟)
   if (curStep < 0) {
     if (!scene3MemoryTick._a) scene3MemoryTick._a = performance.now();

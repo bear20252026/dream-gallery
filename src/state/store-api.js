@@ -116,6 +116,11 @@ export const storeApi = {
   mark(name) {
     rawSet(entry(name).key, '1');
   },
+  unmark(name) {
+    try {
+      localStorage.removeItem(entry(name).key);
+    } catch (e) {}
+  },
   // —— 灵蕴库存(含旧档迁移,迁移逻辑从 spirits.js 收编于此) ——
   getSpirits() {
     let k = this.json('spiritsKeys', null);
