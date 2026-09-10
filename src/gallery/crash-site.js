@@ -196,6 +196,17 @@ ctx.onTick(function crashTick(dt) {
   if (!prince || t < 1.4) return;
   if (princeState === 'dune' && !wakePlayed) {
     wakePlayed = true;
+    // 剧情进度守卫(2026-09-10 主人报「无法从对话跳转画羊」):画羊已完成的旧档
+    // 不再重播叫醒词——否则对话说「给我画一只羊」、画板却被进度守卫跳过,永远接不上。
+    // 旧档开场=王子已在目的地等候,直接放行后续指引(重走全链用 ?storyreset)
+    if (ctx.store.flag('scene2')) {
+      princeState = 'idle';
+      princeAt = { x: PRINCE_DEST.x, z: PRINCE_DEST.z };
+      prince.position.x = PRINCE_DEST.x;
+      prince.position.z = PRINCE_DEST.z;
+      window.__crashWakeDone = true;
+      return;
+    }
     princeState = 'walking';
     princeAt = { x: PRINCE_DEST.x, z: PRINCE_DEST.z }; // 相机投影实测位(2026-09-07)
     princeT0 = now;

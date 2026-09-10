@@ -260,8 +260,12 @@ function startServer() {
       })
   );
   const all2 = texts2.join(' § ');
-  ok('[旧档] 叫醒词出现', /draw me a sheep|画一只羊/.test(all2), all2.slice(0, 120));
+  // 2026-09-10 主人报「无法从对话跳转画羊」:旧档叫醒词重播但画板被进度守卫跳过=空承诺。
+  // 修后旧档不再重播叫醒词(王子直接就位),只走夜里现实链(计数+桥段台词)
+  ok('[旧档] 叫醒词被进度守卫跳过(不再空承诺)', !/draw me a sheep|画一只羊/.test(all2), all2.slice(0, 120));
   ok('[旧档] 桥段台词补播(不再被吞)', /There you are|走了好远/.test(all2));
+  const wakeDone2 = await page2.evaluate(() => window.__crashWakeDone === true);
+  ok('[旧档] 王子就位直接放行指引', wakeDone2);
   const board2 = await page2.evaluate(() => !!document.getElementById('scene2Board'));
   ok('[旧档] 画板被进度守卫跳过', !board2);
   ok('[旧档] 无页面异常', errs2.length === 0, errs2.slice(0, 3).join(' || '));

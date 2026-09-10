@@ -11,7 +11,10 @@ import { TRUTH } from './film-strokes.mjs';
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const BOARD_Z = 60; // 盖过世界与 HUD,低于手绘对话框(80)
 
-// 三组新手绘线稿(病羊/公羊/箱子);孩子画风格,少笔数
+// 三组新手绘线稿(病羊/公羊/箱子);孩子画风格,少笔数。
+// 2026-09-10 主人定「定稿更生动」:基础轮廓后接一批细节笔(delay 续奏)——
+// 垂耳/闭眼/叹气/羊毛卷/羊角纹/山羊胡/落影/草叶;箱子加第三个气孔+孔里飘出的呼吸+暖光。
+// delay=ms(定稿起笔时刻);无 delay 的基础笔按序 110ms 错峰,像一笔一笔画出来的。
 const SHEEP_SICK = [
   { d: 'M270,300 C285,255 360,240 420,265 C455,280 455,320 425,335 C360,362 295,350 270,300', t: 900, w: 3.4 },
   { d: 'M270,300 C240,305 218,325 222,350 C224,362 238,366 248,358', t: 700, w: 3 },
@@ -22,6 +25,16 @@ const SHEEP_SICK = [
   { d: 'M428,330 C446,338 450,352 440,362', t: 400, w: 2.2, soft: true },
   { d: 'M240,335 a3,3 0 1,0 .1,0', t: 250, fill: true },
   { d: 'M236,352 C242,356 250,355 254,350', t: 300, w: 1.8, soft: true },
+  { d: 'M216,321 C207,332 207,345 217,354', t: 500, w: 2.2, delay: 1150 },
+  { d: 'M232,331 L250,329', t: 300, w: 2, delay: 1300 },
+  { d: 'M236,333 a1.3,1.3 0 1,0 .1,0', t: 220, fill: true, hl: true, delay: 1440 },
+  { d: 'M298,262 a9,9 0 0,1 17,2', t: 380, w: 1.8, soft: true, delay: 1580 },
+  { d: 'M338,254 a9,9 0 0,1 17,2', t: 380, w: 1.8, soft: true, delay: 1700 },
+  { d: 'M380,254 a9,9 0 0,1 17,3', t: 380, w: 1.8, soft: true, delay: 1820 },
+  { d: 'M258,372 C266,368 273,376 281,371', t: 420, w: 1.6, soft: true, delay: 1950 },
+  { d: 'M212,404 C216,392 222,388 228,390', t: 380, w: 2, delay: 2080 },
+  { d: 'M224,405 C228,395 234,392 240,393', t: 380, w: 2, delay: 2180 },
+  { d: 'M244,402 C310,410 420,410 474,400', t: 600, w: 2, soft: true, delay: 2290 },
 ];
 const RAM = [
   { d: 'M260,300 C270,255 350,240 420,262 C458,275 462,318 430,335 C365,362 285,352 260,300', t: 900, w: 3.4 },
@@ -33,6 +46,16 @@ const RAM = [
   { d: 'M405,352 L410,392', t: 300, w: 2.6 },
   { d: 'M336,355 L336,396', t: 300, w: 2.6 },
   { d: 'M470,285 a3,3 0 1,0 .1,0', t: 250, fill: true },
+  { d: 'M461,272 L483,268', t: 300, w: 2.2, delay: 1150 },
+  { d: 'M468,283 a1.3,1.3 0 1,0 .1,0', t: 220, fill: true, hl: true, delay: 1290 },
+  { d: 'M490,296 C494,306 492,315 486,321', t: 420, w: 2, delay: 1430 },
+  { d: 'M494,238 C504,227 515,226 520,232', t: 500, w: 1.7, soft: true, delay: 1560 },
+  { d: 'M298,266 a9,9 0 0,1 18,3', t: 380, w: 1.8, soft: true, delay: 1690 },
+  { d: 'M334,256 a9,9 0 0,1 18,3', t: 380, w: 1.8, soft: true, delay: 1810 },
+  { d: 'M262,304 C253,310 253,320 262,326', t: 420, w: 2, delay: 1940 },
+  { d: 'M296,398 L288,408', t: 260, w: 2, delay: 2070 },
+  { d: 'M326,400 L318,410', t: 260, w: 2, delay: 2160 },
+  { d: 'M300,402 C360,411 440,411 496,401', t: 600, w: 2, soft: true, delay: 2250 },
 ];
 const BOX = [
   { d: 'M250,270 L470,270 L470,390 L250,390 Z', t: 1100, w: 3.6 },
@@ -42,6 +65,13 @@ const BOX = [
   { d: 'M340,300 a5,5 0 1,0 .1,0', t: 250, fill: true },
   { d: 'M270,340 C320,332 400,332 450,340', t: 500, w: 1.8, soft: true },
   { d: 'M270,362 C320,354 400,354 450,362', t: 500, w: 1.8, soft: true },
+  { d: 'M366,328 a118,64 0 1,0 .1,0', t: 900, glow: true, delay: 0 },
+  { d: 'M374,300 a5,5 0 1,0 .1,0', t: 250, fill: true, delay: 1250 },
+  { d: 'M305,290 C300,280 306,272 301,263', t: 500, w: 1.6, soft: true, delay: 1390 },
+  { d: 'M345,290 C341,281 346,273 342,265', t: 500, w: 1.6, soft: true, delay: 1510 },
+  { d: 'M494,386 C498,372 505,367 512,369', t: 420, w: 2, delay: 1640 },
+  { d: 'M506,388 C511,376 518,372 524,374', t: 420, w: 2, delay: 1750 },
+  { d: 'M262,398 C330,406 430,406 486,398', t: 600, w: 2, soft: true, delay: 1870 },
 ];
 
 const ROUNDS = [
@@ -53,6 +83,7 @@ const ROUNDS = [
 
 let active = false;
 let root = null;
+let guideStyle = null; // 画板期间的指引卡抑制样式
 let layerGuide = null, layerInk = null, layerPlayer = null;
 let svg = null;
 let roundIdx = 0;
@@ -99,6 +130,11 @@ function open() {
   }
   active = true;
   roundIdx = 0;
+  // 画板期间抑制初见指引卡(它在屏幕中央 64% 处,正好压住画纸中心)
+  document.body.classList.add('scene2BoardActive');
+  guideStyle = document.createElement('style');
+  guideStyle.textContent = 'body.scene2BoardActive #guideCard{display:none!important}';
+  document.head.appendChild(guideStyle);
   root = document.createElement('div');
   root.id = 'scene2Board';
   root.style.cssText =
@@ -158,9 +194,10 @@ function round() {
   submitTimer = setTimeout(function () {
     if (document.getElementById('scene2Done')) submit();
   }, 6000);
-  // 常驻淡灰线稿:定稿路径先以浅灰完整铺底
+  // 常驻淡灰线稿:定稿路径先以浅灰完整铺底(暖光垫底层不进线稿)
   guidePaths = [];
-  for (const st of ROUNDS[roundIdx].strokes) {
+  ROUNDS[roundIdx].strokes.forEach((st) => {
+    if (st.glow) return;
     const p = document.createElementNS(SVG_NS, 'path');
     p.setAttribute('d', st.d);
     p.setAttribute('stroke', '#c9bda8');
@@ -170,7 +207,7 @@ function round() {
     p.style.opacity = 0.55;
     layerGuide.appendChild(p);
     guidePaths.push(p);
-  }
+  });
   bindDraw();
 }
 
@@ -228,7 +265,8 @@ function scheduleSubmit() {
   submitTimer = setTimeout(submit, 1600); // 停笔 1.6s 自动定稿
 }
 
-// —— 定稿:玩家笔迹淡为浅底,深色定稿线逐笔生长 ——
+// —— 定稿:玩家笔迹淡为浅底,深色定稿线逐笔生长(基础笔 110ms 错峰起笔,
+//      细节笔按 delay 续奏——像有人当场把羊一笔一笔描活);收笔整幅轻呼吸一次 ——
 async function submit() {
   console.log('[scene2] submit r=' + (roundIdx + 1));
   if (busy) return;
@@ -237,22 +275,36 @@ async function submit() {
   layerPlayer.style.transition = 'opacity 1.1s ease';
   layerPlayer.style.opacity = 0.16; // 玩家涂鸦淡成浅底,一直留在纸上
   const anims = [];
-  for (const st of ROUNDS[roundIdx].strokes) {
+  ROUNDS[roundIdx].strokes.forEach((st, i) => {
     const p = document.createElementNS(SVG_NS, 'path');
     p.setAttribute('d', st.d);
-    p.setAttribute('stroke', st.soft ? 'rgba(84,70,58,.4)' : '#4e4237');
-    p.setAttribute('stroke-width', st.w || 3.1);
-    p.setAttribute('fill', 'none');
-    p.setAttribute('stroke-linecap', 'round');
-    if (st.fill) {
-      p.setAttribute('fill', '#4e4237');
+    if (st.fill || st.glow) {
+      p.setAttribute('fill', st.hl ? '#f7f0dd' : st.glow ? 'rgba(213,176,110,.30)' : '#4e4237');
       p.setAttribute('stroke', 'none');
+    } else {
+      p.setAttribute('stroke', st.soft ? 'rgba(84,70,58,.4)' : '#4e4237');
+      p.setAttribute('stroke-width', st.w || 3.1);
+      p.setAttribute('fill', 'none');
+      p.setAttribute('stroke-linecap', 'round');
     }
     p.style.opacity = 0;
-    layerInk.appendChild(p);
-    anims.push(grow(p, st.t || 500, st.fill));
-  }
+    (st.glow ? layerGuide : layerInk).appendChild(p); // 暖光垫底,墨线在上
+    anims.push(grow(p, st.t || 500, st.fill || st.glow, st.delay != null ? st.delay : i * 110));
+  });
   await Promise.all(anims).catch(() => {});
+  // 收笔呼吸:整幅轻轻鼓一下(画箱子的这一幅=看不见的羊在里面呼吸)
+  try {
+    layerInk.style.transformBox = 'fill-box';
+    layerInk.style.transformOrigin = 'center';
+    layerInk.animate(
+      [
+        { transform: 'scale(1) rotate(0deg)' },
+        { transform: 'scale(1.02) rotate(.4deg)' },
+        { transform: 'scale(1) rotate(0deg)' },
+      ],
+      { duration: 900, easing: 'ease-in-out' }
+    );
+  } catch (e) {}
   await new Promise((r) => setTimeout(r, 500));
   const line = ROUNDS[roundIdx].line;
   console.log('[scene2] 提交定稿 r=' + (roundIdx + 1));
@@ -294,9 +346,9 @@ function speakOne(line, done) {
 }
 let wd = null;
 
-function grow(p, t, isFill) {
+function grow(p, t, isFill, delay) {
   if (isFill) {
-    return p.animate([{ opacity: 0 }, { opacity: 1 }], { duration: t * 2, fill: 'forwards' })
+    return p.animate([{ opacity: 0 }, { opacity: 1 }], { duration: t * 2, delay: delay || 0, fill: 'forwards' })
       .finished.catch(() => {});
   }
   const L = p.getTotalLength();
@@ -305,6 +357,7 @@ function grow(p, t, isFill) {
   p.style.opacity = 1;
   return p.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], {
     duration: t,
+    delay: delay || 0,
     easing: 'cubic-bezier(.42,.08,.58,.92)',
     fill: 'forwards',
   }).finished.catch(() => {});
@@ -350,6 +403,11 @@ function finale() {
       root.remove();
       root = null;
       active = false;
+      document.body.classList.remove('scene2BoardActive'); // 指引卡解禁
+      if (guideStyle) {
+        guideStyle.remove();
+        guideStyle = null;
+      }
     }, 1300);
   });
 }
