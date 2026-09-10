@@ -1,12 +1,11 @@
-// scene3-memory.js — B612 剧本第 3+4 场·回忆层演出(2026-09-07,书页一·家与日常 + 书页二·玫瑰)
+// scene3-memory.js — B612 剧本第 3+4 场·回忆层演出(2026-09-07,书页一+书页二)
 // 玩家坠入 B612 回忆(幽灵视角):王子在星球上讲述家与日常。
-// 散点互动(文学译本 S3/S4 形态):
-//   · 到达:王子三连问(开场演出,一次)
-//   · 三座小火山:靠近 → 火山台词(其中一座有烟)
-//   · 面包树苗:靠近 → 羊与面包树的对话(6 句)
-//   · 小椅子:靠近 → 日落演出——天幕由夜紫烧成橙红(6s),台词 4 句,再归于黄昏
-//   · 玫瑰坛:靠近 → 玫瑰花开 + 离别戏(SCENE4,10 句,王子告别)
-// 完成条件:面包树 + 日落 + 玫瑰都体验过 → 白光收回 → 发 'story:page1done' 回黑夜现实。
+// 顺序引导(2026-09-07 主人定:一次一站,金色光标指引,走完才亮下一站):
+//   STEP 0: 三座小火山 → 台词
+//   STEP 1: 面包树苗 → 对话 6 句
+//   STEP 2: 小椅子 → 日落演出(天幕烧红 6s) → 台词 4 句
+//   STEP 3: 玫瑰坛 → 玫瑰花开+离别(10 句) + 字幕
+// 完成条件:四站全走完 → 白光收回 → 发 'story:page1done' 回黑夜现实。
 // 艺术基调:回忆层整体比现实层暖一度——记忆是发光的。
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
@@ -14,24 +13,25 @@ import { SCENE3, SCENE4, tt } from '../shared/story-text.mjs';
 
 let built = false;
 let arrivalDone = false;
-let baobabDone = false;
-let sunsetDone = false;
-let sunsetPlaying = false;
-let volDone = false;
-let roseDone = false;
+let curStep = -1; // -1=到达演出未播;0..3=当前站索引;4=全部完成
+let stepMarker = null;
 let exitStarted = false;
 let smokeSprites = [];
 let bgDusk = null;
-let bgBase = null;
 
 const VOLCANOES = [
   { x: -4.6, z: -5.2, s: 1.15, active: true },
   { x: -0.8, z: -6.6, s: 0.9, active: true },
   { x: 3.8, z: -5.4, s: 1.0, active: false },
 ];
-const BAOBAB = { x: 3.4, z: -2.6 };
-const CHAIR = { x: -3.6, z: -0.6 };
-const ROSE_ALTAR = { x: 1.23, z: -0.78 }; // 玫瑰坛(与 story-dialogs 锚点一致)
+
+// 站位表(顺序引导)
+const STEPS = [
+  { x: -4.6, z: -5.2, r: 2.4 },  // 0: 火山
+  { x: 3.4, z: -2.6, r: 2.2 },   // 1: 面包树苗
+  { x: -3.6, z: -0.6, r: 2.2 },  // 2: 小椅子·日落
+  { x: 1.23, z: -0.78, r: 2.5 }, // 3: 玫瑰坛
+];
 
 function world() {
   return ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('b612') : null;
@@ -42,7 +42,7 @@ function build() {
   if (!w) return;
   built = true;
   const s = w.scene;
-  const gy = 0.05; // 星球顶与地面齐平(b612 groundOverride=0)
+  const gy = 0.05;
 
   // —— 三座小火山(两活一熄) ——
   VOLCANOES.forEach(function (v, i) {
@@ -54,13 +54,13 @@ function build() {
     cone.name = 'scene3Volcano' + i;
     s.add(cone);
     if (v.active) {
-      // 活火山:火山口一点暖光
       const glow = new THREE.PointLight(0xff8a4a, 0.5, 3.5);
       glow.position.set(v.x, gy + 1.15 * v.s + 0.1, v.z);
       s.add(glow);
     }
   });
-  // 烟雾(两座活火山,各两缕,缓慢上升循环)
+
+  // —— 烟雾(两座活火山,各两缕) ——
   const smokeTex = (function () {
     const c = document.createElement('canvas');
     c.width = c.height = 64;
@@ -87,7 +87,7 @@ function build() {
     }
   });
 
-  // —— 面包树苗(三片小叶的一株苗) ——
+  // —— 面包树苗 ——
   const sprout = new THREE.Group();
   const stem = new THREE.Mesh(
     new THREE.CylinderGeometry(0.02, 0.03, 0.34, 6),
@@ -105,11 +105,11 @@ function build() {
     leaf.rotation.y = (i * Math.PI * 2) / 3;
     sprout.add(leaf);
   }
-  sprout.position.set(BAOBAB.x, gy, BAOBAB.z);
+  sprout.position.set(STEPS[1].x, gy, STEPS[1].z);
   sprout.name = 'scene3Baobab';
   s.add(sprout);
 
-  // —— 小椅子(书里追日落的那把,面朝西) ——
+  // —— 小椅子(面朝西——日落的方向) ——
   const chair = new THREE.Group();
   const seat = new THREE.Mesh(
     new THREE.BoxGeometry(0.42, 0.05, 0.42),
@@ -131,15 +131,14 @@ function build() {
     leg.position.set(i & 1 ? 0.17 : -0.17, 0.17, i & 2 ? 0.17 : -0.17);
     chair.add(leg);
   }
-  chair.position.set(CHAIR.x, gy, CHAIR.z);
-  chair.rotation.y = 2.3; // 面朝西——日落的方向
+  chair.position.set(STEPS[2].x, gy, STEPS[2].z);
+  chair.rotation.y = 2.3;
   chair.name = 'scene3Chair';
   s.add(chair);
 
-  // —— 回忆的暖度:背景从夜紫调成暖黄昏,并铺一层暮色光 ——
-  bgBase = w.scene.background ? '' + w.scene.background.getHexString() : '';
+  // —— 回忆的暖度 ——
   if (w.scene.background && w.scene.background.isColor) {
-    bgDusk = new THREE.Color(0x241532); // 暮色紫(比夜的 0x05050f 暖)
+    const bgDusk = new THREE.Color(0x241532);
     w.scene.background.lerp(bgDusk, 0.9);
   }
   const duskLamp = new THREE.PointLight(0xffc890, 0.55, 16);
@@ -147,120 +146,71 @@ function build() {
   s.add(duskLamp);
 }
 
-// —— 到达演出:王子三连问 + 箱子当房子 ——
-function arrival() {
-  if (arrivalDone) return;
-  arrivalDone = true;
-  speakSeq(SCENE3.arrival, 0, null);
+// —— 金色光标 ——
+function placeMarker(x, z) {
+  if (!stepMarker) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const x2 = c.getContext('2d');
+    const g = x2.createRadialGradient(32, 32, 4, 32, 32, 30);
+    g.addColorStop(0, 'rgba(255,215,130,0.95)');
+    g.addColorStop(0.5, 'rgba(255,200,80,0.4)');
+    g.addColorStop(1, 'rgba(255,200,80,0)');
+    x2.fillStyle = g;
+    x2.fillRect(0, 0, 64, 64);
+    stepMarker = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: new THREE.CanvasTexture(c),
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    stepMarker.scale.set(1.4, 1.4, 1);
+    stepMarker.name = 'scene3Marker';
+    world().scene.add(stepMarker);
+  }
+  stepMarker.visible = true;
+  stepMarker.position.set(x, 1.2 + Math.sin(Date.now() * 0.002) * 0.15, z);
+}
+function hideMarker() {
+  if (stepMarker) stepMarker.visible = false;
 }
 
+// —— 台词播放(独占:一次一条,播完才前进) ——
+let chainBusy = false;
 function speakSeq(seq, i, done) {
-  if (!active() || i >= seq.length) return done && done();
+  if (i >= seq.length) {
+    chainBusy = false;
+    if (done) done();
+    return;
+  }
   const item = seq[i];
+  chainBusy = true;
   ctx.openDialog({
     speaker: tt(item.who),
     lines: [tt(item)],
-    autoHide: 5200,
+    autoHide: 4600,
     onDone: function () {
       speakSeq(seq, i + 1, done);
     },
   });
 }
-function active() {
-  return (ctx.scene.activeWorld || 'main') === 'b612' && !ctx.store.flag('page1');
+
+// —— 到达演出 ——
+function arrival() {
+  if (arrivalDone) return;
+  arrivalDone = true;
+  speakSeq(SCENE3.arrival, 0, function () {
+    curStep = 0;
+    placeMarker(STEPS[0].x, STEPS[0].z);
+  });
 }
 
-// —— 交互接近检测 ——
-ctx.onTick(function scene3MemoryTick(dt) {
-  if ((ctx.scene.activeWorld || 'b612') !== 'b612') return;
-  if (ctx.store.flag('page1')) return;
-  if (!built) {
-    build();
-    return;
-  }
-  const pl = ctx.player.pl;
-  const d = (x, z) => Math.hypot(pl.p.x - x, pl.p.z - z);
-
-  if (!arrivalDone) {
-    // 到达:落点在出生区,王子台词延迟 1.2s 展开
-    if (!scene3MemoryTick._a) scene3MemoryTick._a = performance.now();
-    if (performance.now() - scene3MemoryTick._a > 1200) arrival();
-    return;
-  }
-
-  // 火山(任一座)
-  if (!volDone) {
-    for (const v of VOLCANOES) {
-      if (d(v.x, v.z) < 2.4) {
-        volDone = true;
-        speakSeq([SCENE3.volcanoes], 0, null);
-        break;
-      }
-    }
-  }
-  // 面包树苗
-  if (!baobabDone && d(BAOBAB.x, BAOBAB.z) < 2.2) {
-    baobabDone = true;
-    speakSeq(SCENE3.baobab, 0, null);
-  }
-  // 小椅子·日落演出
-  if (!sunsetDone && !sunsetPlaying && d(CHAIR.x, CHAIR.z) < 2.2) {
-    sunsetPlaying = true;
-    runSunset(function () {
-      sunsetDone = true;
-      sunsetPlaying = false;
-      speakSeq(SCENE3.sunset, 0, null);
-      setTimeout(checkCompletion, 1200);
-    });
-  }
-  // 玫瑰坛·书页二(面包树+日落之后解锁)
-  if (!roseDone && baobabDone && sunsetDone && d(ROSE_ALTAR.x, ROSE_ALTAR.z) < 2.5) {
-    roseDone = true;
-    speakSeq(SCENE4.arrival.concat(SCENE4.regret, SCENE4.farewell), 0, function () {
-      // 字幕:骄傲的花
-      speakSeq([SCENE4.farewellCaption], 0, function () {
-        setTimeout(checkCompletion, 800);
-      });
-    });
-  }
-  checkCompletion();
-});
-
-// —— 日落演出:天幕由夜紫烧成橙红,6s 后归于黄昏 ——
-function runSunset(done) {
-  const w = world();
-  if (!w || !w.scene.background || !w.scene.background.isColor) return done && done();
-  const bg = w.scene.background;
-  const from = bg.clone();
-  const peak = new THREE.Color(0x8a4020); // 烧红的橙
-  const t0 = performance.now();
-  const DUR = 3000;
-  function ramp() {
-    const k = Math.min(1, (performance.now() - t0) / DUR);
-    bg.copy(from).lerp(peak, k * k); // 加速烧起来
-    if (k < 1) requestAnimationFrame(ramp);
-    else {
-      setTimeout(function () {
-        const t1 = performance.now();
-        const back = function () {
-          const k2 = Math.min(1, (performance.now() - t1) / DUR);
-          bg.copy(peak).lerp(bgDusk || from, k2);
-          if (k2 < 1) requestAnimationFrame(back);
-        };
-        back();
-        done && done();
-      }, 2200);
-    }
-  }
-  ramp();
-  // 台词在烧起来的过程中铺开
-  speakSeq(SCENE3.sunset, 0, null);
-}
-
+// —— 完成检测 ——
 function checkCompletion() {
-  if (exitStarted || !baobabDone || !sunsetDone || !roseDone) return;
+  if (exitStarted || curStep < 4) return;
   exitStarted = true;
-  // 白光收回:回忆淡出到纯白,交棒回黑夜现实
   const veil = document.createElement('div');
   veil.style.cssText =
     'position:fixed;inset:0;z-index:560;background:#f8f1df;opacity:0;transition:opacity 1.6s ease;pointer-events:none';
@@ -282,3 +232,80 @@ function checkCompletion() {
     }, 600);
   }, 1700);
 }
+
+// —— 各站触发动作 ——
+function doStep(stepIdx) {
+  const seqs = [
+    [SCENE3.volcanoes],
+    SCENE3.baobab,
+    SCENE3.sunset,
+    SCENE4.arrival.concat(SCENE4.regret, SCENE4.farewell, [SCENE4.farewellCaption]),
+  ];
+  if (stepIdx >= 0 && stepIdx < seqs.length) {
+    speakSeq(seqs[stepIdx], 0, function () {
+      // 台词播完 → 下一站
+      curStep++;
+      if (curStep < STEPS.length) {
+        placeMarker(STEPS[curStep].x, STEPS[curStep].z);
+      } else {
+        hideMarker();
+      }
+      checkCompletion();
+    });
+  }
+}
+
+// —— 主循环 ——
+ctx.onTick(function scene3MemoryTick(dt) {
+  if ((ctx.scene.activeWorld || 'b612') !== 'b612') return;
+  if (ctx.store.flag('page1')) return;
+  if (!built) {
+    build();
+    return;
+  }
+  const pl = ctx.player.pl;
+
+  if (!scene3MemoryTick._diag || performance.now() - scene3MemoryTick._diag > 5000) {
+    scene3MemoryTick._diag = performance.now();
+    console.log('[scene3] step=' + curStep + ' pos=(' + pl.p.x.toFixed(1) + ',' + pl.p.z.toFixed(1) + ') busy=' + chainBusy + ' built=' + built);
+  }
+  // 到达演出(1.2s 延迟)
+  if (curStep < 0) {
+    if (!scene3MemoryTick._a) scene3MemoryTick._a = performance.now();
+    if (performance.now() - scene3MemoryTick._a > 1200) {
+      arrival();
+      // 安全兜底:如果 speakSeq 链条断了(autoHide 竞态等),5s 后强制推进
+      setTimeout(function () {
+        if (arrivalDone && curStep < 0) {
+          curStep = 0;
+          placeMarker(STEPS[0].x, STEPS[0].z);
+        }
+      }, 5000);
+    }
+    return;
+  }
+
+  // 对话链播放中 → 不检测新站
+  if (chainBusy) return;
+
+  // 顺序引导:检测当前目标站
+  if (curStep >= 0 && curStep < STEPS.length) {
+    const step = STEPS[curStep];
+    const dx = pl.p.x - step.x;
+    const dz = pl.p.z - step.z;
+    if (dx * dx + dz * dz < step.r * step.r) {
+      doStep(curStep);
+    }
+  }
+
+  // 金色光标呼吸
+  if (curStep >= 0 && curStep < STEPS.length) {
+    placeMarker(STEPS[curStep].x, STEPS[curStep].z);
+  }
+
+  // 烟雾飘动
+  for (const sp of smokeSprites) {
+    sp.position.y += dt * 0.15;
+    if (sp.position.y > sp.userData.baseY + 1.5) sp.position.y = sp.userData.baseY;
+  }
+});
