@@ -5,7 +5,7 @@
 // 线稿坐标:720×460(与电影 fSketch 同系)。第一笔复用电影 TRUTH(蟒蛇吞象)描线资产。
 import { ctx } from '../ctx.js';
 import { Z } from '../shared/z-layers.mjs';
-import { SCENE2, tt } from '../shared/story-text.mjs';
+import { SCENE2, tt, whoSpk } from '../shared/story-text.mjs';
 import { TRUTH } from './film-strokes.mjs';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -255,16 +255,31 @@ async function submit() {
   });
 }
 
-// 单条王子台词:按句长自动停留(长句更久),点按可提前收束
+// 单条王子台词:按句长自动停留(长句更久),点按可提前收束;心跳守护防链断
 function speakOne(line, done) {
   const stay = Math.max(4600, (line.en || '').length * 90);
+  let spent = false; // onDone 与心跳守护只许一个推进(晚到的重复收束吞掉)
+  const finish = function () {
+    if (spent) return;
+    spent = true;
+    clearTimeout(wd);
+    done();
+  };
   ctx.openDialog({
     speaker: tt(SCENE2.who.prince),
+    speakerType: whoSpk(SCENE2.who.prince),
     lines: [tt(line)],
     autoHide: stay,
-    onDone: done,
+    lock: true,
+    onDone: finish,
   });
+  // 心跳守护:onDone 意外丢失(对话框被外力关掉)时兜底推进,链不悬死
+  clearTimeout(wd);
+  wd = setTimeout(function () {
+    if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
+  }, stay + 2600);
 }
+let wd = null;
 
 function grow(p, t, isFill) {
   if (isFill) {
@@ -282,50 +297,46 @@ function grow(p, t, isFill) {
   }).finished.catch(() => {});
 }
 
-// —— 台词队列:逐条手绘对话框,点按或 4.6s 自动下一条 ——
+// —— 台词队列:逐条手绘对话框,点按或按句长自动下一条;lock 互斥 + 心跳守护 ——
 function speakSeq(seq, i, done) {
   if (!active) return done && done();
   if (i >= seq.length) return done && done();
   const item = seq[i];
+  const stay = Math.max(4600, ((item.en || '').length * 65) | 0); // 长句更久,点按可提前
+  let spent = false; // onDone 与心跳守护只许一个推进(晚到的重复收束吞掉)
+  const finish = function () {
+    if (spent) return;
+    spent = true;
+    clearTimeout(wd);
+    speakSeq(seq, i + 1, done);
+  };
   ctx.openDialog({
     speaker: tt(item.who),
+    speakerType: whoSpk(item.who),
     lines: [tt(item)],
-    autoHide: 4600,
-    onDone: function () {
-      speakSeq(seq, i + 1, done);
-    },
+    autoHide: stay,
+    lock: true,
+    onDone: finish,
   });
+  clearTimeout(wd);
+  wd = setTimeout(function () {
+    if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
+  }, stay + 2600);
 }
 // —— 第四笔后:满意对话 + 羊初声 → 存档 → 画板淡出 → 广播完成(转夜等后续场景就绪) ——
 function finale() {
-  const seq = SCENE2.after.concat(SCENE2.voice);
-  // autoHide 按句长计算(短句 4s,长句最多 11s):点按可提前,不点也必然前进
-  const total = seq.length;
-  let idx = 0;
-  function next() {
-    if (idx >= total) {
-      try {
-        ctx.store.mark('scene2');
-        ctx.events.emit('story:scene2done'); // scene3-night 收到后才转夜+羊箱计数
-      } catch (e) {
-        console.error('[scene2] 收束异常:', e.message);
-      }
-      root.style.opacity = '0';
-      setTimeout(function () {
-        root.remove();
-        root = null;
-        active = false;
-      }, 1300);
-      return;
+  speakSeq(SCENE2.after.concat(SCENE2.voice), 0, function () {
+    try {
+      ctx.store.mark('scene2');
+      ctx.events.emit('story:scene2done'); // scene3-night 收到后才转夜+羊箱计数
+    } catch (e) {
+      console.error('[scene2] 收束异常:', e.message);
     }
-    const item = seq[idx++];
-    const stay = Math.max(4000, ((item.en || '').length * 65) | 0);
-    ctx.openDialog({
-      speaker: tt(item.who),
-      lines: [tt(item)],
-      autoHide: stay,
-      onDone: next,
-    });
-  }
-  next();
+    root.style.opacity = '0';
+    setTimeout(function () {
+      root.remove();
+      root = null;
+      active = false;
+    }, 1300);
+  });
 }

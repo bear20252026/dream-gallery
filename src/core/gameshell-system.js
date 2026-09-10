@@ -42,6 +42,16 @@ const STYLE = `
   background:linear-gradient(135deg,#b9743a,#8a4f23);
   border:2px solid #4a3526;border-radius:14px 9px 16px 8px / 9px 16px 8px 14px;
   box-shadow:0 3px 8px rgba(0,0,0,.3), inset 0 0 0 1px rgba(255,240,210,.4);
+}
+/* 说话人类型(2026-09-07 剧本对话角色区分) */
+#gameDialog[data-spk='prince']{border-color:#c8a050}
+#gameDialog[data-spk='prince'] .gs-name{background:linear-gradient(135deg,#c8a050,#9a7a30);color:#fff5e0}
+#gameDialog[data-spk='pilot']{border-color:#6a8aaf}
+#gameDialog[data-spk='pilot'] .gs-name{background:linear-gradient(135deg,#6a8aaf,#4a6a8f);color:#fff}
+#gameDialog[data-spk='sheep']{border-color:#d4a0a0}
+#gameDialog[data-spk='sheep'] .gs-name{background:linear-gradient(135deg,#d4a0a0,#b08080);color:#fff5e0}
+#gameDialog[data-spk='rose']{border-color:#b05050}
+#gameDialog[data-spk='rose'] .gs-name{background:linear-gradient(135deg,#b05050,#8a3030);color:#ffddd0}
   transform:rotate(-2deg);
 }
 .gs-text{font-size:19px;line-height:1.85;min-height:1.85em;letter-spacing:.6px;
@@ -262,6 +272,7 @@ questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 
         dialogApi.open({ speaker: dialogApi.speakerFor(voice), lines: [text], autoHide: 9000 });
       };
       ctx.openDialog = dialogApi.open;
+      ctx.dialogOpen = dialogApi.isOpen; // 剧本链心跳守护用:对话框是否开着
     },
     update(dt) {
       acc += dt;

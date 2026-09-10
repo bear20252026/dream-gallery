@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
-import { STORY, tt } from '../shared/story-text.mjs';
+import { STORY, tt, whoSpk } from '../shared/story-text.mjs';
 
 const bag = hotBegin('crash-site');
 const { s } = ctx;
@@ -212,17 +212,27 @@ ctx.onTick(function crashTick(dt) {
       princeState = 'idle';
       // 叫醒词(书内原句):第一句对话即主线发令枪(单语,随语言切换)
       if (ctx.openDialog) {
+        let wakeSpent = false; // onDone 与心跳守护只许一个推进
+        const wakeWd = setTimeout(function () {
+          if (!ctx.dialogOpen || !ctx.dialogOpen()) wakeFinish();
+        }, 11600);
+        const wakeFinish = function () {
+          if (wakeSpent) return;
+          wakeSpent = true;
+          clearTimeout(wakeWd);
+          window.__crashWakeDone = true; // settings.js 等此标记再弹雅号/指引卡,不盖开场对白
+          // 叫醒词说完 → 第 2 场·画羊四笔(gate/scene2-draw.js 经事件解耦启动)
+          setTimeout(function () {
+            ctx.events.emit('story:scene2');
+          }, 900);
+        };
         ctx.openDialog({
-          speaker: STORY.princeWake.speaker,
+          speaker: tt(STORY.princeWake.who),
+          speakerType: whoSpk(STORY.princeWake.who),
           lines: [tt(STORY.princeWake)],
           autoHide: 9000,
-          onDone: function () {
-            window.__crashWakeDone = true; // settings.js 等此标记再弹雅号/指引卡,不盖开场对白
-            // 叫醒词说完 → 第 2 场·画羊四笔(gate/scene2-draw.js 经事件解耦启动)
-            setTimeout(function () {
-              ctx.events.emit('story:scene2');
-            }, 900);
-          },
+          lock: true,
+          onDone: wakeFinish,
         });
       } else {
         window.__crashWakeDone = true;

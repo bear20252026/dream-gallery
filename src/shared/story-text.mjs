@@ -55,7 +55,7 @@ export const GLOBAL = {
 // 坠机点与开场引导(英文照 Woods,中文据《中文文学译本》)
 export const STORY = {
   princeWake: {
-    speaker: '小王子',
+    who: { en: 'The Little Prince', zh: '小王子', spk: 'prince' },
     en: 'If you please-- draw me a sheep!',
     zh: '请你——给我画一只羊！',
   },
@@ -91,10 +91,15 @@ export const DIALOG_LINES = {
 
 // 第 2 场·画羊四笔(2026-09-07;台词照 Woods,中文据《中文文学译本》/《定稿全本》)
 // who 亦是 {en,zh}(对话框说话人随语言)。four rounds + 满意对话 + 羊初声。
-const PRINCE = { en: 'The Little Prince', zh: '小王子' };
-const PILOT = { en: 'The Pilot', zh: '飞行员' };
-const SHEEP = { en: 'The Sheep (in the box)', zh: '箱子里的羊' };
-const ROSE = { en: 'The Rose', zh: '玫瑰' };
+// spk = 对话框说话人视觉类型(gameshell 按 [data-spk] 换边框/名牌配色)
+const PRINCE = { en: 'The Little Prince', zh: '小王子', spk: 'prince' };
+const PILOT = { en: 'The Pilot', zh: '飞行员', spk: 'pilot' };
+const SHEEP = { en: 'The Sheep (in the box)', zh: '箱子里的羊', spk: 'sheep' };
+const ROSE = { en: 'The Rose', zh: '玫瑰', spk: 'rose' };
+// 说话人视觉类型查询(who 缺 spk 时回退空串=默认羊皮卷样式)
+export function whoSpk(who) {
+  return (who && who.spk) || '';
+}
 export const SCENE2 = {
   who: { prince: PRINCE, pilot: PILOT, sheep: SHEEP },
   hint: {
@@ -140,7 +145,7 @@ export const SCENE2 = {
 // 第 3 场·书页一(B612 家与日常;2026-09-07,台词照 Woods/文学译本)
 export const SCENE3 = {
   counting: { en: 'One... two... three...', zh: '一……二……三……' },
-  countingWho: { en: 'The Sheep (in the box)', zh: '箱子里的羊' },
+  countingWho: { en: 'The Sheep (in the box)', zh: '箱子里的羊', spk: 'sheep' },
   doorGlowHint: {
     en: 'In the night, the stone door begins to glow...',
     zh: '夜色里，石门亮了起来。',

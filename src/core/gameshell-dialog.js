@@ -96,14 +96,15 @@ export function createDialogSystem() {
       chEl.appendChild(b);
     });
   }
-  function closeDialog() {
+  function closeDialog(suppressDone) {
     const d = dlg;
     if (d && d.typeTimer) clearInterval(d.typeTimer);
     if (d && d.hideTimer) clearTimeout(d.hideTimer);
     dlg = null;
     dialogEl.style.display = 'none';
+    delete dialogEl.dataset.spk;
     // 收束回调(2026-09-07):此前 onDone 只存不调,依赖它的链式对话(剧本第2场)会断链
-    if (d && d.onDone) {
+    if (d && d.onDone && !suppressDone) {
       try {
         d.onDone();
       } catch (e) {
@@ -113,21 +114,34 @@ export function createDialogSystem() {
   }
   function openDialog(opts) {
     if (!opts) return;
+    // lock 互斥(2026-09-07 剧本对话容错):带 lock 的 openDialog 在上一条 lock 对话
+    // 尚未关闭时静默忽略,防止多系统 speakSeq 互相覆盖导致对话链断裂
+    if (opts.lock && dlg && dlg.lock) return;
     const lines = Array.isArray(opts.lines) ? opts.lines : [opts.lines != null ? String(opts.lines) : ''];
     if (!lines.length) lines.push('');
-    closeDialog();
+    // 打断式换对话(2026-09-09 容错):旧 onDone 延后到新对话装好后再收束——
+    // 同步收束会让旧链抢先 openDialog 下一条,再被本次 dlg=... 覆盖,链直接断死
+    if (dlg) {
+      const prev = dlg.onDone;
+      closeDialog(true);
+      if (prev) setTimeout(() => { try { prev(); } catch (e) {} }, 0);
+    }
     dlg = {
       speaker: opts.speaker || 'B612',
+      speakerType: opts.speakerType || '',
       lines,
       idx: 0,
       choices: opts.choices || null,
       autoHide: opts.autoHide != null ? opts.autoHide : (opts.choices && opts.choices.length ? 0 : 9000),
       onDone: opts.onDone || null,
+      lock: !!opts.lock,
       typing: false,
       typeTimer: null,
       hideTimer: null,
     };
     dialogEl.style.display = 'block';
+    // 说话人视觉类型:prince/pilot/sheep/rose → 不同边框+名字色
+    dialogEl.dataset.spk = dlg.speakerType;
     renderDialog();
   }
   function speakerFor(voice) {
@@ -137,5 +151,5 @@ export function createDialogSystem() {
     return 'B612';
   }
 
-  return { attach, open: openDialog, close: closeDialog, advance, speakerFor };
+  return { attach, open: openDialog, close: closeDialog, advance, speakerFor, isOpen: () => !!dlg };
 }

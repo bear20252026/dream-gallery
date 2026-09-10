@@ -8,7 +8,7 @@ import { CSS2DRenderer, CSS2DObject } from 'three/examples/jsm/renderers/CSS2DRe
 import { ctx } from '../ctx.js';
 import { hotBegin } from '../hot.js';
 import { Z } from '../shared/z-layers.mjs';
-import { DIALOG_LINES } from '../shared/story-text.mjs';
+import { DIALOG_LINES, tt } from '../shared/story-text.mjs';
 
 const bag = hotBegin('story-dialogs');
 
@@ -18,7 +18,7 @@ const ACTORS = [
     world: 'b612',
     id: 'prince',
     match: /polySurface[1456]|^hair$/i, // 小王子身体网格(发/身/腿/臂/披风)
-    lines: DIALOG_LINES.prince,
+    lines: DIALOG_LINES.princeIdle,
     off: 1.6,
     radius: 11,
     every: 7000,
@@ -63,6 +63,7 @@ labelRenderer.domElement.innerHTML = `
 }
 @keyframes b612BubbleIn{from{opacity:0}to{opacity:1}}
 #storyDialogLayer .b612-bubble.show{animation:b612BubbleIn .6s ease both}
+body[data-script-lang='zh'] #storyDialogLayer .b612-bubble{font-family:'Zhi Mang Xing','Microsoft YaHei',sans-serif;font-style:normal}
 </style>`;
 labelRenderer.domElement.id = 'storyDialogLayer';
 // CSS2DRenderer 在渲染时会往 domElement 追加 position:absolute 的对象 div,
@@ -198,7 +199,7 @@ ctx.onTick(function storyDialogTick() {
     if (active && now - st.at > actor.every) {
       st.at = now;
       st.idx = (st.idx + 1) % actor.lines.length;
-      st.inner.textContent = actor.lines[st.idx];
+      st.inner.textContent = tt(actor.lines[st.idx]);
       st.inner.classList.remove('show');
       void st.inner.offsetWidth; // 重启淡入
       st.inner.classList.add('show');

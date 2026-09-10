@@ -6,7 +6,7 @@
 // 艺术处理:余烬暖光/羊箱静立/门光呼吸——夜是安静的,不堆特效。
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
-import { SCENE3, tt } from '../shared/story-text.mjs';
+import { SCENE3, tt, whoSpk } from '../shared/story-text.mjs';
 
 let armed = false;
 let boxProp = null;
@@ -79,15 +79,27 @@ function armGateGlow() {
 function speakSeq(seq, i, done) {
   if (i >= seq.length) return done && done();
   const item = seq[i];
+  let spent = false; // onDone 与心跳守护只许一个推进(晚到的重复收束吞掉)
+  const finish = function () {
+    if (spent) return;
+    spent = true;
+    clearTimeout(wd);
+    speakSeq(seq, i + 1, done);
+  };
   ctx.openDialog({
     speaker: tt(item.who),
+    speakerType: whoSpk(item.who),
     lines: [tt(item)],
     autoHide: 4200,
-    onDone: function () {
-      speakSeq(seq, i + 1, done);
-    },
+    lock: true,
+    onDone: finish,
   });
+  clearTimeout(wd);
+  wd = setTimeout(function () {
+    if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
+  }, 6800);
 }
+let wd = null;
 
 // —— 主循环 ——
 // 画羊四笔收束(scene2-draw 广播 story:scene2done)后,现实才转入黑夜;

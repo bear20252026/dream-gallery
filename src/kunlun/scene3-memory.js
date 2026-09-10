@@ -9,7 +9,7 @@
 // 艺术基调:回忆层整体比现实层暖一度——记忆是发光的。
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
-import { SCENE3, SCENE4, tt } from '../shared/story-text.mjs';
+import { SCENE3, SCENE4, tt, whoSpk } from '../shared/story-text.mjs';
 
 let built = false;
 let arrivalDone = false;
@@ -177,8 +177,9 @@ function hideMarker() {
   if (stepMarker) stepMarker.visible = false;
 }
 
-// —— 台词播放(独占:一次一条,播完才前进) ——
+// —— 台词播放(独占:一次一条,播完才前进;lock 互斥 + 心跳守护防链断) ——
 let chainBusy = false;
+let wd = null;
 function speakSeq(seq, i, done) {
   if (i >= seq.length) {
     chainBusy = false;
@@ -187,14 +188,25 @@ function speakSeq(seq, i, done) {
   }
   const item = seq[i];
   chainBusy = true;
+  let spent = false; // onDone 与心跳守护只许一个推进(晚到的重复收束吞掉)
+  const finish = function () {
+    if (spent) return;
+    spent = true;
+    clearTimeout(wd);
+    speakSeq(seq, i + 1, done);
+  };
   ctx.openDialog({
     speaker: tt(item.who),
+    speakerType: whoSpk(item.who),
     lines: [tt(item)],
     autoHide: 4600,
-    onDone: function () {
-      speakSeq(seq, i + 1, done);
-    },
+    lock: true,
+    onDone: finish,
   });
+  clearTimeout(wd);
+  wd = setTimeout(function () {
+    if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
+  }, 7200);
 }
 
 // —— 到达演出 ——
