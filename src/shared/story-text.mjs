@@ -94,6 +94,7 @@ export const DIALOG_LINES = {
 const PRINCE = { en: 'The Little Prince', zh: '小王子' };
 const PILOT = { en: 'The Pilot', zh: '飞行员' };
 const SHEEP = { en: 'The Sheep (in the box)', zh: '箱子里的羊' };
+const ROSE = { en: 'The Rose', zh: '玫瑰' };
 export const SCENE2 = {
   who: { prince: PRINCE, pilot: PILOT, sheep: SHEEP },
   hint: {
@@ -175,4 +176,37 @@ export const SCENE3 = {
     zh: '你在这儿呀。\n你刚才走了好远——你也看见了吗？',
   },
   questPage: { en: 'Pages of the book', zh: '书页' },
+};
+
+// 第 4 场·书页二·玫瑰(2026-09-07;玫瑰开花+相处+离别,照 Woods/文学译本)
+export const SCENE4 = {
+  arrival: [
+    { who: PRINCE, en: 'Oh! How beautiful you are!', zh: '哦！你多美啊！' },
+    { who: ROSE, en: 'Am I not? And I was born at the same moment as the sun...', zh: '是吗？我和太阳，是同一刻出生的……' },
+    { who: ROSE, en: 'Let the tigers come with their claws!', zh: '让老虎带着爪子来吧！' },
+    { who: PRINCE, en: 'There are no tigers on my planet, and anyway, tigers do not eat weeds.', zh: '我的星球上没有老虎。再说，老虎也不吃草。' },
+    { who: ROSE, en: 'I am not a weed. Please excuse me... I am not at all afraid of tigers, but I have a horror of drafts. I suppose you wouldn\'t have a screen for me?', zh: '我不是草。请你原谅……\n老虎我一点儿也不怕，\n我只怕穿堂风。\n你这里，可有屏风？' },
+    { who: ROSE, en: 'At night I want you to put me under a glass globe. It is very cold where you live.', zh: '夜里，我要你把我罩进玻璃罩。\n你住的地方，很冷。' },
+    { who: SHEEP, en: 'Flowers make me sneeze. But I like this one.', zh: '花会让我打喷嚏。\n不过这一朵，我喜欢。' },
+  ],
+  regret: [
+    { who: PRINCE, en: 'I ought not to have listened to her. One never ought to listen to the flowers. One should simply look at them and breathe their fragrance.', zh: '我本不该听她说话的。\n花的话，永远不该听，\n只要看她们，闻她们的香气就好。' },
+    { who: PRINCE, en: 'The fact is that I did not know how to understand anything! I ought to have judged by deeds and not by words. She cast her fragrance and her radiance over me. I ought never to have run away from her... I ought to have guessed all the affection that lay behind her poor little strategems. Flowers are so inconsistent! But I was too young to know how to love her...', zh: '其实那时候，我什么都不懂！\n我该看她的行动，不该听她的言语。\n她给我香气，给我光。\n我根本不该逃走……\n她那些可怜的小诡计后面，\n全是柔情，我早该猜到。\n花就是这样，口是心非！\n可我太年轻了，\n还不知道怎么去爱她……' },
+  ],
+  farewell: [
+    { who: PRINCE, en: 'Goodbye.', zh: '再见。' },
+    { who: PILOT, en: 'But it was not because she had a cold.', zh: '可她咳嗽，\n并不是因为着凉。' },
+    { who: ROSE, en: 'I have been silly. I ask your forgiveness. Try to be happy...', zh: '从前是我傻。\n请你原谅我。\n你要幸福……' },
+    { who: ROSE, en: 'Of course I love you. It is my fault that you have not known it all the while. That is of no importance. But you-- you have been just as foolish as I. Try to be happy... let the glass globe be. I don\'t want it any more.', zh: '我当然是爱你的。\n这你一直都不知道，是我的错——\n罢了，这不重要。\n可你呢，你也和我一样傻。\n愿你幸福。\n玻璃罩，就免了吧，我不要了。' },
+    { who: PRINCE, en: 'But the wind--', zh: '可是风——' },
+    { who: ROSE, en: 'My cold is not so bad as all that... the cool night air will do me good. I am a flower.', zh: '我的咳嗽没那么要紧……\n夜里的凉气对我有好处。\n我是一朵花。' },
+    { who: PRINCE, en: 'But the animals--', zh: '可是虫子——' },
+    { who: ROSE, en: 'Well, I must endure the presence of two or three caterpillars if I wish to become acquainted with the butterflies. It seems that they are very beautiful. And if not the butterflies-- and the caterpillars-- who will call upon me? You will be far away... as for the large animals-- I am not at all afraid of any of them. I have my claws.', zh: '唉，想认识蝴蝶，\n总得忍受两三条毛毛虫。\n听说蝴蝶美极了。\n要是没有蝴蝶，也没有毛毛虫，\n还有谁来看我呢？\n你就要走得远远的了……\n至于大动物，我才不怕。\n我有我的爪子。' },
+    { who: ROSE, en: "Don't linger like this. You have decided to go away. Now go!", zh: '别这样磨蹭了。\n你既然决定要走——\n那么，走吧！' },
+    { who: SHEEP, en: 'Goodbye.', zh: '再见。' },
+  ],
+  farewellCaption: {
+    en: 'For she did not want him to see her crying. She was such a proud flower...',
+    zh: '她不肯让他看见她的眼泪。\n她是一朵，多么骄傲的花……',
+  },
 };
