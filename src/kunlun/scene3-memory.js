@@ -1,15 +1,16 @@
-// scene3-memory.js — B612 剧本第 3 场·回忆层演出(2026-09-07,书页一·家与日常)
+// scene3-memory.js — B612 剧本第 3+4 场·回忆层演出(2026-09-07,书页一·家与日常 + 书页二·玫瑰)
 // 玩家坠入 B612 回忆(幽灵视角):王子在星球上讲述家与日常。
-// 散点互动(文学译本 S3 形态):
+// 散点互动(文学译本 S3/S4 形态):
 //   · 到达:王子三连问(开场演出,一次)
 //   · 三座小火山:靠近 → 火山台词(其中一座有烟)
 //   · 面包树苗:靠近 → 羊与面包树的对话(6 句)
 //   · 小椅子:靠近 → 日落演出——天幕由夜紫烧成橙红(6s),台词 4 句,再归于黄昏
-// 完成条件:面包树 + 日落都体验过 → 白光收回 → 发 'story:page1done' 回黑夜现实。
+//   · 玫瑰坛:靠近 → 玫瑰花开 + 离别戏(SCENE4,10 句,王子告别)
+// 完成条件:面包树 + 日落 + 玫瑰都体验过 → 白光收回 → 发 'story:page1done' 回黑夜现实。
 // 艺术基调:回忆层整体比现实层暖一度——记忆是发光的。
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
-import { SCENE3, tt } from '../shared/story-text.mjs';
+import { SCENE3, SCENE4, tt } from '../shared/story-text.mjs';
 
 let built = false;
 let arrivalDone = false;
@@ -17,6 +18,7 @@ let baobabDone = false;
 let sunsetDone = false;
 let sunsetPlaying = false;
 let volDone = false;
+let roseDone = false;
 let exitStarted = false;
 let smokeSprites = [];
 let bgDusk = null;
@@ -29,6 +31,7 @@ const VOLCANOES = [
 ];
 const BAOBAB = { x: 3.4, z: -2.6 };
 const CHAIR = { x: -3.6, z: -0.6 };
+const ROSE_ALTAR = { x: 1.23, z: -0.78 }; // 玫瑰坛(与 story-dialogs 锚点一致)
 
 function world() {
   return ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('b612') : null;
@@ -210,6 +213,16 @@ ctx.onTick(function scene3MemoryTick(dt) {
       setTimeout(checkCompletion, 1200);
     });
   }
+  // 玫瑰坛·书页二(面包树+日落之后解锁)
+  if (!roseDone && baobabDone && sunsetDone && d(ROSE_ALTAR.x, ROSE_ALTAR.z) < 2.5) {
+    roseDone = true;
+    speakSeq(SCENE4.arrival.concat(SCENE4.regret, SCENE4.farewell), 0, function () {
+      // 字幕:骄傲的花
+      speakSeq([SCENE4.farewellCaption], 0, function () {
+        setTimeout(checkCompletion, 800);
+      });
+    });
+  }
   checkCompletion();
 });
 
@@ -245,7 +258,7 @@ function runSunset(done) {
 }
 
 function checkCompletion() {
-  if (exitStarted || !baobabDone || !sunsetDone) return;
+  if (exitStarted || !baobabDone || !sunsetDone || !roseDone) return;
   exitStarted = true;
   // 白光收回:回忆淡出到纯白,交棒回黑夜现实
   const veil = document.createElement('div');
