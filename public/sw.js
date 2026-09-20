@@ -1,6 +1,6 @@
 // sw.js — Service Worker(2026-07-25):静态资源 SWR + 媒体缓存优先 + 媒体 LRU 上限
 // API 只走网络;开发环境(localhost/5173)不注册(见 index.html 注册处)
-const VER = 'gallery-v12'; // 2026-08-31 媒体缓存策略修正:网络优先 + 只缓存公开媒体。升版以清除 v11 遗留的全部旧媒体缓存
+const VER = 'gallery-v13'; // 2026-09-20 v13:媒体/静态分池计量 + 视频与>8MB大文件不进缓存(审计 M2)。升版以清空 v12 共池旧缓存
 const MEDIA_CAP = 80; // 媒体缓存最多 80 个(超出逐出最旧)
 
 self.addEventListener('install', e => {
@@ -18,9 +18,10 @@ function isMedia(url) {
   return /^\/(photos|videos|music)\//.test(url.pathname);
 }
 async function mediaLRU(cache) {
-  const keys = await cache.keys();
+  // 2026-09-20 审计 M2:只计量/只逐出媒体条目——js/css/html 与媒体共池时会互相挤占
+  const keys = (await cache.keys()).filter(k => isMedia(new URL(k.url)));
   if (keys.length > MEDIA_CAP) {
-    // 逐出最旧的 20%
+    // 逐出最旧的 20%(近似 LRU:Cache keys 顺序≈插入序)
     const n = Math.ceil(keys.length * 0.2);
     for (let i = 0; i < n; i++) await cache.delete(keys[i]);
   }
@@ -52,7 +53,10 @@ self.addEventListener('fetch', e => {
           if (res.ok) {
             const cc = (res.headers.get('cache-control') || '').toLowerCase();
             // 私密媒体(private/no-store)= 本人上传或未授权内容,绝不缓存,避免在本机留副本
-            if (!/private|no-store/.test(cc)) {
+            // 2026-09-20 审计 M2:视频/超大文件不进缓存——一条就能占满 80 条 LRU 并挤光其它媒体
+            const ctype = res.headers.get('content-type') || '';
+            const big = parseInt(res.headers.get('content-length') || '0', 10) > 8 * 1024 * 1024;
+            if (!/private|no-store/.test(cc) && !ctype.startsWith('video/') && !big) {
               await cache.put(e.request, res.clone());
               mediaLRU(cache);
             }

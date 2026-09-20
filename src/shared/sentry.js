@@ -3,22 +3,20 @@
 // 用法: import { initSentry } from './shared/sentry.js'
 //        initSentry();
 // 配置: 在 index.html 中添加 <meta name="sentry-dsn" content="https://xxx@sentry.io/xxx">
-//       或 URL 加 ?sentry-dsn=https://xxx@sentry.io/xxx
-// 未配置 DSN 时不加载 Sentry(零开销)
+// 未配置 DSN 时不加载 Sentry(零开销)。
+// 2026-09-20 审计 H2:移除 URL 参数 ?sentry-dsn= 来源——防任意访客注入 DSN 把错误/
+// 会话回放外发到任意外部端点;DSN 只认页面 meta 白名单。
 
 let sentryLoaded = false;
 
 /**
- * 初始化 Sentry 错误追踪
- * 优先级: URL 参数 > meta 标签 > 环境变量
+ * 初始化 Sentry 错误追踪(DSN 只认页面 meta,2026-09-20 审计 H2)
  */
 export function initSentry() {
   if (sentryLoaded) return;
 
-  // 获取 DSN
-  const urlDsn = new URLSearchParams(location.search).get('sentry-dsn');
-  const metaDsn = document.querySelector('meta[name="sentry-dsn"]')?.content;
-  const dsn = urlDsn || metaDsn;
+  // 获取 DSN(仅 meta;URL 参数来源已移除——防访客注入外发端点)
+  const dsn = document.querySelector('meta[name="sentry-dsn"]')?.content;
 
   if (!dsn) {
     console.log('[sentry] 未配置 DSN,跳过初始化');
