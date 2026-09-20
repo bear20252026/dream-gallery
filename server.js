@@ -46,12 +46,14 @@ const handler = (req, res) => {
 
   applySecurityHeaders(req, res); // CSP/CORS/nosniff 等(2026-09-18 下沉 lib/security)
 
-  // CORS 预检(CORS_ORIGIN 可配,默认 *;收紧后台跨域时设环境变量即可,不硬编码)
+  // CORS 预检(2026-09-18 审计 P2#7):与 applySecurityHeaders 同轨——本地 *;生产用 CORS_ORIGIN
   if (req.method === 'OPTIONS') {
+    const hostOpt = String(req.headers.host || '');
+    const isLocalOpt = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(hostOpt);
     res.writeHead(204, {
-      'Access-Control-Allow-Origin': CORS_ORIGIN,
+      'Access-Control-Allow-Origin': isLocalOpt ? '*' : CORS_ORIGIN,
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, x-token',
     });
     res.end();
     return;

@@ -17,8 +17,9 @@
 ## 技术栈
 
 - **前端**:原生 ES Modules + Three.js 0.160(开发态原生 ESM 直跑,生产 Vite 8 打包)
-- **后端**:Node.js 零依赖单文件路由(`server.js` + `lib/` 14 模块),数据库即 `gate_data.json`
+- **后端**:Node 路由 + `lib/` 模块(`server.js` 入口 / `lib/routes.js` 声明式路由);持久层 **SQLite 主库 + JSON 镜像**(`gate_data.db`/`gate_data.json`,`USE_SQLITE=0` 可回退)
 - **基建**:Cloudflare CDN/R2(媒体)+ 阿里云源站(pm2 `gallery`)+ GitHub(代码异地备份,⚠️ 该仓为 PUBLIC)
+- **展示区**:2026-09-06 起仅普通模式(演示/本人上传可见);特殊模式已删除
 
 ## 目录结构
 
@@ -49,9 +50,11 @@ node server.js                                # 或裸跑后端 :3000(原生 ESM
 ## 测试(上线前必跑,全绿才部署)
 
 ```bash
-node scripts/test/test.js          # 后端 127 项(数据校验/API/安全边界/审批门/上传/邀请)
-node scripts/test/test-mobile.js   # 手机端渲染 6 项(iPhone 模拟:着色器/JS 异常/空屏)
-# 专项探针:overlay 12 · store 11 · media-rules 8 · ark-free 13 · spirit-hud 5 · ctx-bus 8 · security-fix 11
+node scripts/test/test-store.js     # 后端存档原子写 4 项
+node scripts/test/test.js           # 后端 API/安全边界/门禁/上传/邀请
+node scripts/test/test-mobile.js    # 手机端渲染 6 项(iPhone 模拟:着色器/JS 异常/空屏)
+npm run test:unit                   # Vitest 单元测试
+# 专项探针见 scripts/probe/(overlay/store/media-rules/security-fix/ark/story/minimap…)
 ```
 
 ## 部署

@@ -11,32 +11,42 @@ const ROOT = path.join(__dirname, '..', '..');
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n); } };
 
+// 2026-09-18 审计:SQLite 为主持久层后,只写 gate_data.json 种子会被 db 覆盖 → 本探针强制 USE_SQLITE=0
+const probeEnv = () => ({
+  ...process.env,
+  PORT: '3223',
+  TOKEN: 'audit-t0ken',
+  GATE_MODE: 'approval',
+  USE_SQLITE: '0',
+  AI_GRADE_API_KEY: process.env.AI_GRADE_API_KEY || '',
+});
+const seedDbFiles = () => {
+  for (const f of ['gate_data.db', 'gate_data.db-shm', 'gate_data.db-wal']) {
+    try { fs.unlinkSync(path.join(ROOT, f)); } catch (e) {}
+  }
+};
+
 (async () => {
   const server = spawn(process.execPath, ['server.js'], {
-    cwd: ROOT, env: { ...process.env, PORT: '3223', TOKEN: 'audit-t0ken', GATE_MODE: 'approval' }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: ROOT, env: probeEnv(), stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise(r => server.stdout.on('data', d => d.toString().includes('服务器已启动') && r()));
   const B = 'http://localhost:3223';
 
-  // 建档拿 vid(审批门接口无 GATE_MODE 时不可用,直接 /api/gate/apply?——无 approval 模式时该路由不挂,
-  // 改用静态首页 autoAdmit?也无 approval。这里手动构造 vid:先调任意接口拿 Set-Cookie…没有。
-  // 简化:直接造 applicant —— 借 quiz/start 之外的公开接口不行,改读 gate_data.json 注入。
-  // ⚠️ 必须先杀掉 s1 并等它真正退出,再写种子(2026-08-29 修):saveGateData() 是异步写链
-  //    (_writeChain.then 里 writeFileSync+rename),s1 存活期间写种子,会被 s1 尚未落盘的
-  //    写入覆盖掉 → s2 启动时加载到无 vidAAA 的数据 → ownerAid() 取不到 vid、aid 变 null。
-  //    这个竞态曾让「上传记录含 vid 归属 aid」间歇性失败(时红时绿)。
+  // 建档拿 vid:必须先杀 s1 再写 JSON 种子;并清 SQLite 文件(探针走 USE_SQLITE=0)
   server.kill();
   await new Promise((r) => {
     const t = setTimeout(r, 3000);
     server.on('exit', () => { clearTimeout(t); r(); });
   });
+  seedDbFiles();
   fs.writeFileSync(path.join(ROOT, 'gate_data.json'), JSON.stringify({
     secret: 'test-secret', applicants: {
       vidAAA: { dk: 'dk-uploader', ua: 'RealUser/1.0', answer: '真主', status: 'approved', level: 'perm', applyTime: 1, approveTime: 1 },
     }, stats: { total: 0, byDay: {} }, blockedIps: [], watchIps: [], uploads: {}, chat: [], siteConfig: { mode: 'normal', customLinks: [], demoPhotos: [] },
   }, null, 1));
   const s2 = spawn(process.execPath, ['server.js'], {
-    cwd: ROOT, env: { ...process.env, PORT: '3223', TOKEN: 'audit-t0ken', GATE_MODE: 'approval' }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: ROOT, env: probeEnv(), stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise(r => s2.stdout.on('data', d => d.toString().includes('服务器已启动') && r()));
 
@@ -98,18 +108,20 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   const steal = await fetch(B + '/photos/sec-test.png', { headers: { 'user-agent': 'EvilUser/9.9' } });
   ok(steal.status === 403, '伪造者直接读文件 403');
 
-  // [4] token 常量时间比较:错 401 对 200
-  const bad = await fetch(B + '/api/admin/list?token=wrong-t0ken');
-  const good = await fetch(B + '/api/admin/list?token=audit-t0ken');
-  ok(bad.status === 401 && good.status === 200, 'token 错误 401 / 正确 200(timingSafeEqual)');
+  // [4] token 常量时间比较:错 401 对 200(header 与 query 双通道)
+  const bad = await fetch(B + '/api/admin/list', { headers: { 'x-token': 'wrong-t0ken' } });
+  const good = await fetch(B + '/api/admin/list', { headers: { 'x-token': 'audit-t0ken' } });
+  const goodQ = await fetch(B + '/api/admin/list?token=audit-t0ken');
+  ok(bad.status === 401 && good.status === 200 && goodQ.status === 200, 'token 错误 401 / 正确 200(header+query)');
 
   // [5] vision 限额:构造 21 张本人照片记录,第 21 次应 429
+  seedDbFiles();
   const gd2 = JSON.parse(fs.readFileSync(path.join(ROOT, 'gate_data.json'), 'utf8'));
   for (let i = 0; i < 21; i++) gd2.uploads['vq' + i + '.jpg'] = { dk: 'dk-uploader', aid: 'vidAAA', ts: Date.now(), mt: 'x' + i };
   fs.writeFileSync(path.join(ROOT, 'gate_data.json'), JSON.stringify(gd2, null, 1));
   s2.kill();
   const s3 = spawn(process.execPath, ['server.js'], {
-    cwd: ROOT, env: { ...process.env, PORT: '3223', TOKEN: 'audit-t0ken', GATE_MODE: 'approval', AI_GRADE_API_KEY: '', AI_GRADE_API_KEY_BACKUP: '' }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: ROOT, env: probeEnv(), stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise(r => s3.stdout.on('data', d => d.toString().includes('服务器已启动') && r()));
   // 文件要真实存在(vision 读盘);造 21 个小文件,走完 20 次配额后第 21 次 429

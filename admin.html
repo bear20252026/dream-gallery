@@ -1119,10 +1119,16 @@
 
     <script>
       const TOKEN = new URLSearchParams(location.search).get('token') || '';
-      const tk = () => '?token=' + encodeURIComponent(TOKEN);
-      const tk2 = () => '&token=' + encodeURIComponent(TOKEN);
-      // admin-media 无既有查询串,必须用 ?token= 而非 &token=,否则 &token 被当路径导致 404(2026-08-29 修复)
-      const tkq = () => '?token=' + encodeURIComponent(TOKEN);
+      // 2026-09-18 审计 P1#2:API 一律走 x-token 请求头;URL query 仅用于首次打开后台页
+      const authH = () => (TOKEN ? { 'x-token': TOKEN } : {});
+      const tk = () => ''; // 兼容旧调用拼接位,token 已在 header
+      const tk2 = () => '';
+      const tkq = () => '';
+      async function adminFetch(url, init) {
+        init = init || {};
+        const headers = Object.assign({}, init.headers || {}, authH());
+        return fetch(url, Object.assign({}, init, { headers }));
+      }
       function confirmAsync(msg) {
         return new Promise(function (resolve) {
           var m = $('cfm'),
@@ -1190,7 +1196,7 @@
       // ===================== 一念墙管理(2026-09-04) =====================
       async function loadWishes() {
         try {
-          const r = await fetch('/api/admin/wishes' + tk());
+          const r = await adminFetch('/api/admin/wishes' + tk());
           const d = await r.json();
           if (!r.ok) throw new Error(d.error || '加载失败');
           $('wishTotal').textContent = '共 ' + d.total + ' 念';
@@ -1219,7 +1225,7 @@
             del.addEventListener('click', async function () {
               if (!(await confirmAsync('确定删除这条一念?'))) return;
               try {
-                const rr = await fetch('/api/admin/wish' + tk(), {
+                const rr = await adminFetch('/api/admin/wish' + tk(), {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ action: 'del', id: w.id }),
@@ -1248,7 +1254,7 @@
         try {
           const type = $('errType').value;
           const q = $('errQ').value.trim();
-          const r = await fetch(
+          const r = await adminFetch(
             '/api/admin/client-errors' +
               tk() +
               '&type=' +
@@ -1308,7 +1314,7 @@
       $('errClear').addEventListener('click', async function () {
         if (!(await confirmAsync('确定清空全部报错记录?此操作不可恢复'))) return;
         try {
-          await fetch('/api/admin/client-errors/clear' + tk(), { method: 'POST' });
+          await adminFetch('/api/admin/client-errors/clear' + tk(), { method: 'POST' });
           toast('已清空');
           loadErrors();
         } catch (e) {
@@ -1374,7 +1380,7 @@
       async function loadDocs() {
         if (docDirty) return; // 有未保存修改时绝不重载(防刷没)
         try {
-          const r = await fetch('/api/admin/docs?file=' + encodeURIComponent(docCur) + tk2());
+          const r = await adminFetch('/api/admin/docs?file=' + encodeURIComponent(docCur) + tk2());
           const d = await r.json();
           if (!r.ok) throw new Error(d.error || '加载失败');
           const f = $('docFrame'),
@@ -1425,7 +1431,7 @@
         $('docSave').disabled = true;
         try {
           const body = $('docFrame').contentDocument.body.innerHTML;
-          const r = await fetch('/api/admin/docs' + tk(), {
+          const r = await adminFetch('/api/admin/docs' + tk(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ file: docCur, content: docHead + body + docTail }),
@@ -1451,7 +1457,7 @@
       async function loadDocBaks() {
         try {
           const d = await (
-            await fetch('/api/admin/docs?backups=' + encodeURIComponent(docCur) + tk2())
+            await adminFetch('/api/admin/docs?backups=' + encodeURIComponent(docCur) + tk2())
           ).json();
           $('docBak').innerHTML =
             '<option value="">选择备份回滚…</option>' +
@@ -1469,7 +1475,7 @@
         )
           return;
         try {
-          const r = await fetch('/api/admin/docs' + tk(), {
+          const r = await adminFetch('/api/admin/docs' + tk(), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ file: docCur, restore: $('docBak').value }),
@@ -1487,7 +1493,7 @@
       async function load() {
         let r, d;
         try {
-          r = await fetch('/api/admin/list' + tk());
+          r = await adminFetch('/api/admin/list' + tk());
           if (r.status === 401) {
             document.querySelector('.wrap').innerHTML =
               '<h1>401 未授权：网址后请加 ?token=你的密码</h1>';
@@ -1567,7 +1573,7 @@
       async function editNote(id, old) {
         const n = prompt('给这台设备起个备注名（留空清除）:', old || '');
         if (n === null) return;
-        const r = await fetch('/api/admin/decide' + tk(), {
+        const r = await adminFetch('/api/admin/decide' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id, action: 'note', note: n }),
@@ -1597,7 +1603,7 @@
         decide(id, 'revoke-session');
       }
       async function decide(id, action, reason) {
-        const r = await fetch('/api/admin/decide' + tk(), {
+        const r = await adminFetch('/api/admin/decide' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id, action, reason: reason || '' }),
@@ -1716,7 +1722,7 @@
   </div>`;
       }
       async function dismissAlert(idx) {
-        const r = await fetch('/api/admin/alerts' + tk(), {
+        const r = await adminFetch('/api/admin/alerts' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'dismiss', idx }),
@@ -1729,7 +1735,7 @@
       }
       async function clearAlerts() {
         if (!(await confirmAsync('忽略全部预警?(可疑标记也会清除)'))) return;
-        const r = await fetch('/api/admin/alerts' + tk(), {
+        const r = await adminFetch('/api/admin/alerts' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'clear' }),
@@ -1753,7 +1759,7 @@
           ))
         )
           return;
-        const r = await fetch('/api/admin/bulk' + tk(), {
+        const r = await adminFetch('/api/admin/bulk' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'block', ip }),
@@ -1978,7 +1984,7 @@
       }
       // ---------- 答题记录页 ----------
       async function loadQuiz() {
-        const r = await fetch('/api/admin/quiz' + tk());
+        const r = await adminFetch('/api/admin/quiz' + tk());
         if (!r.ok) {
           $('quizList').innerHTML = '<div class="empty">加载失败</div>';
           return;
@@ -2043,14 +2049,14 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         const demos = (DATA && DATA.siteConfig && DATA.siteConfig.demoPhotos) || [];
         let html = '';
         for (const [dir, label] of dirs) {
-          const r = await fetch('/api/files?dir=' + dir + tk2());
+          const r = await adminFetch('/api/files?dir=' + dir + tk2());
           const d = await r.json();
           const files = (d[dir] || []).sort((a, b) => b.mtime.localeCompare(a.mtime));
           // 大屏 1~5 号:与「户外大屏」管理页同一套编号/同一批文件(videos/户外大屏/ 子目录,列表 API 不递归故单独拉配置)
           let bsHtml = '';
           if (dir === 'videos') {
             try {
-              const bd = await (await fetch('/api/bigscreen')).json();
+              const bd = await (await adminFetch('/api/bigscreen')).json();
               bsHtml = (bd.slots || [])
                 .map(
                   (s) => `<div class="file-row" style="align-items:center">
@@ -2132,7 +2138,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       }
       async function delFile(dir, name) {
         if (!(await confirmAsync('确定删除 ' + decodeURIComponent(name) + ' ？不可恢复！'))) return;
-        const r = await fetch(`/api/files/${dir}/${name}?x=1` + tk2(), { method: 'DELETE' });
+        const r = await adminFetch(`/api/files/${dir}/${name}?x=1` + tk2(), { method: 'DELETE' });
         if (r.ok) {
           toast('已删除');
           loadFiles();
@@ -2145,7 +2151,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           return;
         }
         const f = inp.files[0];
-        const r = await fetch(`/api/upload?dir=${dir}&name=${encodeURIComponent(f.name)}` + tk2(), {
+        const r = await adminFetch(`/api/upload?dir=${dir}&name=${encodeURIComponent(f.name)}` + tk2(), {
           method: 'POST',
           body: f,
         });
@@ -2267,7 +2273,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         if (!box) return;
         box.innerHTML = '加载中…';
         try {
-          const r = await fetch('/api/bigscreen');
+          const r = await adminFetch('/api/bigscreen');
           const d = await r.json();
           if (!d.ok) {
             box.innerHTML = '加载失败';
@@ -2301,7 +2307,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           if (!(await confirmAsync('替换「' + label + '」的视频为 ' + f.name + ' ?'))) return;
           const btn = document.querySelector(`#bigscreen button[data-slot="${slot}"]`);
           try {
-            const r = await fetch(
+            const r = await adminFetch(
               '/api/admin/bigscreen/upload?slot=' +
                 slot +
                 '&name=' +
@@ -2321,7 +2327,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       async function delBigscreen(slot, label) {
         if (!(await confirmAsync('清空「' + label + '」的视频?'))) return;
         try {
-          const r = await fetch('/api/admin/bigscreen/delete?slot=' + slot + tk(), {
+          const r = await adminFetch('/api/admin/bigscreen/delete?slot=' + slot + tk(), {
             method: 'POST',
           });
           const d = await r.json();
@@ -2340,7 +2346,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
           toast('名称和链接都要填', 1);
           return;
         }
-        const r = await fetch('/api/admin/links' + tk(), {
+        const r = await adminFetch('/api/admin/links' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'add', name, url, icon, model }),
@@ -2359,7 +2365,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         $('clUrl').value = url;
       }
       async function delCustomLink(id) {
-        const r = await fetch('/api/admin/links' + tk(), {
+        const r = await adminFetch('/api/admin/links' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'del', id }),
@@ -2371,7 +2377,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         } else toast('失败', 1);
       }
       async function delUserLink(id) {
-        const r = await fetch('/api/admin/links' + tk(), {
+        const r = await adminFetch('/api/admin/links' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'delUser', id }),
@@ -2383,7 +2389,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         } else toast('失败', 1);
       }
       async function toggleDemo(name, demo) {
-        const r = await fetch('/api/admin/demo' + tk(), {
+        const r = await adminFetch('/api/admin/demo' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file: name, demo }),
@@ -2398,7 +2404,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       async function editCaption(name, old) {
         const c = prompt('编辑「' + name + '」的 AI 配文(留空删除):', old || '');
         if (c === null) return;
-        const r = await fetch('/api/admin/caption' + tk(), {
+        const r = await adminFetch('/api/admin/caption' + tk(), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file: name, caption: c }),
@@ -2419,7 +2425,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       // 带令牌头的下载(fetch x-token → blob → 本地保存),不再依赖 URL 参数存活,任何浏览器都不会"需要授权"
       async function dl(url, filename) {
         try {
-          const r = await fetch(url, { headers: { 'x-token': TOKEN } });
+          const r = await adminFetch(url, { headers: { 'x-token': TOKEN } });
           if (!r.ok) {
             toast('下载失败:HTTP ' + r.status, 1);
             return;
@@ -2439,7 +2445,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       }
       async function clearClicks() {
         if (!(await confirmAsync('确定清空全部链接点击记录?不可恢复!(建议先导出 Excel)'))) return;
-        const r = await fetch('/api/admin/clicks/clear' + tk(), { method: 'POST' });
+        const r = await adminFetch('/api/admin/clicks/clear' + tk(), { method: 'POST' });
         if (r.ok) {
           DATA.linkClicks = [];
           loadDisplay();
@@ -2448,10 +2454,10 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       }
       // 导出 PDF:新开打印页(记录 + 答题全量 + 照片原图附录),浏览器「打印→另存为 PDF」
       async function exportPdf() {
-        const photos = await (await fetch('/api/files?dir=photos' + tk2())).json();
+        const photos = await (await adminFetch('/api/files?dir=photos' + tk2())).json();
         const imgs = photos.photos || [];
         const clicks = DATA.linkClicks || [];
-        const attempts = (await (await fetch('/api/admin/quiz' + tk())).json()).attempts || [];
+        const attempts = (await (await adminFetch('/api/admin/quiz' + tk())).json()).attempts || [];
         const w = window.open('', '_blank');
         const escH = (s) =>
           String(s == null ? '' : s)
@@ -2558,7 +2564,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
       async function loadChatMsgs() {
         if (!chatCurDk) return;
         try {
-          const r = await fetch('/api/admin/chats?dk=' + chatCurDk);
+          const r = await adminFetch('/api/admin/chats?dk=' + chatCurDk);
           const d = await r.json();
           const cs = d.chats || [],
             box = $('chatMsgArea');
@@ -2605,7 +2611,7 @@ ${a.qaComment ? `<div class="meta" style="margin-top:6px"><b>评语:</b>${esc(a.
         $('chatMsgInput').value = '';
         $('chatSendBtn').disabled = true;
         try {
-          await fetch('/api/admin/chat', {
+          await adminFetch('/api/admin/chat', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text: t, target: chatCurDk }),
