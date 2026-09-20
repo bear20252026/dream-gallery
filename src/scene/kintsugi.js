@@ -1,3 +1,8 @@
+// kintsugi.js — 金缮天花板(2026-07-28 C1,补天 100% 奖励;2026-09-20 自 scene.js 拆分)
+// 天穹 100% 后:天花板换为半透明金缮纹理——天空透过,淡金色愈合纹路如瓷器金缮;
+// 玩家抬头注视时纹路微微发亮(0.55→0.95 缓动)。零 PointLight(MeshBasicMaterial),手机灯光账户不动。
+// 触发:settings.js checkSkyMs 100 档 或 启动时进度已 100 → ctx.scene.kintsugiOn()
+// 依赖注入:roof/roofThick 由调用方传入
 import { ctx } from '../ctx.js';
 import * as THREE from 'three';
 
