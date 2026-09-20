@@ -94,7 +94,7 @@ export class AirborneState extends PlayerState {
     // 滑翔判断
     if (pl.glideEnergy > 0) {
       // 检测跳跃键是否按住
-      if (ctx._jumpHold) {
+      if (ctx.player.jumpHold) {
         return new GlidingState();
       }
     }
@@ -128,7 +128,7 @@ export class GlidingState extends PlayerState {
     }
 
     // 松开跳跃键
-    if (!ctx._jumpHold) {
+    if (!ctx.player.jumpHold) {
       pl.gliding = false;
       return new AirborneState();
     }

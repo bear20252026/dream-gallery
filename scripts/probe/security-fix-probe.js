@@ -7,22 +7,29 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const ROOT = path.join(__dirname, '..', '..');
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n); } };
 
 // 2026-09-18 审计:SQLite 为主持久层后,只写 gate_data.json 种子会被 db 覆盖 → 本探针强制 USE_SQLITE=0
+// 2026-09-20 审计 H1 修复:GATE_DATA_FILE 指向临时目录,与仓库根真实 gate_data.json/db 完全隔离——
+// 此前本探针直接覆写/删除真实数据文件(含 live WAL),有数据丢失风险。
+// 注意:上传测试文件仍落在真实 photos/(上传目录固定),结束时清理。
+const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'secprobe-'));
+const DATA_FILE = path.join(DATA_DIR, 'gate_data.json');
 const probeEnv = () => ({
   ...process.env,
   PORT: '3223',
   TOKEN: 'audit-t0ken',
   GATE_MODE: 'approval',
   USE_SQLITE: '0',
+  GATE_DATA_FILE: DATA_FILE,
   AI_GRADE_API_KEY: process.env.AI_GRADE_API_KEY || '',
 });
 const seedDbFiles = () => {
   for (const f of ['gate_data.db', 'gate_data.db-shm', 'gate_data.db-wal']) {
-    try { fs.unlinkSync(path.join(ROOT, f)); } catch (e) {}
+    try { fs.unlinkSync(path.join(DATA_DIR, f)); } catch (e) {}
   }
 };
 
@@ -40,7 +47,7 @@ const seedDbFiles = () => {
     server.on('exit', () => { clearTimeout(t); r(); });
   });
   seedDbFiles();
-  fs.writeFileSync(path.join(ROOT, 'gate_data.json'), JSON.stringify({
+  fs.writeFileSync(DATA_FILE, JSON.stringify({
     secret: 'test-secret', applicants: {
       vidAAA: { dk: 'dk-uploader', ua: 'RealUser/1.0', answer: '真主', status: 'approved', level: 'perm', applyTime: 1, approveTime: 1 },
     }, stats: { total: 0, byDay: {} }, blockedIps: [], watchIps: [], uploads: {}, chat: [], siteConfig: { mode: 'normal', customLinks: [], demoPhotos: [] },
@@ -66,9 +73,13 @@ const seedDbFiles = () => {
   ok(!/PUBLIC_IMG_EXT[\s\S]{0,300}?\.svg/.test(filesSrc), 'PUBLIC_IMG_EXT 白名单不含 .svg');
   ok(filesStaticSrc.includes("script-src 'none'"), '存量 SVG 仍有 CSP script-src none 兜底(-files-static)');
 
-  // [2] HTML 安全头
+  // [2] HTML 安全头(2026-09-20 M4 策略对齐):公开页不再全局 XFO(保持可被外链合法嵌套,
+  //     回归 2026-07-28 修订);nosniff 仍全站;后台页 admin.html 静态路径仍带 SAMEORIGIN
   const idx = await fetch(B + '/index.html');
-  ok(idx.headers.get('x-frame-options') === 'SAMEORIGIN' && idx.headers.get('x-content-type-options') === 'nosniff', 'HTML 带 XFO/nosniff');
+  ok(idx.headers.get('x-content-type-options') === 'nosniff', '公开 HTML 带 nosniff');
+  ok(idx.headers.get('x-frame-options') === null, '公开 HTML 不再全局 XFO(M4 策略)');
+  const adm = await fetch(B + '/admin.html');
+  ok(adm.status === 404, 'admin.html 公网静态路径 404(黑名单)');
 
   // [3] vid 归属 / 越权防护 —— 载体改用普通图片(.png,在白名单内)。
   //     归属与越权和文件类型无关,原来借 SVG 传只是历史巧合;SVG 被移除后必须换载体,
@@ -85,7 +96,7 @@ const seedDbFiles = () => {
   // ⚠️ 必须轮询等落盘(2026-08-29 修):lib/store.js 的 saveGateData() 是**异步**的
   //    (_writeChain.then 里 writeFileSync+rename),而 files.js 是先调落盘、立刻回 201,
   //    故 HTTP 响应返回时磁盘可能还没写完——直接 readFileSync 会读到旧内容而误报失败。
-  const readGate = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'gate_data.json'), 'utf8'));
+  const readGate = () => JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   const waitForUpload = async (name, ms = 5000) => {
     const t0 = Date.now();
     let d = readGate();
@@ -116,9 +127,9 @@ const seedDbFiles = () => {
 
   // [5] vision 限额:构造 21 张本人照片记录,第 21 次应 429
   seedDbFiles();
-  const gd2 = JSON.parse(fs.readFileSync(path.join(ROOT, 'gate_data.json'), 'utf8'));
+  const gd2 = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   for (let i = 0; i < 21; i++) gd2.uploads['vq' + i + '.jpg'] = { dk: 'dk-uploader', aid: 'vidAAA', ts: Date.now(), mt: 'x' + i };
-  fs.writeFileSync(path.join(ROOT, 'gate_data.json'), JSON.stringify(gd2, null, 1));
+  fs.writeFileSync(DATA_FILE, JSON.stringify(gd2, null, 1));
   s2.kill();
   const s3 = spawn(process.execPath, ['server.js'], {
     cwd: ROOT, env: probeEnv(), stdio: ['ignore', 'pipe', 'pipe'],
@@ -139,9 +150,10 @@ const seedDbFiles = () => {
   ok(/linkClicks\.length > 5000/.test(src), 'linkClicks 5000 上限已写入源码');
 
   // 清理(逐个 try:清理失败不应让整个探针崩掉、吞掉已得出的结论)
-  for (const f of [path.join(ROOT, 'photos', 'sec-test.png'), path.join(ROOT, 'gate_data.json'), path.join(ROOT, '.audit-tmp.svg')]) {
+  for (const f of [path.join(ROOT, 'photos', 'sec-test.png'), path.join(ROOT, '.audit-tmp.svg')]) {
     try { fs.unlinkSync(f); } catch (e) {}
   }
+  try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch (e) {}
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   s3.kill();
   process.exit(fail ? 1 : 0);

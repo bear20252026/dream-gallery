@@ -1,5 +1,6 @@
 // ============================================================
 // 实体注册表 — 统一管理所有 3D 交互对象
+/** @typedef {import('three').Object3D} Object3D */
 // 新增对象只需 ent.register(mesh, {type, tags})
 // 可以用 ent.find('painting') 批量操作
 // 2026-08-01 游戏引擎化改造
@@ -15,7 +16,7 @@
  */
 export class EntityRegistry {
   constructor() {
-    /** @type {Map<string, {mesh: THREE.Object3D, type: string, tags: string[], data: Object}>} */
+    /** @type {Map<string, {mesh: Object3D, type: string, tags: string[], data: Object, id: string}>} */
     this._map = new Map();
     /** 按类型索引: Map<type, Set<id>> —— O(1) 查询，不再遍历全表 */
     this._byType = new Map();
@@ -26,14 +27,14 @@ export class EntityRegistry {
 
   /**
    * 注册实体
-   * @param {THREE.Object3D} mesh - Three.js 对象
-   * @param {Object} opts
-   * @param {string} opts.type - 实体类型（如 'painting', 'marker', 'sign'）
+   * @param {Object3D} mesh - Three.js 对象
+   * @param {Object} [opts]
+   * @param {string} [opts.type='entity'] - 实体类型（如 'painting', 'marker', 'sign'）
    * @param {string[]} [opts.tags] - 自定义标签
    * @param {Object} [opts.data] - 附加数据
    * @returns {string} 实体 ID
    */
-  register(mesh, { type, tags = [], data = {} } = {}) {
+  register(mesh, { type = 'entity', tags = [], data = {} } = {}) {
     const id = 'ent_' + ++this._nextId;
     this._map.set(id, { mesh, type, tags, data, id });
     // 维护类型索引

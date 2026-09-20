@@ -251,7 +251,8 @@ async function refreshMode(){
 refreshMode();
 setInterval(refreshMode,60000);
 
-Object.assign(ctx,{renderCustomLinks,applyTexGate});
+ctx.mode.renderCustomLinks = renderCustomLinks; // 2026-09-20 收编登记册(mode 域)
+ctx.mode.applyTexGate = applyTexGate;
 ctx.mode.refreshMode=refreshMode; // 命名空间注册(扁平写已软冻结)
 
 hotEnd('mode');

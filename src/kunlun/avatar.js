@@ -75,7 +75,7 @@ function loadModel(url, onOk, onFail, attempt) {
       }
     },
     function (err) {
-      console.warn('[avatar] 加载失败(第' + attempt + '次):', err && err.message);
+      console.warn('[avatar] 加载失败(第' + attempt + '次):', err && /** @type {any} */ (err).message);
       if (attempt < 3) {
         setStatus('加载失败，' + (3 - attempt) + ' 秒后重试...', '#ff6666');
         setTimeout(function () { loadModel(url, onOk, onFail, attempt + 1); }, 3000);
@@ -188,9 +188,10 @@ function setupModel(gltf) {
   if (old && old !== obj) {
     ctx.scene.s.remove(old);
     old.traverse(function (c) {
-      if (c.geometry) c.geometry.dispose();
-      if (c.material) {
-        const ms = Array.isArray(c.material) ? c.material : [c.material];
+      const c2 = /** @type {any} */ (c);
+      if (c2.geometry) c2.geometry.dispose();
+      if (c2.material) {
+        const ms = Array.isArray(c2.material) ? c2.material : [c2.material];
         for (const m of ms) m.dispose();
       }
     });
@@ -229,7 +230,7 @@ function setupModel(gltf) {
 
 // ===================== 行走状态 =====================
 function isMovingNow() {
-  const sm = ctx._playerSM;
+  const sm = ctx.player.playerSM;
   return !!(sm && sm.current && sm.current.name === 'walking');
 }
 

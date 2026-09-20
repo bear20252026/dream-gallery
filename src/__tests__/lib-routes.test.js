@@ -41,7 +41,7 @@ describe('路由表结构契约', () => {
   });
 
   it('auth 只允许 public/token/write 枚举', () => {
-    const OK = ['public', 'token', 'write'];
+    const OK = ['public', 'token', 'write', 'adminPage']; // adminPage=后台页 bootstrap(TOKEN 必验,不查 TOKEN_QUERY)
     for (const r of ROUTES) expect(OK, JSON.stringify(r.match)).toContain(r.auth);
   });
 

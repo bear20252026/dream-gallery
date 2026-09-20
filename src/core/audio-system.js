@@ -64,7 +64,7 @@ export function createAudioSystem(deps = {}) {
         url,
         (buffer) => {
           pa.setBuffer(buffer);
-          resolve();
+          resolve(undefined);
         },
         undefined,
         (err) => {

@@ -81,7 +81,7 @@ function build() {
       );
       sp.position.set(v.x + k * 0.25, gy + 1.2 * v.s, v.z + k * 0.15);
       sp.scale.set(0.4, 0.4, 1);
-      sp.userData = { baseX: v.x + k * 0.25, baseZ: v.z + k * 0.15, phase: k * 2.4 + i * 3.1 };
+      sp.userData = { baseY: gy + 1.2 * v.s, baseX: v.x + k * 0.25, baseZ: v.z + k * 0.15, phase: k * 2.4 + i * 3.1 };
       sp.name = 'scene3Smoke';
       s.add(sp);
       smokeSprites.push(sp);

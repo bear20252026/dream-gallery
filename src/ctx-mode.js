@@ -13,7 +13,7 @@ import { getGameState } from './core/game-state.js';
  * @returns {Object} 模式命名空间代理对象
  */
 export function createModeNamespace(vault) {
-  const properties = [
+  const properties = [ 'renderCustomLinks', 'applyTexGate',
     'siteMode',
     'demoPhotos',
     'myUploads',

@@ -267,7 +267,7 @@ questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 
 
       // 升级昆仑开口:既播 TTS,又落进手绘框(所有现有 kunlunSpeak 调用自动生效)
       prevKunlunSpeak = ctx.ui.kunlunSpeak;
-      ctx.ui.kunlunSpeak = (text, voice) => {
+      ctx.ui.kunlunSpeak = (/** @type {string} */ text, /** @type {string} */ voice) => {
         if (prevKunlunSpeak) { try { prevKunlunSpeak(text, voice); } catch (e) {} }
         dialogApi.open({ speaker: dialogApi.speakerFor(voice), lines: [text], autoHide: 9000 });
       };

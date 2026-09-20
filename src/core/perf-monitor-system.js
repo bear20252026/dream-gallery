@@ -41,8 +41,8 @@ export function createPerfMonitorSystem(deps = {}) {
     const mem = info.memory;
     const render = info.render;
     let heap = 'N/A';
-    if (performance.memory) {
-      heap = (performance.memory.usedJSHeapSize / 1024 / 1024).toFixed(1) + 'MB';
+    if ((/** @type {any} */ (performance)).memory) {
+      heap = ((/** @type {any} */ (performance)).memory.usedJSHeapSize / 1024 / 1024).toFixed(1) + 'MB';
     }
     const fpsColor = fps >= 50 ? '#0f0' : fps >= 30 ? '#ff0' : '#f00';
     const sparkChars = '▁▂▃▄▅▆▇█';

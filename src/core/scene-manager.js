@@ -135,7 +135,8 @@ export class SceneManager {
       const claim = el.getAttribute('data-world-ui');
       if (claim === 'space') {
         // 太空专属:默认隐藏,进太空显式恢复声明的显示态
-        el.style.display = show ? 'none' : el.getAttribute('data-world-ui-display') || 'block';
+        const elH = /** @type {HTMLElement} */ (el);
+        elH.style.display = show ? 'none' : elH.getAttribute('data-world-ui-display') || 'block';
         return;
       }
       toggleEl(el, claim === 'main' ? show : true, el.getAttribute('data-world-ui-display') || '');
@@ -212,7 +213,7 @@ export class SceneManager {
             .then(resolve)
             .catch((e) => {
               commitError = e;
-              resolve();
+              resolve(undefined);
             });
         })
       );

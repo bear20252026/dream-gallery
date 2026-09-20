@@ -12,6 +12,9 @@ import { getEventBus } from './event-bus.js';
  * 创建统一输入 facade。
  * @param {object} input 既有 InputManager 实例(通常传 ctx.input)
  */
+/**
+ * @param {import('../engine.js').InputManager} input
+ */
 export function createInputSystem(input) {
   const bus = getEventBus();
 

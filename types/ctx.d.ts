@@ -56,6 +56,23 @@ export interface SceneNamespace {
   ambL: Light;
   hemiL: Light;
   L: HTMLElement;
+  // —— 运行期挂载(2026-09-20 对齐实际代码) ——
+  renderPostProcessing?: () => void;
+  resizePostProcessing?: (w: number, h: number) => void;
+  activeWorld?: string;
+  worldManager?: unknown;
+  worldStack?: unknown[];
+  enterWorld?: (id: string, opts?: unknown) => unknown;
+  leaveWorld?: (opts?: unknown) => unknown;
+  toMainWorld?: (opts?: unknown) => unknown;
+  worldChanged?: (fn: (...a: unknown[]) => void) => void;
+  getActiveRoot?: () => unknown;
+  getActiveGround?: (x: number, z: number) => unknown;
+  getActiveBounds?: () => unknown;
+  setTime?: (h: number) => void;
+  loopManager?: unknown;
+  setLowQuality?: (on: boolean) => void;
+  startWorld?: () => Promise<void>;
   jT: HTMLElement;
   jB: HTMLElement;
   aB: HTMLElement;
@@ -75,6 +92,9 @@ export interface PlayerState {
 }
 
 export interface PlayerNamespace {
+  playerSM?: { current?: { name?: string }; change(state: unknown): void; tick(dt: number): void };
+  orbit?: { yaw: number; pitch: number; dist: number };
+  jumpHold?: boolean;
   pl: PlayerState;
   jD: { x: number; z: number };
   ks: Record<string, boolean>;
@@ -180,7 +200,11 @@ export interface StoreAPI {
 
 export interface UINamespace {
   modeToast: (msg: string) => void;
-  kunlunSpeak: (text: string) => void;
+  openDialog: (opts: unknown) => void;
+  dialogOpen: () => boolean;
+  showGuideCard: () => void;
+  stopAgreementMusic: () => void;
+  kunlunSpeak: (text: string, voice?: string) => void;
   overlay: OverlayAPI;
   store: StoreAPI;
 }
@@ -201,67 +225,31 @@ export interface RegisterOpts {
   data?: Record<string, unknown>;
 }
 
-export declare class EntityRegistry {
-  _map: Map<string, EntityEntry>;
-  _byType: Map<string, Set<string>>;
-  _dirty: Set<string>;
-  _nextId: number;
-
-  register(mesh: Object3D, opts?: RegisterOpts): string;
-  unregister(id: string): void;
-  find(type: string): Object3D[];
-  findByTag(tag: string): Object3D[];
-  get(id: string): EntityEntry | undefined;
-  forEach(fn: (entry: EntityEntry, id: string) => void): void;
-  readonly size: number;
-  markDirty(id: string): void;
-  markTypeDirty(type: string): void;
-  getDirtyAndClear(): string[];
-  processDirty(fn: (entry: EntityEntry, id: string) => void): void;
-}
+export type EntityRegistry = import('../src/engine.js').EntityRegistry;
 
 // ===================== 输入管理器 =====================
 
-export declare class InputManager {
-  _keys: Record<string, boolean>;
-  _actions: Record<string, Array<(dt: number) => void>>;
-  _mouse: { x: number; y: number; dx: number; dy: number; down: boolean };
-  _touch: { active: boolean; x: number; y: number };
-  _bindings: Record<string, string[]>;
-
-  bindAction(action: string, keys: string[]): void;
-  isDown(action: string): boolean;
-  readonly mouseDelta: { x: number; y: number };
-  initDefaults(): void;
-  on(action: string, fn: (dt: number) => void): void;
-  tick(dt: number): void;
-}
+export type InputManager = import('../src/engine.js').InputManager;
 
 // ===================== 游戏主循环 =====================
 
 export type GamePhase = 'input' | 'update' | 'render' | 'ui';
 
-export declare class GameLoop {
-  _phases: Record<GamePhase, Array<(dt: number) => void>>;
-  _running: boolean;
-  _lastTime: number;
-  timeScale: number;
-  maxDelta: number;
-
-  on(phase: GamePhase, fn: (dt: number) => void): () => void;
-  off(phase: GamePhase, fn: (dt: number) => void): void;
-  start(): void;
-  pause(): void;
-  resume(): void;
-}
+export type GameLoop = import('../src/loop.js').GameLoop;
 
 // ===================== 事件总线 =====================
 
-export interface EventBus {
-  on(event: string, fn: (...args: unknown[]) => void): () => void;
-  once(event: string, fn: (...args: unknown[]) => void): () => void;
-  off(event: string, fn?: (...args: unknown[]) => void): void;
-  emit(event: string, ...args: unknown[]): void;
+export type EventBus = import('../src/event-bus.js').EventBus;
+
+// ===================== Window 探针钩子(运行时挂载,均为诊断用途) =====================
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-empty-interface
+  interface Window {
+    [key: string]: any;
+    __ctx: import('./ctx').GalleryCtx;
+    __gsInitN?: number;
+  }
 }
 
 // ===================== 主上下文 =====================
@@ -289,5 +277,5 @@ export interface GalleryCtx {
   ui: UINamespace;
 
   // 扁平兼容层（软冻结，新代码应使用命名空间）
-  [key: string]: unknown;
+  [key: string]: any;
 }

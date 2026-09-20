@@ -7,117 +7,117 @@
 //   ① 新挂属性必须先在本文件的对应分组登记(写明类型/写入方/用途);
 //   ② 能收进深模块的不要挂总线——存档走 ctx.store,弹层走 ctx.overlay,媒体规则走 mediarules.mjs;
 //   ③ 分型(命名空间化)为既定方向,见 RFC-架构深化.md 候选①的阶段二/三提案。
-/**
+/*
  * 画廊共享上下文。各模块通过 `import {ctx} from './ctx.js'` 读写。
- * @typedef {Object} GalleryCtx
+ * 【类型权威定义:types/ctx.d.ts 的 GalleryCtx;本块仅人类可读说明】
  *
  * ── 帧循环(ctx.js 自身) ──
- * @property {Function[]} tickers   统一每帧动画队列(主循环逐帧调用)
- * @property {function(Function):void} onTick 注册每帧动画:ctx.onTick(fn)
+ * - tickers   统一每帧动画队列(主循环逐帧调用)
+ * - onTick 注册每帧动画:ctx.onTick(fn)
  *
  * ── 场景内核(scene/scene.js 写入) ──
- * @property {THREE.Scene} s        3D 场景
- * @property {THREE.PerspectiveCamera} cam 相机
- * @property {THREE.WebGLRenderer} rnd 渲染器
- * @property {HTMLElement} L        加载遮罩元素
- * @property {THREE.Raycaster} ray  射线拾取器(点击交互用)
- * @property {THREE.Vector2} mP2    鼠标/触摸归一化坐标(射线拾取用)
- * @property {THREE.Object3D[]} iG  可交互对象数组(画框/图标/视频墙等)
- * @property {THREE.TextureLoader} tL 纹理加载器
- * @property {function(string,function=):THREE.CanvasTexture} loadTexCapped 降采样纹理加载(最长边1024,带门禁与距离懒加载)
- * @property {number} OL/OR/OT/OBE/OBR 整体边界:左/右/顶(北)/展厅区南/最南
- * @property {number} WH            墙高
- * @property {number} IL/IR/IRT/IRB 回字内墙禁区边界:左/右/顶/底
+ * - s        3D 场景
+ * - cam 相机
+ * - rnd 渲染器
+ * - L        加载遮罩元素
+ * - ray  射线拾取器(点击交互用)
+ * - mP2    鼠标/触摸归一化坐标(射线拾取用)
+ * - iG  可交互对象数组(画框/图标/视频墙等)
+ * - tL 纹理加载器
+ * - loadTexCapped 降采样纹理加载(最长边1024,带门禁与距离懒加载)
+ * - OL/OR/OT/OBE/OBR 整体边界:左/右/顶(北)/展厅区南/最南
+ * - WH            墙高
+ * - IL/IR/IRT/IRB 回字内墙禁区边界:左/右/顶/底
  * @property {{mnX:number,mxX:number,mnZ:number,mxZ:number}[]} bounds 全部墙体碰撞盒(移动/传送校验用)
- * @property {number} floorW/floorD 地板宽/深
- * @property {number} bW/bD         音乐演奏器棕色地板宽/深
- * @property {number} pyrHeight     金字塔高度(烟花参照)
- * @property {Object} groundUniforms 云影地面 shader uniforms
- * @property {Object} skyUniforms   天空 shader uniforms
+ * - floorW/floorD 地板宽/深
+ * - bW/bD         音乐演奏器棕色地板宽/深
+ * - pyrHeight     金字塔高度(烟花参照)
+ * - groundUniforms 云影地面 shader uniforms
+ * - skyUniforms   天空 shader uniforms
  * @property {{l:THREE.PointLight}[]} pls 呼吸灯数组(主循环驱动明暗)
- * @property {THREE.Light} ambL/hemiL 环境光/半球光(昼夜循环调色用)
+ * - ambL/hemiL 环境光/半球光(昼夜循环调色用)
  *
  * ── 特效(core/effects-system.js 写入) ──
- * @property {function():void} updateFireworks 烟花逐帧更新(主循环调用;热模块,调用时从 ctx 现取)
- * @property {THREE.BufferAttribute} pG 漂浮粒子位置属性
- * @property {number} pC            粒子数量
+ * - updateFireworks 烟花逐帧更新(主循环调用;热模块,调用时从 ctx 现取)
+ * - pG 漂浮粒子位置属性
+ * - pC            粒子数量
  *
  * ── 媒体(scene/media.js 写入) ──
- * @property {function():void} drawMusicCanvas 2D音乐演奏器逐帧重绘
- * @property {HTMLVideoElement} vidEl/v45El 大屏1号/4·5号视频元素
- * @property {THREE.VideoTexture} vidTex/v45Tex 对应视频纹理
- * @property {THREE.Mesh} vidMesh/v45Mesh 对应视频墙网格(点击播放/暂停)
- * @property {boolean} bigScreenHold 大屏轮播闸口(三连读未签完=1号原地循环)
- * @property {function(string):void} kunlunSpeak TTS 统一入口(失败静默;/api/tts 代理)
- * @property {number} dayHour       沙漠昼夜时刻(0-24,desert.js 写入)
- * @property {Object} desert        沙漠地形接口(getH 等,desert.js 写入)
+ * - drawMusicCanvas 2D音乐演奏器逐帧重绘
+ * - vidEl/v45El 大屏1号/4·5号视频元素
+ * - vidTex/v45Tex 对应视频纹理
+ * - vidMesh/v45Mesh 对应视频墙网格(点击播放/暂停)
+ * - bigScreenHold 大屏轮播闸口(三连读未签完=1号原地循环)
+ * - kunlunSpeak TTS 统一入口(失败静默;/api/tts 代理)
+ * - dayHour       沙漠昼夜时刻(0-24,desert.js 写入)
+ * - desert        沙漠地形接口(getH 等,desert.js 写入)
  *
  * ── 户外交互(gallery/signs.js·markers.js·links.js 写入) ──
- * @property {THREE.Mesh} signMesh/mpMesh/guideMesh 牌子/音乐入口/准则卷轴
- * @property {THREE.Material} signMat/mpMat 点击闪烁材质
- * @property {Object} scrollLink    卷轴链接(redraw 改写为《元素共鸣准则》)
- * @property {function} linkGuard   外链可见性守卫(isLink2~13/isGarden,普通模式接管)
- * @property {string[]} LINK_MODEL_TYPES/MOUNTABLE_ICONS 链接模型类型表/可挂载图标表(mode.js)
- * @property {function} spawnLinkModel 链接模型生成(10 种,mode.js)
- * @property {function} trackClick  链接点击埋点(mode.js)
+ * - signMesh/mpMesh/guideMesh 牌子/音乐入口/准则卷轴
+ * - signMat/mpMat 点击闪烁材质
+ * - scrollLink    卷轴链接(redraw 改写为《元素共鸣准则》)
+ * - linkGuard   外链可见性守卫(isLink2~13/isGarden,普通模式接管)
+ * - LINK_MODEL_TYPES/MOUNTABLE_ICONS 链接模型类型表/可挂载图标表(mode.js)
+ * - spawnLinkModel 链接模型生成(10 种,mode.js)
+ * - trackClick  链接点击埋点(mode.js)
  *
  * ── 挂画(gallery/paintings.js 写入) ──
- * @property {THREE.Group[]} paintGroups 全部画框注册表(模式系统按 src 分级显隐)
- * @property {function(Intersection):void} onC3D 3D 点击处理(player.js 调用)
- * @property {function():void} zoomOut 画框缩回复位
- * @property {?THREE.Group} zG      当前放大的画框(player.js 按 Escape 时读取)
- * @property {function} hangOne     挂画(上传后新照换芯空框用)
- * @property {THREE.Material[]} houseMats/mA 房屋材质分组(housecolor.js 换色用)
+ * - paintGroups 全部画框注册表(模式系统按 src 分级显隐)
+ * - onC3D 3D 点击处理(player.js 调用)
+ * - zoomOut 画框缩回复位
+ * - zG      当前放大的画框(player.js 按 Escape 时读取)
+ * - hangOne     挂画(上传后新照换芯空框用)
+ * - houseMats/mA 房屋材质分组(housecolor.js 换色用)
  *
  * ── 玩家(scene/player.js 写入) ──
  * @property {{p:THREE.Vector3,y:number,pi:number}} pl 玩家状态:位置/偏航/俯仰
  * @property {{x:number,z:number}} jD 摇杆输入向量
- * @property {Object<string,boolean>} ks 键盘按键状态
- * @property {function(number,number,number):void} mv 玩家移动(含碰撞)
- * @property {function():void} drawMap 小地图逐帧重绘
- * @property {HTMLElement} jT/jB/aB 摇杆容器/手柄/音乐按钮
+ * - ks 键盘按键状态
+ * - mv 玩家移动(含碰撞)
+ * - drawMap 小地图逐帧重绘
+ * - jT/jB/aB 摇杆容器/手柄/音乐按钮
  *
  * ── 门禁与答题(gate/quizgate.js·quiz.js·prologue.js) ──
- * @property {boolean} quizPassed   心象共鸣通过(建筑门禁总开关)
- * @property {number} quizPassScore 分数线(服务端 QUIZ_PASS_SCORE 经 /api/quiz/state 下发,单一源)
- * @property {function} showGuideCard 初见指引卡(main.js)
+ * - quizPassed   心象共鸣通过(建筑门禁总开关)
+ * - quizPassScore 分数线(服务端 QUIZ_PASS_SCORE 经 /api/quiz/state 下发,单一源)
+ * - showGuideCard 初见指引卡(main.js)
  *
  * ── 展示区模式(gallery/mode.js) ──
- * @property {'normal'|'special'} siteMode 展示模式
- * @property {string[]} demoPhotos/myUploads/myLinks/customLinks 站点配置下发名单
- * @property {Object} myUploadTokens/myCaptions 媒体令牌/AI 配文
- * @property {function():void} applyPaintMode/applyMode/refreshMode 模式重算入口
- * @property {?function(string):boolean} texAllowed 纹理门禁(普通模式拦图库;medirules.mjs 决策表)
- * @property {function(string):void} modeToast 轻提示统一入口(反馈文案唯一通道)
- * @property {string} viewMode      视角模式(player.js 写入)
- * @property {function} openUpload/openHouseColor 上传面板/换色面板入口(upload.js/housecolor.js)
+ * - siteMode 展示模式
+ * - demoPhotos/myUploads/myLinks/customLinks 站点配置下发名单
+ * - myUploadTokens/myCaptions 媒体令牌/AI 配文
+ * - applyPaintMode/applyMode/refreshMode 模式重算入口
+ * - texAllowed 纹理门禁(普通模式拦图库;medirules.mjs 决策表)
+ * - modeToast 轻提示统一入口(反馈文案唯一通道)
+ * - viewMode      视角模式(player.js 写入)
+ * - openUpload/openHouseColor 上传面板/换色面板入口(upload.js/housecolor.js)
  *
  * ── 天穹与灵蕴(kunlun/* 神话层) ──
- * @property {function():number} spiritsGot/isDone 灵蕴收集数/是否集齐(spirits.js)
- * @property {Object[]} spiritsState 灵蕴状态表(设置页罗盘渲染用)
- * @property {string[]} spiritsTTS 灵蕴文案(finale.js 灵蕴归位播报)
- * @property {function} spiritMark  当前灵蕴目标坐标(小地图金点)
- * @property {function} checkSkyMs  天穹里程碑检测(settings.js)
- * @property {function} fadeTeleport 传送过渡遮罩(传送/回家共用)
+ * - spiritsGot/isDone 灵蕴收集数/是否集齐(spirits.js)
+ * - spiritsState 灵蕴状态表(设置页罗盘渲染用)
+ * - spiritsTTS 灵蕴文案(finale.js 灵蕴归位播报)
+ * - spiritMark  当前灵蕴目标坐标(小地图金点)
+ * - checkSkyMs  天穹里程碑检测(settings.js)
+ * - fadeTeleport 传送过渡遮罩(传送/回家共用)
  *
  * ── 永恒展厅与飞舟(kunlun/eternal.js·ark.js 等) ──
- * @property {Object} eternalHandlers 高空交互分发表(各模块自注册 action→fn)
- * @property {function} eternalClick/eternalTeleport/eternalWelcome 金门点击/传送/欢迎
- * @property {function} eternalKeepOut/groundOverride 小地图禁区/厅内地面覆盖(player.js 钩子)
- * @property {HTMLVideoElement} peakVidEl 昆仑巅彩蛋视频(peaks.js)
- * @property {boolean} flightLock   飞行期总锁(位移/海拔触发类功能必须先查,ark.js)
- * @property {function} arkTeleportToPeak 罗盘传送山巅登舟点(ark.js)
- * @property {Object} flyAudio      飞行音效(ark.js)
- * @property {function} letgoRecall 放下画作召回(letgo.js)
+ * - eternalHandlers 高空交互分发表(各模块自注册 action→fn)
+ * - eternalClick/eternalTeleport/eternalWelcome 金门点击/传送/欢迎
+ * - eternalKeepOut/groundOverride 小地图禁区/厅内地面覆盖(player.js 钩子)
+ * - peakVidEl 昆仑巅彩蛋视频(peaks.js)
+ * - flightLock   飞行期总锁(位移/海拔触发类功能必须先查,ark.js)
+ * - arkTeleportToPeak 罗盘传送山巅登舟点(ark.js)
+ * - flyAudio      飞行音效(ark.js)
+ * - letgoRecall 放下画作召回(letgo.js)
  *
  * ── 冷核心深模块(2026-07-28 架构深化) ──
- * @property {Object} overlay       弹层注册处(src/ui/overlay.js):register/anyOpen/isUiTouch
- * @property {Object} store         存档登记处(src/state/store.js):num/str/json/flag/getSpirits…
- * @property {Object} avatar        头像/入场动画(若非上列归属)
+ * - overlay       弹层注册处(src/ui/overlay.js):register/anyOpen/isUiTouch
+ * - store         存档登记处(src/state/store.js):num/str/json/flag/getSpirits…
+ * - avatar        头像/入场动画(若非上列归属)
  */
 
 /** @type {import('../types/ctx').GalleryCtx} */
-export const ctx = {};
+export const ctx = /** @type {import('../types/ctx').GalleryCtx} */ ({});
 // 诊断钩子:探针脚本读取运行时状态(quizPassed/store/overlay 等)用
 if (typeof window !== 'undefined') window.__ctx = ctx;
 
