@@ -5,13 +5,13 @@
 //   3. 强信号踢出命中:上报时服务端发现本机命中"已踢出"档案 → 自动跳申请页(防清 Cookie 绕过)
 //   4. SSE 监听 /api/entry/watch:被踢出时立即弹回申请页
 // 均为无感操作,不阻塞游戏加载。
+import { storeApi } from './state/store-api.js';
+
 (function () {
   'use strict';
 
-  // ---------- 持久 ID(三处冗余) ----------
-  const LS_KEY = '_galDevId';
-  var localId = '';
-  try { localId = localStorage.getItem(LS_KEY) || ''; } catch (e) {}
+  // ---------- 持久 ID(三处冗余;localStorage 副本经 store 唯一入口,SCHEMA: devId) ----------
+  var localId = storeApi.str('devId');
   if (!localId) {
     try {
       var m = document.cookie.match(/(?:^|;\s*)_galDevId=([^;]+)/);
@@ -22,7 +22,7 @@
     localId = Math.random().toString(36).slice(2) + Date.now().toString(36);
   }
   // 写回三处(每次都写,修复丢失的副本)
-  try { localStorage.setItem(LS_KEY, localId); } catch (e) {}
+  storeApi.setStr('devId', localId);
   try {
     document.cookie = '_galDevId=' + localId + '; Path=/; Max-Age=31536000; SameSite=Lax';
   } catch (e) {}

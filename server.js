@@ -32,33 +32,7 @@ const { entryGate } = require('./lib/gate');
 const { serveStatic } = require('./lib/files');
 const { dispatch } = require('./lib/routes');
 const { canServeMedia } = require('./lib/siteconfig');
-const cacheBust = require('./lib/cache-bust'); // 一次性强制刷新(2026-08-31)
-
-// 公开静态黑名单:点文件、后端目录、私钥/脚本/文档、数据库与清单文件
-// 根目录 .js 仅放行 data.js/sw.js(前端 ESM 需要),其余根级 js 均为后端/工具脚本
-// src/ 与 vendor/ 目录(可读源码):公网一律 404,仅 localhost 放行(本地开发/test-mobile 依赖)
-// scripts/ 目录(测试/探针/生成器):公网一律 404
-function staticDenied(rel, req) {
-  const seg = rel.split('/');
-  const base = seg[seg.length - 1];
-  if (base.startsWith('.')) return true;
-  // 任意路径段以点开头(如 .docs-bak/ 隐藏目录)与敏感后缀一律拒绝(2026-08-31 审计:client_errors.json 曾公网可下载)
-  if (seg.some((x) => x.startsWith('.'))) return true;
-  if (/\.(bak|cjs)$/.test(base)) return true;
-  if (['lib', 'node_modules', 'origin', 'tools', 'questions', 'scripts', 'dist'].includes(seg[0])) return true;
-  if (seg[0] === 'src' || seg[0] === 'vendor') {
-    // 放行 Three.js 加载器依赖(浏览器 importmap 路径)
-    if (rel.startsWith('vendor/examples/jsm/')) return false;
-    const host = String(req && req.headers && req.headers.host || '');
-    if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return true;
-  }
-  if (/\.(pem|bat|sh|md|log)$/.test(base)) return true;
-  if (['gate_data.json', 'package.json', 'package-lock.json', 'admin.html', 'docs.html'].includes(base)) return true;
-  // 根目录 .json(客户端报错日志等)一律不服务
-  if (seg.length === 1 && base.endsWith('.json')) return true;
-  if (seg.length === 1 && base.endsWith('.js') && !['data.js', 'sw.js'].includes(base)) return true;
-  return false;
-}
+const { staticDenied, applySecurityHeaders, mediaGate, serveEntryHtml } = require('./lib/security');
 
 const handler = (req, res) => {
   const u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
@@ -70,42 +44,7 @@ const handler = (req, res) => {
   if (pathname.includes('\\')) { sendJson(res, 404, { error: 'Not Found' }); return; }
   const query = Object.fromEntries(u.searchParams);
 
-  // ===================== 全局安全头(2026-08-22 大厂标准) =====================
-  // CSP: 限制脚本/样式/图片/连接来源,防止 XSS 和数据注入
-  // CORS: 仅允许 cloudbear.cloud + localhost(开发),不再默认 *
-  const isLocal = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(String(req.headers.host || ''));
-  if (isLocal) {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-  } else {
-    res.setHeader('Access-Control-Allow-Origin', 'https://cloudbear.cloud');
-  }
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
-  // CSP: 允许内联脚本(页面内 <script>)、blob URL(视频)、data URL(图片)
-  // 不允许 eval、外部脚本域(除 Three.js CDN 备份)、外部样式域
-  // 2026-08-29:放行 Google Fonts(官网落地页用 Noto Serif SC,Preloader 等待 document.fonts.ready,
-  //   不放行会导致页面永远停在渐变 Preloader 而不显示内容)
-  res.setHeader(
-    'Content-Security-Policy',
-    [
-      "default-src 'self'",
-      // 2026-08-30:放行 Cloudflare Web Analytics(beacon.min.js)。
-      //   CF 反代会自动向所有页面注入该统计脚本,不放行 script-src 会在浏览器控制台
-      //   与 #errTrap(左下角错误陷阱)刷"加载失败 @ beacon.min.js",移动端已累计 94 次。
-      //   上报端点是 cloudflareinsights.com(非 static 子域),需同时放行 connect-src。
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://static.cloudflareinsights.com",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "img-src 'self' data: blob: https:",
-      "media-src 'self' blob: https:",
-      // blob: 必需 —— GLTFLoader 把 GLB 内嵌贴图转成 blob: URL 后再 fetch,
-      //   不放行会报 "Couldn't load texture blob:...",角色变成无贴图白模
-      "connect-src 'self' blob: data: https://cloudbear.cloud https://cdn.cloudbear.cloud https://cloudflareinsights.com",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      "object-src 'none'",
-      "frame-ancestors 'self'",
-    ].join('; ')
-  );
+  applySecurityHeaders(req, res); // CSP/CORS/nosniff 等(2026-09-18 下沉 lib/security)
 
   // CORS 预检(CORS_ORIGIN 可配,默认 *;收紧后台跨域时设环境变量即可,不硬编码)
   if (req.method === 'OPTIONS') {
@@ -134,14 +73,7 @@ const handler = (req, res) => {
   let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   // 官网落地页子目录回落(2026-08-29):/landing 与 /landing/ → /landing/index.html
   if (rel === 'landing' || rel === 'landing/') rel = 'landing/index.html';
-  // 媒体文件级门禁(2026-07-26):普通用户仅演示照片/白板/户外大屏/本人上传,其余 403
-  const mediaMatch = rel.match(/^(photos|videos)\/(.+)$/);
-  if (mediaMatch) {
-    if (!canServeMedia(req, mediaMatch[1], mediaMatch[2])) {
-      sendJson(res, 403, { error: '无权访问该文件' });
-      return;
-    }
-  }
+  if (!mediaGate(req, res, rel)) return; // 媒体门禁(2026-09-18 下沉 lib/security)
   // 敏感文件黑名单(2026-07-26):.env/gate_data.json/origin 私钥/题库/后端源码等一律 404
   // 注意:/admin 与 /admin-media 走独立 token 通道,不经过这里,不受影响
   if (staticDenied(rel, req)) {
@@ -153,33 +85,7 @@ const handler = (req, res) => {
     sendJson(res, 403, { error: '禁止访问' });
     return;
   }
-  // 一次性强制刷新(2026-08-31 主人定:只刷一遍,以现在为时间起点):
-  //   入口 HTML 读盘后在 </head> 前注入一次性脚本 → 每个浏览器首次进入清 Cache Storage + 强制 reload。
-  //   HTML 本身 no-store,避免 Cloudflare/浏览器把带脚本的页面缓存成"永久刷新循环"。
-  //   注入窗口过后(cached-bust.js 的 INJECT_UNTIL)自动停止,代码留着无害。
-  //   SMOKE=1(CI 冒烟)跳过注入:强刷 reload 会中止无头浏览器首轮全部模块请求。
-  if (
-    (rel === 'index.html' || rel === 'landing/index.html') &&
-    process.env.SMOKE !== '1' &&
-    cacheBust.shouldInject()
-  ) {
-    try {
-      let html = fs.readFileSync(filePath, 'utf8');
-      html = html.includes('</head>')
-        ? html.replace('</head>', cacheBust.injectScript() + '</head>')
-        : cacheBust.injectScript() + html;
-      res.writeHead(200, {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Cache-Control': 'no-store, must-revalidate',
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'no-referrer',
-      });
-      res.end(html);
-      return;
-    } catch (e) {
-      console.error('[cache-bust] 注入失败,回落常规静态服务:', e && (e.message || e));
-    }
-  }
+  if (serveEntryHtml(rel, res, filePath)) return; // 一次性强刷注入(2026-09-18 下沉 lib/security)
   serveStatic(req, res, filePath);
 };
 

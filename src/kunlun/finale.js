@@ -4,6 +4,7 @@
 // ③星屑归位:六墙印记点击重听星屑 TTS;全部点过→六色闪光+「六颗藏梦人·雅号」+自动冠前缀
 // 零 PointLight;DOM 弹层守三铁律(投影:✕跳过/点击即走/仅播放期存在)
 import * as THREE from 'three';
+import { Z } from '../shared/z-layers.mjs';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
 import { bigText } from '../ui/kit.js';
@@ -86,7 +87,7 @@ function playProjection(){
   if(projBusy)return;projBusy=true;
   const src=oldestSrc();
   const ov=document.createElement('div');
-  ov.style.cssText='position:fixed;inset:0;z-index:393;background:rgba(10,8,14,0.78);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .8s;cursor:pointer';
+  ov.style.cssText='position:fixed;inset:0;z-index:'+Z.finaleBase+';background:rgba(10,8,14,0.78);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .8s;cursor:pointer';
   const card=document.createElement('div');
   card.style.cssText='max-width:82vw;text-align:center;opacity:0;transition:opacity .6s;filter:drop-shadow(0 0 24px rgba(255,220,160,.35))';
   ov.appendChild(card);document.body.appendChild(ov);
@@ -158,7 +159,7 @@ function finale(){
   ctx.store.mark('marksDone');
   // 六色闪光
   const fl=document.createElement('div');
-  fl.style.cssText='position:fixed;inset:0;z-index:394;pointer-events:none;opacity:0;transition:opacity .3s;background:conic-gradient(#7ddb7a,#ff5a4a,#e8a03c,#dfeaf5,#7cc8e8,#f0a860,#7ddb7a)';
+  fl.style.cssText='position:fixed;inset:0;z-index:'+Z.finaleMid+';pointer-events:none;opacity:0;transition:opacity .3s;background:conic-gradient(#7ddb7a,#ff5a4a,#e8a03c,#dfeaf5,#7cc8e8,#f0a860,#7ddb7a)';
   document.body.appendChild(fl);
   requestAnimationFrame(()=>{fl.style.opacity='0.85';});
   setTimeout(()=>{fl.style.transition='opacity 1.2s';fl.style.opacity='0';setTimeout(()=>fl.remove(),1300);},900);
@@ -178,7 +179,7 @@ function finale(){
 function showTitleCard(nick){
   const d=document.createElement('div');
   d.id='titleCardOv';
-  d.style.cssText='position:fixed;inset:0;z-index:396;display:flex;align-items:center;justify-content:center;background:rgba(10,6,14,.55)';
+  d.style.cssText='position:fixed;inset:0;z-index:'+Z.finaleTop+';display:flex;align-items:center;justify-content:center;background:rgba(10,6,14,.55)';
   d.innerHTML='<style>@keyframes tcSpin{to{transform:rotate(360deg)}}</style>'
     +'<div style="position:relative;max-width:88vw;text-align:center;padding:38px 42px 26px;border-radius:22px;overflow:hidden;background:linear-gradient(160deg,rgba(40,26,34,.97),rgba(26,16,28,.97));border:1px solid rgba(255,214,170,.45);box-shadow:0 20px 70px rgba(0,0,0,.6)">'
     +'<div style="position:absolute;inset:-45%;background:conic-gradient(#7ddb7a,#ff5a4a,#e8a03c,#dfeaf5,#7cc8e8,#f0a860,#7ddb7a);opacity:.15;animation:tcSpin 14s linear infinite"></div>'

@@ -11,6 +11,14 @@ import { Z } from '../shared/z-layers.mjs';
 import { GLOBAL, tt } from '../shared/story-text.mjs';
 import { makeLangToggle } from '../ui/lang-toggle.js';
 
+// 三连协议会话签名(2026-09-18 自 main.js 外迁):闸门 60s 超时/初始化失败时放行用。
+// 会话级键不进 store(存档规矩:sessionStorage 不登记)。
+export function signAllConsents() {
+  sessionStorage.setItem('agreementConsented', '1');
+  sessionStorage.setItem('privacyConsented', '1');
+  sessionStorage.setItem('communityConsented', '1');
+}
+
 export function setupEntryGate(opts) {
   opts = opts || {};
   // 审计 P1-R2:引导期 60s 超时已放行的话,迟到的闸门不再构建

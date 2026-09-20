@@ -166,7 +166,7 @@ ctx.kunlun.letgoRecall=function(name){
 
 // ===================== 长按 3s(环形进度条+边缘变暗;拖拽/松手取消;仅厅内,正放大时不可) =====================
 const ring=document.createElement('div');
-ring.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:76px;height:76px;border-radius:50%;z-index:392;display:none;pointer-events:none';
+ring.style.cssText='position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:76px;height:76px;border-radius:50%;z-index:'+Z.letgoVeil+';display:none;pointer-events:none';
 const ringHole=document.createElement('div');
 ringHole.style.cssText='position:absolute;inset:9px;border-radius:50%;background:rgba(20,12,8,0.85);display:flex;align-items:center;justify-content:center;color:#ffe9c4;font-size:11px;letter-spacing:1px';
 ringHole.textContent='放下';

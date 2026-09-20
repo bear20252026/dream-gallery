@@ -6,6 +6,7 @@
 // 加载策略:世界模型第一次进入时按需加载(带进度遮罩),之后常驻 visible 切换,切换瞬时
 // 接入:画廊南通道 (6, 26) 放发光门框,走近 2.5m 自动触发 enterHall
 import * as THREE from 'three';
+import { Z } from '../shared/z-layers.mjs';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
@@ -43,7 +44,7 @@ function showMask(name) {
   if (!maskEl) {
     maskEl = document.createElement('div');
     maskEl.style.cssText =
-      'position:fixed;inset:0;z-index:9000;background:#0d0a12;color:#ffe2c4;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:15px;letter-spacing:2px';
+      'position:fixed;inset:0;z-index:'+Z.museumOv+';background:#0d0a12;color:#ffe2c4;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:15px;letter-spacing:2px';
     maskEl.innerHTML =
       '<div id="_mzName" style="font-size:22px;font-weight:700;margin-bottom:14px"></div>' +
       '<div style="width:260px;height:8px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden"><div id="_mzBar" style="width:0%;height:100%;background:linear-gradient(90deg,#ff9a9e,#fecfef);transition:width .2s"></div></div>' +

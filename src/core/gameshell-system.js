@@ -271,8 +271,8 @@ questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 
         if (prevKunlunSpeak) { try { prevKunlunSpeak(text, voice); } catch (e) {} }
         dialogApi.open({ speaker: dialogApi.speakerFor(voice), lines: [text], autoHide: 9000 });
       };
-      ctx.openDialog = dialogApi.open;
-      ctx.dialogOpen = dialogApi.isOpen; // 剧本链心跳守护用:对话框是否开着
+      ctx.ui.openDialog = dialogApi.open; // 剧本链统一入口(2026-09-18 收编;扁平读 ctx.openDialog 仍等价)
+      ctx.ui.dialogOpen = dialogApi.isOpen; // 剧本链心跳守护用:对话框是否开着
     },
     update(dt) {
       acc += dt;

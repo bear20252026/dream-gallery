@@ -801,4 +801,4 @@ setInterval(function () {
 }, 500);
 
 Object.assign(ctx.gallery, { onC3D, zoomOut });
-ctx.zoomIn = zoomIn; // 命名空间注册(zoomIn 仅本模块外用潜力,暂留扁平)
+ctx.gallery.zoomIn = zoomIn; // 2026-09-18 收编登记册

@@ -811,8 +811,7 @@
         ck.onchange = syncBtn;
         ok.onclick = function () {
           if (!ck.checked) return;
-          localStorage.setItem('consentDone', '1');
-          enterGallery();
+          enterGallery(); // (2026-09-18 审计)consentDone 死写入删除:全仓无读者,同意态由 sessionStorage communityConsented 管理
         };
         exitBtn.onclick = function () {
           if (window.parent && window.parent.setPanelLock) window.parent.setPanelLock(false);

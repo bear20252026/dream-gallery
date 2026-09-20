@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { bigText } from '../ui/kit.js';
+import { Z } from '../shared/z-layers.mjs';
 import { chime as blipChime } from '../shared/audio-blip.js';
 const bag = hotBegin('spirits');
 const { s, onTick } = ctx;
@@ -261,7 +262,7 @@ function placePillar(i) {
 // ===================== 反馈:边缘色光 + 水晶叮声(音高逐颗上行) =====================
 function edgeFlash(color) {
   const d = document.createElement('div');
-  d.style.cssText = `position:fixed;inset:0;z-index:388;pointer-events:none;box-shadow:inset 0 0 120px 30px ${color};opacity:0;transition:opacity .4s`;
+  d.style.cssText = `position:fixed;inset:0;z-index:${Z.spiritFx};pointer-events:none;box-shadow:inset 0 0 120px 30px ${color};opacity:0;transition:opacity .4s`;
   document.body.appendChild(d);
   requestAnimationFrame(() => {
     d.style.opacity = '0.9';

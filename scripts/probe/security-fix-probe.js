@@ -50,9 +50,11 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
     body: fs.readFileSync(path.join(ROOT,'.audit-tmp.svg')),
   });
   ok(up.status === 400, 'SVG 上传被拒(白名单已移除 svg) ' + up.status);
-  const filesSrc = fs.readFileSync(path.join(ROOT, 'lib', 'files.js'), 'utf8');
+  // 2026-09-18 files.js 拆分:白名单在 files-upload.js,SVG CSP 兜底在 files-static.js(门面 files.js 仅聚合)
+  const filesSrc = fs.readFileSync(path.join(ROOT, 'lib', 'files-upload.js'), 'utf8');
+  const filesStaticSrc = fs.readFileSync(path.join(ROOT, 'lib', 'files-static.js'), 'utf8');
   ok(!/PUBLIC_IMG_EXT[\s\S]{0,300}?\.svg/.test(filesSrc), 'PUBLIC_IMG_EXT 白名单不含 .svg');
-  ok(filesSrc.includes("script-src 'none'"), '存量 SVG 仍有 CSP script-src none 兜底');
+  ok(filesStaticSrc.includes("script-src 'none'"), '存量 SVG 仍有 CSP script-src none 兜底(-files-static)');
 
   // [2] HTML 安全头
   const idx = await fetch(B + '/index.html');

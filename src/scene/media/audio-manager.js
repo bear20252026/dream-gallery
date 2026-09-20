@@ -51,15 +51,10 @@ let welcomeSpokenThisPage = false;
 document.addEventListener('click', function () {
   if (welcomeSpokenThisPage) return;
   welcomeSpokenThisPage = true;
-  let last = 0;
-  try {
-    last = parseInt(localStorage.getItem('kunlunWelcomed') || '0', 10) || 0;
-  } catch (e) {}
+  const last = ctx.store.num('welcomed'); // 存档唯一入口(store SCHEMA: welcomed)
   const now = Date.now();
   if (now - last < 24 * 3600 * 1000) return; // 24 小时内已欢迎过,不再播
-  try {
-    localStorage.setItem('kunlunWelcomed', String(now));
-  } catch (e) {}
+  ctx.store.setNum('welcomed', now);
   // 用 click 而非 pointerdown,避免消费手势导致画廊音乐 play() 被拦截
   ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('Welcome to B612 — a gallery for unfinished drawings.');
 });

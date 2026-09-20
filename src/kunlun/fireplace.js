@@ -3,6 +3,7 @@
 // 靠近 1.5m:火焰增亮 + 屏幕暖色晕;点击壁炉:火焰依次染六灵蕴色(5s 复原,替代设计稿的拖拽灵蕴)
 // 首次点击 TTS「夏炽之焰点燃了这面壁炉……」
 import * as THREE from 'three';
+import { Z } from '../shared/z-layers.mjs';
 import {ctx} from '../ctx.js';
 import {hotBegin,hotEnd} from '../hot.js';
 const bag=hotBegin('fireplace');
@@ -100,7 +101,7 @@ ctx.kunlun.eternalHandlers.fireplace=function(){
 
 // ===================== 屏幕暖色晕(靠近时) =====================
 const vign=document.createElement('div');
-vign.style.cssText='position:fixed;inset:0;z-index:384;pointer-events:none;box-shadow:inset 0 0 130px 24px rgba(255,150,60,0.22);opacity:0;transition:opacity .6s';
+vign.style.cssText='position:fixed;inset:0;z-index:'+Z.fireplaceUi+';pointer-events:none;box-shadow:inset 0 0 130px 24px rgba(255,150,60,0.22);opacity:0;transition:opacity .6s';
 document.body.appendChild(vign);
 
 // ===================== 主循环:火焰/火星/辉光/靠近感应(300ms 节流) =====================

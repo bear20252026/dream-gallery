@@ -80,6 +80,6 @@ async function playGalleryAudio(i) {
 }
 
 // 导出:供 video-wall.js 串行序列调用
-ctx.playGalleryAudio = playGalleryAudio;
+ctx.media.playGalleryAudio = playGalleryAudio; // 2026-09-18 收编登记册
 
 export { playGalleryAudio };

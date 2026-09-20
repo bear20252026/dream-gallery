@@ -216,14 +216,11 @@ function applyMode(){
   applyTexGate();
   // 卷轴文案
   if(ctx.media.scrollLink&&ctx.media.scrollLink.redraw){
-    if(ctx.mode.siteMode==='normal')ctx.media.scrollLink.redraw('元素共鸣准则','点击阅读');
-    else ctx.media.scrollLink.redraw('了解更多','Click to Open');
+    ctx.media.scrollLink.redraw('元素共鸣准则','点击阅读'); // 特殊模式已删(2026-09-06),恒普通模式文案
   }
-  // 坐标绿条:?debug 或 特殊模式才显示(2026-07-25 主人定)
+  // 坐标绿条:?debug 才显示(特殊模式已删)
   const posEl=document.getElementById('posD');
-  if(posEl)posEl.style.display=(ctx.mode.siteMode==='special'||location.search.includes('debug'))?'block':'none';
-  // 奕彤爱心:普通模式隐藏,特殊模式展现
-  if(ctx.media.ytHeart)ctx.media.ytHeart.visible=ctx.mode.siteMode==='special';
+  if(posEl)posEl.style.display=location.search.includes('debug')?'block':'none';
   renderCustomLinks();
 }
 ctx.mode.applyMode=applyMode;

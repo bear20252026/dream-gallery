@@ -8,6 +8,7 @@
 // 完成条件:四站全走完 → 白光收回 → 发 'story:page1done' 回黑夜现实。
 // 艺术基调:回忆层整体比现实层暖一度——记忆是发光的。
 import * as THREE from 'three';
+import { Z } from '../shared/z-layers.mjs';
 import { ctx } from '../ctx.js';
 import { SCENE3, SCENE4, tt, whoSpk } from '../shared/story-text.mjs';
 
@@ -225,7 +226,7 @@ function checkCompletion() {
   exitStarted = true;
   const veil = document.createElement('div');
   veil.style.cssText =
-    'position:fixed;inset:0;z-index:560;background:#f8f1df;opacity:0;transition:opacity 1.6s ease;pointer-events:none';
+    'position:fixed;inset:0;z-index:'+Z.storyVeil+';background:#f8f1df;opacity:0;transition:opacity 1.6s ease;pointer-events:none';
   document.body.appendChild(veil);
   requestAnimationFrame(function () {
     veil.style.opacity = '1';

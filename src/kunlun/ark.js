@@ -5,6 +5,7 @@
 // 之后罗盘「✦ 六星屑」页可传送往返(返回展厅 / 山巅登舟);重登飞舟可再飞一遍
 // 手机灯光账户:全船零 PointLight——发光件全部 MeshBasicMaterial;粒子单套 Points 复用
 import * as THREE from 'three';
+import { Z } from '../shared/z-layers.mjs';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
@@ -410,7 +411,7 @@ s.add(flightPts);
 const chime = (i) => blipChime([659, 698, 784, 880, 988, 1047][i] || 880);
 const tintOv = document.createElement('div');
 tintOv.style.cssText =
-  'position:fixed;inset:0;z-index:385;pointer-events:none;opacity:0;transition:opacity 1.2s';
+  'position:fixed;inset:0;z-index:'+Z.arkHud+';pointer-events:none;opacity:0;transition:opacity 1.2s';
 document.body.appendChild(tintOv);
 
 // ===================== 自由飞(飞机骨·2026-07-27:首飞后再登舟进入;配方来自两套飞机参考码,温和无失速) =====================

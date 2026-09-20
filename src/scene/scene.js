@@ -1049,4 +1049,4 @@ Object.assign(ctx.scene, {
   hemiL,
 });
 ctx.gallery.houseMats = houseMats;
-ctx.setTime = setTime; // 未映射属性,保持扁平
+ctx.scene.setTime = setTime; // 2026-09-18 收编登记册

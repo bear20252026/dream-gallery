@@ -1,4 +1,4 @@
-// media-rules-probe.js — 媒体可见性决策表(shared/mediarules.cjs)实机验收(2026-07-28 架构深化④)
+// media-rules-probe.js — 媒体可见性决策表(src/shared/mediarules.mjs)实机验收(2026-07-28 架构深化④)
 // 断言:普通模式=演示上墙/图库框留内容拿掉/他人整框隐藏;切特殊模式=演示下墙/图库全展示;全程无 pageerror
 // 用法: node scripts/probe/media-rules-probe.js
 const { spawn } = require('child_process');

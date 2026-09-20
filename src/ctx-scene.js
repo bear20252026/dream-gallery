@@ -12,7 +12,7 @@ import { eventBus } from './event-bus.js';
  * @returns {Object} 场景命名空间代理对象
  */
 export function createSceneNamespace(vault) {
-  const properties = [
+  const properties = ['loopManager', 'setLowQuality', 'startWorld', 'setTime',
     's',
     'cam',
     'rnd',

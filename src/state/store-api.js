@@ -3,7 +3,7 @@
 // 也能复用同一套存档语义,而不必把整个 ctx.js(GameLoop/实体注册表/输入管理器/8 个命名空间)
 // 拖进轻量页面。store.js 仅负责把本 api 挂到 ctx.ui.store。
 //
-// 深模块:24+ 把 localStorage 钥匙在此登记造册(SCHEMA),键名字符串只出现在本文件。
+// 深模块:41 把 localStorage 钥匙在此登记造册(SCHEMA),键名字符串只出现在本文件。
 // 接口只有 11 个入口:num/setNum · str/setStr · json/setJson · flag/mark · getSpirits/addSpirit ·
 //   houseColor/setHouseColor/clearHouseColor —— 类型转换、默认值、旧档迁移、异常兜底全部藏里面。
 // 铁律:行为与旧直写 localStorage 逐点对齐——
@@ -56,11 +56,15 @@ const SCHEMA = {
   chimeTts: { key: 'chimeTts', type: 'flag' },
   arkFlew: { key: 'arkFlew', type: 'flag' }, // 飞舟首飞完成(之后登舟直接自由飞)
   arkFFSeen: { key: 'arkFFSeen', type: 'flag' }, // 自由飞教学已播
-  prologueDone: { key: 'kunlunPrologueDone', type: 'flag' }, // 序章已播(首访判定)
   gateEntered: { key: 'b612GateEntered', type: 'flag' }, // 入口闸门已进过(2026-09-05:进过即永不再见闸门)
   planetsChapter: { key: 'b612PlanetChapter', type: 'num' }, // B612 六星章节进度(0..6,2026-09-05)
   genderSelected: { key: 'genderSelected', type: 'flag' }, // 性别选择已完成
   gender: { key: 'gender', type: 'str' }, // 性别(male/female)
+  welcomed: { key: 'kunlunWelcomed', type: 'num' }, // 首点欢迎词 24h 节流时间戳(audio-manager)
+  devId: { key: '_galDevId', type: 'str' }, // 访客设备 ID(visitor-fp 三重冗余之 localStorage 副本)
+  // —— 独立子页/开机迁移豁免(键已登记;写入方无法加载 ctx.store,见各自注释) ——
+  musicHistory: { key: 'musicHistory', type: 'json' }, // 音乐子页播放历史(music.html 经典脚本内联 onclick 依赖,不改模块)
+  kunlunVer: { key: 'kunlunVer', type: 'str' }, // 存档版本迁移标记(index.html 开机块写入,先于一切模块)
 };
 function entry(name) {
   const e = SCHEMA[name];
@@ -117,8 +121,9 @@ export const storeApi = {
     rawSet(entry(name).key, '1');
   },
   unmark(name) {
+    const k = entry(name).key; // 未登记即抛(与 num/str 同语义)
     try {
-      localStorage.removeItem(entry(name).key);
+      localStorage.removeItem(k);
     } catch (e) {}
   },
   // —— 灵蕴库存(含旧档迁移,迁移逻辑从 spirits.js 收编于此) ——

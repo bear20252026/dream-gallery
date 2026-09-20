@@ -317,7 +317,8 @@ function triggerSequence() {
 }
 
 // 供 prologue.js 调用（在用户点"我愿意"后调用，确保在用户手势回调链内）
-ctx.startVidSeq = triggerSequence;
+ctx.media.startVidSeq = triggerSequence; // 2026-09-18 收编登记册
+
 
 // 用户点击页面兜底重试(仅序列已启动后生效;协议/序章阶段 sequenceTriggered=false 不触发)
 document.addEventListener('click', function () {

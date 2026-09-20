@@ -224,8 +224,7 @@ function setupModel(gltf) {
   setTimeout(clearStatus, 5000);
 
   // 注册帧 tick:推进 mixer 并按移动状态调速
-  ctx._avatarTick = avatarTick;
-  ctx.onTick(ctx._avatarTick);
+  ctx.onTick(avatarTick); // 2026-09-18:tick 自产自销,不再挂 ctx(审计 M3)
 }
 
 // ===================== 行走状态 =====================

@@ -6,7 +6,7 @@ export function bigText(text, opts) {
   const { hold = 1800, after = null, small = false } = opts || {};
   const d = document.createElement('div');
   d.style.cssText =
-    'position:fixed;inset:0;z-index:389;display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
+    'position:fixed;inset:0;z-index:'+Z.kitBase+';display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
   const inner = document.createElement('div');
   inner.style.cssText =
     (small

@@ -31,13 +31,12 @@
         });
       }
       // ===================== 版本迁移 v8(2026-07-31):所有用户回归最初状态 =====================
-      // 必须在模块加载前执行(prologue.js 会读 prologueDone 决定走新老用户分支)
+      // 必须在模块加载前执行(性别存档迁移清理;原序章分支已随 openfilm 收敛删除)
       // 强制清除序章完成标记 + 性别选择标记 → 新老访客统一重走序章和性别选择
       // 只执行一次(写入 kunlunVer=v8 后不再清),之后正常缓存
       (function () {
         try {
           if (localStorage.getItem('kunlunVer') !== 'v8') {
-            localStorage.removeItem('kunlunPrologueDone'); // 重新走序章
             localStorage.removeItem('genderSelected'); // 重新选性别
             localStorage.removeItem('gender'); // 清除性别存档
             localStorage.setItem('kunlunVer', 'v8');

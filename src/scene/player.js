@@ -12,7 +12,7 @@ import { StateMachine } from '../player/StateMachine.js';
 import { IdleState } from '../player/states/PlayerStates.js';
 import { resolveMove } from './collision-resolve.js'; // 2026-08-31 水平碰撞解析(子步进+滑行,纯函数)
 const playerSM = new StateMachine();
-ctx._playerSM = playerSM; // 供外部查询当前状态
+ctx.player.playerSM = playerSM; // 供外部查询当前状态(2026-09-18 收编登记册)
 
 // ===================== 玩家 =====================
 // 出生点(2026-09-07 主人定:迁至坠机残骸旁——石门南侧沙漠洼地,残骸与王子出场见 gallery/crash-site.js)
@@ -262,7 +262,7 @@ document.addEventListener('keyup', (e) => {
 // 现在拖拽=环绕相机(yaw 360° 自由 + pitch 大范围),滚轮/双指=拉远拉近;
 // 角色自身朝向由 loop-manager 平滑转向实际移动方向,静止时拖拽只环绕不转身。
 const orbit = { yaw: 0, pitch: ORBIT_DEFAULTS.pitch, dist: ORBIT_DEFAULTS.dist };
-ctx._orbit = orbit; // loop-manager 第三人称相机分支读取;toggleView 时初始化 yaw
+ctx.player.orbit = orbit; // loop-manager 第三人称相机分支读取;toggleView 时初始化 yaw(收编登记册)
 const PITCH_MIN = -0.6,
   PITCH_MAX = 1.25,
   DIST_MIN = 1.2,

@@ -12,7 +12,7 @@ import { eventBus } from './event-bus.js';
  * @returns {Object} 媒体命名空间代理对象
  */
 export function createMediaNamespace(vault) {
-  const properties = [
+  const properties = ['startVidSeq', 'playGalleryAudio',
     'vidEl',
     'v45El',
     'vidTex',
@@ -32,7 +32,6 @@ export function createMediaNamespace(vault) {
     'mpMesh',
     'mpMat',
     'guideMesh',
-    'ytHeart',
     'scrollLink',
     'mA',
     'audioManager',

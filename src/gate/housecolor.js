@@ -110,5 +110,33 @@ for(const [g] of GROUPS){
 }
 refreshSwatch();
 
+// 性别配色(老档案兼容;2026-09-18 自 main.js 外迁——houseMats 本归此模块,不再跨模块轮询内部结构)
+export function applyGenderColor(gender) {
+  if (gender !== 'male') return;
+  const blueHex = '#3a5a8c';
+  let tries = 0;
+  (function tryApply() {
+    tries++;
+    if (tries > 20) return;
+    if (!(ctx.gallery && ctx.gallery.houseMats && ctx.gallery.houseMats.wall)) {
+      setTimeout(tryApply, 2000);
+      return;
+    }
+    const mats = ctx.gallery.houseMats.wall;
+    try {
+      mats.forEach((m) => {
+        if (m && m.color && m.color.set) {
+          m.color.set(blueHex);
+          if (m.needsUpdate) m.needsUpdate = true;
+        }
+      });
+      if (ctx.store.setHouseColor) ctx.store.setHouseColor('wall', blueHex);
+    } catch (e) {
+      console.warn('[gender] 配色应用失败,重试:', e.message);
+      setTimeout(tryApply, 2000);
+    }
+  })();
+}
+
 hotEnd('housecolor');
 if(import.meta.hot)import.meta.hot.accept();

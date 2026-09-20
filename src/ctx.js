@@ -3,7 +3,7 @@
 // 模块加载顺序见 main.js；写入方见各字段注释。
 //
 // ===================== 总线登记册(2026-07-28 架构深化①,阶段一) =====================
-// ctx 现为全站跨模块通道(107 个映射属性已收入 7 个命名空间,见文件底部别名层)。为避免"上帝总线"继续膨胀,规矩:
+// ctx 现为全站跨模块通道(146 个映射属性已收入 7 个命名空间,见文件底部别名层;2026-09-18 收编 13 个散落扁写后核数)。为避免"上帝总线"继续膨胀,规矩:
 //   ① 新挂属性必须先在本文件的对应分组登记(写明类型/写入方/用途);
 //   ② 能收进深模块的不要挂总线——存档走 ctx.store,弹层走 ctx.overlay,媒体规则走 mediarules.mjs;
 //   ③ 分型(命名空间化)为既定方向,见 RFC-架构深化.md 候选①的阶段二/三提案。
@@ -37,7 +37,7 @@
  * @property {{l:THREE.PointLight}[]} pls 呼吸灯数组(主循环驱动明暗)
  * @property {THREE.Light} ambL/hemiL 环境光/半球光(昼夜循环调色用)
  *
- * ── 特效(scene/effects.js 写入) ──
+ * ── 特效(core/effects-system.js 写入) ──
  * @property {function():void} updateFireworks 烟花逐帧更新(主循环调用;热模块,调用时从 ctx 现取)
  * @property {THREE.BufferAttribute} pG 漂浮粒子位置属性
  * @property {number} pC            粒子数量
@@ -55,7 +55,6 @@
  * ── 户外交互(gallery/signs.js·markers.js·links.js 写入) ──
  * @property {THREE.Mesh} signMesh/mpMesh/guideMesh 牌子/音乐入口/准则卷轴
  * @property {THREE.Material} signMat/mpMat 点击闪烁材质
- * @property {THREE.Mesh} ytHeart   奕彤爱心(普通模式隐藏)
  * @property {Object} scrollLink    卷轴链接(redraw 改写为《元素共鸣准则》)
  * @property {function} linkGuard   外链可见性守卫(isLink2~13/isGarden,普通模式接管)
  * @property {string[]} LINK_MODEL_TYPES/MOUNTABLE_ICONS 链接模型类型表/可挂载图标表(mode.js)

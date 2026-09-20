@@ -33,6 +33,20 @@ export const Z = {
   teleport: 400,    // darkTeleport 传送黑幕/答题面板 #quizOv(压过一切游戏内 UI)
   worldToast: 500,  // 世界级提示条(答题门禁 toast,浮在遮罩上)
 
+  // —— 剧情与玩法浮层(2026-09-18 收编,原裸值一一对应) ——
+  storyVeil: 560,   // scene3-memory 回忆层白光收幕
+  finaleBase: 393,  // 终章层1(底)
+  finaleMid: 394,   // 终章层2
+  finaleTop: 396,   // 终章层3(顶)
+  letgoVeil: 392,   // 放下仪式暗晕
+  kitBase: 389,     // ui.kit 浮层基线(toast/条)
+  spiritFx: 388,    // 灵蕴拾取特效浮字
+  arkHud: 385,      // 飞舟 HUD
+  fireplaceUi: 384, // 壁炉交互浮层
+  skyProgress: 380, // 天穹进度全屏层
+  museumOv: 9000,   // 线下参观模式全屏罩
+  skipLink: 9999,   // 无障碍跳转链接(与 kickNotice 同档;CSS 段经注释引用)
+
   // —— 系统 ——
   kickNotice: 9999, // 被踢出通知/浮层提示(ui.kit toast、上传拖罩)
   exitFade: 99998,  // 退出告别淡出

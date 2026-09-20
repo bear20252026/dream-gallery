@@ -85,12 +85,12 @@ describe('store', () => {
 
   describe('flag / mark', () => {
     it('未标记时返回 false', () => {
-      expect(store.flag('prologueDone')).toBe(false);
+      expect(store.flag('spiritsIntro')).toBe(false);
     });
 
     it('mark 后 flag 返回 true', () => {
-      store.mark('prologueDone');
-      expect(store.flag('prologueDone')).toBe(true);
+      store.mark('spiritsIntro');
+      expect(store.flag('spiritsIntro')).toBe(true);
     });
   });
 

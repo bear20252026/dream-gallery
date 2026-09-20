@@ -7,6 +7,8 @@ import { eventBus } from './event-bus.js';
 import { EYE_HEIGHT } from './shared/constants.js';
 import { ORBIT_DEFAULTS } from './shared/constants.js';
 
+let camRig = null; // 第三人称相机推拉状态(2026-09-18 自 ctx._camRig 收编为模块局部,自产自销不上总线)
+
 /**
  * 玩家眼睛离地高度(米)——与 scene/player.js 的 `groundY(x,z) + 1.6` 保持一致。
  * pl.p.y 存的是**眼睛**高度,而第三人称角色模型的原点在**脚底**,
@@ -247,7 +249,7 @@ export class LoopManager {
       mx /= mg;
       mz /= mg;
       // 移动基准朝向:第一人称=玩家朝向 pl.y;第三人称=轨道相机朝向(所见即所往)
-      const yawSrc = ctx.player.viewMode === 1 && ctx._orbit ? ctx._orbit.yaw : pl.y;
+      const yawSrc = ctx.player.viewMode === 1 && ctx.player.orbit ? ctx.player.orbit.yaw : pl.y;
       const fx = -Math.sin(yawSrc), fz = -Math.cos(yawSrc),
             rx = Math.cos(yawSrc), rz = -Math.sin(yawSrc);
       const wx = fx * mz + rx * mx, wz = fz * mz + rz * mx;
@@ -351,7 +353,7 @@ export class LoopManager {
       // 相机只拥有"臂长 curDist"一个量 —— 碰撞立即收缩,畅通后指数弹回;
       // 用户缩放意图 ob.dist 永不被污染(收缩量不回写,避开 OrbitControls 回写坑)。
       // 时序契约:本段在 UPDATE 阶段执行 —— 玩家移动/tickPhysics 之后、渲染之前。
-      const ob = ctx._orbit || { yaw: pl.y, pitch: ORBIT_DEFAULTS.pitch, dist: ORBIT_DEFAULTS.dist };
+      const ob = ctx.player.orbit || { yaw: pl.y, pitch: ORBIT_DEFAULTS.pitch, dist: ORBIT_DEFAULTS.dist };
       const cp = Math.cos(ob.pitch), sp = Math.sin(ob.pitch);
       const footY = pl.p.y - EYE_HEIGHT; // 角色脚底世界高度
       const px = pl.p.x, py = footY + 0.9, pz = pl.p.z; // 射线原点 = 角色胸口(与 lookAt 同轴)
@@ -364,7 +366,8 @@ export class LoopManager {
       // bounds 盒只有 XZ 脚印(墙体足够高),Y 覆盖 0~8m 全楼层。
       // 不对 1788 个场景网格做射线(three.js 论坛证实地形网格射线极慢)。
       // 多世界切割(2026-09-06):非主世界用当前世界自己的边界(如 B612 天幕壳无墙=不受限)
-      const rig = ctx._camRig || (ctx._camRig = { curDist: ob.dist });
+      camRig = camRig || (camRig = { curDist: ob.dist });
+      const rig = camRig;
       let safeDist = ob.dist;
       {
         const vx = ix - px, vy = iy - py, vz = iz - pz;

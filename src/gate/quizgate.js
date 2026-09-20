@@ -343,7 +343,7 @@ const quizCloseBtn = document.createElement('button');
 quizCloseBtn.id = 'quizCloseBtn';
 quizCloseBtn.textContent = '✕ 退出';
 quizCloseBtn.style.cssText =
-  'position:absolute;top:14px;right:14px;z-index:401;padding:8px 16px;border-radius:20px;border:1px solid rgba(255,182,200,.5);background:rgba(0,0,0,.55);color:#fff;font-size:13px;cursor:pointer;font-family:"Microsoft YaHei",sans-serif';
+  'position:absolute;top:14px;right:14px;z-index:'+Z.quizPanel+';padding:8px 16px;border-radius:20px;border:1px solid rgba(255,182,200,.5);background:rgba(0,0,0,.55);color:#fff;font-size:13px;cursor:pointer;font-family:"Microsoft YaHei",sans-serif';
 ov.appendChild(quizCloseBtn);
 // 三铁律注册即得(2026-07-28 深化⑤):✕/Esc 任何阶段可关;点外圈答题中(stage=quiz)拦截
 const quizOvApi = ctx.overlay.register(ov, {

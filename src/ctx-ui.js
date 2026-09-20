@@ -12,7 +12,7 @@ import { eventBus } from './event-bus.js';
  * @returns {Object} UI 命名空间代理对象
  */
 export function createUINamespace(vault) {
-  const properties = ['modeToast', 'kunlunSpeak', 'overlay', 'store'];
+  const properties = ['modeToast', 'kunlunSpeak', 'overlay', 'store', 'openDialog', 'dialogOpen', 'showGuideCard', 'stopAgreementMusic'];
   const proxy = {};
   
   for (const prop of properties) {

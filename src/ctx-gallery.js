@@ -12,7 +12,7 @@ import { eventBus } from './event-bus.js';
  * @returns {Object} 画廊命名空间代理对象
  */
 export function createGalleryNamespace(vault) {
-  const properties = [
+  const properties = ['zoomIn',
     'paintGroups',
     'onC3D',
     'zoomOut',
