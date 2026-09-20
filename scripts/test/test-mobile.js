@@ -99,23 +99,6 @@ function startServer(port) {
   ok(realErrs.length === 0, `无 JS 未捕获异常 (${realErrs.length})${realErrs[0] ? ': ' + realErrs[0].slice(0, 120) : ''}`);
 
   // 截图非纯色(纯色 PNG 体积极小;真实场景包含天空/地形/建筑,体积大)
-  const dbg = await page.evaluate(() => {
-    const c = document.getElementById('c');
-    const cs = c ? getComputedStyle(c) : null;
-    const gate = document.getElementById('b612Gate');
-    return {
-      canvases: document.querySelectorAll('canvas').length,
-      cVis: c ? c.style.visibility : 'N/A',
-      cOpacity: cs ? cs.opacity : 'N/A',
-      cDisplay: cs ? cs.display : 'N/A',
-      gate: !!gate,
-      bodyKids: [...document.body.children].map(x => x.id || x.tagName).slice(0, 14),
-      world: window.__ctx && window.__ctx.scene ? window.__ctx.scene.activeWorld : 'N/A',
-      rnd: window.__ctx && window.__ctx.scene && window.__ctx.scene.rnd ? 'yes' : 'no',
-    };
-  });
-  console.log('[dbg]', JSON.stringify(dbg));
-  await page.screenshot({ path: 'scripts/artifacts/mobile-blank.png' });
   const shot = await page.screenshot();
   ok(shot.length > 60000, `画面非纯色空屏 (截图 ${(shot.length / 1024).toFixed(0)} KB)`);
 
