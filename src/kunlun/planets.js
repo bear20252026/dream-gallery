@@ -427,6 +427,16 @@ function refreshGate() {
   }
 }
 refreshGate();
+// 章节推进/星屑隐藏钩子(2026-09-20 情节阶段一:scene6-king.js 等剧情模块调用)
+ctx.kunlun.setChapter = function (n) {
+  chapter = Math.max(chapter, Math.min(n, 6));
+  try { ctx.store.setNum('planetsChapter', chapter); } catch (e) {}
+  refreshGate();
+};
+ctx.kunlun.hideSproutMote = function () {
+  const isl = islandOfKey('sprout');
+  if (isl && isl.mote) isl.mote.visible = false;
+};
 // 独立世界双向传送台:main 石门→B612;B612→king;king→B612/main。
 // king 台放在第一座岛中心,玩家进入国王星球后立即可见;B612 台在原点。
 loadPortalPad(worldManager.getWorld('main'), { x: 0.1, y: mainGateY + 0.03, z: 56.0 }, 'b612');

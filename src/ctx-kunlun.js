@@ -13,7 +13,7 @@ import { getGameState } from './core/game-state.js';
  * @returns {Object} 昆仑命名空间代理对象
  */
 export function createKunlunNamespace(vault) {
-  const properties = [
+  const properties = [ 'setChapter', 'hideSproutMote',
     'flightLock',
     'eternalHandlers',
     'eternalClick',

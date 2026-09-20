@@ -80,12 +80,12 @@ export const DIALOG_LINES = {
     'My book left its ending unfinished. Perhaps you will write it.',
     'All the stars are yours tonight.',
   ],
-  rose: ['Tend me, and I will be unlike any other rose in the world.'],
+  rose: [{ en: 'Let the tigers come with their claws!', zh: '让老虎带着爪子来吧！' }],
   king: [
-    'Approach! You are my very first subject.',
-    'Over my kingdom the stars obey me. I only command the sunset — it always happens at dusk.',
-    'It is contrary to etiquette to yawn before a king. For you, I allow it.',
-    'I command you to enjoy your stay. It will happen anyway.',
+    { en: 'Ah! Here is a subject.', zh: '啊！来了一个臣民。' },
+    { en: 'They obey instantly. I do not permit insubordination.', zh: '它们立刻服从。我不容许抗命。' },
+    { en: 'That will be this evening about twenty minutes to eight. And you will see how well I am obeyed.', zh: '大约在今晚七点四十分。到时你就知道，我的话，它们句句都听。' },
+    { en: 'I made you my Ambassador.', zh: '我封你做我的大使！' },
   ],
 };
 
@@ -96,6 +96,7 @@ const PRINCE = { en: 'The Little Prince', zh: '小王子', spk: 'prince' };
 const PILOT = { en: 'The Pilot', zh: '飞行员', spk: 'pilot' };
 const SHEEP = { en: 'The Sheep (in the box)', zh: '箱子里的羊', spk: 'sheep' };
 const ROSE = { en: 'The Rose', zh: '玫瑰', spk: 'rose' };
+const KING = { en: 'The King', zh: '国王', spk: 'king' };
 // 说话人视觉类型查询(who 缺 spk 时回退空串=默认羊皮卷样式)
 export function whoSpk(who) {
   return (who && who.spk) || '';
@@ -214,4 +215,32 @@ export const SCENE4 = {
     en: 'For she did not want him to see her crying. She was such a proud flower...',
     zh: '她不肯让他看见她的眼泪。\n她是一朵，多么骄傲的花……',
   },
+};
+// 第 6 场·书页四·325 国王(2026-09-20 情节阶段一;台词照《定稿全本》第 6 场)
+// chain1 = 入梦到求日落;chain2 = 日落敕令演出之后(审判自己/老耗子/封大使/退场+羊箱吐槽)。
+export const SCENE5 = {
+  chain1: [
+    { who: KING, en: 'Ah! Here is a subject.', zh: '啊！来了一个臣民。' },
+    { who: KING, en: 'Approach, so that I may see you better.', zh: '走近些，\n好让我看清楚你。' },
+    { who: PRINCE, en: '(a yawn) I can\'t help it. I can\'t stop myself. I have come on a long journey, and I have had no sleep...', zh: '（打了个哈欠）\n我忍不住。\n我走了很远的路，一直没睡……' },
+    { who: KING, en: 'It is contrary to etiquette to yawn in the presence of a king. I forbid you to do so.', zh: '在国王面前打哈欠，于礼不合。\n我禁止你。' },
+    { who: KING, en: 'Ah, then. I order you to yawn. It is years since I have seen anyone yawning. Yawns, to me, are objects of curiosity. Come, now! Yawn again! It is an order.', zh: '那么，我命令你打哈欠。\n多少年没见人打哈欠了。哈欠于我，是稀罕物。\n来，再打一个！这是命令。' },
+    { who: PRINCE, en: 'Sire-- over what do you rule?', zh: '陛下——您统治什么？' },
+    { who: KING, en: 'Over everything.', zh: '统治一切。' },
+    { who: PRINCE, en: 'And the stars obey you?', zh: '星星也听您的？' },
+    { who: KING, en: 'Certainly they do. They obey instantly. I do not permit insubordination.', zh: '当然听。它们立刻服从。\n我不容许抗命。' },
+    { who: PRINCE, en: 'I should like to see a sunset... do me that kindness... Order the sun to set...', zh: '我想看一次日落……\n行行好……命令太阳落下去吧……' },
+    { who: KING, en: 'You shall have your sunset. I shall command it. But, according to my science of government, I shall wait until conditions are favorable.', zh: '你会看到你的日落的，我会下令。\n只是按治国的道理，\n得等时机成熟。' },
+    { who: PRINCE, en: 'When will that be?', zh: '那要等到什么时候？' },
+    { who: KING, en: 'Hum! Hum! That will be about-- about-- that will be this evening about twenty minutes to eight. And you will see how well I am obeyed.', zh: '嗯……嗯……大约在——\n大约在今晚七点四十分。\n到时你就知道，\n我的话，它们句句都听。' },
+  ],
+  chain2: [
+    { who: KING, en: 'Then you shall judge yourself. That is the most difficult thing of all. It is much more difficult to judge oneself than to judge others. If you succeed in judging yourself rightly, then you are indeed a man of true wisdom.', zh: '那你就审判你自己吧。\n这是所有事里最难的一件：\n审判自己，远比审判别人难。\n你要是能审得自己公道，\n才算真正的智者。' },
+    { who: KING, en: 'I have good reason to believe that somewhere on my planet there is an old rat. I hear him at night. From time to time you will condemn him to death. But you will pardon him on each occasion; for he must be treated thriftily. He is the only one we have.', zh: '我有充分的根据相信，\n我的星球上住着一只老耗子，夜里我听得见它。\n你可以时不时判它死刑——\n但每一次都要赦免。\n得省着用，\n它是我们仅有的一只。' },
+    { who: PRINCE, en: 'If Your Majesty wishes to be promptly obeyed, he should be able to give me a reasonable order. He should be able, for example, to order me to be gone by the end of one minute. It seems to me that conditions are favorable...', zh: '陛下若是想让人立刻服从，\n就该下合理的命令。\n比如，命令我在一分钟之内离开。\n依我看，时机正好……' },
+    { who: KING, en: 'I made you my Ambassador.', zh: '我封你做我的大使！' },
+    { who: PRINCE, en: '(to himself) The grown-ups are very strange.', zh: '（自言自语）\n大人们真是奇怪。' },
+    { who: SHEEP, en: 'He rules everything, you know. Especially the sunsets.', zh: '你知道的，\n他统治一切——尤其是日落。' },
+    { who: SHEEP, en: 'I am glad I am not a rat.', zh: '幸好我不是耗子。' },
+  ],
 };

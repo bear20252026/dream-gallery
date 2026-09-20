@@ -52,6 +52,8 @@ const STYLE = `
 #gameDialog[data-spk='sheep'] .gs-name{background:linear-gradient(135deg,#d4a0a0,#b08080);color:#fff5e0}
 #gameDialog[data-spk='rose']{border-color:#b05050}
 #gameDialog[data-spk='rose'] .gs-name{background:linear-gradient(135deg,#b05050,#8a3030);color:#ffddd0}
+#gameDialog[data-spk='king']{border-color:#7a5a9a}
+#gameDialog[data-spk='king'] .gs-name{background:linear-gradient(135deg,#7a5a9a,#4e3670);color:#f3e8ff}
   transform:rotate(-2deg);
 }
 .gs-text{font-size:19px;line-height:1.85;min-height:1.85em;letter-spacing:.6px;
@@ -135,13 +137,19 @@ function createGameShellSystem() {
 
   // ---- 任务栏进度 ----
   function readProgress() {
-    const spirits = (ctx.kunlun && ctx.kunlun.spiritsGot) ? ctx.kunlun.spiritsGot() : (ctx.store.getSpirits ? ctx.store.getSpirits().length : 0);
+    let spirits = (ctx.kunlun && ctx.kunlun.spiritsGot) ? ctx.kunlun.spiritsGot() : (ctx.store.getSpirits ? ctx.store.getSpirits().length : 0);
+    const chapter = ctx.store.num('planetsChapter'); // 星屑:每章一颗,与新剧情线取大
+    spirits = Math.max(spirits, Math.min(chapter, 6));
     const picks = (ctx.store.json('eternalPicks', []) || []).length;
     let ark = '尚未启程';
     if (spirits >= 6) ark = '六颗星屑归位';
     else if (spirits >= 1) ark = '飞舟已现';
     let pages = 0;
-    try { if (ctx.store.flag('page1')) pages = 1; } catch (e) {}
+    try {
+      if (ctx.store.flag('page1')) pages = 1;
+      const chapter = ctx.store.num('planetsChapter'); // 书页映射:一~三=1;四=4;五=5;六=6;七=7
+      pages = Math.max(pages, { 0: 1, 1: 4, 2: 5, 3: 6, 4: 7 }[chapter] || 0);
+    } catch (e) {}
     let main;
     if (spirits < 6) main = tt(GLOBAL.questMain);
     else if (picks < 1) main = '在永恒展厅挂上你的画';

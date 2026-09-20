@@ -133,6 +133,7 @@ async function preloadWorld() {
     ['壁炉', () => import('./kunlun/fireplace.js')],
     ['雪窗', () => import('./kunlun/snowwin.js')],
     ['星球世界', () => import('./kunlun/planets.js')],
+    ['第6场国王', () => import('./kunlun/scene6-king.js')],
     ['对话', () => import('./kunlun/story-dialogs.js')],
     ['石门', () => import('./gallery/portal.js')],
     ['坠机点', () => import('./gallery/crash-site.js')],
