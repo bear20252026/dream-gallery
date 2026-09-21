@@ -38,7 +38,7 @@ export function createPaperTerrainMaterial(opts) {
 
   const paperTex = loadTex('textures/paper.jpg', 1, true);
   const perlinTex = loadTex('textures/perlin.jpg', 1, false);
-  const terrainTex = loadTex('textures/terrain1.jpg', 1, false);
+  const terrainTex = loadTex('textures/terrain1.webp', 1, false); // 2026-09-20 jpg→webp(1.3MB→约300KB)
 
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.92, metalness: 0.04 });
   const uniforms = {

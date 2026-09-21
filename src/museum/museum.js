@@ -7,7 +7,7 @@
 // 接入:画廊南通道 (6, 26) 放发光门框,走近 2.5m 自动触发 enterHall
 import * as THREE from 'three';
 import { Z } from '../shared/z-layers.mjs';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
@@ -31,7 +31,7 @@ const bag = hotBegin('museum');
 
 const { s, bounds, addBounds, removeBounds } = ctx.scene;
 
-const loader = new GLTFLoader();
+const loader = createGLTFLoader();
 const cache = new Map(); // url -> THREE.Group(常驻,visible 切换)
 const worldBounds = new Map(); // url -> [AABB...] 该世界专属碰撞
 let current = 'gallery'; // gallery | hall:<url> | room:<id>

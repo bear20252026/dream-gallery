@@ -4,7 +4,7 @@
 // 说出第一句 "If you please— draw me a sheep!"(原著 Woods 译,书内原句)。
 // 模型: models/b612/piper-pa18.glb / models/b612/chibi-prince.glb(均无骨骼动画,动效全程序化)。
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { STORY, tt, whoSpk } from '../shared/story-text.mjs';
@@ -21,7 +21,7 @@ const DUNE = { x: -11.8, z: 72.2 }; // 小王子初见位(玩家睁眼即可见�
 const PRINCE_DEST = { x: -9.3, z: 72.8 }; // 叫醒站位(相机投影实测:屏幕 84%/75%,对话框右侧空地)
 const PRINCE_H = 3.2; // chibi 王子目标身高(m)(2026-09-07 主人定:放大 3~5 倍,取 4 倍)
 
-const loader = new GLTFLoader();
+const loader = createGLTFLoader();
 const pushedBounds = []; // HMR 退出时回收
 function addBox(b) {
   pushedBounds.push(b);

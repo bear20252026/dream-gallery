@@ -7,7 +7,7 @@
 //   商用允许,但使用处须注明作者。本游戏仅作学习用途复用该美术资产。
 //   资产为 glTF(/assets/wise_zzz.glb),由 GLTFLoader 加载;缺失时回退到程序化轮滑小人。
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createGLTFLoader } from '../scene/gltf-loader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import './room.css';
 
@@ -214,7 +214,7 @@ function buildSkater(parent, wheels, color) {
 }
 
 // 单例 loader,复用以走浏览器缓存
-const _gltfLoader = new GLTFLoader();
+const _gltfLoader = createGLTFLoader();
 function loadRollerblade(avatar) {
   _gltfLoader.load(
     WISE_ZZZ_GLB,

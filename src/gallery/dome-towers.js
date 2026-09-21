@@ -5,7 +5,7 @@
 //       塔高统一 8.5m(画廊墙 5m 的 1.7 倍),塔身朝向圆心,落地对齐 Y=0。
 // 碰撞:每座塔一个轴对齐碰撞盒(与墙体 bounds 同格式),玩家不可穿塔。
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 
@@ -20,7 +20,7 @@ const CZ = (OT + OBR) / 2; // 画廊几何中心 z = 8
 const RADIUS = 30 * 10; // 圆环半径:30m 拉远 10 倍 = 300m
 const COUNT = 6;
 
-new GLTFLoader().load(
+createGLTFLoader().load(
   MODEL_URL,
   function (gltf) {
     const proto = gltf.scene;

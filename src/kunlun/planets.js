@@ -7,7 +7,7 @@
 // 门槛解除: spirits questActive 在 planetsMode 下恒真(天穹100%前置退役)。
 import * as THREE from 'three';
 import { buildChapterProps } from './planet-props.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
@@ -93,7 +93,7 @@ b612World.scene.background = new THREE.Color(0x05050f);
 addWorldLights(b612World.scene, true);
 addStarfield(b612World.scene);
 
-const assetLoader = new GLTFLoader();
+const assetLoader = createGLTFLoader();
 assetLoader.setMeshoptDecoder(MeshoptDecoder);
 function loadWorldAsset(url, world, opts = {}) {
   assetLoader.load(
@@ -343,7 +343,7 @@ function loadPortalPad(world, position, targetWorld) {
   );
   marker.position.y = 0.09;
   root.add(marker);
-  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
+  createGLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
     'models/hall/b612-world/portal-platform.glb',
     (gltf) => {
       const m = gltf.scene;
@@ -368,7 +368,7 @@ function loadPortalPad(world, position, targetWorld) {
   base.position.y = 0.12;
   gateGrp.add(base);
   // 石门 GLB(压缩版 4.5MB;门洞朝向画廊内部,即 -Z)
-  new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
+  createGLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
     'models/hall/b612-gate-moss.glb',
     function (gltf) {
       const m = gltf.scene;

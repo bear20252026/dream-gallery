@@ -15,7 +15,7 @@
 //      材质 alpha=0 且无贴图,是完全隐形的(Sketchfab 网页上看得到水是它自家渲染器补的)。
 //      几何/UV/法线都是现成的,只差一层会动的水 → 这里换成程序化流动水材质。
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'; // 与 museum.js 同款(走 importmap)
+import { createGLTFLoader } from '../scene/gltf-loader.js'; // 与 museum.js 同款(走 importmap)
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 
@@ -200,7 +200,7 @@ function setupWater(localProto) {
   return n;
 }
 
-new GLTFLoader().load(
+createGLTFLoader().load(
   '/models/hall/zsolnay-fountain.glb',
   (g) => {
     const proto = g.scene;

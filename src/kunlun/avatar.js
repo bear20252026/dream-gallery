@@ -6,7 +6,7 @@
 // 授权:由用户提供的 ActorCore/AccuRig 资源(非 CC-BY,可商用情况由用户确认)
 //   原作者与授权以你提供的下载来源为准
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
 import { expose } from '../debug-hooks.js';
 
@@ -65,7 +65,7 @@ function watchViewMode() {
 function loadModel(url, onOk, onFail, attempt) {
   attempt = attempt || 1;
   setStatus('角色加载中' + (attempt > 1 ? '(第' + attempt + '次) ' : '') + ' 0%', '#ffcc66');
-  new GLTFLoader().load(
+  createGLTFLoader().load(
     url,
     function (gltf) { onOk(gltf); },
     function (xhr) {

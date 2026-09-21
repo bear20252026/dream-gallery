@@ -6,7 +6,7 @@
 // 手机灯光账户:全船零 PointLight——发光件全部 MeshBasicMaterial;粒子单套 Points 复用
 import * as THREE from 'three';
 import { Z } from '../shared/z-layers.mjs';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
@@ -96,7 +96,7 @@ const aura = new THREE.Points(
 ark.add(aura);
 
 // 异步加载草莓牛奶飞船模型
-const gltfLoader = new GLTFLoader();
+const gltfLoader = createGLTFLoader();
 gltfLoader.load(
   '/models/strawberry_ship/scene.gltf',
   (gltf) => {

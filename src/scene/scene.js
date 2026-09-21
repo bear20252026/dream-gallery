@@ -4,7 +4,7 @@ import { createSkyMesh, skyUniforms } from './sky-shader.js';
 import { setupKintsugi } from './kintsugi.js';
 import { ctx } from '../ctx.js';
 import { createPaperTerrainMaterial, updatePaperTerrain } from './paper-floor.js'; // 山河舆图·纸质地形地板(2026-08-29)
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'; // 婚礼拱廊外壳加载(museum.js 同款静态导入,项目验证过)
+import { createGLTFLoader } from './gltf-loader.js'; // 婚礼拱廊外壳加载(museum.js 同款静态导入,项目验证过)
 import { LAYOUT } from './layout.mjs'; // 建筑布局尺寸唯一源(2026-09-07 P4)
 
 const L = document.getElementById('l'),
@@ -466,7 +466,7 @@ if (WEDDING_SHELL) {
   // ✅ 用顶部静态导入的 GLTFLoader(museum.js/dome-towers.js 同款,项目内验证过);
   //    之前用动态 import 引 vendor 副本在此模块上下文始终失败且无日志(2026-09-03 排坑)
   try {
-    new GLTFLoader().load(
+    createGLTFLoader().load(
       '/models/hall/wedding-arch.glb',
       (g) => {
         const base = g.scene;
