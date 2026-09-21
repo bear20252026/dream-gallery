@@ -97,6 +97,7 @@ let busy = false;
 if (new URLSearchParams(location.search).has('storyreset')) {
   ctx.store.unmark('scene2');
   ctx.store.unmark('page1');
+  ctx.store.setNum('planetsChapter', 0); // 章节同步归零:325 剧情可重走
 }
 
 function el(tag, css, parent) {

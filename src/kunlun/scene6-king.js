@@ -68,12 +68,18 @@ function tryPickup(pl, onPick) {
   }
 }
 
+let prevWorld = '';
 ctx.onTick(function scene6Tick() {
-  if ((ctx.scene.activeWorld || '') !== 'king325') return;
+  const active = ctx.scene.activeWorld || '';
+  // 离开 325:复位入梦标记——同会话内再进可重新触发(2026-09-20「没对话」修复②)
+  if (prevWorld === 'king325' && active !== 'king325' && !sceneDone) {
+    arrivalDone = false;
+    pickupArmed = false;
+  }
+  prevWorld = active;
+  if (active !== 'king325') return;
   if (sceneDone) return;
-  // 书页一二三(page1)未完成:325 只是风景,剧情不触发(顺序=定稿)
-  if (!ctx.store.flag('page1')) return;
-  // 章节已推进过(重访):纯观赏
+  // 章节已推进过(重访):纯观赏。?storyreset 会把章节清回 0,可完整重走
   if (ctx.store.num('planetsChapter') !== 0) { sceneDone = true; return; }
 
   if (pickupArmed) {
