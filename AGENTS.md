@@ -61,6 +61,10 @@ npm run test:scene                # 场景截图回归 4 检查点(主世界/B61
 - **可维护约定**:新功能优先开新模块(src/ 对应子目录 或 lib/),旧文件只加钩子;跨模块只经 `ctx.js` 共享;模块职责写在 `main.js` 的 import 注释和本文件。
 - **开发工具(2026-07-27 引入)**:`npm run lint`(eslint 10 flat config `eslint.config.mjs`,只抓真错误不管风格,历史代码宽松项已关);`npm run format`(prettier,**不批量重排历史文件**——只排版新写/正在改的文件);`.env` 加载走 dotenv(lib/config.js,生产无 node_modules 自动回退手写解析,行为不变)。
 
+## 模型压缩管线(2026-09-20 审计 v3-P0 落地)
+
+全部 GLB 经 @gltf-transform/cli 压缩(meshopt 几何+webp 纹理+量化+prune,182.6MB→39.3MB,生产开机传输 20MB→4.5MB)。**规矩:①任何 GLB 加载点禁止直接 `new GLTFLoader()`,一律 `import { createGLTFLoader } from '../scene/gltf-loader.js'`(MeshoptDecoder 统一接线,漏接=解析失败);②新模型入库必须过 scripts/optimize 管线压缩;③模型不入 git,服务器 /opt/gallery/models 为源,本地改用 .models-staging 流程后回填双端;④重压缩前先备份(server /tmp tar 或 /opt/backups)。**
+
 ## 优化资产(2026-07-25 九大优化落地)
 
 - **照片缩略图**:`node scripts/gen/gen-thumbs.js`(服务器/本地,需 ffmpeg)→ `photos/thumbs/*.webp`(1024px);前端优先拉缩略图,404 回退原图。上传后记得重跑。
