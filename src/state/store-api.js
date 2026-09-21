@@ -3,7 +3,7 @@
 // 也能复用同一套存档语义,而不必把整个 ctx.js(GameLoop/实体注册表/输入管理器/8 个命名空间)
 // 拖进轻量页面。store.js 仅负责把本 api 挂到 ctx.ui.store。
 //
-// 深模块:41 把 localStorage 钥匙在此登记造册(SCHEMA),键名字符串只出现在本文件。
+// 深模块:42 把 localStorage 钥匙在此登记造册(SCHEMA),键名字符串只出现在本文件。
 // 接口只有 11 个入口:num/setNum · str/setStr · json/setJson · flag/mark · getSpirits/addSpirit ·
 //   houseColor/setHouseColor/clearHouseColor —— 类型转换、默认值、旧档迁移、异常兜底全部藏里面。
 // 铁律:行为与旧直写 localStorage 逐点对齐——
@@ -65,6 +65,7 @@ const SCHEMA = {
   // —— 独立子页/开机迁移豁免(键已登记;写入方无法加载 ctx.store,见各自注释) ——
   musicHistory: { key: 'musicHistory', type: 'json' }, // 音乐子页播放历史(music.html 经典脚本内联 onclick 依赖,不改模块)
   kunlunVer: { key: 'kunlunVer', type: 'str' }, // 存档版本迁移标记(index.html 开机块写入,先于一切模块)
+  uiFold: { key: 'b612UiFold', type: 'json' }, // 大站位 UI 收纳状态(questHud 折叠等)
 };
 function entry(name) {
   const e = SCHEMA[name];

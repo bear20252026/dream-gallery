@@ -89,6 +89,12 @@ const STYLE = `
 #questHud .q-row{font-size:14px;line-height:1.7;display:flex;justify-content:space-between;gap:8px;}
 #questHud .q-row .q-k{color:#6b4f37;}
 #questHud .q-row .q-v{color:#a35a1e;font-weight:700;}
+#questFold{position:absolute;top:9px;right:11px;width:22px;height:22px;border:1px solid rgba(74,53,38,.45);
+  border-radius:6px;background:rgba(255,250,235,.88);color:#6b4f37;font-size:13px;line-height:1;
+  cursor:pointer;pointer-events:auto;font-family:inherit}
+#questHud.folded{width:auto;padding:9px 14px;}
+#questHud.folded .q-main,#questHud.folded .q-rows{display:none}
+#questHud.folded .q-title{border-bottom:none;margin-bottom:0;padding-bottom:0;font-size:13px}
 
 /* ===== 系统菜单按钮(右上毛笔印) ===== */
 #gsMenuBtn{
@@ -255,10 +261,25 @@ function createGameShellSystem() {
       questEl.id = 'questHud';
 questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
       questEl.innerHTML = `
+        <button id="questFold" type="button" aria-label="收起/展开任务册" title="收起/展开">－</button>
         <div class="q-title">任 务 册</div>
         <div class="q-main">◈ 收集六颗星屑</div>
         <div class="q-rows"></div>`;
       document.body.appendChild(questEl);
+      // 收纳(2026-09-20 UI 清理):折叠成小签,偏好入 store
+      const qFoldBtn = questEl.querySelector('#questFold');
+      const applyFold = function (folded) {
+        questEl.classList.toggle('folded', !!folded);
+        qFoldBtn.textContent = folded ? '＋' : '－';
+      };
+      try { applyFold((ctx.store.json('uiFold', {}) || {}).quest); } catch (e) {}
+      qFoldBtn.onclick = function () {
+        const folded = !questEl.classList.contains('folded');
+        applyFold(folded);
+        try {
+          ctx.store.setJson('uiFold', Object.assign({}, ctx.store.json('uiFold', {}) || {}, { quest: folded }));
+        } catch (e) {}
+      };
       refreshQuest();
 
       menuBtn = document.createElement('div');
