@@ -1,8 +1,9 @@
 // entrygate.js — B612 入口闸门(2026-09-05 定稿;2026-09-06 主人定重构)
 // 结构借自 Chartogne-Taillet 入口(标题+一句话+Enter+底部协议小字),皮肤用本作"纸与墨"语言。
 // - **每次进入都显示**(主人 2026-09-06 定:闸门是开场第一屏,不再按 gateEntered 跳过)。
-// - 底部一行:勾选一个「同意」+ 三个协议名字;协议全文点开单独阅读
-//   (?from=gate 只读模式,左上「‹ 返回」退回闸门,状态不丢)。
+// - 底部一行:勾选一个「同意」+ 三个协议名字。
+//   **2026-09-23(P1-1)起:三个名字点开的是并列三协议面板**,不是三次整页跳转 ——
+//   见 gate/agreement-swipe.js。三份在同一面板内切换、各自勾选,签毕返回闸门,**全程零 reload**。
 // - 勾选后 ENTER 才可用;点 ENTER 写 3 个会话标记(下游大屏轮播/指引卡只认会话键)。
 //   取代 2026-07-27 的三连读强制签署。
 import { ctx } from '../ctx.js';
@@ -10,14 +11,13 @@ import * as bootState from '../core/boot-state.js';
 import { Z } from '../shared/z-layers.mjs';
 import { GLOBAL, tt } from '../shared/story-text.mjs';
 import { makeLangToggle } from '../ui/lang-toggle.js';
+import { spawnAgreementPages } from './agreement-swipe.js';
 
 // 三连协议会话签名(2026-09-18 自 main.js 外迁):闸门 60s 超时/初始化失败时放行用。
 // 会话级键不进 store(存档规矩:sessionStorage 不登记)。
-export function signAllConsents() {
-  sessionStorage.setItem('agreementConsented', '1');
-  sessionStorage.setItem('privacyConsented', '1');
-  sessionStorage.setItem('communityConsented', '1');
-}
+// 2026-09-23(P1-1):此处原有一份重复定义,与 gate/consent-session.js 逐字相同但无人引用
+// —— 已删,统一走 consent-session.js 单一来源。见 entrygate.js 的 signAllConsents 改用 import。
+import { signAllConsents } from './consent-session.js';
 
 export function setupEntryGate(opts) {
   opts = opts || {};
@@ -95,7 +95,7 @@ function build(opts) {
     #b612Gate .gAgree{flex-wrap:wrap;justify-content:center;row-gap:4px}
   }
   </style>`;
-    document.body.appendChild(ov);
+  document.body.appendChild(ov);
   renderLang();
   const langBtn = makeLangToggle({ placement: 'top:14px;right:14px', z: Z.gate + 1 });
   langBtn.style.position = 'fixed';
@@ -126,34 +126,29 @@ function build(opts) {
     if (opts.onEnter) opts.onEnter();
   };
 
-  // 底行协议:点开只读(?from=gate),闸门暂隐;面板关闭(✕/Esc/‹返回)即回闸门,状态不丢。
-  // preventDefault 同时阻止 label 默认行为(点链接误触发勾选框)。
-  // 2026-09-06 主人定:面板顶栏旧「✕ 返回画廊」在闸门阅读期是错误按钮——返回闸门已由
-  // 文档内「‹ 返回」实现。阅读期间隐藏该按钮,关面板后恢复(音乐/白板等面板不受影响)。
-  const panelCloseBtn = document.getElementById('panelClose');
-  ov.querySelectorAll('.gLegal a').forEach(function (a) {
-    a.onclick = function (e) {
-      e.preventDefault();
-      if (!window.openPanel) {
-        location.href = a.getAttribute('data-doc');
-        return;
-      }
-      if (panelCloseBtn) panelCloseBtn.style.display = 'none';
+  // 底行协议(P1-1,2026-09-23 重写):点开的是**并列三协议面板**,在同一面板内三标签切换,
+  // 每份各自勾选,签毕返回闸门。全程零 reload —— 旧实现是三次整页跳转(agreement→privacy→
+  // community),收尾还 parent.location.reload() 把整个世界推倒重来,是开场耗时的大头。
+  // 三份都签完后面板自动把闸门底部的总勾选框勾上并点亮 ENTER,用户少点一次。
+  const swipe = spawnAgreementPages(ov, {
+    z: Z.gate + 50,
+    // 打开面板时闸门暂隐(面板本身是全屏遮罩,叠着看两套 UI 会乱)
+    onHide: function () {
       ov.style.opacity = '0';
       ov.style.pointerEvents = 'none';
-      window.openPanel(a.getAttribute('data-doc') + '?from=gate', 'B612');
-    };
+    },
+    // 面板关闭(三份读完 / 「‹ 返回闸门」/ Esc)后闸门恢复显示,已签状态不丢
+    onRestore: function () {
+      if (entered) return;
+      ov.style.opacity = '1';
+      ov.style.pointerEvents = 'auto';
+    },
+    // 三份签毕:闸门总勾选框自动勾上 + ENTER 点亮,用户直接点 ENTER 进场
+    onAllSigned: function () {
+      if (entered) return;
+      chk.checked = true;
+      enterBtn.classList.toggle('ready', true);
+    },
   });
-  if (window.closePanel) {
-    const origClose = window.closePanel;
-    window.closePanel = function () {
-      origClose.apply(this, arguments);
-      if (panelCloseBtn) panelCloseBtn.style.display = '';
-      if (!entered) {
-        // 读协议回来:闸门恢复(勾选状态保留在 checkbox 上,不受隐显影响)
-        ov.style.opacity = '1';
-        ov.style.pointerEvents = 'auto';
-      }
-    };
-  }
+  void swipe;
 }

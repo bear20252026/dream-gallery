@@ -50,6 +50,28 @@ export const GLOBAL = {
     zh: '献给莱昂·维尔特——\n献给那个还是小男孩的他。',
   },
   questMain: { en: 'Finish the book.', zh: '把这本书，写完。' },
+  // 三协议并列面板(P1-1,2026-09-23):闸门底行点开后,同一面板内三标签切换
+  pact: {
+    tos: { en: 'Terms of Service', zh: '用户协议' },
+    privacy: { en: 'Privacy Policy', zh: '隐私保护指引' },
+    community: { en: 'Community Guidelines', zh: '社区公约' },
+    agreeTos: {
+      en: 'I have read and agree to the Terms of Service',
+      zh: '我已完整阅读并同意《用户协议》',
+    },
+    agreePrivacy: {
+      en: 'I have read and agree to the Privacy Policy',
+      zh: '我已完整阅读并同意《隐私保护指引》',
+    },
+    agreeCommunity: {
+      en: 'I have read and agree to the Community Guidelines',
+      zh: '我已完整阅读并同意《社区公约》',
+    },
+    next: { en: 'Read, next ›', zh: '已读，下一份 ›' },
+    finish: { en: 'All three read — back to gate', zh: '三份已阅，返回闸门' },
+    back: { en: '‹  Back to gate', zh: '‹  返回闸门' },
+    progress: { en: 'read {n} / 3', zh: '已阅 {n} / 3' },
+  },
 };
 
 // 坠机点与开场引导(英文照 Woods,中文据《中文文学译本》)
