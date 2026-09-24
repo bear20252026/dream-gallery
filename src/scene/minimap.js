@@ -49,17 +49,10 @@ export function isBig() {
 }
 
 // ===================== 建筑区坐标变换(传送反算共用,玩家坐标 ↔ 图面像素) =====================
-// zone(x∈[-34,34], z∈[-13,60] 中心 z=23.5)的外沿角正好落在圆周上:S=w/100。
-// 旧版导出 mapScale/mapOffX/mapOffZ 已废:传送与绘制统一走这两个函数,永不再各写一份。
-const ZONE_CZ = 23.5;
-export function bMap(w, x, z) {
-  const S = w / 100;
-  return [w / 2 + x * S, w / 2 + (z - ZONE_CZ) * S];
-}
-export function bUnmap(w, px, py) {
-  const S = w / 100;
-  return [(px - w / 2) / S, (py - w / 2) / S + ZONE_CZ];
-}
+// 2026-09-24 抽到 scene/map-transform.mjs(纯函数可单测,node 里也能跑):round-trip
+// 契约单测钉死。此处 re-export 保持 player.js 等既有 import 路径不变。
+import { bMap, bUnmap, ZONE_CZ } from './map-transform.mjs';
+export { bMap, bUnmap };
 
 // ===================== 调色板(全站羊皮纸语言) =====================
 const INK = '#4e4237',
@@ -201,7 +194,7 @@ function seal(c, x, y, ch, size) {
   c.roundRect(x - s / 2, y - s / 2, s, s, r);
   c.fill();
   c.fillStyle = '#f8f1df';
-  c.font = "bold " + Math.round(s * 0.72) + "px 'Kaiti SC','STKaiti','KaiTi',serif";
+  c.font = 'bold ' + Math.round(s * 0.72) + "px 'Kaiti SC','STKaiti','KaiTi',serif";
   c.textAlign = 'center';
   c.textBaseline = 'middle';
   c.fillText(ch, x, y + s * 0.04);
@@ -228,21 +221,32 @@ function buildAtlas() {
     const H = new Float32Array((GX + 1) * (GZ + 1));
     for (let j = 0; j <= GZ; j++)
       for (let i = 0; i <= GX; i++)
-        H[j * (GX + 1) + i] = ctx.media.desert.getH(ATLAS.x0 + i * ATLAS.cell, ATLAS.z0 + j * ATLAS.cell);
+        H[j * (GX + 1) + i] = ctx.media.desert.getH(
+          ATLAS.x0 + i * ATLAS.cell,
+          ATLAS.z0 + j * ATLAS.cell
+        );
     // 纸底
     c.fillStyle = PAPER;
     c.fillRect(0, 0, ATLAS.w, ATLAS.h);
     // 沙色水彩洗(按格均高调色,向纸色褪)
     for (let j = 0; j < GZ; j++)
       for (let i = 0; i < GX; i++) {
-        const h = (H[j * (GX + 1) + i] + H[j * (GX + 1) + i + 1] + H[(j + 1) * (GX + 1) + i] + H[(j + 1) * (GX + 1) + i + 1]) / 4;
+        const h =
+          (H[j * (GX + 1) + i] +
+            H[j * (GX + 1) + i + 1] +
+            H[(j + 1) * (GX + 1) + i] +
+            H[(j + 1) * (GX + 1) + i + 1]) /
+          4;
         c.fillStyle = washColor(h);
         c.fillRect(i * ATLAS.cell, j * ATLAS.cell, ATLAS.cell + 1, ATLAS.cell + 1);
         // 山影:西北光,坡向差 ±10%
         const dh = H[(j + 1) * (GX + 1) + i + 1] - H[j * (GX + 1) + i];
         const a = Math.max(-0.1, Math.min(0.1, -dh * 0.012));
         if (Math.abs(a) > 0.015) {
-          c.fillStyle = a > 0 ? 'rgba(255,252,240,' + a.toFixed(3) + ')' : 'rgba(70,50,30,' + (-a).toFixed(3) + ')';
+          c.fillStyle =
+            a > 0
+              ? 'rgba(255,252,240,' + a.toFixed(3) + ')'
+              : 'rgba(70,50,30,' + (-a).toFixed(3) + ')';
           c.fillRect(i * ATLAS.cell, j * ATLAS.cell, ATLAS.cell + 1, ATLAS.cell + 1);
         }
       }
@@ -289,14 +293,38 @@ function seg(idx, T, R, B, L, c) {
     c.lineTo(q[0], q[1]);
   };
   switch (idx) {
-    case 1: case 14: mv(L, B); break;
-    case 2: case 13: mv(B, R); break;
-    case 3: case 12: mv(L, R); break;
-    case 4: case 11: mv(T, R); break;
-    case 6: case 9: mv(T, B); break;
-    case 7: case 8: mv(L, T); break;
-    case 5: mv(T, L); mv(B, R); break;
-    case 10: mv(T, R); mv(L, B); break;
+    case 1:
+    case 14:
+      mv(L, B);
+      break;
+    case 2:
+    case 13:
+      mv(B, R);
+      break;
+    case 3:
+    case 12:
+      mv(L, R);
+      break;
+    case 4:
+    case 11:
+      mv(T, R);
+      break;
+    case 6:
+    case 9:
+      mv(T, B);
+      break;
+    case 7:
+    case 8:
+      mv(L, T);
+      break;
+    case 5:
+      mv(T, L);
+      mv(B, R);
+      break;
+    case 10:
+      mv(T, R);
+      mv(L, B);
+      break;
   }
 }
 function washColor(h) {
@@ -548,7 +576,13 @@ function drawDesert(pl, W) {
     if (vis(x, y, 14)) drawStar(mapCtx, x, y, W === BIG ? 8 : 6, mBig);
     else {
       const a = Math.atan2(y - W / 2, x - W / 2);
-      drawStar(mapCtx, W / 2 + Math.cos(a) * (W / 2 - 14), W / 2 + Math.sin(a) * (W / 2 - 14), W === BIG ? 7 : 5, false);
+      drawStar(
+        mapCtx,
+        W / 2 + Math.cos(a) * (W / 2 - 14),
+        W / 2 + Math.sin(a) * (W / 2 - 14),
+        W === BIG ? 7 : 5,
+        false
+      );
     }
   }
   // 灵蕴目标(脉动金点;视野外贴边)
@@ -578,7 +612,13 @@ function drawDesert(pl, W) {
         mapCtx.strokeStyle = 'rgba(248,241,223,.9)';
         mapCtx.lineWidth = 1;
         mapCtx.beginPath();
-        mapCtx.arc(W / 2 + Math.cos(a) * (W / 2 - 12), W / 2 + Math.sin(a) * (W / 2 - 12), 3.5, 0, Math.PI * 2);
+        mapCtx.arc(
+          W / 2 + Math.cos(a) * (W / 2 - 12),
+          W / 2 + Math.sin(a) * (W / 2 - 12),
+          3.5,
+          0,
+          Math.PI * 2
+        );
         mapCtx.fill();
         mapCtx.stroke();
       }
@@ -605,7 +645,8 @@ window.__minimap = {
   drawArrowAt: (x, y, ang, s) => drawArrow(mapCtx, x, y, ang, s),
 };
 // 启动空闲期提前预渲染图集(desert.js 已挂载时);否则首次进沙漠当帧同步构建
-if (typeof requestIdleCallback === 'function') requestIdleCallback(() => buildAtlas(), { timeout: 8000 });
+if (typeof requestIdleCallback === 'function')
+  requestIdleCallback(() => buildAtlas(), { timeout: 8000 });
 else setTimeout(buildAtlas, 4000);
 
 // 阻止小地图上的鼠标/触摸事件冒泡到场景(避免点地图时误转视角/误点画框)

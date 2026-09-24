@@ -1,12 +1,20 @@
 import { Z } from '../shared/z-layers.mjs';
 // upload.js — 访客上传(照片 + 我的链接) + AI 配文 + 空中悬浮路标
-// 照片:任何人可传、不限张数、≤5MB;自己只见自己的,后台见全部
+// 照片:任何人可传、不限张数、≤50MB(视频 ≤700MB);自己只见自己的,后台见全部
 // AI 配文:/api/vision/analyze(审核不过也照常上传,用回退句)
 // 路标:上传成功后,从脚下到挂画处拉一条虚线,动态向前流动,带你找到自己的作品
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { expose } from '../debug-hooks.js';
+import {
+  isVideo,
+  maxBytes,
+  isDirect,
+  chunkCount,
+  sanitizeExt,
+  CHUNK_SIZE,
+} from './upload-rules.mjs'; // 预校验单一源(2026-09-24 抽出)
 hotBegin('upload');
 const { s } = ctx;
 
@@ -95,12 +103,11 @@ $('tabLink').onclick = () => {
 };
 $('drop').onclick = () => $('file').click();
 let picked = null;
-const VID_EXT = /\.(mp4|webm|mov|m4v|mkv|avi|flv|wmv|ts|m2ts|3gp|mpg|mpeg)$/i;
 $('file').onchange = () => {
   picked = $('file').files[0] || null;
   if (picked) {
-    const isVid = VID_EXT.test(picked.name) || /^video\//.test(picked.type);
-    const max = isVid ? 700 * 1024 * 1024 : 50 * 1024 * 1024;
+    const isVid = isVideo(picked.name, picked.type);
+    const max = maxBytes(isVid);
     if (picked.size > max) {
       prog(isVid ? '视频超过 700MB,换个小点的' : '图片超过 50MB,换个小点的');
       picked = null;
@@ -232,7 +239,8 @@ function playUploadHint(onEnd) {
 // ===== B612灵鉴:上传成功金色微尘(2 秒,灵蕴归位的视觉化;DOM 粒子零依赖) =====
 function goldDust() {
   const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;inset:0;z-index:' + Z.kickNotice + ';pointer-events:none;overflow:hidden';
+  box.style.cssText =
+    'position:fixed;inset:0;z-index:' + Z.kickNotice + ';pointer-events:none;overflow:hidden';
   document.body.appendChild(box);
   for (let i = 0; i < 26; i++) {
     const p = document.createElement('div');
@@ -285,19 +293,15 @@ function classifyAura(t) {
 $('doUp').onclick = async () => {
   if (!picked) return;
   const file = picked;
-  const isVid = VID_EXT.test(file.name) || /^video\//.test(file.type);
+  const isVid = isVideo(file.name, file.type);
   const dir = isVid ? 'videos' : 'photos';
-  const ext =
-    (file.name.split('.').pop() || (isVid ? 'mp4' : 'jpg'))
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, '') || (isVid ? 'mp4' : 'jpg');
+  const ext = sanitizeExt(file.name, isVid);
   const name = 'u' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5) + '.' + ext;
   prog('你的照片正在飞往 B612…(可关闭本页,上传不会断)');
   // 分片上传(2026-07-28 晚高峰应急):CF 回源限流,>384KB 的文件按 256KB 切片逐片传,
-  // 每片几秒内完成,绕开 Cloudflare 100s 超时(524);小文件仍直传
-  const CHUNK = 256 * 1024;
+  // 每片几秒内完成,绕开 Cloudflare 100s 超时(524);小文件仍直传(阈值/片长单一源 upload-rules.mjs)
   async function uploadFile() {
-    if (file.size <= 384 * 1024) {
+    if (isDirect(file.size)) {
       const r = await fetch('/api/upload?dir=' + dir + '&name=' + encodeURIComponent(name), {
         method: 'POST',
         body: file,
@@ -306,7 +310,7 @@ $('doUp').onclick = async () => {
       if (!r.ok) throw new Error(d.error || '上传失败');
       return d;
     }
-    const total = Math.ceil(file.size / CHUNK);
+    const total = chunkCount(file.size);
     let last = null;
     for (let i = 0; i < total; i++) {
       prog('正在上传 ' + (i + 1) + '/' + total + ' 片(高峰期限速,分片慢传)…');
@@ -319,7 +323,7 @@ $('doUp').onclick = async () => {
           i +
           '&total=' +
           total,
-        { method: 'POST', body: file.slice(i * CHUNK, (i + 1) * CHUNK) }
+        { method: 'POST', body: file.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE) }
       );
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || '上传失败(第 ' + (i + 1) + ' 片)');

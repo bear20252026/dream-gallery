@@ -7,6 +7,7 @@ import { ctx } from '../ctx.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片/视频即同步新媒体墙(2026-08-29)
 import { P, V, AI_DESC, LINKS, VIDEO_WALL_SOURCES } from '../../data.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
+import { withMemoryPrefix } from '../shared/memory-prefix.mjs'; // 配文前缀单一源(2026-09-24 抽出)
 const {
   s,
   cam,
@@ -610,11 +611,12 @@ function onC3D(e) {
   if (ctx.gallery.zG) zoomOut();
 }
 
-// 显示/隐藏AI文字面板(2026-07-26《B612灵鉴》:配文统一加前缀「B612 替你记得：」,AI=B612的记忆回声;前缀幂等,HMR 重载不会叠两层)
+// 显示/隐藏AI文字面板(2026-07-26《B612灵鉴》:配文统一加前缀「B612 替你记得：」,AI=B612的记忆回声)
+// 前缀单一源=shared/memory-prefix.mjs(2026-09-24 抽出;幂等契约单测钉死,HMR 重载不会叠两层)
 const aiPanel = document.getElementById('aiPanel'),
   aiT = document.getElementById('aiT');
 function showAI(text) {
-  aiT.textContent = /^B612 替你记得：/.test(text) ? text : 'B612 替你记得：' + text;
+  aiT.textContent = withMemoryPrefix(text);
   aiPanel.classList.add('show');
 }
 function hideAI() {
