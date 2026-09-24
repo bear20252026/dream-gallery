@@ -1,6 +1,8 @@
 // core/gameshell-dialog.js — GameShell 对话框状态机(2026-08-30 B5 从 gameshell-system.js 外迁)
-// 职责:打字机逐行渲染 / 点击推进 / 选项分支 / 自动隐藏 / 说话人命名。
+// 职责:打字机逐行渲染 / 点击推进 / 选项分支 / 自动隐藏 / 说话人命名 / **台词朗读**(2026-09-24)。
 // 纯表现层:不持有场景/物理状态;DOM 容器由 gameshell-system 创建后经 attach() 注入。
+import { speakLine, stopSpeaking, installMuteBtn } from './dialog-voice.mjs';
+
 export function createDialogSystem() {
   let dlg = null; // {speaker, lines, idx, choices, onDone, typeTimer, hideTimer, typing}
   let dialogEl = null;
@@ -8,6 +10,7 @@ export function createDialogSystem() {
 
   function attach(element) {
     dialogEl = element;
+    installMuteBtn(element); // 台词朗读开关(会话级,sessionStorage)
   }
   function el(id) {
     return document.getElementById(id);
@@ -23,6 +26,8 @@ export function createDialogSystem() {
     chEl.innerHTML = '';
     hintEl.style.display = 'none';
     typeLine(dlg.lines[dlg.idx] || '');
+    // 台词朗读(2026-09-24):每行显示即读;只读中文行(英文会话静默),新行顶旧行不排队
+    speakLine(dlg.lines[dlg.idx] || '', dlg.speakerType);
   }
   function typeLine(str) {
     const textEl = dialogEl.querySelector('.gs-text');
@@ -105,6 +110,7 @@ export function createDialogSystem() {
     dlg = null;
     dialogEl.style.display = 'none';
     delete dialogEl.dataset.spk;
+    stopSpeaking(); // 台词朗读随对话框关闭停止(朗读长于阅读时,别让声音拖到下一场)
     // 收束回调(2026-09-07):此前 onDone 只存不调,依赖它的链式对话(剧本第2场)会断链
     if (d && d.onDone && !suppressDone) {
       try {
