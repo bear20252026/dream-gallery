@@ -30,7 +30,16 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
     sessionStorage.setItem('nickPopOff', '1');
   });
   await page.goto('http://localhost:3222/', { waitUntil: 'domcontentloaded', timeout: 90000 });
+  // 2026-09-24 修:9-06 起闸门每次进入都显示且 ENTER 需勾选(不点则世界永不启动,
+  // kunlun 簇模块(spiritsGot/eternalHandlers)不加载 → [4][5] 断言假失败)。
+  // 入场与其余 b612 探针对齐:勾选 → ENTER → 等 __bootCheck.ok(全模块装配完成)。
+  await page.waitForSelector('#b612Gate', { timeout: 90000 });
+  await page.check('#b612Gate #gAgreeChk');
+  await page.click('#b612Gate .gEnter');
   await page.waitForFunction(() => window.__ctx && window.__ctx.ui && window.__ctx.kunlun && window.__ctx.player, null, { timeout: 90000 });
+  await page.waitForFunction(() => window.__bootCheck && window.__bootCheck.ok === true, null, { timeout: 120000 }).catch(() => {
+    console.log('  (bootCheck 未全绿,继续按现状断言)');
+  });
   await page.waitForTimeout(3000);
 
   // [1] 别名读===扁平读(运行期真值,函数引用同一)
