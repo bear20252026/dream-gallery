@@ -96,7 +96,10 @@ export function playOpeningFilm(onDone, onFinishBegin) {
   document.body.appendChild(root);
   // 电影层 0.45s 淡入(2026-09-24 消闪):z=580 高于闸门 z=150,原来瞬间盖上等于
   // 纸色闸门→纯黑硬切(主人报「ENTER 后闪一下」)。淡入让闸门透出来自然过渡。
+  // ⚠️ 先强制回流再改 1:元素从未以 opacity:0 渲染过时,rAF 内直接改 1 会被样式合并
+  // 成瞬跳(2026-09-24 探针实测 computed 恒 1.00),双 rAF/回流才触发真过渡。
   root.style.opacity = '0';
+  void root.offsetWidth;
   requestAnimationFrame(function () {
     if (gate.dead) return;
     root.style.transition = 'opacity .45s ease';
