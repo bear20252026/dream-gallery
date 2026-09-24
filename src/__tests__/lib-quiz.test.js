@@ -7,8 +7,6 @@ import { createRequire } from 'node:module';
 process.env.TOKEN = process.env.TOKEN || 'vitest-token-abc';
 const require = createRequire(import.meta.url);
 const { handleQuizStart, QUIZ_PASS_SCORE } = require('../../lib/quiz.js');
-// 2026-09-23 P0:AI 阅卷成本闸。走同一实例取 gateData(ESM import 会产生双实例,必须 createRequire)
-const { gateData } = require('../../lib/store.js');
 
 const REQ = { headers: { 'user-agent': 'quiz-ua' }, url: '' };
 function mockRes() {
@@ -67,57 +65,5 @@ describe('quiz 出卷', () => {
   });
 });
 
-// 2026-09-23 P0 回归:阅卷成本闸(每设备每天 20 次 AI 阅卷)。
-// 网关逻辑在 handleQuizSubmit 内联,这里直接验证配额表语义 + 额度耗尽时的降级行为。
-describe('quiz 阅卷成本闸', () => {
-  const DAY = new Date().toISOString().slice(0, 10);
-  const QK = 'quota-key-test';
-  const KEY = 'quizAiQuota';
-
-  it('配额表按 day 记账,跨天自动归零', () => {
-    gateData[KEY] = {};
-    gateData[KEY][QK] = { day: '2000-01-01', n: 19 };
-    // 模拟网关读改写
-    const q = gateData[KEY][QK];
-    const day = DAY;
-    if (q.day !== day) {
-      q.day = day;
-      q.n = 0;
-    }
-    expect(q.day).toBe(DAY);
-    expect(q.n).toBe(0);
-  });
-
-  it('额度未耗尽 → 计数递增(20 次封顶)', () => {
-    gateData[KEY] = {};
-    gateData[KEY][QK] = { day: DAY, n: 0 };
-    const LIMIT = 20;
-    for (let i = 0; i < LIMIT; i++) {
-      const q = gateData[KEY][QK];
-      if (q.day !== DAY) {
-        q.day = DAY;
-        q.n = 0;
-      }
-      expect(q.n < LIMIT).toBe(true); // 全部放行
-      q.n++;
-    }
-    expect(gateData[KEY][QK].n).toBe(20);
-  });
-
-  it('额度耗尽 → 第 21 次不放行 AI(降级本地细则)', () => {
-    gateData[KEY] = {};
-    gateData[KEY][QK] = { day: DAY, n: 20 };
-    const q = gateData[KEY][QK];
-    expect(q.n < 20).toBe(false); // 网关判定:不再调 AI
-    // 交卷本身不中断 —— 本地细则兜底,总分仍有值
-    expect(q.n).toBe(20); // 额度不被继续消耗
-  });
-
-  it('配额表键数上限 3000(防伪造身份无限增键)', () => {
-    gateData[KEY] = {};
-    for (let i = 0; i < 3100; i++) gateData[KEY]['k' + i] = { day: DAY, n: 0 };
-    const { capKeys } = require('../../lib/store.js');
-    capKeys(gateData[KEY], 2500);
-    expect(Object.keys(gateData[KEY]).length).toBeLessThanOrEqual(2500);
-  });
-});
+// 2026-09-24 主人令:AI 阅卷每设备日限已拆除(交卷始终走 AI),原"阅卷成本闸"自模拟
+// 用例随之退役 —— 网关逻辑不复存在,继续模拟只会钉死一段被删除的代码。

@@ -1,6 +1,6 @@
 // dialog-voice.mjs — 剧情台词朗读(2026-09-24,主人指令"用小米语音接口朗读台词")
 // 桥接:对话框(gameshell-dialog) ↔ /api/tts(lib/tts.js:MiMo TTS 首选 → edge-tts 兜底,
-//       30→120 次/天/设备,文案哈希缓存 —— 同一句台词永不重复合成/重复计数)。
+//       文案哈希缓存 —— 同一句台词永不重复合成;2026-09-24 起 AI 调用不再设日限配额)。
 //
 // 设计定夺:
 //   ① **只读含汉字的行**:闸门默认英文(scriptLang=en),英文行不读 —— zh 声线读英文
@@ -10,6 +10,8 @@
 //   ③ **每会话可静音**:对话框角落 🔈 按钮,sessionStorage 记忆(会话级,不进 store 存档)。
 //   ④ 说话人分声线(spk 来自 story-text who 常量):王子=小艺,飞行员=云希,其余=晓晓。
 //      MiMo 不认 edge-tts 声线名时其内部兜底,再不行回落 edge-tts —— 双引擎都在服务端。
+//   ⑤ **下一行预取**(2026-09-24 流畅度):当前行朗读时把下一行语音预热进缓存,
+//      推进到下一行时即刻开口,不再有 1-3s 合成空窗(prefetchLine)。
 const SPK_VOICES = {
   prince: 'zh-CN-XiaoyiNeural',
   pilot: 'zh-CN-YunxiNeural',
@@ -41,6 +43,7 @@ export function speakDecision(text, voiceOff) {
 }
 
 let cur = null; // 当前台词朗读(替换语义:新行顶旧行)
+const warmed = new Set(); // 本会话已预取过的台词 URL(防重复 load)
 
 export function stopSpeaking() {
   if (cur) {
@@ -56,18 +59,42 @@ export function speakLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
   if (!d.speak) return d;
   stopSpeaking();
-  const v = voiceFor(spk);
-  const url =
-    '/api/tts?text=' +
-    encodeURIComponent(String(text).slice(0, MAX_SPEAK_LEN)) +
-    '&voice=' +
-    encodeURIComponent(v);
   try {
-    cur = new Audio(url);
+    cur = new Audio(ttsUrl(text, voiceFor(spk)));
     cur.play().catch(() => {}); // 手势限制/缓存未就绪静默(与 kunlunSpeak 同策略)
   } catch (e) {
     cur = null;
   }
+  return d;
+}
+
+/** 组 TTS 请求 URL(speakLine 与 prefetchLine 共用,保音色/截断一致) */
+function ttsUrl(text, voice) {
+  return (
+    '/api/tts?text=' +
+    encodeURIComponent(String(text).slice(0, MAX_SPEAK_LEN)) +
+    '&voice=' +
+    encodeURIComponent(voice)
+  );
+}
+
+/**
+ * 预取下一行台词(2026-09-24 流畅度):静默 load 进浏览器缓存(服务端亦有文案哈希缓存),
+ * 推进到该行时 speakLine 的 Audio 直接吃 HTTP 缓存,零合成空窗。
+ * 复用 speakDecision:静音/无汉字/空行不预取,浪费带宽为零。
+ */
+export function prefetchLine(text, spk) {
+  const d = speakDecision(text, isVoiceOff());
+  if (!d.speak) return d;
+  const url = ttsUrl(text, voiceFor(spk));
+  if (warmed.has(url)) return d;
+  warmed.add(url);
+  try {
+    const a = new Audio();
+    a.preload = 'auto';
+    a.src = url;
+    a.load();
+  } catch (e) { /* 无 Audio 环境(测试/异常)静默 */ }
   return d;
 }
 

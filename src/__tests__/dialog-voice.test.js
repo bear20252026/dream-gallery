@@ -2,7 +2,7 @@
 // 回归锚点:①英文会话烧配额(只读汉字行);②前缀替换语义误改排队 → 声音越落越远;
 // ③静音钮失效 → 用户无法关掉朗读。
 import { describe, it, expect } from 'vitest';
-import { voiceFor, hasCJK, speakDecision } from '../core/dialog-voice.mjs';
+import { voiceFor, hasCJK, speakDecision, prefetchLine } from '../core/dialog-voice.mjs';
 
 describe('voiceFor 说话人分声线', () => {
   it('prince=小艺 / pilot=云希(spk 来自 story-text who 常量)', () => {
@@ -48,5 +48,16 @@ describe('speakDecision 决策表', () => {
   });
   it('静音+无汉字:静音理由优先(可诊断用户为何没听到)', () => {
     expect(speakDecision('draw', true).reason).toBe('muted');
+  });
+});
+
+describe('prefetchLine 下一行预取(2026-09-24 流畅度)', () => {
+  it('与 speakDecision 同一张决策表(静音/空/无汉字不预取,不浪费带宽)', () => {
+    expect(prefetchLine('画一只羊', 'prince').speak).toBe(true);
+    expect(prefetchLine('draw me a sheep', 'prince').speak).toBe(false);
+    expect(prefetchLine('', 'prince').speak).toBe(false);
+  });
+  it('可朗读行在无 Audio 环境也不抛错(静默兜底)', () => {
+    expect(() => prefetchLine('请你——给我画一只羊！', 'prince')).not.toThrow();
   });
 });

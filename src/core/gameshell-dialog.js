@@ -1,7 +1,8 @@
 // core/gameshell-dialog.js — GameShell 对话框状态机(2026-08-30 B5 从 gameshell-system.js 外迁)
 // 职责:打字机逐行渲染 / 点击推进 / 选项分支 / 自动隐藏 / 说话人命名 / **台词朗读**(2026-09-24)。
 // 纯表现层:不持有场景/物理状态;DOM 容器由 gameshell-system 创建后经 attach() 注入。
-import { speakLine, stopSpeaking, installMuteBtn } from './dialog-voice.mjs';
+import { speakLine, stopSpeaking, installMuteBtn, prefetchLine } from './dialog-voice.mjs';
+import { dwellFor } from '../shared/typing-rhythm.mjs';
 
 export function createDialogSystem() {
   let dlg = null; // {speaker, lines, idx, choices, onDone, typeTimer, hideTimer, typing}
@@ -28,34 +29,37 @@ export function createDialogSystem() {
     typeLine(dlg.lines[dlg.idx] || '');
     // 台词朗读(2026-09-24):每行显示即读;只读中文行(英文会话静默),新行顶旧行不排队
     speakLine(dlg.lines[dlg.idx] || '', dlg.speakerType);
+    // 下一行预取(2026-09-24 流畅度):当前行朗读的同时,把下一行的语音预热进
+    // 浏览器/服务端缓存 —— 推进到下一行时声音即刻开口,不再等 1-3s 合成空窗
+    if (dlg.idx < dlg.lines.length - 1) prefetchLine(dlg.lines[dlg.idx + 1] || '', dlg.speakerType);
   }
   function typeLine(str) {
     const textEl = dialogEl.querySelector('.gs-text');
     dlg.typing = true;
-    let i = 0;
-    clearInterval(dlg.typeTimer);
+    clearTimeout(dlg.typeTimer);
     textEl.innerHTML = '';
     const caret = document.createElement('span');
     caret.className = 'gs-caret';
     caret.textContent = '✎';
     textEl.appendChild(caret);
-    const timerId = setInterval(() => {
+    let i = 0;
+    // 自适应节奏(2026-09-24 流畅度):普通字恒速,标点驻留(逗号轻顿/句末重顿),
+    // 台词打字从"机关枪"变成"说话的呼吸感"。setTimeout 递归取代 setInterval。
+    const step = () => {
       // 打字过程中对话可能已被关闭/切换(onDone 链会立刻开下一条)——空手而归
-      if (!dlg) {
-        clearInterval(timerId);
-        return;
-      }
+      if (!dlg) return;
       if (i >= str.length) {
-        clearInterval(timerId);
         dlg.typing = false;
         textEl.textContent = str;
         onLineDone();
         return;
       }
+      const ch = str[i];
       textEl.textContent = str.slice(0, ++i);
       textEl.appendChild(caret);
-    }, 38);
-    dlg.typeTimer = timerId;
+      dlg.typeTimer = setTimeout(step, dwellFor(ch));
+    };
+    dlg.typeTimer = setTimeout(step, 0);
   }
   function onLineDone() {
     clearTimeout(dlg.hideTimer);
@@ -72,7 +76,7 @@ export function createDialogSystem() {
     if (!dlg) return;
     if (dlg.typing) {
       // 点击=秒显本行
-      clearInterval(dlg.typeTimer);
+      clearTimeout(dlg.typeTimer);
       dlg.typing = false;
       dialogEl.querySelector('.gs-text').textContent = dlg.lines[dlg.idx] || '';
       onLineDone();
@@ -105,7 +109,7 @@ export function createDialogSystem() {
   }
   function closeDialog(suppressDone) {
     const d = dlg;
-    if (d && d.typeTimer) clearInterval(d.typeTimer);
+    if (d && d.typeTimer) clearTimeout(d.typeTimer);
     if (d && d.hideTimer) clearTimeout(d.hideTimer);
     dlg = null;
     dialogEl.style.display = 'none';
