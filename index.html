@@ -120,7 +120,9 @@
       >
         WASD移动 | 鼠标拖拽转视角 | 滚轮缩放
       </div>
-      <div id="m" data-world-ui="main" role="img" aria-label="小地图"><canvas id="mc"></canvas></div>
+      <div id="m" data-world-ui="main" role="img" aria-label="小地图">
+        <canvas id="mc"></canvas>
+      </div>
 
       <div id="j">
         <div id="jb"></div>
@@ -243,7 +245,7 @@
       (function () {
         async function recheck() {
           try {
-            const r = await fetch('/api/gate/status');
+            const r = await fetch('/api/entry/status');
             if (!r.ok) return;
             const d = await r.json();
             if (d && d.enter === false) location.reload();
@@ -305,7 +307,8 @@
           if (el) return el;
           el = document.createElement('div');
           el.id = 'errTrap';
-          el.style.cssText = 'position:fixed;left:0;bottom:0;max-width:100%;z-index:99999;font-family:monospace';
+          el.style.cssText =
+            'position:fixed;left:0;bottom:0;max-width:100%;z-index:99999;font-family:monospace';
           el.innerHTML =
             '<div id="errTrapBar" style="display:flex;gap:10px;align-items:center;padding:4px 8px;' +
             'background:rgba(0,0,0,0.82);color:#ffb0b0;font-size:11px;cursor:pointer;user-select:none">' +
@@ -348,10 +351,13 @@
           errCount++;
           el._badge.textContent = '⚠ 错误 ×' + errCount;
           el._log.textContent += m + '\n';
-          if (el._log.textContent.length > 3000) el._log.textContent = el._log.textContent.slice(-2000);
+          if (el._log.textContent.length > 3000)
+            el._log.textContent = el._log.textContent.slice(-2000);
           el._setFold(false);
           if (autoFoldT) clearTimeout(autoFoldT);
-          autoFoldT = setTimeout(function () { el._setFold(true); }, 12000);
+          autoFoldT = setTimeout(function () {
+            el._setFold(true);
+          }, 12000);
         }
         window.addEventListener(
           'error',

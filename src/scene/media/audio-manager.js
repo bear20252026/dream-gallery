@@ -129,7 +129,11 @@ setTimeout(function () {
           _aB.classList.add('p');
         })
         .catch((e) => {
-          alert('音乐播放失败: ' + ((e && e.name) || e) + '\n请把这条提示告诉开发者');
+          // 2026-09-24 主人令:报错不在前台出现 —— alert 改静默自动上报后台
+          if (window.__reportError)
+            window.__reportError('js', '音乐播放失败: ' + ((e && e.name) || e), {
+              source: 'audio-manager',
+            });
         });
     } else {
       if (mA.paused) {
