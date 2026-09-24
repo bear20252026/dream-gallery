@@ -26,7 +26,7 @@ import { makeLangToggle } from '../ui/lang-toggle.js';
 
 let active = false;
 
-export function playOpeningFilm(onDone) {
+export function playOpeningFilm(onDone, onFinishBegin) {
   const timers = new Set();
   const later = (fn, ms) => {
     const id = window.setTimeout(() => {
@@ -42,11 +42,16 @@ export function playOpeningFilm(onDone) {
   // 双语可切换:字幕单语显示,切语言即时重绘(2026-09-07 主人定)
   const capKey = { q: null, reply: null, sleep: null, fly1: null, fly2: null };
   function applyFilmLang() {
-    if (capKey.q && $('fTq') && $('fTq').classList.contains('show')) $('fTq').textContent = tt(capKey.q);
-    if (capKey.reply && $('fReply') && $('fReply').classList.contains('show')) $('fReply').textContent = tt(capKey.reply);
-    if (capKey.sleep && $('fSleep') && $('fSleep').classList.contains('show')) $('fSleep').textContent = tt(capKey.sleep);
-    if (capKey.fly1 && $('tFly1') && $('tFly1').classList.contains('ftshow')) $('tFly1').textContent = tt(capKey.fly1);
-    if (capKey.fly2 && $('tFly2') && $('tFly2').classList.contains('ftshow')) $('tFly2').textContent = tt(capKey.fly2);
+    if (capKey.q && $('fTq') && $('fTq').classList.contains('show'))
+      $('fTq').textContent = tt(capKey.q);
+    if (capKey.reply && $('fReply') && $('fReply').classList.contains('show'))
+      $('fReply').textContent = tt(capKey.reply);
+    if (capKey.sleep && $('fSleep') && $('fSleep').classList.contains('show'))
+      $('fSleep').textContent = tt(capKey.sleep);
+    if (capKey.fly1 && $('tFly1') && $('tFly1').classList.contains('ftshow'))
+      $('tFly1').textContent = tt(capKey.fly1);
+    if (capKey.fly2 && $('tFly2') && $('tFly2').classList.contains('ftshow'))
+      $('tFly2').textContent = tt(capKey.fly2);
   }
   window.addEventListener('script:lang', applyFilmLang);
 
@@ -89,6 +94,14 @@ export function playOpeningFilm(onDone) {
   root.id = 'b612film';
   root.innerHTML = FILM_MARKUP; // 标记/样式已拆分 gate/film-style.js(2026-09-20)
   document.body.appendChild(root);
+  // 电影层 0.45s 淡入(2026-09-24 消闪):z=580 高于闸门 z=150,原来瞬间盖上等于
+  // 纸色闸门→纯黑硬切(主人报「ENTER 后闪一下」)。淡入让闸门透出来自然过渡。
+  root.style.opacity = '0';
+  requestAnimationFrame(function () {
+    if (gate.dead) return;
+    root.style.transition = 'opacity .45s ease';
+    root.style.opacity = '1';
+  });
   // 影片内语言切换钮(右上角,与闸门/HUD 共用 makeLangToggle;root 完整后才挂)
   {
     const fT = makeLangToggle({ placement: 'top:14px;right:14px', z: 20 });
@@ -135,8 +148,7 @@ export function playOpeningFilm(onDone) {
     $('fc').addEventListener('webglcontextlost', function (e) {
       e.preventDefault();
       renderer = null; // 后续帧直接走降级
-      if (window.__reportError)
-        window.__reportError('webgl', 'film WebGL context lost,已降级收束');
+      if (window.__reportError) window.__reportError('webgl', 'film WebGL context lost,已降级收束');
       later(function () {
         gate.finish(); // 上下文丢失收束:与 skip/自然播完同口,幂等只放一次
       }, 400);
@@ -776,6 +788,11 @@ export function playOpeningFilm(onDone) {
   // 收束状态机(film-gate.mjs 纯逻辑):running/skipped/幂等 finish/后来居上的收束定时器
   let choseBoa = false;
   const gate = createFilmGate(function () {
+    // 交棒通知(2026-09-24 消闪):淡出开始前让主流程先把世界揭幕跑起来,
+    // 世界在电影层之下同步淡入 → 交叉溶解,替代旧的「黑场等 1.7s 再揭幕」硬切。
+    try {
+      if (onFinishBegin) onFinishBegin();
+    } catch (e) {}
     root.style.transition = 'opacity 1.6s ease';
     root.style.opacity = '0';
     setTimeout(done, 1700);
@@ -828,7 +845,8 @@ export function playOpeningFilm(onDone) {
     await drawGroup(HAT, false);
     await wait(900);
     if (dead()) return;
-    $('fTq').textContent = tt(FILM.question); capKey.q = FILM.question;
+    $('fTq').textContent = tt(FILM.question);
+    capKey.q = FILM.question;
     $('fTq').classList.add('show');
     $('fChoice').classList.add('show');
     await new Promise((res) => {
@@ -865,11 +883,13 @@ export function playOpeningFilm(onDone) {
     );
     await wait(1200);
     if (dead()) return;
-    $('tFly1').textContent = tt(FILM.fly1); capKey.fly1 = FILM.fly1;
+    $('tFly1').textContent = tt(FILM.fly1);
+    capKey.fly1 = FILM.fly1;
     $('tFly1').classList.add('ftshow');
     await wait(3600);
     if (dead()) return;
-    $('tFly2').textContent = tt(FILM.fly2); capKey.fly2 = FILM.fly2;
+    $('tFly2').textContent = tt(FILM.fly2);
+    capKey.fly2 = FILM.fly2;
     $('tFly2').classList.add('ftshow');
     await wait(4200);
     if (dead()) return;

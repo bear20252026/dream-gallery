@@ -331,9 +331,21 @@ import('./gate/entrygate.js')
     }
     import('./gate/openfilm.js')
       .then(function (m) {
-        m.playOpeningFilm(function () {
-          finishIntro(false);
-        });
+        m.playOpeningFilm(
+          function () {
+            finishIntro(false);
+          },
+          function () {
+            // 电影整层开始淡出的同一刻(2026-09-24 消闪):先把世界揭幕跑起来,
+            // 世界在电影层之下同步淡入 → 交叉溶解。替代旧时序「电影淡出到黑场
+            // → 等 done → 才揭幕」(黑→亮纸→地图 = 主人报的「闪一下」)。
+            // startWorld 有 worldStarted 幂等闸,done 后的 finishIntro 再叫是无害空转。
+            if (ctx.startWorld)
+              Promise.resolve(ctx.startWorld()).catch(function () {
+                showWorldLoadError();
+              });
+          }
+        );
       })
       .catch(function (e) {
         console.warn('[film] 开幕电影加载失败,直接进馆:', e.message);
