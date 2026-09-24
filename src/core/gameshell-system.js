@@ -11,6 +11,7 @@ import { eventBus } from './event-bus.js';
 import { GLOBAL, tt } from '../shared/story-text.mjs';
 import { defineSystem } from './system.js';
 import { createDialogSystem } from './gameshell-dialog.js'; // 对话框状态机(B5 外迁)
+import { pagesBonusForChapter } from '../shared/story-progress.mjs'; // 书页映射单一权威(2026-09-24 抽出)
 
 // ---------- 手绘样式(一次性注入,羊皮纸 + 抖边 + 楷体笔触) ----------
 const STYLE = `
@@ -158,8 +159,8 @@ function createGameShellSystem() {
     let pages = 0;
     try {
       if (ctx.store.flag('page1')) pages = 1;
-      const chapter = ctx.store.num('planetsChapter'); // 书页映射:一~三=1;四=4;五=5;六=6;七=7
-      pages = Math.max(pages, { 0: 1, 1: 4, 2: 5, 3: 6, 4: 7 }[chapter] || 0);
+      // 书页映射单一权威在 shared/story-progress.mjs(单测钉死;5/6 章未映射=回退 page1)
+      pages = Math.max(pages, pagesBonusForChapter(ctx.store.num('planetsChapter')));
     } catch (e) {
       console.debug('[gameshell-system] 任务册书页映射读取失败(用兜底页数):', e);
     }

@@ -22,6 +22,7 @@ import {
   spawnFor,
   kingSpawnPoint,
 } from '../shared/planet-logic.mjs';
+import { clampChapter, advanceChapter, decorateSpiritsState } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -121,8 +122,7 @@ function loadWorldAsset(url, world, opts = {}) {
   );
 }
 /* ===================== 状态 ===================== */
-let chapter = ctx.store.num('planetsChapter'); // 0..6(6=全部完成)
-if (chapter > 6) chapter = 6;
+let chapter = clampChapter(ctx.store.num('planetsChapter')); // 0..6(6=全部完成;脏数据钳制,2026-09-24 下沉 story-progress.mjs)
 ctx.kunlun.planetsMode = true; // spirits.js:沙漠光柱系统休眠,questActive 恒真
 
 /* ===================== groundOverride 链式注册(浮空岛地面) ===================== */
@@ -343,19 +343,21 @@ function loadPortalPad(world, position, targetWorld) {
   );
   marker.position.y = 0.09;
   root.add(marker);
-  createGLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
-    'models/hall/b612-world/portal-platform.glb',
-    (gltf) => {
-      const m = gltf.scene;
-      m.scale.setScalar(0.003);
-      m.traverse((o) => {
-        if (o.name && /monolith|column|pillar/i.test(o.name)) o.visible = false;
-      });
-      root.add(m);
-    },
-    undefined,
-    (e) => console.warn('[planets] portal platform load failed', e.message)
-  );
+  createGLTFLoader()
+    .setMeshoptDecoder(MeshoptDecoder)
+    .load(
+      'models/hall/b612-world/portal-platform.glb',
+      (gltf) => {
+        const m = gltf.scene;
+        m.scale.setScalar(0.003);
+        m.traverse((o) => {
+          if (o.name && /monolith|column|pillar/i.test(o.name)) o.visible = false;
+        });
+        root.add(m);
+      },
+      undefined,
+      (e) => console.warn('[planets] portal platform load failed', e.message)
+    );
   world.scene.add(root);
   pads[targetWorld] = root;
   return root;
@@ -368,20 +370,22 @@ function loadPortalPad(world, position, targetWorld) {
   base.position.y = 0.12;
   gateGrp.add(base);
   // 石门 GLB(压缩版 4.5MB;门洞朝向画廊内部,即 -Z)
-  createGLTFLoader().setMeshoptDecoder(MeshoptDecoder).load(
-    'models/hall/b612-gate-moss.glb',
-    function (gltf) {
-      const m = gltf.scene;
-      m.scale.setScalar(8.2); // 0.74m → ~6.1m 高
-      m.rotation.y = Math.PI; // 门洞转向画廊
-      m.position.y = 0;
-      gateGrp.add(m);
-    },
-    undefined,
-    function (e) {
-      console.warn('[planets] 星门模型加载失败,保留石环:', e.message);
-    }
-  );
+  createGLTFLoader()
+    .setMeshoptDecoder(MeshoptDecoder)
+    .load(
+      'models/hall/b612-gate-moss.glb',
+      function (gltf) {
+        const m = gltf.scene;
+        m.scale.setScalar(8.2); // 0.74m → ~6.1m 高
+        m.rotation.y = Math.PI; // 门洞转向画廊
+        m.position.y = 0;
+        gateGrp.add(m);
+      },
+      undefined,
+      function (e) {
+        console.warn('[planets] 星门模型加载失败,保留石环:', e.message);
+      }
+    );
 }
 // 门内符文环+膜(挂在门洞中心;颜色随章节变化,是"下一站"的信号)
 const gateRingMat = new THREE.MeshBasicMaterial({
@@ -429,8 +433,10 @@ function refreshGate() {
 refreshGate();
 // 章节推进/星屑隐藏钩子(2026-09-20 情节阶段一:scene6-king.js 等剧情模块调用)
 ctx.kunlun.setChapter = function (n) {
-  chapter = Math.max(chapter, Math.min(n, 6));
-  try { ctx.store.setNum('planetsChapter', chapter); } catch (e) {}
+  chapter = advanceChapter(chapter, n); // 只前进不回退,封顶 6(契约单测钉死)
+  try {
+    ctx.store.setNum('planetsChapter', chapter);
+  } catch (e) {}
   refreshGate();
 };
 ctx.kunlun.hideSproutMote = function () {
@@ -441,7 +447,6 @@ ctx.kunlun.hideSproutMote = function () {
 // king 台放在第一座岛中心,玩家进入国王星球后立即可见;B612 台在原点。
 loadPortalPad(worldManager.getWorld('main'), { x: 0.1, y: mainGateY + 0.03, z: 56.0 }, 'b612');
 loadPortalPad(worldManager.getWorld('king325'), { x: 0, y: 0, z: 0 }, 'b612');
-
 
 /* ===================== 指引 HUD(屏顶箭头, spirits 同款自建) ===================== */
 const hud = document.createElement('div');
@@ -476,7 +481,9 @@ const navB = mkNavBtn('');
 const worldNav = document.createElement('div');
 worldNav.id = 'worldNav';
 worldNav.style.cssText =
-  'position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:'+Z.navBtn+';display:none;flex-direction:column;gap:10px;align-items:center';
+  'position:fixed;left:50%;bottom:150px;transform:translateX(-50%);z-index:' +
+  Z.navBtn +
+  ';display:none;flex-direction:column;gap:10px;align-items:center';
 worldNav.appendChild(navA);
 worldNav.appendChild(navB);
 document.body.appendChild(worldNav);
@@ -660,9 +667,12 @@ onTick(function (dt) {
     const jz = (ctx.player.jD && ctx.player.jD.z) || 0;
     const jl = Math.hypot(jx, jz);
     if (jl > 0.1) {
-      const nx = jx / jl, nz = jz / jl;
-      const fx2 = -Math.sin(yaw), fz2 = -Math.cos(yaw);
-      const rx2 = Math.cos(yaw), rz2 = -Math.sin(yaw);
+      const nx = jx / jl,
+        nz = jz / jl;
+      const fx2 = -Math.sin(yaw),
+        fz2 = -Math.cos(yaw);
+      const rx2 = Math.cos(yaw),
+        rz2 = -Math.sin(yaw);
       const js = speed * 0.75 * dt2;
       p.x += (fx2 * nz + rx2 * nx) * js;
       p.z += (fz2 * nz + rz2 * nx) * js;
@@ -716,15 +726,7 @@ onTick(function (dt) {
 // 罗盘页:覆盖 spiritsState 的 place/name(星球版);顺序与 SPIRITS 一致
 const prevSpiritsState = ctx.kunlun.spiritsState;
 ctx.kunlun.spiritsState = function () {
-  const arr = prevSpiritsState();
-  return arr.map(function (st, i) {
-    if (i >= PLANETS.length) return st;
-    return Object.assign({}, st, {
-      name: PLANETS[i].name,
-      en: PLANETS[i].en,
-      place: chapter > i ? PLANETS[i].place + ' · 已点亮' : PLANETS[i].place,
-    });
-  });
+  return decorateSpiritsState(prevSpiritsState(), PLANETS, chapter);
 };
 // 小地图标记:当前目标(星门或当前岛)
 ctx.kunlun.planetsMark = function () {
