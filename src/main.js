@@ -40,6 +40,9 @@ import { paperReveal } from './ui/reveal.js'; // 纸色揭幕(2026-09-18 外迁)
 import { startBigscreenWhenReady } from './ui/bigscreen-boot.js'; // 大屏轮播延迟启动(零重依赖,2026-09-18 外迁)
 import { setupAgreementSwipe, spawnAgreementPages } from './gate/agreement-swipe.js'; // 三协议并列铺开(P1-1,只读不写)
 import { signAllConsents } from './gate/consent-session.js'; // 三连协议会话签(零依赖,2026-09-18 外迁)
+import { loadWorldModules } from './core/world-loader.js'; // 世界模块加载链(2026-09-24 下沉)
+import { sweepLights } from './core/light-sweep.js'; // 灯光限额执行器(2026-09-24 下沉)
+import { runBootCheck } from './core/boot-check.js'; // 启动自检(2026-09-24 下沉)
 
 // ===================== 主画布视觉保险 + 加载屏交接 =====================
 // 主画布开机隐藏:闸门/电影期间世界不可见——不是遮盖,startWorld 时才显形,
@@ -108,75 +111,14 @@ let preloadPromise = null; // 预加载记忆化:并发调用(onEnter 与 startW
 async function preloadWorld() {
   if (preloadPromise) return preloadPromise; // 2026-09-07 修复:重复调用曾让组合根 init 多跑,系统全量重复装配
   preloadPromise = (async () => {
-    // —— 世界模块按原 import 顺序加载(2026-09-18 数据化:字面量 import thunk,Vite 仍逐个切包) ——
-    const WORLD_MODULES = [
-      ['场景', () => import('./scene/scene.js')],
-      ['媒体', () => import('./scene/media.js')],
-      ['牌子', () => import('./gallery/signs.js')],
-      ['喷泉', () => import('./gallery/fountains.js')],
-      ['标记', () => import('./gallery/markers.js')],
-      ['链接', () => import('./gallery/links.js')],
-      ['挂画', () => import('./gallery/paintings.js')],
-      ['模式', () => import('./gallery/mode.js')],
-      ['塔楼', () => import('./gallery/dome-towers.js')],
-      ['设置', () => import('./gate/settings.js')],
-      ['上传', () => import('./gate/upload.js')],
-      ['房屋色', () => import('./gate/housecolor.js')],
-      ['温柔度', () => import('./gate/quiz.js')],
-      ['沙漠', () => import('./scene/desert.js')],
-      ['玩家', () => import('./scene/player.js')],
-      ['答题门', () => import('./gate/quizgate.js')],
-      ['远方山巅', () => import('./kunlun/peaks.js')],
-      ['灵蕴', () => import('./kunlun/spirits.js')],
-      ['永恒厅', () => import('./kunlun/eternal.js')],
-      ['飞舟', () => import('./kunlun/ark.js')],
-      ['风铃', () => import('./kunlun/windchime.js')],
-      ['壁炉', () => import('./kunlun/fireplace.js')],
-      ['雪窗', () => import('./kunlun/snowwin.js')],
-      ['星球世界', () => import('./kunlun/planets.js')],
-      ['第6场国王', () => import('./kunlun/scene6-king.js')],
-      ['对话', () => import('./kunlun/story-dialogs.js')],
-      ['石门', () => import('./gallery/portal.js')],
-      ['坠机点', () => import('./gallery/crash-site.js')],
-      ['画羊', () => import('./gate/scene2-draw.js')],
-      ['书页一', () => import('./gate/scene3-night.js')],
-      ['回忆层', () => import('./kunlun/scene3-memory.js')],
-      ['重置视角', () => import('./kunlun/resetview.js')],
-      ['放下', () => import('./kunlun/letgo.js')],
-      ['终章', () => import('./kunlun/finale.js')],
-      ['状态机', () => import('./player/states/PlayerStates.js')],
-      ['后处理', () => import('./scene/postprocessing.js')],
-    ];
-    for (const [label, load] of WORLD_MODULES) {
-      try {
-        window.__worldPhase = label;
-        await load();
-      } catch (e) {
-        window.__worldPhase = '失败:' + label;
-        console.error('[startWorld] ' + label + ' 加载失败:', e.message);
-        if (window.__reportError)
-          window.__reportError('boot', 'startWorld 模块失败: ' + label + ' ' + e.message);
-        throw e;
-      }
-    }
+    // —— 世界模块按原 import 顺序加载(2026-09-24 下沉 core/world-loader.js) ——
+    await loadWorldModules();
 
     // —— 以下为原 main.js 顶层构建代码(依赖上述模块的副作用,顺序不可调换) ——
-    const { s, cam, rnd, pls } = ctx;
+    const { s, cam, rnd } = ctx;
 
-    // ===================== 灯光限额(性能;选择算法在 core/light-budget.js 纯逻辑) =====================
-    // 光源总数直接决定着色器体积:实测单程序编译 59盏≈822ms / 24盏≈208ms / 13盏≈103ms。
-    {
-      const isMobile = 'ontouchstart' in window && Math.min(screen.width, screen.height) < 768;
-      const { selectLightsToRemove } = await import('./core/light-budget.js');
-      const { remove: rm, ceil } = selectLightsToRemove((cb) => s.traverse(cb), pls, { isMobile });
-      rm.forEach((l) => l.parent && l.parent.remove(l));
-      for (let i = pls.length - 1; i >= 0; i--) if (!ceil.has(pls[i].l)) pls.splice(i, 1);
-      expose('lightBudget', {
-        removed: rm.length,
-        keepEvery: isMobile ? 3 : 2,
-        spotKeep: isMobile ? 4 : 10,
-      });
-    }
+    // 灯光限额(性能;2026-09-24 执行器下沉 core/light-sweep.js,选择算法在 core/light-budget.js)
+    await sweepLights(ctx);
 
     // ===================== 后处理管线初始化(2026-08-22) =====================
     const pp = await import('./scene/postprocessing.js'); // 已在上方链加载,此处取缓存
@@ -269,43 +211,8 @@ async function preloadWorld() {
       softImport(() => import('./kunlun/avatar.js'));
     }, 2000);
 
-    // P3(2026-09-07 审计):启动自检——模块清单靠人肉同步,漏载的后果是静默的
-    // (2026-09-06「石门消失」就是漏载 planets.js)。对关键装配断言,缺谁喊谁。
-    const missing = [];
-    const need = function (name, getter) {
-      try {
-        if (!getter()) missing.push(name);
-      } catch (e) {
-        missing.push(name);
-      }
-    };
-    need('scene.rnd(渲染器)', function () {
-      return ctx.scene.rnd;
-    });
-    need('scene.s(活动场景)', function () {
-      return ctx.scene.s;
-    });
-    need('scene.worldManager(世界注册表)', function () {
-      return ctx.scene.worldManager;
-    });
-    need('scene.renderPostProcessing(后处理)', function () {
-      return ctx.scene.renderPostProcessing;
-    });
-    need('player.pl(玩家)', function () {
-      return ctx.player && ctx.player.pl;
-    });
-    need('desert.getH(地形)', function () {
-      return ctx.media && ctx.media.desert && ctx.media.desert.getH;
-    });
-    need('kunlun.spiritsState(灵蕴契约)', function () {
-      return ctx.kunlun && ctx.kunlun.spiritsState;
-    });
-    need('media.vidEl(户外大屏)', function () {
-      return ctx.media && ctx.media.vidEl;
-    });
-    window.__bootCheck = { ok: missing.length === 0, missing: missing };
-    if (missing.length)
-      console.error('[startWorld] 启动自检缺项(模块漏载或初始化失败):', missing.join(', '));
+    // P3(2026-09-07 审计):启动自检(2026-09-24 下沉 core/boot-check.js)——缺谁喊谁
+    runBootCheck(ctx);
 
     worldBooted = true; // 预加载完成:模块与场景构建全部就绪(揭幕由 startWorld 负责)
   })().catch(function (e) {
