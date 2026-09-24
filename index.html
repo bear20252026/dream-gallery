@@ -248,7 +248,10 @@
             const r = await fetch('/api/entry/status');
             if (!r.ok) return;
             const d = await r.json();
-            if (d && d.enter === false) location.reload();
+            // 只在"被踢/被拒/历史档"时刷新重进(与闸门页 gate.js 判据一致);
+            // enter:false 还包含"无档案"状态,对它 reload 会造成每 10s 无限刷新(2026-09-24 回归修复)
+            if (d && (d.status === 'kicked' || d.status === 'denied' || d.status === 'history'))
+              location.reload();
           } catch (e) {}
         }
         try {
