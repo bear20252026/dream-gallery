@@ -29,6 +29,15 @@ export default [
       'no-useless-escape': 'off',
     },
   },
+  // core/ 关键路径收紧(2026-09-24 空 catch 分级治理):对话链/游戏状态等核心模块
+  // 禁止静默吞错——排障要有迹可循(9-10 对话链断链排障成本高的教训)。
+  // 其余目录维持 allowEmptyCatch:true,待后续分批治理;新增空 catch 一律先写 debug 日志。
+  {
+    files: ['src/core/**/*.js'],
+    rules: {
+      'no-empty': ['error', { allowEmptyCatch: false }],
+    },
+  },
   // 后端与脚本(CommonJS;探针/测试里有 page.evaluate 浏览器代码,故同时放行浏览器全局)
   {
     files: ['server.js', 'lib/**/*.js', 'scripts/**/*.js', 'vite.config.js'],

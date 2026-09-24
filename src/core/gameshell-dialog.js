@@ -65,7 +65,8 @@ export function createDialogSystem() {
   }
   function advance() {
     if (!dlg) return;
-    if (dlg.typing) { // 点击=秒显本行
+    if (dlg.typing) {
+      // 点击=秒显本行
       clearInterval(dlg.typeTimer);
       dlg.typing = false;
       dialogEl.querySelector('.gs-text').textContent = dlg.lines[dlg.idx] || '';
@@ -129,14 +130,23 @@ export function createDialogSystem() {
       lockQueue.push(opts);
       return;
     }
-    const lines = Array.isArray(opts.lines) ? opts.lines : [opts.lines != null ? String(opts.lines) : ''];
+    const lines = Array.isArray(opts.lines)
+      ? opts.lines
+      : [opts.lines != null ? String(opts.lines) : ''];
     if (!lines.length) lines.push('');
     // 打断式换对话(2026-09-09 容错):旧 onDone 延后到新对话装好后再收束——
     // 同步收束会让旧链抢先 openDialog 下一条,再被本次 dlg=... 覆盖,链直接断死
     if (dlg) {
       const prev = dlg.onDone;
       closeDialog(true);
-      if (prev) setTimeout(() => { try { prev(); } catch (e) {} }, 0);
+      if (prev)
+        setTimeout(() => {
+          try {
+            prev();
+          } catch (e) {
+            console.debug('[gameshell-dialog] 被打断的旧 onDone 回调出错(不阻断新链):', e);
+          }
+        }, 0);
     }
     dlg = {
       speaker: opts.speaker || 'B612',
@@ -144,7 +154,8 @@ export function createDialogSystem() {
       lines,
       idx: 0,
       choices: opts.choices || null,
-      autoHide: opts.autoHide != null ? opts.autoHide : (opts.choices && opts.choices.length ? 0 : 9000),
+      autoHide:
+        opts.autoHide != null ? opts.autoHide : opts.choices && opts.choices.length ? 0 : 9000,
       onDone: opts.onDone || null,
       lock: !!opts.lock,
       typing: false,

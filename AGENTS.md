@@ -33,7 +33,9 @@ npm test                          # = 下面三条(test-store + test.js + test-m
 node scripts/test/test-store.js   # 存档原子写 4 项(并发保存/截断恢复/tmp 残留)
 node scripts/test/test.js         # 后端 125 项(数据校验/API/安全边界/审批门/上传限制/邀请)
 node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色器错误/JS异常/空屏)
-npx vitest run                    # 前端单测 228 项(collision/EntityRegistry/GameLoop/StateMachine/events/SpatialIndex/store/planet-logic/light-budget/film-gate)
+npx vitest run                    # 前端单测 245 项(物理/碰撞/状态机/游戏状态/存档/路由契约/配额/灯光预算/剧情纯逻辑等 24 文件)
+npx vitest run --coverage         # 覆盖率基线(2026-09-24 建):已测纯逻辑模块普遍 82-100%(game-state 94/collision-resolve 96/light-budget 100/store 100/vertical-physics 92);
+                                  # 全库 2.02% 是**假低**——3D/浏览器模块在 node 里跑不了,由探针层(scripts/probe/)兜住,勿用全库数字评判
 npm run test:scene                # 场景截图回归 4 检查点(主世界/B612/国王星球/返回;见「场景自动化测试」节)
 ```
 

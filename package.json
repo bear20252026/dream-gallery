@@ -47,6 +47,7 @@
     "@gltf-transform/extensions": "^4.4.2",
     "@gltf-transform/functions": "^4.4.2",
     "@types/three": "^0.185.4",
+    "@vitest/coverage-v8": "^4.1.11",
     "dependency-cruiser": "^18.1.0",
     "dexie": "^4.4.6",
     "esbuild": "^0.28.1",

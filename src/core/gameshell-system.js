@@ -143,7 +143,12 @@ function createGameShellSystem() {
 
   // ---- 任务栏进度 ----
   function readProgress() {
-    let spirits = (ctx.kunlun && ctx.kunlun.spiritsGot) ? ctx.kunlun.spiritsGot() : (ctx.store.getSpirits ? ctx.store.getSpirits().length : 0);
+    let spirits =
+      ctx.kunlun && ctx.kunlun.spiritsGot
+        ? ctx.kunlun.spiritsGot()
+        : ctx.store.getSpirits
+          ? ctx.store.getSpirits().length
+          : 0;
     const chapter = ctx.store.num('planetsChapter'); // 星屑:每章一颗,与新剧情线取大
     spirits = Math.max(spirits, Math.min(chapter, 6));
     const picks = (ctx.store.json('eternalPicks', []) || []).length;
@@ -155,7 +160,9 @@ function createGameShellSystem() {
       if (ctx.store.flag('page1')) pages = 1;
       const chapter = ctx.store.num('planetsChapter'); // 书页映射:一~三=1;四=4;五=5;六=6;七=7
       pages = Math.max(pages, { 0: 1, 1: 4, 2: 5, 3: 6, 4: 7 }[chapter] || 0);
-    } catch (e) {}
+    } catch (e) {
+      console.debug('[gameshell-system] 任务册书页映射读取失败(用兜底页数):', e);
+    }
     let main;
     if (spirits < 6) main = tt(GLOBAL.questMain);
     else if (picks < 1) main = '在永恒展厅挂上你的画';
@@ -175,7 +182,10 @@ function createGameShellSystem() {
       ['飞舟', p.ark],
     ];
     questEl.querySelector('.q-rows').innerHTML = rows
-      .map((r) => `<div class="q-row"><span class="q-k">${r[0]}</span><span class="q-v">${r[1]}</span></div>`)
+      .map(
+        (r) =>
+          `<div class="q-row"><span class="q-k">${r[0]}</span><span class="q-v">${r[1]}</span></div>`
+      )
       .join('');
   }
 
@@ -197,38 +207,45 @@ function createGameShellSystem() {
     document.body.appendChild(menuEl);
     menuEl.querySelector('[data-act="ask"]').onclick = () => {
       menuApi.close();
-      ctx.openDialog && ctx.openDialog({
-        speaker: 'B612',
-        lines: [
-          'Welcome to B612 — a gallery for unfinished drawings.',
-          '收集六颗星屑罢——天、地、风、火、水、心。集齐了，飞舟自会来接你。',
-        ],
-      });
+      ctx.openDialog &&
+        ctx.openDialog({
+          speaker: 'B612',
+          lines: [
+            'Welcome to B612 — a gallery for unfinished drawings.',
+            '收集六颗星屑罢——天、地、风、火、水、心。集齐了，飞舟自会来接你。',
+          ],
+        });
     };
     menuEl.querySelector('[data-act="help"]').onclick = () => {
       menuApi.close();
-      ctx.openDialog && ctx.openDialog({
-        speaker: 'B612',
-        lines: [
-          'W A S D 行走，鼠标转望，空格起跳。',
-          '走近发光的光柱即可拾取星屑；登上山巅的飞舟可巡游天穹。',
-          '右上那枚朱印，随时唤出这本手札。',
-        ],
-      });
+      ctx.openDialog &&
+        ctx.openDialog({
+          speaker: 'B612',
+          lines: [
+            'W A S D 行走，鼠标转望，空格起跳。',
+            '走近发光的光柱即可拾取星屑；登上山巅的飞舟可巡游天穹。',
+            '右上那枚朱印，随时唤出这本手札。',
+          ],
+        });
     };
     menuEl.querySelector('[data-act="quest"]').onclick = () => {
       menuApi.close();
       const p = readProgress();
-      ctx.openDialog && ctx.openDialog({
-        speaker: '当前任务',
-        lines: [
-          '主线 · ' + p.main,
-          '星屑 ' + p.spirits + ' / 6　·　展厅挂画 ' + p.picks + ' / 20　·　飞舟 ' + p.ark,
-        ],
-      });
+      ctx.openDialog &&
+        ctx.openDialog({
+          speaker: '当前任务',
+          lines: [
+            '主线 · ' + p.main,
+            '星屑 ' + p.spirits + ' / 6　·　展厅挂画 ' + p.picks + ' / 20　·　飞舟 ' + p.ark,
+          ],
+        });
     };
     menuEl.querySelector('[data-act="close"]').onclick = () => menuApi.close();
-    menuApi = ctx.overlay.register(menuEl, { display: 'flex', escapable: true, closeOnOutside: true });
+    menuApi = ctx.overlay.register(menuEl, {
+      display: 'flex',
+      escapable: true,
+      closeOnOutside: true,
+    });
   }
 
   // ---- 系统装配 ----
@@ -239,7 +256,8 @@ function createGameShellSystem() {
     order: 6,
     init() {
       window.__gsInitN = (window.__gsInitN || 0) + 1;
-      if (window.__gsInitN > 1) console.warn('[gameshell] init 重复装配 #' + window.__gsInitN, new Error().stack);
+      if (window.__gsInitN > 1)
+        console.warn('[gameshell] init 重复装配 #' + window.__gsInitN, new Error().stack);
       styleEl = document.createElement('style');
       styleEl.textContent = STYLE;
       document.head.appendChild(styleEl);
@@ -259,7 +277,7 @@ function createGameShellSystem() {
 
       questEl = document.createElement('div');
       questEl.id = 'questHud';
-questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
+      questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
       questEl.innerHTML = `
         <button id="questFold" type="button" aria-label="收起/展开任务册" title="收起/展开">－</button>
         <div class="q-title">任 务 册</div>
@@ -272,13 +290,22 @@ questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 
         questEl.classList.toggle('folded', !!folded);
         qFoldBtn.textContent = folded ? '＋' : '－';
       };
-      try { applyFold((ctx.store.json('uiFold', {}) || {}).quest); } catch (e) {}
+      try {
+        applyFold((ctx.store.json('uiFold', {}) || {}).quest);
+      } catch (e) {
+        console.debug('[gameshell-system] 任务册折叠偏好读取失败(保持展开):', e);
+      }
       qFoldBtn.onclick = function () {
         const folded = !questEl.classList.contains('folded');
         applyFold(folded);
         try {
-          ctx.store.setJson('uiFold', Object.assign({}, ctx.store.json('uiFold', {}) || {}, { quest: folded }));
-        } catch (e) {}
+          ctx.store.setJson(
+            'uiFold',
+            Object.assign({}, ctx.store.json('uiFold', {}) || {}, { quest: folded })
+          );
+        } catch (e) {
+          console.debug('[gameshell-system] 任务册折叠偏好保存失败(不影响本次折叠):', e);
+        }
       };
       refreshQuest();
 
@@ -286,7 +313,9 @@ questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 
       menuBtn.id = 'gsMenuBtn';
       menuBtn.textContent = '印';
       menuBtn.title = '唤出手札';
-      menuBtn.onclick = () => { menuApi ? menuApi.open() : null; };
+      menuBtn.onclick = () => {
+        menuApi ? menuApi.open() : null;
+      };
       document.body.appendChild(menuBtn);
       buildMenu();
 
@@ -297,7 +326,13 @@ questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 
       // 升级昆仑开口:既播 TTS,又落进手绘框(所有现有 kunlunSpeak 调用自动生效)
       prevKunlunSpeak = ctx.ui.kunlunSpeak;
       ctx.ui.kunlunSpeak = (/** @type {string} */ text, /** @type {string} */ voice) => {
-        if (prevKunlunSpeak) { try { prevKunlunSpeak(text, voice); } catch (e) {} }
+        if (prevKunlunSpeak) {
+          try {
+            prevKunlunSpeak(text, voice);
+          } catch (e) {
+            console.debug('[gameshell-system] 旧 kunlunSpeak 升级回调出错(不影响手绘框):', e);
+          }
+        }
         dialogApi.open({ speaker: dialogApi.speakerFor(voice), lines: [text], autoHide: 9000 });
       };
       ctx.ui.openDialog = dialogApi.open; // 剧本链统一入口(2026-09-18 收编;扁平读 ctx.openDialog 仍等价)
@@ -305,7 +340,10 @@ questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 
     },
     update(dt) {
       acc += dt;
-      if (acc >= 0.5) { acc = 0; refreshQuest(); }
+      if (acc >= 0.5) {
+        acc = 0;
+        refreshQuest();
+      }
     },
     dispose() {
       if (unsub) unsub();
