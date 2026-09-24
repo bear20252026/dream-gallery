@@ -4,9 +4,11 @@
 //   后台链 = 远区山巅深处/深剧情模块(永恒厅/飞舟/星球/回忆层/终章等),
 //            核心链完成后立即在后台按原相对顺序补载,**不阻塞进图**。
 // 按字面量 import thunk 逐个加载(Vite 仍逐个切包)。
-// ⚠️ 顺序即依赖(顶层 ctx 副作用):后台链内部保持原相对顺序;
-//    已核实 core 后段(对话/石门/坠机点/画羊/书页一/状态机/后处理)顶层不读后台链登记
-//    (planetsMode/eternalHandlers/eternalTeleport/arkTeleportToPeak/letgoRecall 等零引用)。
+// ⚠️ 顺序即依赖(顶层 ctx 副作用):后台链内部保持原相对顺序。
+// ⚠️ **planets.js(星球世界)必须在核心链**:它顶层创建 worldManager 世界注册表
+//    (scene-manager initSceneManager + 石门传送垫 loadPortalPad 都在其顶层),
+//    boot-check 断言 ctx.scene.worldManager——延后会让自检假报缺项(2026-09-24 探针实测踩坑)。
+//    「石门消失」教训的本质也是它:石门/星门传送垫在 planets.js 顶层注册。
 // 漏载后果是静默的(2026-09-06「石门消失」= 漏载 planets.js),启动自检见 core/boot-check.js;
 // 后台链完成状态挂 window.__deferredWorldReady 供探针/诊断读取。
 
@@ -30,6 +32,7 @@ export const WORLD_MODULES = [
   ['答题门', () => import('../gate/quizgate.js')],
   ['远方山巅', () => import('../kunlun/peaks.js')],
   ['灵蕴', () => import('../kunlun/spirits.js')],
+  ['星球世界', () => import('../kunlun/planets.js')],
   ['对话', () => import('../kunlun/story-dialogs.js')],
   ['石门', () => import('../gallery/portal.js')],
   ['坠机点', () => import('../gallery/crash-site.js')],
@@ -46,7 +49,6 @@ export const WORLD_MODULES_DEFERRED = [
   ['风铃', () => import('../kunlun/windchime.js')],
   ['壁炉', () => import('../kunlun/fireplace.js')],
   ['雪窗', () => import('../kunlun/snowwin.js')],
-  ['星球世界', () => import('../kunlun/planets.js')],
   ['第6场国王', () => import('../kunlun/scene6-king.js')],
   ['回忆层', () => import('../kunlun/scene3-memory.js')],
   ['重置视角', () => import('../kunlun/resetview.js')],

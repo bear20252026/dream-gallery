@@ -67,6 +67,17 @@ const { launch } = require('./browser.js');
   });
   console.log('=== 阶段耗时(ms) ===');
   console.log('TTFB:', nav.ttfb, '| DCL:', nav.domContentLoaded, '| 闸门就绪:', gateReadyAt, '| 世界就绪:', worldReadyAt || '超时');
+  // 后台链状态(2026-09-24 渐进加载):核心链完成即进图,后台链随后补载
+  const deferred = await page.evaluate(async () => {
+    const phase = window.__worldPhase || '(无)';
+    let dOK = '超时';
+    try {
+      await Promise.race([window.__deferredWorldReady || Promise.resolve(), new Promise((r) => setTimeout(r, 20000))]);
+      dOK = '完成';
+    } catch (e) { dOK = '异常'; }
+    return { phase, deferredReady: dOK, boot: window.__bootCheck };
+  });
+  console.log('世界相位:', deferred.phase, '| 后台链:', deferred.deferredReady, '| bootCheck:', JSON.stringify(deferred.boot));
   console.log('=== 资源总览 ===', stats.total, '个,', Math.round(stats.totalKB / 1024) + 'MB');
   console.log('=== 按域 ===');
   for (const [h, v] of Object.entries(stats.byHost))
