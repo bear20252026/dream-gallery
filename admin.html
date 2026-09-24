@@ -908,8 +908,9 @@
           <button class="btn-del" onclick="clearClicks()">批量清理</button>
         </div>
         <div id="clickList"></div>
-        <div class="section-title">访客端报错(仅后台可见)</div>
-        <div id="errList"></div>
+        <!-- 旧"访客端报错"小节已删(2026-09-24):它的 id=errList 与「报错」独立 tab 撞重复 id,
+             getElementById 永远命中这里 → 报错 tab 永远空白。数据源 /api/track/error 前端也已无调用方。
+             访客报错统一看「报错」tab(loadErrors → /api/admin/client-errors)。 -->
         <div class="section-title">一念墙(访客写下的一句话 · 可删不当内容)</div>
         <div style="display: flex; gap: 8px; margin-bottom: 10px">
           <button class="btn-day" id="wishRefresh">刷新一念</button>

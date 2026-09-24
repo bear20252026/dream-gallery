@@ -1137,17 +1137,10 @@ function loadDisplay() {
     </div>`;
       })
       .join('') || '<div class="empty">还没有点击记录</div>';
-  // 访客端 JS 报错(仅后台可见)
-  const errs = DATA.clientErrors || [];
-  $('errList').innerHTML =
-    errs
-      .map(
-        (e) => `<div class="card" style="border-color:rgba(255,120,120,.35)">
-    <div class="answer"> ${brandIcon(e.brand)} 「${esc(e.name || '访客')}」 ${esc(e.msg.slice(0, 90))}</div>
-    <div class="meta">${fmt(e.t)} · ${esc(e.brand || '')} · ${esc((e.src || '').split('/').pop())}:${e.line || '-'}</div>
-  </div>`
-      )
-      .join('') || '<div class="empty">暂无访客报错</div>';
+  // 访客端报错不再在此渲染(2026-09-24 修空白 bug):
+  // 旧链路(/api/track/error → gateData.clientErrors)前端已无调用方,且此处
+  // $('errList') 与「报错」独立 tab 的 #errList 撞重复 id,互相覆写 ——
+  // 报错统一由独立 tab 的 loadErrors()(读 /api/admin/client-errors)渲染。
 }
 // ---------- 户外大屏管理(软编码;上传替换/清空 → 同步 R2 + 游戏即时生效) ----------
 async function loadBigscreen() {
