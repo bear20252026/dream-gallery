@@ -264,20 +264,28 @@ document.getElementById('gearX').onclick = function () {
   panel.classList.remove('show');
 };
 
-// ===================== 开局触发 =====================
-// 2026-09-07:等坠机点「王子叫醒」对话收束(window.__crashWakeDone)再弹雅号/指引卡,
-// 不让弹窗盖住开场对白;兜底 25s 强制放行(crash-site.js 异常时不至于永不弹)。
-setTimeout(function () {
-  let waited = 0;
-  const t = setInterval(function () {
-    waited++;
-    if (window.__crashWakeDone || waited > 21) {
-      clearInterval(t);
-      if (ctx.showGuideCard) ctx.showGuideCard();
-      maybePop();
-    }
-  }, 1000);
-}, 4000);
+// ===================== 开局触发(已归档,2026-09-24 主人令) =====================
+// 两弹窗**归档不再自动弹出**,代码全部保留,POPUPS_ARCHIVED 改 false 即整体恢复:
+//   ① #nickPop 昵称弹窗(「古老的低语在等待回应……请给出你的真言」) —— maybePop()
+//   ② #guideCard 初见指引卡(《元素共鸣准则》说明书) —— showGuideCard()
+// 替代入口不变:昵称在罗盘设置面板改;说明书从罗盘菜单「📖 元素共鸣准则」或
+// 出生点旁 3D 牌子打开。探针/诊断可手动调 ctx.ui.showGuideCard() 复现弹窗。
+const POPUPS_ARCHIVED = true;
+if (!POPUPS_ARCHIVED) {
+  // 原逻辑:等坠机点「王子叫醒」对话收束(window.__crashWakeDone)再弹,不让弹窗
+  // 盖住开场对白;兜底 25s 强制放行(crash-site.js 异常时不至于永不弹)。
+  setTimeout(function () {
+    let waited = 0;
+    const t = setInterval(function () {
+      waited++;
+      if (window.__crashWakeDone || waited > 21) {
+        clearInterval(t);
+        if (ctx.showGuideCard) ctx.showGuideCard();
+        maybePop();
+      }
+    }, 1000);
+  }, 4000);
+}
 
 hotEnd('settings');
 if (import.meta.hot) import.meta.hot.accept();
