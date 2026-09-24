@@ -140,8 +140,14 @@ function build(opts) {
     // 面板关闭(三份读完 / 「‹ 返回闸门」/ Esc)后闸门恢复显示,已签状态不丢
     onRestore: function () {
       if (entered) return;
+      // 2026-09-24 修"闪一下真画廊":面板是 display:none **瞬间消失**,而闸门若走
+      // 1.2s 淡入,头几帧近乎全透明 → 底下已在渲染的 3D 世界直接闪出来。
+      // → 恢复时跳过过渡,同一帧直接不透明回屏;ENTER 揭幕的淡出照旧(enterBtn 路径)。
+      ov.style.transition = 'none';
       ov.style.opacity = '1';
       ov.style.pointerEvents = 'auto';
+      void ov.offsetWidth; // 强制本帧应用,再交还过渡控制
+      ov.style.transition = '';
     },
     // 三份签毕:闸门总勾选框自动勾上 + ENTER 点亮,用户直接点 ENTER 进场
     onAllSigned: function () {
