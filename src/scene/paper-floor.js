@@ -7,15 +7,17 @@
 // 纹理来自 public/textures/(paper/perlin/terrain1),缺失时自动回退纯色,不阻塞加载。
 import * as THREE from 'three';
 
+// 2026-09-25 加速:地面纹理走 R2 CDN 边缘(terrain1 913KB→322KB 后仍原同源最慢 18s);
+// localhost 走 public/ 源码目录
+const TEX_CDN =
+  location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    ? ''
+    : 'https://cdn.cloudbear.cloud/';
+
 function loadTex(url, repeat, srgb) {
-  const tex = new THREE.TextureLoader().load(
-    url,
-    undefined,
-    undefined,
-    () => {
-      console.warn('[paper-floor] 纹理缺失,回退纯色:', url);
-    }
-  );
+  const tex = new THREE.TextureLoader().load(TEX_CDN + url, undefined, undefined, () => {
+    console.warn('[paper-floor] 纹理缺失,回退纯色:', url);
+  });
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   if (repeat) tex.repeat.set(repeat, repeat);
   if (srgb) tex.colorSpace = THREE.SRGBColorSpace;

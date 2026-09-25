@@ -295,8 +295,13 @@ loadWorldAsset('models/hall/b612-world/king-scene.glb', worldManager.getWorld('k
 });
 // B612 由 storybook GLB 原样呈现(小王子+绵羊+玫瑰+火山+星空全在模型内)
 // 终幕配乐:进入 B612 播放 GARGANTUA intro + main
-const gargIntro = new Audio('media/gargantua/gargantua-intro.mp3');
-const gargMain = new Audio('media/gargantua/gargantua-main.mp3');
+// 2026-09-25 加速:音频走 R2 CDN 边缘(1.4MB main 原走同源抢开机带宽);localhost 走源码目录
+const AUDIO_CDN =
+  location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+    ? ''
+    : 'https://cdn.cloudbear.cloud/';
+const gargIntro = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-intro.mp3');
+const gargMain = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-main.mp3');
 gargMain.loop = true;
 let gargStarted = false;
 ctx.scene.worldChanged &&
