@@ -92,9 +92,9 @@ export function setupAgreementSwipe(opts) {
       <style>
       #b612Pact{position:fixed;inset:0;z-index:${ZINDEX};display:flex;align-items:center;justify-content:center;
         background:rgba(30,22,14,.55);backdrop-filter:blur(2px);font-family:Georgia,'Times New Roman',serif}
-      #b612Pact .pFrame{width:min(1080px,94vw);height:min(88vh,900px);display:flex;flex-direction:column;
-        background:#f7f2e6;border:1px solid rgba(90,72,50,.42);border-radius:14px;overflow:hidden;
-        box-shadow:0 24px 70px rgba(30,20,10,.42)}
+      #b612Pact .pFrame{width:100vw;height:100vh;display:flex;flex-direction:column;
+        background:#f7f2e6;border:0;border-radius:0;overflow:hidden;
+        box-shadow:none}
       #b612Pact .pBar{display:flex;align-items:center;gap:10px;padding:10px 14px;flex:none;
         border-bottom:1px solid rgba(90,72,50,.22);background:rgba(240,232,214,.96)}
       #b612Pact .pTabs{display:flex;gap:6px;flex:1;flex-wrap:wrap}
