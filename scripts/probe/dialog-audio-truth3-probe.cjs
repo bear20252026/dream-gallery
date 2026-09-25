@@ -3,9 +3,14 @@
 //   开对话 → 每行停留 5s(阅读节奏)→ 点击推进 → 逐行验证:
 //   ① play() resolved(不是 reject/AbortError) ② 该 Audio 的 currentTime > 0(真的在走)
 const { launch } = require('./browser.js');
+const pw = (() => { try { return require('playwright'); } catch (e) { return require('playwright-core'); } })();
 (async () => {
   const URL = process.env.PROBE_URL || 'https://cloudbear.cloud';
-  const b = await launch([]);
+  const b = await pw.chromium.launch({
+    headless: false, // 有头真实渲染(最接近主人浏览器)
+    executablePath: process.env.PW_EDGE || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe',
+    args: ['--no-sandbox', '--autoplay-policy=no-user-gesture-required'],
+  });
   const page = await (await b.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   await page.addInitScript(() => {
     for (const k of ['agreementConsented', 'privacyConsented', 'communityConsented'])
@@ -20,6 +25,15 @@ const { launch } = require('./browser.js');
         .catch((e) => { rec.result = 'rejected:' + e.name; });
       return p;
     };
+  });
+  const netlog = [];
+  page.on('response', (r) => {
+    if (r.url().includes('/api/tts') && !r.url().includes('batch'))
+      netlog.push({ u: decodeURIComponent(r.url()).slice(-46), st: r.status(), ms: Date.now() });
+  });
+  page.on('requestfailed', (r) => {
+    if (r.url().includes('/api/tts') && !r.url().includes('batch'))
+      netlog.push({ u: decodeURIComponent(r.url()).slice(-46), fail: r.failure() && r.failure().errorText });
   });
   await page.goto(URL + '/?noopening&noprologue', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
@@ -68,6 +82,7 @@ const { launch } = require('./browser.js');
   console.log('全量 playLog:', JSON.stringify(window.__playLog_full || 'skip'));
   });
   console.log('逐行真实播放取证:', JSON.stringify(report, null, 1));
+  console.log('网络层 tts 响应(近 10 条):', JSON.stringify(netlog.slice(-10), null, 1));
   const audible = report.filter((r) => r.result === 'resolved' && r.currentTime > 0).length;
   console.log('=== 真出声行数: ' + audible + ' / ' + report.length + ' ===');
   await b.close();

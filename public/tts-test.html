@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>B612 语音自检</title>
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        background: #1a1a2e;
+        color: #eee;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+      }
+      .card {
+        background: #16213e;
+        padding: 32px 40px;
+        border-radius: 16px;
+        max-width: 560px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 6px;
+        color: #ffd700;
+      }
+      p {
+        font-size: 13px;
+        color: #aab;
+        line-height: 1.7;
+        margin: 0 0 22px;
+      }
+      button {
+        display: block;
+        width: 100%;
+        padding: 13px 18px;
+        margin: 10px 0;
+        border: none;
+        border-radius: 10px;
+        background: #0f3460;
+        color: #fff;
+        font-size: 15px;
+        cursor: pointer;
+        text-align: left;
+        transition: 0.2s;
+      }
+      button:hover {
+        background: #1a4a8a;
+      }
+      .log {
+        margin-top: 20px;
+        padding: 14px;
+        background: #0a0a1a;
+        border-radius: 10px;
+        font-size: 12px;
+        font-family: Consolas, monospace;
+        min-height: 120px;
+        white-space: pre-wrap;
+        color: #8f8;
+        line-height: 1.8;
+      }
+      .ok {
+        color: #4e4;
+      }
+      .bad {
+        color: #f66;
+      }
+      .dim {
+        color: #889;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>B612 语音自检</h1>
+      <p>
+        点下面任意按钮：能听到说话 = 语音链路和您的设备都正常；按钮显示"播放失败" =
+        看日志里的红色原因。日志同时会显示声音输出电平（非静音证明）。
+      </p>
+      <button data-t="你好呀，我是茉莉。如果你能听见我说话，说明语音链路一切正常。" data-v="茉莉">
+        ▶ 测试 1 · 中文女声（茉莉）
+      </button>
+      <button data-t="你好呀，我是苏打。如果你能听见我说话，说明中文男声也正常。" data-v="苏打">
+        ▶ 测试 2 · 中文男声（苏打）
+      </button>
+      <button
+        data-t="Hello, I am Milo. If you can hear me, English voice works fine."
+        data-v="Milo"
+      >
+        ▶ 测试 3 · 英文男声（Milo）
+      </button>
+      <div class="log" id="log">点按钮开始…</div>
+    </div>
+    <script>
+      const log = document.getElementById('log');
+      function put(s, cls) {
+        const d = document.createElement('div');
+        if (cls) d.className = cls;
+        d.textContent = s;
+        log.appendChild(d);
+      }
+      document.querySelectorAll('button').forEach((b) => {
+        b.onclick = async () => {
+          log.innerHTML = '';
+          const text = b.dataset.t,
+            voice = b.dataset.v;
+          put('1) 请求合成: /api/tts voice=' + voice, 'dim');
+          try {
+            const t0 = performance.now();
+            const r = await fetch(
+              '/api/tts?text=' + encodeURIComponent(text) + '&voice=' + encodeURIComponent(voice)
+            );
+            const buf = await r.arrayBuffer();
+            put(
+              '   HTTP ' +
+                r.status +
+                ' · ' +
+                (buf.byteLength / 1024).toFixed(1) +
+                'KB · ' +
+                ((performance.now() - t0) / 1000).toFixed(1) +
+                's',
+              r.ok ? 'ok' : 'bad'
+            );
+            if (!r.ok) {
+              put('   ✗ 服务端合成失败（看服务端日志）', 'bad');
+              return;
+            }
+            put('2) 解码音频,检查是否静音…', 'dim');
+            const ac = new (window.AudioContext || window.webkitAudioContext)();
+            const audio = await ac.decodeAudioData(buf.slice(0));
+            let peak = 0;
+            for (let i = 0; i < audio.numberOfChannels; i++) {
+              const d = audio.getChannelData(i);
+              for (let j = 0; j < d.length; j += 8) peak = Math.max(peak, Math.abs(d[j]));
+            }
+            put(
+              '   时长 ' +
+                audio.duration.toFixed(1) +
+                's · 峰值 ' +
+                peak.toFixed(2) +
+                (peak > 0.05 ? '（有声，非静音）' : '（⚠ 音频内容静音！合成有问题）'),
+              peak > 0.05 ? 'ok' : 'bad'
+            );
+            put('3) 播放（请开音量）…', 'dim');
+            const a = new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' })));
+            try {
+              await a.play();
+              put('   play() 成功', 'ok');
+              let last = -1;
+              const iv = setInterval(() => {
+                put('   播放中… ' + a.currentTime.toFixed(1) + 's', 'ok');
+                if (a.currentTime === last && !a.paused) {
+                  clearInterval(iv);
+                }
+                last = a.currentTime;
+                if (a.currentTime > 0 && a.currentTime < last + 1) {
+                  /* walking */
+                }
+              }, 500);
+              a.onended = () => {
+                clearInterval(iv);
+                put('   ✔ 播放完毕 —— 您听到了吗？听到=一切正常；没听到=设备/系统音量问题', 'ok');
+              };
+            } catch (e) {
+              put(
+                '   ✗ play() 失败: ' +
+                  e.name +
+                  ' —— ' +
+                  (e.name === 'NotAllowedError'
+                    ? '浏览器拦截了自动播放，请点击页面任意处后重试'
+                    : '详见浏览器控制台'),
+                'bad'
+              );
+            }
+          } catch (e) {
+            put('✗ 异常: ' + e.message, 'bad');
+          }
+        };
+      });
+    </script>
+  </body>
+</html>
