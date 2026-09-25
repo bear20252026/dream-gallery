@@ -63,7 +63,7 @@ export function stopSpeaking() {
     try {
       cur.pause();
     } catch (e) {}
-    cur = null;
+    cur = null; // 置空:被顶掉的旧行其 AbortError 不再触发重试(重试仅限"未替换"场景)
   }
 }
 
@@ -73,8 +73,21 @@ export function speakLine(text, spk) {
   if (!d.speak || !avAllowed('dialogue')) return d; // 对白豁免总闸(2026-09-26 主人令:先只让对话进行),仅受对话框🔇钮控制
   stopSpeaking();
   try {
-    cur = new Audio(ttsUrl(text, voiceFor(spk, text)));
-    cur.play().catch(() => {}); // 手势限制/缓存未就绪静默(与 kunlunSpeak 同策略)
+    const audio = new Audio(ttsUrl(text, voiceFor(spk, text)));
+    cur = audio;
+    // 2026-09-26 真实取证(探针 dialog-audio-truth):台词 play 频发 AbortError —— 行切换快于
+    // 合成时长时,旧行被 stopSpeaking pause → play promise reject,旧版静默吞掉 → 主人全程无声。
+    // 修复:①失败留痕(admin 错误追踪可见,不再是黑洞);②若 cur 未被替换(非正常换行)且是
+    // AbortError,重试一次 —— 缓存命中后重试即秒开。
+    audio.play().catch((e) => {
+      if (window.__reportError)
+        window.__reportError('tts', '台词朗读播放失败: ' + ((e && e.name) || e), { source: 'dialog-voice' });
+      if (e && e.name === 'AbortError' && cur === audio) {
+        setTimeout(() => {
+          if (cur === audio) audio.play().catch(() => {});
+        }, 120);
+      }
+    });
   } catch (e) {
     cur = null;
   }

@@ -10,8 +10,8 @@ import * as ST from '../shared/story-text.mjs';
 import { voiceFor } from './dialog-voice.mjs';
 import { avAllowed } from './av-switch.js';
 
-const BATCH_SIZE = 10; // 每批条数(≤服务端 MAX_BATCH_ITEMS 60)
-const BATCH_GAP_MS = 4000; // 批间隔:给实时请求留空档
+const BATCH_SIZE = 20; // 每批条数(≤服务端 MAX_BATCH_ITEMS 60;batch 让位,连续灌不抢实时)
+const BATCH_GAP_MS = 1200; // 批间隔:服务端低优先级队列保证实时台词优先,这里尽量快煮
 let started = false;
 
 // 递归收集 {en,zh} 形状的台词条目(story-text 的所有导出常量)
