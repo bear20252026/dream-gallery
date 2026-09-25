@@ -11,7 +11,9 @@ const { launch } = require('./browser.js');
   page.on('pageerror', (e) => errors.push(e.message));
   const ttsReqs = [];
   page.on('request', (r) => {
-    if (r.url().includes('/api/tts')) ttsReqs.push(decodeURIComponent(r.url()));
+    // 2026-09-26: 排除预合成流水线的后台批量端点(它本来就常驻,与台词朗读无关)
+    if (r.url().includes('/api/tts') && !r.url().includes('/api/tts/batch'))
+      ttsReqs.push(decodeURIComponent(r.url()));
   });
   await page.addInitScript(() => {
     for (const k of ['agreementConsented', 'privacyConsented', 'communityConsented'])
