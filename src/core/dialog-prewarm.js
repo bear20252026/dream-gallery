@@ -14,14 +14,20 @@ const BATCH_SIZE = 20; // 每批条数(≤服务端 MAX_BATCH_ITEMS 60;batch 让
 const BATCH_GAP_MS = 1200; // 批间隔:服务端低优先级队列保证实时台词优先,这里尽量快煮
 let started = false;
 
-// 递归收集 {en,zh} 形状的台词条目(story-text 的所有导出常量)
-function collectEntries(node, out) {
+// 递归收集 {en,zh} 台词条目;沿途继承容器上的 who.spk(说话人)——
+// 2026-09-26 真实取证:缓存键含音色,煮错音色=白煮(王子行被煮成默认女声,
+// 实际播放用 Milo → 缓存永不命中)。STORY/SCENE2-5 每条自带 who.spk,务必带上。
+function collectEntries(node, out, spk) {
   if (!node || typeof node !== 'object') return out;
   if (typeof node.en === 'string' || typeof node.zh === 'string') {
-    out.push(node);
+    out.push({ entry: node, spk: (node.who && node.who.spk) || spk || '' });
     return out;
   }
-  for (const k of Object.keys(node)) collectEntries(node[k], out);
+  const own = (node.who && node.who.spk) || spk || '';
+  for (const k of Object.keys(node)) {
+    if (k === 'who') continue; // who 是说话人元数据,不是台词
+    collectEntries(node[k], out, own);
+  }
   return out;
 }
 
@@ -30,7 +36,7 @@ function allLines() {
   for (const k of Object.keys(ST)) {
     const v = ST[k];
     if (typeof v === 'function') continue;
-    collectEntries(v, entries);
+    collectEntries(v, entries, '');
   }
   return entries;
 }
@@ -59,13 +65,13 @@ export function prewarmDialogs() {
     const lang = ST.scriptLang();
     const ordered = [];
     for (const e of entries) {
-      const t = e[lang] || e.en || e.zh;
-      if (t) ordered.push({ text: t, voice: voiceFor(null, t) });
+      const t = e.entry[lang] || e.entry.en || e.entry.zh;
+      if (t) ordered.push({ text: t, voice: voiceFor(e.spk, t) });
     }
     const other = lang === 'zh' ? 'en' : 'zh';
     for (const e of entries) {
-      const t = e[other] || e.en || e.zh;
-      if (t) ordered.push({ text: t, voice: voiceFor(null, t) });
+      const t = e.entry[other] || e.entry.en || e.entry.zh;
+      if (t) ordered.push({ text: t, voice: voiceFor(e.spk, t) });
     }
     // 分批发送:批间 4s,总 ~23 批 ≈ 90s 内把全部台词煮进缓存
     let i = 0;
