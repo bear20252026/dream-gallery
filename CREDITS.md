@@ -83,8 +83,9 @@ CC BY 4.0 要求转载/二次分发时保留本署名文件，请一并携带本
 | 项目 | 说明 |
 | --- | --- |
 | 模型 | The Chibi Prince（Q 版小王子） |
-| 出处 | Sketchfab（作者名待补——待主人提供模型页链接后补全） |
-| 授权 | **CC BY 4.0**（Creative Commons Attribution 4.0 International，主人确认"署名即可随意使用"） |
+| 出处 | Sketchfab · bingko（@bingko） |
+| 模型页 | https://sketchfab.com/3d-models/the-chibi-prince-ae60394446354a8abf2ab69d90260de5 |
+| 授权 | **CC BY 4.0**（Creative Commons Attribution 4.0 International，带 NoAI 附加条款——仅禁止用于 AI 训练数据，正常展示使用不受影响；主人确认"署名即可随意使用"） |
 | 本地文件 | `models/b612/chibi-prince.glb`（约 2.9 MB） |
 | 处理 | 等比归一化至身高 0.8m；原始模型无骨骼动画，走近/待机动效为程序化跳步与轻息 |
 

@@ -2,7 +2,7 @@
 // 电影结尾纸飞机贴沙即"变成"这架真飞机(Piper PA-18 残骸, CC BY 4.0, 署名见 CREDITS.md);
 // 玩家在残骸旁睁眼(视野从仰望天空缓缓回正),小王子从沙丘跳步走下,
 // 说出第一句 "If you please— draw me a sheep!"(原著 Woods 译,书内原句)。
-// 模型: models/b612/piper-pa18.glb / models/b612/chibi-prince.glb(均无骨骼动画,动效全程序化)。
+// 模型: models/b612/piper-pa18.glb(无动画,程序化) / chibi-prince-rigged.glb(2026-09-25 骨骼动画版:Idle/Walk/Wave/Hop)。
 import * as THREE from 'three';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
@@ -142,20 +142,49 @@ let prince = null;
 let princeState = 'dune'; // dune → walking → idle
 let princeAt = null; // 目的地
 let princeT0 = 0;
-// idle 小动作状态(chibi 无骨骼,动效只能整体变换;纯呼吸≈雕像,2026-09-25 主人报「没有动作」)
+// idle 小动作状态(2026-09-25 起骨骼动画版 chibi-prince-rigged.glb 接管:
+// Blender 程序化绑骨+烘焙的四段动画 Idle/Walk/Wave/Hop 经 AnimationMixer 播放;
+// 加载失败或旧模型时回落到整体变换的程序化 hop/look,逻辑保持不变)
+let princeMixer = null; // 骨骼动画混音器(rigged 模型才有)
+let princeActs = null; // { idle, walk, wave, hop }
+let princeCurAct = null; // 当前播放的 Action
 let idleClock = 0; // idle 累计秒
-let idleAction = null; // 'hop' 原地小跳 | 'look' 张望摆头
+let idleAction = null; // 'hop' 原地小跳 | 'look' 张望摆头 | 'wave' 挥手
 let idleActionT = 0;
 let idleActionDur = 0;
 let idleNextAt = 4; // 首次小动作提前,睁眼后马上能看见王子"活着"
+// 动画切换:交叉淡化到目标动作(rigged 专用;未加载时返回 false 走程序化)
+function princeFadeTo(next, fade) {
+  if (!princeMixer || !princeActs || !princeActs[next]) return false;
+  const act = princeActs[next];
+  if (princeCurAct === act) return true;
+  act.reset();
+  if (princeCurAct) act.crossFadeFrom(princeCurAct, fade, false);
+  act.play();
+  princeCurAct = act;
+  return true;
+}
 loader.load(
-  '/models/b612/chibi-prince.glb',
+  '/models/b612/chibi-prince-rigged.glb',
   (g) => {
     const m = g.scene;
     const box = new THREE.Box3().setFromObject(m);
     const h = box.max.y - box.min.y;
     m.scale.setScalar(PRINCE_H / h); // 归一化到 0.8m(chibi 小人影)
     m.position.y -= box.min.y * (PRINCE_H / h); // 底面贴到轴心(否则半截埋沙)
+    // 骨骼动画接线(无动画时 mixer 为 null,自动回落程序化动效)
+    if (g.animations && g.animations.length) {
+      princeMixer = new THREE.AnimationMixer(m);
+      const pick = (n) => g.animations.find((c) => c.name === n);
+      princeActs = {
+        idle: princeMixer.clipAction(pick('ChibiIdle')),
+        walk: princeMixer.clipAction(pick('ChibiWalk')),
+        wave: princeMixer.clipAction(pick('ChibiWave')),
+        hop: princeMixer.clipAction(pick('ChibiHop')),
+      };
+      princeActs.idle.play(); // 待机呼吸常驻
+      princeCurAct = princeActs.idle;
+    }
     const wrap = new THREE.Group();
     wrap.add(m);
     const gh = getH(DUNE.x, DUNE.z);
@@ -171,6 +200,12 @@ loader.load(
     s.add(wrap);
     prince = wrap;
     princeState = 'dune';
+    // 探针/调试钩子(不进 UI,只读):线上验收 prince-rig-probe.cjs 用
+    window.__princeDebug = {
+      state: () => princeState,
+      clip: () => (princeCurAct && princeCurAct.getClip().name) || null,
+      rigged: () => !!princeMixer,
+    };
   },
   undefined,
   (e) => console.error('[crash-site] 王子模型加载失败:', e.message)
@@ -200,6 +235,7 @@ ctx.onTick(function crashTick(dt) {
 
   // 王子未就绪/未到出场时刻:只处理待机呼吸
   if (!prince || t < 1.4) return;
+  if (princeMixer) princeMixer.update(dt); // 骨骼动画推进(rigged 版)
   if (princeState === 'dune' && !wakePlayed) {
     wakePlayed = true;
     // 剧情进度守卫(2026-09-10 主人报「无法从对话跳转画羊」):画羊已完成的旧档
@@ -207,6 +243,7 @@ ctx.onTick(function crashTick(dt) {
     // 旧档开场=王子已在目的地等候,直接放行后续指引(重走全链用 ?storyreset)
     if (ctx.store.flag('scene2')) {
       princeState = 'idle';
+      princeFadeTo('idle', 0.2);
       princeAt = { x: PRINCE_DEST.x, z: PRINCE_DEST.z };
       prince.position.x = PRINCE_DEST.x;
       prince.position.z = PRINCE_DEST.z;
@@ -214,6 +251,7 @@ ctx.onTick(function crashTick(dt) {
       return;
     }
     princeState = 'walking';
+    princeFadeTo('walk', 0.25);
     princeAt = { x: PRINCE_DEST.x, z: PRINCE_DEST.z }; // 相机投影实测位(2026-09-07)
     princeT0 = now;
   }
@@ -227,6 +265,7 @@ ctx.onTick(function crashTick(dt) {
     prince.rotation.y = Math.atan2(-(princeAt.x - DUNE.x), -(princeAt.z - DUNE.z)) + Math.PI; // 行进朝向(模型前向补 π)
     if (k >= 1) {
       princeState = 'idle';
+      princeFadeTo('idle', 0.3);
       // 叫醒词(书内原句):第一句对话即主线发令枪(单语,随语言切换)
       if (ctx.openDialog) {
         let wakeSpent = false; // onDone 与心跳守护只许一个推进
@@ -274,15 +313,20 @@ ctx.onTick(function crashTick(dt) {
         idleAction = null;
         idleClock = 0;
         idleNextAt = 6 + Math.random() * 5;
+        princeFadeTo('idle', 0.25); // 骨骼动画:小动作结束回落待机
       } else if (idleAction === 'hop') {
-        y += Math.sin(k * Math.PI) * 0.3;
+        if (!princeFadeTo('hop', 0.1)) y += Math.sin(k * Math.PI) * 0.3; // 无动画时程序化跳
+      } else if (idleAction === 'wave') {
+        if (!princeMixer) yaw += Math.sin(k * Math.PI * 2) * 0.7; // 无动画退化为张望
       } else {
         yaw += Math.sin(k * Math.PI * 2) * 0.7;
       }
     } else if (idleClock >= idleNextAt) {
-      idleAction = Math.random() < 0.5 ? 'hop' : 'look';
+      const r = Math.random();
+      idleAction = r < 0.4 ? 'wave' : r < 0.7 ? 'hop' : 'look';
       idleActionT = 0;
-      idleActionDur = idleAction === 'hop' ? 0.6 : 1.6;
+      idleActionDur = idleAction === 'wave' ? 2.1 : idleAction === 'hop' ? 1.0 : 1.6;
+      if (idleAction !== 'look') princeFadeTo(idleAction, 0.15);
     }
     prince.position.y = y;
     prince.rotation.y = yaw;
