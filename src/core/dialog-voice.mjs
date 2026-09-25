@@ -108,38 +108,58 @@ export function speakLine(text, spk) {
   stat('speak', text, voice); // 发起朗读(主人要的「播放条数」)
   stopSpeaking();
   try {
-    const audio = new Audio(ttsUrl(text, voice));
+    const audio = new Audio();
     audio._statText = String(text || '').slice(0, 24);
     audio._statVoice = voice;
     cur = audio;
     // 2026-09-26 真实取证(探针 dialog-audio-truth):台词 play 频发 AbortError —— 行切换快于
     // 合成时长时,旧行被 stopSpeaking pause → play promise reject,旧版静默吞掉 → 主人全程无声。
     // 修复:①失败留痕(admin 错误追踪可见,不再是黑洞);②若 cur 未被替换(非正常换行)且是
-    // AbortError,重试一次 —— 缓存命中后重试即秒开。
+    // AbortError,重试一次 —— 缓存命中后重试即秒开;③冷台词 404 回退经典通道(见 playFail)。
     const t0 = performance.now();
-    audio.play().then(
-      () => {
-        stat('ok', text, voice, { ms: Math.round(performance.now() - t0) }); // 真实开播(「播放过」)
-      },
-      (e) => {
-        stat('fail', text, voice, { err: (e && e.name) || 'unknown' });
-        if (window.__reportError)
-          window.__reportError('tts', '台词朗读播放失败: ' + ((e && e.name) || e), { source: 'dialog-voice' });
-        if (e && e.name === 'AbortError' && cur === audio) {
-          setTimeout(() => {
-            if (cur === audio) audio.play().catch(() => {});
-          }, 120);
-        }
-      }
-    );
+    ttsUrl(text, voice).then((url) => {
+      if (cur !== audio) return; // 行已切换:废播,别让旧台词开口
+      audio.src = url;
+      audio.play().then(
+        () => {
+          stat('ok', text, voice, { ms: Math.round(performance.now() - t0) }); // 真实开播(「播放过」)
+        },
+        (e) => playFail(audio, url, text, voice, e),
+      );
+    }).catch(() => {});
   } catch (e) {
     cur = null;
   }
   return d;
 }
 
-/** 组 TTS 请求 URL(speakLine 与 prefetchLine 共用,保音色/截断一致) */
-function ttsUrl(text, voice) {
+/** play 失败分诊(2026-09-26):
+ *  AbortError(行切换竞态)且未被替换 → 120ms 后重试一次(缓存命中即秒开);
+ *  NotSupportedError(.mp3 未煮 404 / 网络失败)→ 回退经典 /api/tts 触发合成,只回退一次
+ *  (合成落盘后同一行下次走 /tts-audio 直接命中边缘缓存)。 */
+function playFail(audio, url, text, voice, e) {
+  const name = (e && e.name) || 'unknown';
+  stat('fail', text, voice, { err: name });
+  if (window.__reportError)
+    window.__reportError('tts', '台词朗读播放失败: ' + name, { source: 'dialog-voice' });
+  if (name === 'AbortError' && cur === audio) {
+    setTimeout(() => {
+      if (cur === audio) audio.play().catch(() => {});
+    }, 120);
+    return;
+  }
+  if (cur === audio && url.indexOf('/tts-audio/') === 0 && !audio._fellBack) {
+    audio._fellBack = true;
+    audio.src = legacyTtsUrl(text, voice);
+    audio.play().then(
+      () => stat('ok', text, voice), // 回退通道播响也算「真的响了」(audibleRate 口径一致)
+      () => {},
+    );
+  }
+}
+
+/** 组经典 TTS 请求 URL(回退通道;截断与 lib/tts.js MAX_LEN 对齐) */
+function legacyTtsUrl(text, voice) {
   return (
     '/api/tts?text=' +
     encodeURIComponent(String(text).slice(0, MAX_SPEAK_LEN)) +
@@ -148,23 +168,53 @@ function ttsUrl(text, voice) {
   );
 }
 
+// ============ 台词音频边缘缓存化(2026-09-26 实测取证定案) ============
+// 病根:/api/tts?text=.. 响应 Cloudflare 恒不缓存(cf-cache-status: DYNAMIC,URL 无缓存
+// 扩展名)→ 每条音频都要跨境回源;晚高峰单流拥塞 16KB 爬 10s+ → 台词链条被 onVoiceEnd
+// 的 15s 兜底拖着走 = 主人报的「无声/太快」(源站缓存命中本身只要 ~2ms)。
+// 修法:直拼 /tts-audio/<key>.mp3 —— .mp3 扩展名命中 CF 默认缓存清单,边缘就近交付。
+// key = sha256('tts1|voice|text截断至220') 前 20 位,与 lib/tts.js ttsKey() 同一算法
+// (契约测试 dialog-voice.test.js / lib-tts.test.js 两端钉死);改键必须两端同步升版本。
+// 冷台词(未煮)404 → playFail 自动回退 legacyTtsUrl 触发服务端合成,下次 .mp3 直接命中。
+const KEY_VER = 'tts1';
+async function sha256hex(s) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+/** 台词音频 URL:边缘可缓存优先,环境不支持 subtle(非 https)退回经典 URL */
+export async function ttsUrl(text, voice) {
+  try {
+    if (typeof crypto !== 'undefined' && crypto.subtle) {
+      const key = (await sha256hex(KEY_VER + '|' + voice + '|' + String(text).slice(0, MAX_SPEAK_LEN))).slice(0, 20);
+      return '/tts-audio/' + key + '.mp3';
+    }
+  } catch (e) { /* 落回经典 URL */ }
+  return legacyTtsUrl(text, voice);
+}
+
 /**
  * 预取下一行台词(2026-09-24 流畅度):静默 load 进浏览器缓存(服务端亦有文案哈希缓存),
  * 推进到该行时 speakLine 的 Audio 直接吃 HTTP 缓存,零合成空窗。
- * 复用 speakDecision:静音/无汉字/空行不预取,浪费带宽为零。
+ * 复用 speakDecision:静音/空行不预取,浪费带宽为零。预取只吃已煮好的缓存
+ * (冷台词 404 静默,不触发合成 —— 合成是 batch 预热流水线的职责)。
  */
 export function prefetchLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
   if (!d.speak || !avAllowed('dialogue')) return d; // 对白豁免总闸:预取照常(推进到该行零空窗)
-  const url = ttsUrl(text, voiceFor(spk, text));
-  if (warmed.has(url)) return d;
-  warmed.add(url);
-  try {
-    const a = new Audio();
-    a.preload = 'auto';
-    a.src = url;
-    a.load();
-  } catch (e) { /* 无 Audio 环境(测试/异常)静默 */ }
+  const voice = voiceFor(spk, text);
+  const warmKey = voice + '|' + text;
+  if (warmed.has(warmKey)) return d;
+  warmed.add(warmKey);
+  ttsUrl(text, voice)
+    .then((url) => {
+      try {
+        const a = new Audio();
+        a.preload = 'auto';
+        a.src = url;
+        a.load();
+      } catch (e) { /* 无 Audio 环境(测试/异常)静默 */ }
+    })
+    .catch(() => {});
   return d;
 }
 
