@@ -168,7 +168,10 @@ loader.load(
   '/models/b612/chibi-prince-rigged-v2.glb',
   (g) => {
     const m = g.scene;
-    const box = new THREE.Box3().setFromObject(m);
+    // precise=true:three r160 对 SkinnedMesh 走 getVertexPosition(含蒙皮变形)逐顶点取
+    // 真实渲染包围盒。默认 false 用几何原始包围盒,与蒙皮渲染位相差 ~1.4m →
+    // 2026-09-25 主人报「小王子位置有问题」(半埋沙)的根因。
+    const box = new THREE.Box3().setFromObject(m, true);
     const h = box.max.y - box.min.y;
     m.scale.setScalar(PRINCE_H / h); // 归一化到 0.8m(chibi 小人影)
     m.position.y -= box.min.y * (PRINCE_H / h); // 底面贴到轴心(否则半截埋沙)
