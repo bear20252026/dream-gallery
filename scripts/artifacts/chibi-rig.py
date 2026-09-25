@@ -1,11 +1,11 @@
 # chibi-prince 程序化绑骨 + 动画烘焙 (Blender 5.2 headless)
 # 用法: blender.exe -b -P chibi-rig.py
-# 产物: models/b612/chibi-prince-rigged.glb (含 Idle/Walk/Wave/Hop 四段动画)
+# 产物: models/b612/chibi-prince-rigged-v2.glb (含 Idle/Walk/Wave/Hop 四段动画)
 import bpy, math
 from mathutils import Vector
 
 SRC = "C:/Users/17296/WorkBuddy/2026-08-29-08-24-29/dream-gallery/models/b612/chibi-prince.glb"
-OUT = "C:/Users/17296/WorkBuddy/2026-08-29-08-24-29/dream-gallery/models/b612/chibi-prince-rigged.glb"
+OUT = "C:/Users/17296/WorkBuddy/2026-08-29-08-24-29/dream-gallery/models/b612/chibi-prince-rigged-v2.glb"
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.gltf(filepath=SRC)

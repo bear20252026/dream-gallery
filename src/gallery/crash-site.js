@@ -2,7 +2,7 @@
 // 电影结尾纸飞机贴沙即"变成"这架真飞机(Piper PA-18 残骸, CC BY 4.0, 署名见 CREDITS.md);
 // 玩家在残骸旁睁眼(视野从仰望天空缓缓回正),小王子从沙丘跳步走下,
 // 说出第一句 "If you please— draw me a sheep!"(原著 Woods 译,书内原句)。
-// 模型: models/b612/piper-pa18.glb(无动画,程序化) / chibi-prince-rigged.glb(2026-09-25 骨骼动画版:Idle/Walk/Wave/Hop)。
+// 模型: models/b612/piper-pa18.glb(无动画,程序化) / chibi-prince-rigged-v2.glb(2026-09-25 骨骼动画版:Idle/Walk/Wave/Hop)。
 import * as THREE from 'three';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
@@ -142,7 +142,7 @@ let prince = null;
 let princeState = 'dune'; // dune → walking → idle
 let princeAt = null; // 目的地
 let princeT0 = 0;
-// idle 小动作状态(2026-09-25 起骨骼动画版 chibi-prince-rigged.glb 接管:
+// idle 小动作状态(2026-09-25 起骨骼动画版 chibi-prince-rigged-v2.glb 接管:
 // Blender 程序化绑骨+烘焙的四段动画 Idle/Walk/Wave/Hop 经 AnimationMixer 播放;
 // 加载失败或旧模型时回落到整体变换的程序化 hop/look,逻辑保持不变)
 let princeMixer = null; // 骨骼动画混音器(rigged 模型才有)
@@ -165,7 +165,7 @@ function princeFadeTo(next, fade) {
   return true;
 }
 loader.load(
-  '/models/b612/chibi-prince-rigged.glb',
+  '/models/b612/chibi-prince-rigged-v2.glb',
   (g) => {
     const m = g.scene;
     const box = new THREE.Box3().setFromObject(m);
