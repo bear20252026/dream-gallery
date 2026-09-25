@@ -184,7 +184,11 @@ audioManager.playHint = function (audio, onEnd) {
   const doPlay = () => {
     audioManager.hintSound = audio;
     audioManager.isHintPlaying = true;
+    let finished = false;
+    let started = false;
     const finish = () => {
+      if (finished) return;
+      finished = true;
       audioManager.hintSound = null;
       audioManager.isHintPlaying = false;
       if (onEnd) onEnd();
@@ -193,11 +197,43 @@ audioManager.playHint = function (audio, onEnd) {
         doPlay();
       }
     };
+    // 2026-09-25 主人报「没有语音且卡」:audio.play() 在网络慢/服务端排队时会长时间
+    // pending,而 isHintPlaying 已置真 → 后续台词全部压进 hintQueue 饿死。
+    // 防线:① play 兑现或 'playing' 事件视为已开播;② 9s 内未能开播则放弃本条放行下一条。
+    audio.addEventListener('playing', () => {
+      started = true;
+    });
     audio.addEventListener('ended', finish);
     audio.addEventListener('error', finish);
-    audio.play().catch(finish);
+    audio
+      .play()
+      .then(() => {
+        started = true;
+      })
+      .catch(finish);
+    setTimeout(() => {
+      if (!started && !finished) {
+        try {
+          audio.pause();
+        } catch (e) {
+          /* 已中止 */
+        }
+        finish();
+      }
+    }, 9000);
   };
   if (audioManager.isHintPlaying) {
+    // 队列上限:压 3 条以上时丢最旧(其 onEnd 照常回调,对话推进不受阻)
+    while (audioManager.hintQueue.length >= 3) {
+      const stale = audioManager.hintQueue.shift();
+      if (stale && stale.onEnd) {
+        try {
+          stale.onEnd();
+        } catch (e) {
+          /* 静默 */
+        }
+      }
+    }
     audioManager.hintQueue.push({ audio, onEnd });
   } else {
     doPlay();

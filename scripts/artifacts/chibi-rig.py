@@ -111,6 +111,15 @@ for o in merged:
     mod = o.modifiers.new("Armature", 'ARMATURE')
     mod.object = arm
 
+# 关键(2026-09-25 位置偏移根因): join 后每个 mesh 的原点留在首个碎岛中心,
+# three.js 对蒙皮网格用节点空间算包围盒、渲染却走骨骼空间 → 原点残差 = 视觉位移。
+# 把平移烘进顶点数据, 节点变换归零, 包围盒=蒙皮渲染位, 游戏 Box3 贴地修正才正确。
+for o in merged:
+    bpy.ops.object.select_all(action='DESELECT')
+    o.select_set(True)
+    bpy.context.view_layer.objects.active = o
+    bpy.ops.object.transform_apply(location=True, rotation=False, scale=False)
+
 # ---------- 5. 动画 ----------
 def new_action(name):
     act = bpy.data.actions.new(name)
