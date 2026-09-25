@@ -58,9 +58,38 @@ export function speakDecision(text, voiceOff) {
 let cur = null; // 当前台词朗读(替换语义:新行顶旧行)
 const warmed = new Set(); // 本会话已预取过的台词 URL(防重复 load)
 
+// ============ 播放追踪(2026-09-26 主人令:「播放过/播放错误/播放条数全部记录」) ============
+// 本地缓冲,10s 批量上报 /api/tts/stats(失败静默丢弃,绝不影响播放)
+const statBuf = [];
+let statTimer = null;
+function stat(ev, text, voice, extra) {
+  try {
+    statBuf.push(Object.assign({ ev, text: String(text || '').slice(0, 24), voice }, extra || {}));
+    if (!statTimer) {
+      statTimer = setTimeout(flushStats, 10000);
+    }
+  } catch (e) {}
+}
+function flushStats() {
+  statTimer = null;
+  if (!statBuf.length) return;
+  const events = statBuf.splice(0, statBuf.length);
+  try {
+    fetch('/api/tts/stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ events }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch (e) {}
+}
+
+
 export function stopSpeaking() {
   if (cur) {
     try {
+      // 掐断统计(2026-09-26):正在播的行被顶 = 主人只听到半句(直接量化「放太快」)
+      if (!cur.paused && cur._statText) stat('cut', cur._statText, cur._statVoice);
       cur.pause();
     } catch (e) {}
     cur = null; // 置空:被顶掉的旧行其 AbortError 不再触发重试(重试仅限"未替换"场景)
@@ -70,24 +99,39 @@ export function stopSpeaking() {
 /** 朗读一行台词;返回决策(诊断/探针用) */
 export function speakLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
-  if (!d.speak || !avAllowed('dialogue')) return d; // 对白豁免总闸(2026-09-26 主人令:先只让对话进行),仅受对话框🔇钮控制
+  if (!d.speak) {
+    if (d.reason === 'muted') stat('muted', text, ''); // 静音跳过也记录(主人要全量)
+    return d;
+  }
+  if (!avAllowed('dialogue')) return d; // 对白豁免总闸(2026-09-26 主人令:先只让对话进行),仅受对话框🔇钮控制
+  const voice = voiceFor(spk, text);
+  stat('speak', text, voice); // 发起朗读(主人要的「播放条数」)
   stopSpeaking();
   try {
-    const audio = new Audio(ttsUrl(text, voiceFor(spk, text)));
+    const audio = new Audio(ttsUrl(text, voice));
+    audio._statText = String(text || '').slice(0, 24);
+    audio._statVoice = voice;
     cur = audio;
     // 2026-09-26 真实取证(探针 dialog-audio-truth):台词 play 频发 AbortError —— 行切换快于
     // 合成时长时,旧行被 stopSpeaking pause → play promise reject,旧版静默吞掉 → 主人全程无声。
     // 修复:①失败留痕(admin 错误追踪可见,不再是黑洞);②若 cur 未被替换(非正常换行)且是
     // AbortError,重试一次 —— 缓存命中后重试即秒开。
-    audio.play().catch((e) => {
-      if (window.__reportError)
-        window.__reportError('tts', '台词朗读播放失败: ' + ((e && e.name) || e), { source: 'dialog-voice' });
-      if (e && e.name === 'AbortError' && cur === audio) {
-        setTimeout(() => {
-          if (cur === audio) audio.play().catch(() => {});
-        }, 120);
+    const t0 = performance.now();
+    audio.play().then(
+      () => {
+        stat('ok', text, voice, { ms: Math.round(performance.now() - t0) }); // 真实开播(「播放过」)
+      },
+      (e) => {
+        stat('fail', text, voice, { err: (e && e.name) || 'unknown' });
+        if (window.__reportError)
+          window.__reportError('tts', '台词朗读播放失败: ' + ((e && e.name) || e), { source: 'dialog-voice' });
+        if (e && e.name === 'AbortError' && cur === audio) {
+          setTimeout(() => {
+            if (cur === audio) audio.play().catch(() => {});
+          }, 120);
+        }
       }
-    });
+    );
   } catch (e) {
     cur = null;
   }

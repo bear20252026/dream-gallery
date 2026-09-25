@@ -780,6 +780,7 @@
         <div class="tab" data-tab="files" onclick="switchTab('files')">文件管理</div>
         <div class="tab" data-tab="docs" onclick="switchTab('docs')">协议文档</div>
         <div class="tab" data-tab="errors" onclick="switchTab('errors')">报错反馈</div>
+        <div class="tab" data-tab="ttsstats" onclick="switchTab('ttsstats')">语音播放</div>
       </div>
 
       <!-- ========== 访客管理(2026-08-31 UI 重构:待办优先,唯一管理动作=踢出) ========== -->
@@ -1094,6 +1095,22 @@
           ><button class="btn-revoke" id="cfmCancel">取消</button>
         </div>
       </div>
+    </div>
+
+    <!-- ========== 语音播放追踪 ========== -->
+    <div id="tab-ttsstats" style="display: none">
+      <div class="section-title">
+        🔊 语音播放追踪(台词朗读:发起/开播成功/失败/掐断/静音全量记录,2026-09-26)
+      </div>
+      <div class="stats" id="ttsStatsCards"></div>
+      <div style="display: flex; gap: 8px; align-items: center; padding: 6px 0; flex-wrap: wrap">
+        <button id="ttsRefresh" style="padding: 7px 14px">🔄 刷新</button>
+        <button id="ttsClear" style="padding: 7px 14px">清空记录</button>
+        <span style="font-size: 12px; color: var(--muted)"
+          >speak=发起 · ok=开播成功 · cut=播一半被掐 · fail=播放失败 · muted=静音跳过</span
+        >
+      </div>
+      <div id="ttsStatsList"></div>
     </div>
 
     <!-- ========== 报错反馈 ========== -->

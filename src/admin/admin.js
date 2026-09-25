@@ -206,6 +206,81 @@ $('errClear').addEventListener('click', async function () {
 $('errQ').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') loadErrors();
 });
+
+// ===================== 语音播放追踪(2026-09-26 主人令:播放过/错误/条数全记录) =====================
+const TTS_EV_NAME = {
+  speak: '发起朗读',
+  ok: '开播成功',
+  cut: '播一半被掐',
+  fail: '播放失败',
+  muted: '静音跳过',
+  skip: '缓存未命中',
+};
+async function loadTtsStats() {
+  try {
+    const r = await adminFetch('/api/admin/tts-stats');
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || '加载失败');
+    const c = d.counters || {};
+    const cards = [
+      ['发起朗读', c.speak || 0],
+      ['开播成功', c.ok || 0],
+      ['播一半被掐', c.cut || 0],
+      ['播放失败', c.fail || 0],
+      ['静音跳过', c.muted || 0],
+      ['开播率', d.audibleRate == null ? '—' : d.audibleRate + '%'],
+      ['近 24h', d.recent24 || 0],
+    ];
+    $('ttsStatsCards').innerHTML = cards
+      .map(
+        ([k, v]) =>
+          `<div class="stat"><div class="stat-num">${v}</div><div class="stat-lab">${esc(k)}</div></div>`
+      )
+      .join('');
+    if (!(d.list || []).length) {
+      $('ttsStatsList').innerHTML =
+        '<div class="card" style="color:var(--muted)">暂无记录 —— 进游戏触发一段剧情对话后点刷新</div>';
+      return;
+    }
+    $('ttsStatsList').innerHTML = d.list
+      .map((e) => {
+        const color =
+          e.ev === 'ok'
+            ? 'var(--ok,#2a2)'
+            : e.ev === 'fail'
+              ? '#c64545'
+              : e.ev === 'cut'
+                ? '#b8860b'
+                : 'var(--muted)';
+        return `<div class="card" style="padding:8px 14px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <b style="color:${color}">${TTS_EV_NAME[e.ev] || esc(e.ev)}</b>
+            <span style="font-family:monospace;font-size:12px">${esc(e.text)}…</span>
+            <span style="font-size:11px;color:var(--muted)">音色 ${esc(e.voice || '—')}</span>
+            ${e.ms != null ? `<span style="font-size:11px;color:var(--muted)">起播 ${e.ms}ms</span>` : ''}
+            ${e.err ? `<span style="font-size:11px;color:#c64545">${esc(e.err)}</span>` : ''}
+            <span style="font-size:11px;color:var(--muted);margin-left:auto">${fmt(e.t)}</span>
+          </div>
+        </div>`;
+      })
+      .join('');
+  } catch (e) {
+    $('ttsStatsList').innerHTML =
+      '<div class="card" style="color:#c64545">加载失败: ' + esc(e.message) + '</div>';
+  }
+}
+$('ttsRefresh').addEventListener('click', loadTtsStats);
+$('ttsClear').addEventListener('click', async function () {
+  if (!(await confirmAsync('确定清空语音播放记录?此操作不可恢复'))) return;
+  try {
+    await adminFetch('/api/admin/tts-stats/clear' + tk(), { method: 'POST' });
+    toast('已清空');
+    loadTtsStats();
+  } catch (e) {
+    toast('清空失败: ' + e.message, true);
+  }
+});
+
 function brandIcon(b) {
   var s = typeof b === 'object' ? b.brand || '' : b || '';
   if (/iPhone|iPad/.test(s)) return '🍎';
@@ -226,6 +301,7 @@ function switchTab(t) {
     'files',
     'docs',
     'errors',
+    'ttsstats',
     'chat',
   ];
   for (var i = 0; i < panels.length; i++) {

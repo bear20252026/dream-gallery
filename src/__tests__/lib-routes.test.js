@@ -79,7 +79,8 @@ describe('路由表结构契约', () => {
   it('端点总数快照:增删路由必须显式更新本测试(防静默丢失)', () => {
     // 2026-09-05: +4 一念墙(POST/GET wish(es) 公开×2 + admin 拉取/删除 token×2)
     // 2026-09-26: +1 /api/tts/batch 剧情台词批量预合成(预合成流水线)
-    expect(ROUTES.length).toBe(53);
+    // 2026-09-26: +3 /api/tts/stats 打点(public) + admin tts-stats 查询/清空(token×2)
+    expect(ROUTES.length).toBe(56);
   });
 });
 
