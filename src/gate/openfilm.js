@@ -26,7 +26,7 @@ import { makeLangToggle } from '../ui/lang-toggle.js';
 
 let active = false;
 
-export function playOpeningFilm(onDone, onFinishBegin) {
+export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
   const timers = new Set();
   const later = (fn, ms) => {
     const id = window.setTimeout(() => {
@@ -524,6 +524,11 @@ export function playOpeningFilm(onDone, onFinishBegin) {
     later(() => {
       $('fDark').style.opacity = '1'; // 沉入全黑
       $('fSleep').classList.remove('show');
+      // 黑场预热钩子(2026-09-25 治本消闪):此刻起电影静止全黑约 4s,主流程在此启动世界
+      // ——世界首帧编译/资源上传的 4~5s 主线程卡顿全被纯黑画面盖住,交棒瞬间零卡顿。
+      try {
+        if (onBlackout) onBlackout();
+      } catch (e) {}
     }, 5500);
     later(() => {
       capKey.sleep = FILM.sleep;

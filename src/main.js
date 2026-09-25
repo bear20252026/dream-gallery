@@ -331,19 +331,26 @@ import('./gate/entrygate.js')
     }
     import('./gate/openfilm.js')
       .then(function (m) {
+        function bootWorldSafe() {
+          // startWorld 有 worldStarted 幂等闸,重复叫是无害空转
+          if (ctx.startWorld)
+            Promise.resolve(ctx.startWorld()).catch(function () {
+              showWorldLoadError();
+            });
+        }
         m.playOpeningFilm(
           function () {
             finishIntro(false);
           },
           function () {
-            // 电影整层开始淡出的同一刻(2026-09-24 消闪):先把世界揭幕跑起来,
-            // 世界在电影层之下同步淡入 → 交叉溶解。替代旧时序「电影淡出到黑场
-            // → 等 done → 才揭幕」(黑→亮纸→地图 = 主人报的「闪一下」)。
-            // startWorld 有 worldStarted 幂等闸,done 后的 finishIntro 再叫是无害空转。
-            if (ctx.startWorld)
-              Promise.resolve(ctx.startWorld()).catch(function () {
-                showWorldLoadError();
-              });
+            // 电影整层开始淡出(2026-09-24 消闪):世界在电影层之下同步淡入,交叉溶解。
+            bootWorldSafe();
+          },
+          function () {
+            // 黑场预热(2026-09-25 治本):电影「沉入全黑」后有约 4s 静止黑场,
+            // 在此启动世界——首帧编译 4~5s 主线程卡顿全被纯黑盖住,交棒零卡顿。
+            // (跳过电影/降级路径不走这里,由 fade-begin 兜底,至多多看 1.6s 黑场)
+            bootWorldSafe();
           }
         );
       })

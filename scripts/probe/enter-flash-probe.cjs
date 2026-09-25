@@ -79,9 +79,16 @@ const { launch } = require('./browser.js');
     if (Math.abs(parseFloat(after[i].cOp) - parseFloat(after[i - 1].cOp)) > 0.35)
       jumps.push(after[i].cOp + '<-' + after[i - 1].cOp);
   }
+  // 黑场预热契约(2026-09-25):世界揭幕(cVis 翻 visible)必须发生在电影移除前 ≥1.5s
+  // ——即在「沉入全黑」静止期内已启动世界,首帧编译卡顿被纯黑盖住,交棒零卡顿。
+  const cVisFlipIdx = snap.findIndex((s) => s.cVis === 'visible');
+  const goneIdx = snap.findIndex((s) => !s.film);
+  const revealLead = cVisFlipIdx >= 0 && goneIdx > cVisFlipIdx ? (goneIdx - cVisFlipIdx) * 80 : 0;
+  console.log('揭幕领先电影移除:', revealLead + 'ms(cVis 翻转于第 ' + cVisFlipIdx + ' 帧)');
   let pass = 0, fail = 0;
   const ok = (n, c, x) => { if (c) { pass++; console.log('  ✅ ' + n); } else { fail++; console.log('  ❌ ' + n + (x ? ' → ' + x : '')); } };
   ok('缝A 电影层淡入(挂载后首帧 opacity<1)', parseFloat(fadein[0]) < 0.9, '首帧=' + fadein[0]);
+  ok('缝B 黑场预热:揭幕领先电影移除 ≥1.5s', revealLead >= 1500, revealLead + 'ms');
   ok('缝B 交叉溶解:电影消失瞬间世界已亮起(cOp≥0.85)', parseFloat(atGone.cOp) >= 0.85, 'cOp=' + atGone.cOp + ' cVis=' + atGone.cVis);
   ok('缝B 无暗帧(电影消失后 cOp 恒 ≥0.5)', darkGap.length === 0, darkGap.length + ' 帧暗');
   ok('缝B 无亮度跳变(>0.35)', jumps.length === 0, jumps.join(', '));
