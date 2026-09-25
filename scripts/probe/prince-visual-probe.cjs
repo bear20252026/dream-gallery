@@ -47,15 +47,17 @@ const { launch } = require('./browser.js');
   });
   console.log('状态:', JSON.stringify(stat));
 
-  // 游戏内 Audio 播放取证(kunlunSpeak 同路径)
+  // 游戏内 Audio 播放取证(kunlunSpeak 同路径;等对话 TTS 风暴过去再测)
+  await page.waitForTimeout(25000);
   const audio = await page.evaluate(async () => {
-    const a = new Audio('/api/tts?text=' + encodeURIComponent('语音链路浏览器取证'));
+    const a = new Audio('/api/tts?text=' + encodeURIComponent('语音链路浏览器取证B5'));
     a.preload = 'auto';
     return await new Promise((res) => {
       const done = {};
-      a.addEventListener('canplay', () => { if (!done.c) { done.c = 1; a.play().then(() => res({ play: 'resolved' })).catch((e) => res({ play: 'rejected:' + e.name })); } });
+      const t0 = Date.now();
+      a.addEventListener('canplay', () => { if (!done.c) { done.c = 1; a.play().then(() => res({ play: 'resolved', ms: Date.now() - t0 })).catch((e) => res({ play: 'rejected:' + e.name })); } });
       a.addEventListener('error', () => res({ error: (a.error && a.error.code) + '/' + a.currentSrc.slice(-40) }));
-      setTimeout(() => res({ timeout: true, readyState: a.readyState }), 15000);
+      setTimeout(() => res({ timeout: true, readyState: a.readyState, ms: Date.now() - t0 }), 30000);
       a.load();
     });
   });

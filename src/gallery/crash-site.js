@@ -169,28 +169,21 @@ loader.load(
   (g) => {
     const m = g.scene;
     // 尺寸:与原版一致——全 bbox(含隐藏星星层)定标,视觉大小不变。
-    // precise=true:three r160 对 SkinnedMesh 走 getVertexPosition(含蒙皮变形)逐顶点,
-    // 默认 false 的几何原始包围盒与蒙皮渲染位不对应(2026-09-25「小王子半埋沙」根因之一)。
     const boxAll = new THREE.Box3().setFromObject(m, true);
     const h = boxAll.max.y - boxAll.min.y;
     m.scale.setScalar(PRINCE_H / h);
+    // 贴地(2026-09-25「小王子半埋沙」终版修法):绑骨时 root 骨骼锚点就是脚底
+    // (scripts/artifacts/chibi-rig.py BONES.root head=(0,0,-195)=脚底),直接用它的
+    // 世界坐标把脚底抬到轴心。不用几何包围盒——蒙皮网格的包围盒/首帧骨骼矩阵
+    // 都不可靠(渲染前 boneMatrices 未更新),实测差 1.4~1.6m。
     m.updateWorldMatrix(true, true);
-    // 贴地:只对「可见网格」的蒙皮真实包围盒取脚底(隐藏星星不参与,否则会被
-    // 比脚更低的星星层抬高 0.5m 悬空)。抽稀采样,装载期一次性开销。
-    const boxBody = new THREE.Box3();
-    const sv = new THREE.Vector3();
-    m.traverse((c) => {
-      if (!c.isMesh || !c.visible) return;
-      const pos = c.geometry.getAttribute('position');
-      if (!pos) return;
-      const step = Math.max(1, Math.floor(pos.count / 400));
-      for (let i = 0; i < pos.count; i += step) {
-        c.getVertexPosition(i, sv);
-        sv.applyMatrix4(c.matrixWorld);
-        boxBody.expandByPoint(sv);
-      }
+    let rootBone = null;
+    m.traverse((o) => {
+      if (!rootBone && o.isBone && o.name === 'root') rootBone = o;
     });
-    if (isFinite(boxBody.min.y)) m.position.y -= boxBody.min.y; // 脚底贴到轴心
+    if (rootBone) {
+      m.position.y -= rootBone.getWorldPosition(new THREE.Vector3()).y;
+    }
     // 骨骼动画接线(无动画时 mixer 为 null,自动回落程序化动效)
     if (g.animations && g.animations.length) {
       princeMixer = new THREE.AnimationMixer(m);
