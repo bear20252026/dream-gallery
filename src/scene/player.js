@@ -265,6 +265,10 @@ const orbit = { yaw: 0, pitch: ORBIT_DEFAULTS.pitch, dist: ORBIT_DEFAULTS.dist }
 ctx.player.orbit = orbit; // loop-manager 第三人称相机分支读取;toggleView 时初始化 yaw(收编登记册)
 const PITCH_MIN = -0.6,
   PITCH_MAX = 1.25,
+  // 第一人称俯仰上限(2026-09-25 主人令「完整转向天空」):原来三条输入路径各钳
+  // ±0.5/±0.8/±0.5 rad(±29°~46°),抬头看不到天顶。统一放宽到 1.45 rad ≈ 83°,
+  // 留 7° 余量避开 ±90° 万向节翻转奇异;滑翔物理直接吃同一 pitch,俯冲随视角自然变陡。
+  FP_PITCH_MAX = 1.45,
   DIST_MIN = 1.2,
   DIST_MAX = 7;
 
@@ -292,7 +296,7 @@ document.addEventListener('mousemove', (e) => {
     } else {
       pl.y -= (e.clientX - mLX) * s;
       pl.pi -= (e.clientY - mLY) * s * 0.6;
-      pl.pi = Math.max(-0.5, Math.min(0.5, pl.pi));
+      pl.pi = Math.max(-FP_PITCH_MAX, Math.min(FP_PITCH_MAX, pl.pi));
     }
     mLX = e.clientX;
     mLY = e.clientY;
@@ -335,7 +339,7 @@ cEl.addEventListener(
       orbit.dist = Math.max(DIST_MIN, Math.min(DIST_MAX, orbit.dist + e.deltaY * 0.0025));
     } else {
       pl.pi += e.deltaY * 0.0005;
-      pl.pi = Math.max(-0.8, Math.min(0.8, pl.pi));
+      pl.pi = Math.max(-FP_PITCH_MAX, Math.min(FP_PITCH_MAX, pl.pi));
     }
   },
   { passive: false }
@@ -476,7 +480,7 @@ document.addEventListener(
         } else {
           pl.y -= dxT * s;
           pl.pi -= dyT * s * 0.6;
-          pl.pi = Math.max(-0.5, Math.min(0.5, pl.pi));
+          pl.pi = Math.max(-FP_PITCH_MAX, Math.min(FP_PITCH_MAX, pl.pi));
         }
         lx = t.clientX;
         ly = t.clientY;
