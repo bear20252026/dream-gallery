@@ -47,7 +47,7 @@ const { launch } = require('./browser.js');
     return { found: !!box, shown: box ? box.style.display !== 'none' : false, hasBtn: !!document.querySelector('#gameDialog .gs-voice') };
   });
   ok('A. 对话框显示且静音钮就位', dlgVisible.shown && dlgVisible.hasBtn, JSON.stringify(dlgVisible));
-  const hit = ttsReqs.find((u) => u.includes('请你') && u.includes('%E8%8B%8F%E6%89%93')); // 苏打 URL 编码
+  const hit = ttsReqs.find((u) => u.includes('请你') && u.includes('苏打')); // 列表已解码(decodeURIComponent),直接比中文
   ok('B. 自动请求 /api/tts 且带王子声线(中文行→苏打)', !!hit, JSON.stringify(ttsReqs.slice(0, 2)));
 
   // 1b. 英文行也朗读(2026-09-26 根因修复:旧版只读汉字行,默认英文会话全程无声)
