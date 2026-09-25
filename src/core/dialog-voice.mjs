@@ -20,6 +20,7 @@ const SPK_VOICES = {
 };
 const OFF_KEY = 'dialogVoiceOff';
 const MAX_SPEAK_LEN = 220; // 与 lib/tts.js MAX_LEN 对齐,超长服务端还会再截
+import { avAllowed } from './av-switch.js'; // 全站音视频总闸(2026-09-26):总闸关闭等同静音
 
 /** 说话人 → 声线(未知说话人走默认晓晓) */
 export function voiceFor(spk) {
@@ -57,7 +58,7 @@ export function stopSpeaking() {
 /** 朗读一行台词;返回决策(诊断/探针用) */
 export function speakLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
-  if (!d.speak) return d;
+  if (!d.speak || !avAllowed()) return d; // 总闸关闭:不开口(决策照返回,探针可见 reason 不变)
   stopSpeaking();
   try {
     cur = new Audio(ttsUrl(text, voiceFor(spk)));
@@ -85,7 +86,7 @@ function ttsUrl(text, voice) {
  */
 export function prefetchLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
-  if (!d.speak) return d;
+  if (!d.speak || !avAllowed()) return d; // 总闸关闭:预取一并停(省带宽省合成)
   const url = ttsUrl(text, voiceFor(spk));
   if (warmed.has(url)) return d;
   warmed.add(url);

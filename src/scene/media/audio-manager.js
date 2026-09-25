@@ -1,6 +1,7 @@
 // audio-manager.js — 统一音频管理器 + TTS 昆仑开口 + HTML5 背景音乐
 import { ctx } from '../../ctx.js';
 import { onMediaChanged } from '../../media-push.js'; // 服务端主动推送:后台增删音乐即刷新(2026-08-29)
+import { avAllowed } from '../../core/av-switch.js'; // 全站音视频总闸(2026-09-26):默认全静,?av=1 恢复
 // 惰性读取 aB:scene.js 在 main.js 第 6 行已执行,vault['aB'] 已填充;
 // 不做顶层解构,直接在事件回调里读 ctx.scene.aB,防御打包器重排。
 
@@ -23,6 +24,10 @@ const KUNLUN_VOICES = {
 function kunlunSpeak(text, voice, onEnd) {
   try {
     if (!text) return;
+    if (!avAllowed()) {
+      if (onEnd) onEnd(); // 总闸关闭:不出声但对白链照常推进
+      return;
+    }
     let v = '';
     if (typeof voice === 'string' && voice) {
       v = KUNLUN_VOICES[voice] || voice;
@@ -119,6 +124,7 @@ function ensureMusic() {
 }
 setTimeout(function () {
   ctx.scene.aB.addEventListener('click', () => {
+    if (!avAllowed()) return; // 总闸关闭:音乐按钮不动声
     ensureMusic();
     const _aB = ctx.scene.aB;
     if (!mOn) {
@@ -156,7 +162,7 @@ let bgmWasPlaying = false;
 ctx.scene.worldChanged &&
   ctx.scene.worldChanged(function (d) {
     if (!d || d.to === 'main') {
-      if (bgmWasPlaying && mA.paused) mA.play().catch(function () {});
+      if (bgmWasPlaying && mA.paused && avAllowed()) mA.play().catch(function () {});
     } else {
       bgmWasPlaying = !mA.paused;
       if (bgmWasPlaying) mA.pause();
@@ -181,6 +187,10 @@ audioManager.unregisterVideo = function (el) {
   if (audioManager.videoSound === el) audioManager.videoSound = null;
 };
 audioManager.playHint = function (audio, onEnd) {
+  if (!avAllowed()) {
+    if (onEnd) onEnd(); // 总闸关闭:不播,回调照发(上传/TTS 流程不受阻)
+    return;
+  }
   const doPlay = () => {
     audioManager.hintSound = audio;
     audioManager.isHintPlaying = true;

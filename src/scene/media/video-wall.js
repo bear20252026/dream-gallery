@@ -16,6 +16,7 @@
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
 import { onMediaChanged } from '../../media-push.js'; // 后台改大屏 → 重新拉配置(2026-08-29)
+import { avAllowed } from '../../core/av-switch.js'; // 全站音视频总闸(2026-09-26)
 
 /**
  * CDN 根路径。音频和视频统一从 R2 加载。
@@ -252,6 +253,7 @@ async function playV45Slots() {
 async function startSequence() {
   if (sequenceStarted) return;
   sequenceStarted = true;
+  if (!avAllowed()) return; // 总闸关闭:大屏串行序列(视频+音频轨)整体不起,屏面静止
   await reloadBigscreen();
 
   // 阶段1协议配乐停掉 + 背景音乐暂停(进入串行序列,同一时刻只播一个)
@@ -318,7 +320,6 @@ function triggerSequence() {
 
 // 供 prologue.js 调用（在用户点"我愿意"后调用，确保在用户手势回调链内）
 ctx.media.startVidSeq = triggerSequence; // 2026-09-18 收编登记册
-
 
 // 用户点击页面兜底重试(仅序列已启动后生效;协议/序章阶段 sequenceTriggered=false 不触发)
 document.addEventListener('click', function () {

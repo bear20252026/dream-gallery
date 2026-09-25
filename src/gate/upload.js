@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { expose } from '../debug-hooks.js';
+import { avAllowed } from '../core/av-switch.js'; // 全站音视频总闸(2026-09-26)
 import {
   isVideo,
   maxBytes,
@@ -190,6 +191,10 @@ function guideTo(target) {
 // 2026-07-31:使用统一音频管理器,最多同时2个声音(1视频+1提示音),提示音排队
 const HINT_SOUNDS = ['music/VID_20260725_51.mp3', 'music/VID_20260725_52.mp3'];
 function playUploadHint(onEnd) {
+  if (!avAllowed()) {
+    if (onEnd) onEnd(); // 总闸关闭:提示音不出声,TTS 排队照常推进
+    return;
+  }
   try {
     const snd = new Audio(HINT_SOUNDS[Math.floor(Math.random() * HINT_SOUNDS.length)]);
     expose('upHint', snd); // 诊断钩子:探针验证提示音/暂停恢复用

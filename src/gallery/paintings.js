@@ -8,6 +8,7 @@ import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后�
 import { P, V, AI_DESC, LINKS, VIDEO_WALL_SOURCES } from '../../data.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
 import { withMemoryPrefix } from '../shared/memory-prefix.mjs'; // 配文前缀单一源(2026-09-24 抽出)
+import { avAllowed } from '../core/av-switch.js'; // 全站音视频总闸(2026-09-26)
 const {
   s,
   cam,
@@ -657,7 +658,7 @@ setInterval(function () {
     }
     const d2 = (e.x - px) * (e.x - px) + (e.z - pz) * (e.z - pz);
     if (d2 < 18 * 18) {
-      if (e.v.paused) e.v.play().catch(function () {});
+      if (avAllowed() && e.v.paused) e.v.play().catch(function () {}); // 总闸关闭:挂画视频停播(静态首帧)
     } else if (d2 > 22 * 22 && !e.v.paused) e.v.pause();
   }
 }, 500);

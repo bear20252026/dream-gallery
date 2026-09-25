@@ -13,6 +13,7 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { Z } from '../shared/z-layers.mjs';
 import { initSceneManager } from '../core/scene-manager.js';
+import { avAllowed } from '../core/av-switch.js'; // 全站音视频总闸(2026-09-26)
 import {
   PLANETS,
   ISLAND_R as R,
@@ -309,11 +310,13 @@ ctx.scene.worldChanged &&
     if (d && d.to === 'b612') {
       if (!gargStarted) {
         gargStarted = true;
-        gargIntro.play().catch(function () {});
-        gargIntro.onended = function () {
-          gargMain.play().catch(function () {});
-        };
-      } else gargMain.play().catch(function () {});
+        if (avAllowed()) {
+          gargIntro.play().catch(function () {});
+          gargIntro.onended = function () {
+            gargMain.play().catch(function () {});
+          };
+        }
+      } else if (avAllowed()) gargMain.play().catch(function () {});
     } else {
       try {
         gargMain.pause();
