@@ -1,6 +1,6 @@
 // sw.js — Service Worker(2026-07-25):静态资源 SWR + 媒体缓存优先 + 媒体 LRU 上限
 // API 只走网络;开发环境(localhost/5173)不注册(见 index.html 注册处)
-const VER = 'gallery-v13'; // 2026-09-20 v13:媒体/静态分池计量 + 视频与>8MB大文件不进缓存(审计 M2)。升版以清空 v12 共池旧缓存
+const VER = 'gallery-v14'; // 2026-09-25 v14:/admin 系列绕过 SW(见下);升版以清空 v13 旧缓存——v13 曾把带 token 的 /admin 整页落盘
 const MEDIA_CAP = 80; // 媒体缓存最多 80 个(超出逐出最旧)
 
 self.addEventListener('install', e => {
@@ -31,6 +31,11 @@ self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin) return;
   if (url.pathname.startsWith('/api/')) return; // API 只走网络
+  // 后台页(/admin、/admin/docs、/admin-media)整个绕过 SW,2026-09-25 血泪:
+  //   ① isHtml 只认 '/' 与 *.html,/admin 被当静态资源走 SWR → 后台更新后主人首屏
+  //      仍是 SW 缓存里的旧 admin.html(「报错反馈 文件不存在」久修不愈的真凶);
+  //   ② /admin?token=… 整 URL 落盘 = 管理凭据持久化到磁盘,绝不缓存
+  if (/^\/admin(\/|$)/.test(url.pathname)) return;
   // 协议/法律文本(用户协议/隐私指引/说明书)永不缓存,永远取最新(2026-07-26)
   if (/\/(agreement|privacy|guide)\.html$/.test(url.pathname)) return;
   // Range 请求(视频/音频拖放与起播)不拦截直接走网络:
@@ -73,7 +78,10 @@ self.addEventListener('fetch', e => {
   }
 
   // HTML 页面(含协议页):网络优先,离线才回退缓存——否则协议锁/新功能会被旧 HTML 架空(2026-07-26 血泪)
-  const isHtml = url.pathname === '/' || url.pathname.endsWith('.html');
+  //   2026-09-25 补:凡文档导航(mode==='navigate')一律按 HTML 网络优先——/admin 这类
+  //   不带 .html 的美化路径此前漏判,被下面 SWR 当静态缓存,后台更新后首屏仍是旧代码
+  const isHtml =
+    e.request.mode === 'navigate' || url.pathname === '/' || url.pathname.endsWith('.html');
   if (isHtml) {
     e.respondWith(
       caches.open(VER).then(async cache => {
