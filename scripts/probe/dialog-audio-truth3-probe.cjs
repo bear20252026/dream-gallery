@@ -27,13 +27,14 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
     };
   });
   const netlog = [];
+  const isTtsUrl = (u) => u.includes('/api/tts') || u.includes('/tts-audio/');
   page.on('response', (r) => {
-    if (r.url().includes('/api/tts') && !r.url().includes('batch'))
-      netlog.push({ u: decodeURIComponent(r.url()).slice(-46), st: r.status(), ms: Date.now() });
+    if (isTtsUrl(r.url()) && !r.url().includes('batch'))
+      netlog.push({ u: decodeURIComponent(r.url()).slice(-56), st: r.status(), ms: Date.now() });
   });
   page.on('requestfailed', (r) => {
-    if (r.url().includes('/api/tts') && !r.url().includes('batch'))
-      netlog.push({ u: decodeURIComponent(r.url()).slice(-46), fail: r.failure() && r.failure().errorText });
+    if (isTtsUrl(r.url()) && !r.url().includes('batch'))
+      netlog.push({ u: decodeURIComponent(r.url()).slice(-56), fail: r.failure() && r.failure().errorText });
   });
   await page.goto(URL + '/?noopening&noprologue', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
@@ -73,7 +74,10 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
     return window.__playLog
       .filter((r) => r.src.includes('tts') && !r.src.includes('batch'))
       .map((r) => ({
-        line: decodeURIComponent((r.src.match(/text=([^&]*)/) || [])[1] || '').slice(0, 16),
+        line: r.src.includes('/tts-audio/')
+          ? 'key:' + ((r.src.match(/tts-audio\/([0-9a-f]{8})/) || [])[1] || '?') // 边缘缓存 URL 无 text=,亮键前8位
+          : decodeURIComponent((r.src.match(/text=([^&]*)/) || [])[1] || '').slice(0, 16),
+        url: r.src.slice(-40),
         result: r.result || 'pending',
         currentTime: r.el ? +r.el.currentTime.toFixed(2) : null, // >0 = 真的在播
         paused: r.el ? r.el.paused : null,

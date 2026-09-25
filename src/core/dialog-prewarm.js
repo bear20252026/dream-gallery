@@ -47,9 +47,33 @@ function postBatch(items) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
-    }).catch(() => {});
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
   } catch (e) {
-    return Promise.resolve();
+    return Promise.resolve(null);
+  }
+}
+
+// ============ 最后一米:边缘/浏览器双预热(2026-09-26 单行诊断定案) ============
+// 单行诊断(tts-single-line-probe)实锤:台词 .mp3 在 CF 边缘的**首次拉取**要付一次
+// 跨境回源填充(拥塞时 16KB 爬 17s),正好撞上播放窗口 = 该行无声;填充后 Range 请求
+// 也 HIT(~2s)、浏览器 HTTP 缓存内 ~20ms。解法:batch 响应带回「已煮键」,
+// 客户端立刻在后台 load 这些 .mp3 —— 闸门/电影的死时间里把边缘填满 + 浏览器缓存焐热,
+// 剧情开播时每行 <100ms 就绪。静默失败,绝不影响页面。
+const edgeWarmed = new Set();
+function warmEdge(keys) {
+  for (const k of keys || []) {
+    if (edgeWarmed.has(k)) continue;
+    edgeWarmed.add(k);
+    try {
+      const a = new Audio();
+      a.preload = 'auto';
+      a.src = '/tts-audio/' + k + '.mp3';
+      a.load();
+    } catch (e) {
+      /* 无 Audio 环境静默 */
+    }
   }
 }
 
@@ -73,13 +97,15 @@ export function prewarmDialogs() {
       const t = e.entry[other] || e.entry.en || e.entry.zh;
       if (t) ordered.push({ text: t, voice: voiceFor(e.spk, t) });
     }
-    // 分批发送:批间 4s,总 ~23 批 ≈ 90s 内把全部台词煮进缓存
+    // 分批发送:批间 1.2s,总 ~23 批;服务端煮缓存的同批响应带回已煮键 → 立刻预热边缘
     let i = 0;
     (function next() {
       if (i >= ordered.length) return;
       const batch = ordered.slice(i, i + BATCH_SIZE);
       i += BATCH_SIZE;
-      postBatch(batch);
+      postBatch(batch).then((r) => {
+        if (r && Array.isArray(r.keys)) warmEdge(r.keys);
+      });
       setTimeout(next, BATCH_GAP_MS);
     })();
   } catch (e) {

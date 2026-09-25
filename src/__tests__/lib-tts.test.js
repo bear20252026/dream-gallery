@@ -6,8 +6,8 @@ import { describe, it, expect, afterAll } from 'vitest';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Writable } from 'node:stream';
-import { ttsKey, handleTtsAudio, handleTts } from '../../lib/tts.js';
+import { Writable, Readable } from 'node:stream';
+import { ttsKey, handleTtsAudio, handleTts, handleTtsBatch } from '../../lib/tts.js';
 
 const CACHE_DIR = path.join(process.cwd(), '.tts-cache');
 
@@ -103,5 +103,53 @@ describe('handleTts 经典通道仍工作(回退通道不回归)', () => {
     const res = fakeRes();
     handleTts({ method: 'GET' }, res, { text: '', voice: '' });
     expect(res.code).toBe(400);
+  });
+});
+
+describe('handleTtsBatch 响应带已煮键(客户端边缘预热的依据,2026-09-26 最后一米)', () => {
+  function fakeReq(body) {
+    const req = new Readable({ read() {} });
+    req.push(body);
+    req.push(null);
+    req.headers = { 'content-type': 'application/json' };
+    return req;
+  }
+  it('已煮的条目回 keys(未煮的不给,免得客户端预载 404 白跑回源)', async () => {
+    const warmText = 'lib-tts-test-batch-已煮';
+    const coldText = 'lib-tts-test-batch-未煮';
+    const warmKey = ttsKey('苏打', warmText);
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(path.join(CACHE_DIR, warmKey + '.mp3'), Buffer.from('fake-mp3-bytes'));
+    const res = fakeRes();
+    handleTtsBatch(
+      fakeReq(
+        JSON.stringify({
+          items: [
+            { text: warmText, voice: '苏打' },
+            { text: coldText, voice: '苏打' },
+          ],
+        })
+      ),
+      res
+    );
+    await new Promise((r) => res.on('finish', r).on('close', r));
+    const body = JSON.parse(Buffer.concat(res.chunks).toString());
+    expect(body.ok).toBe(true);
+    expect(body.cached).toBe(1);
+    expect(body.keys).toEqual([warmKey]);
+    // 收尾:清掉刚写的测试缓存文件(未煮条目已入队,合成失败会自清理 tmp)
+    try {
+      fs.unlinkSync(path.join(CACHE_DIR, warmKey + '.mp3'));
+    } catch {
+      /* 忽略 */
+    }
+  });
+  it('坏 body → 宽松 200 空批(fire-and-forget 契约:客户端永不因响应体炸掉)', async () => {
+    const res = fakeRes();
+    handleTtsBatch(fakeReq('not-json'), res);
+    await new Promise((r) => res.on('finish', r).on('close', r));
+    expect(res.code).toBe(200);
+    const body = JSON.parse(Buffer.concat(res.chunks).toString());
+    expect(body).toEqual({ ok: true, cached: 0, queued: 0, keys: [] });
   });
 });
