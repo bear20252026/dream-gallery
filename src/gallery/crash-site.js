@@ -17,8 +17,11 @@ const getH = (x, z) => ctx.media.desert.getH(x, z);
 // 石门南侧洼地,16×14m 内高差仅 0.73m,缓坡可达;残骸机头朝北(朝画廊方向滑停)。
 const WRECK = { x: -9, z: 76, yaw: -0.35 }; // yaw: 机头大致朝北偏东
 const SPAWN_DIR = { x: -3.5, z: 70.5 }; // 出生点(与 player.js SPAWN 常量一致;残骸碰撞盒外)
-const DUNE = { x: -11.8, z: 72.2 }; // 小王子初见位(玩家睁眼即可见的西南沙地,走出时不穿残骸)
-const PRINCE_DEST = { x: -9.3, z: 72.8 }; // 叫醒站位(相机投影实测:屏幕 84%/75%,对话框右侧空地)
+// 2026-09-25 主人报「小王子卡在飞机里」:王子 3.2m 高,原站位距机身轴线仅 1.37m,
+// 机翼/尾翼包络直接罩住上半身 → 站位与初见位整体向西南挪出机翼包络(垂距 ≥3.1m),
+// 行走路线顺势拉长(2.6m→3.7m),跳步更有戏。
+const DUNE = { x: -13.5, z: 73.5 }; // 小王子初见位(西南沙丘,机翼包络外垂距 5.1m)
+const PRINCE_DEST = { x: -10.6, z: 71.2 }; // 叫醒站位(机身轴线垂距 3.1m,机尾外空地)
 const PRINCE_H = 3.2; // chibi 王子目标身高(m)(2026-09-07 主人定:放大 3~5 倍,取 4 倍)
 
 const loader = createGLTFLoader();
@@ -110,17 +113,14 @@ function makeSign() {
       draw(); // 行书子集加载完成后重绘牌面中文
     });
   }
-  const board = new THREE.Mesh(
-    new THREE.BoxGeometry(1.7, 1.06, 0.06),
-    [
-      new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
-      new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
-      new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
-      new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
-      new THREE.MeshStandardMaterial({ map: tex }),
-      new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
-    ]
-  );
+  const board = new THREE.Mesh(new THREE.BoxGeometry(1.7, 1.06, 0.06), [
+    new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
+    new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
+    new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
+    new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
+    new THREE.MeshStandardMaterial({ map: tex }),
+    new THREE.MeshStandardMaterial({ color: '#8a6a4a' }),
+  ]);
   const post = new THREE.Mesh(
     new THREE.BoxGeometry(0.09, 1.5, 0.09),
     new THREE.MeshStandardMaterial({ color: '#6b4f37' })
@@ -142,6 +142,12 @@ let prince = null;
 let princeState = 'dune'; // dune → walking → idle
 let princeAt = null; // 目的地
 let princeT0 = 0;
+// idle 小动作状态(chibi 无骨骼,动效只能整体变换;纯呼吸≈雕像,2026-09-25 主人报「没有动作」)
+let idleClock = 0; // idle 累计秒
+let idleAction = null; // 'hop' 原地小跳 | 'look' 张望摆头
+let idleActionT = 0;
+let idleActionDur = 0;
+let idleNextAt = 4; // 首次小动作提前,睁眼后马上能看见王子"活着"
 loader.load(
   '/models/b612/chibi-prince.glb',
   (g) => {
@@ -251,15 +257,35 @@ ctx.onTick(function crashTick(dt) {
       }
     }
   } else if (princeState === 'idle') {
-    prince.position.y = getH(prince.position.x, prince.position.z) + Math.abs(Math.sin(now * 0.003)) * 0.03; // 待机轻息
-    // 面向玩家(不背对):随玩家缓慢转身
+    // 待机呼吸(0.05m,肉眼可见) + 每 6~11s 一次小动作:原地小跳 0.3m / 张望摆头 ±40°
+    idleClock += dt;
     const tx = pl.p.x - prince.position.x;
     const tz = pl.p.z - prince.position.z;
     const targetYaw = Math.atan2(-tx, -tz) + Math.PI; // 模型视觉前向补 π
     let dy = targetYaw - prince.rotation.y;
     while (dy > Math.PI) dy -= Math.PI * 2;
     while (dy < -Math.PI) dy += Math.PI * 2;
-    prince.rotation.y += dy * Math.min(1, dt * 4); // 平滑转体
+    let yaw = prince.rotation.y + dy * Math.min(1, dt * 4); // 平滑转体面向玩家
+    let y = getH(prince.position.x, prince.position.z) + Math.abs(Math.sin(now * 0.003)) * 0.05;
+    if (idleAction) {
+      idleActionT += dt;
+      const k = Math.min(1, idleActionT / idleActionDur);
+      if (k >= 1) {
+        idleAction = null;
+        idleClock = 0;
+        idleNextAt = 6 + Math.random() * 5;
+      } else if (idleAction === 'hop') {
+        y += Math.sin(k * Math.PI) * 0.3;
+      } else {
+        yaw += Math.sin(k * Math.PI * 2) * 0.7;
+      }
+    } else if (idleClock >= idleNextAt) {
+      idleAction = Math.random() < 0.5 ? 'hop' : 'look';
+      idleActionT = 0;
+      idleActionDur = idleAction === 'hop' ? 0.6 : 1.6;
+    }
+    prince.position.y = y;
+    prince.rotation.y = yaw;
   }
 });
 
