@@ -90,6 +90,9 @@ function fadeLoadOnce() {
     if (document.getElementById('b612Gate') || window.__gateFailed) {
       clearInterval(t);
       setTimeout(fadeLoadOnce, 400);
+      // 剧情台词预合成流水线(2026-09-26):闸门就位即后台分批煮缓存
+      // (玩家读协议/看电影的死时间全部利用;服务端 batch 低优先级,实时台词永远优先)
+      import('./core/dialog-prewarm.js').then((m) => m.prewarmDialogs()).catch(() => {});
     }
   }, 100);
   setTimeout(() => {

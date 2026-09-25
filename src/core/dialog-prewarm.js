@@ -1,0 +1,82 @@
+// dialog-prewarm.js — 剧情台词预合成流水线(2026-09-26,主人令「最好的方案」·调研定案)
+// 调研结论(联网:AAA 游戏语音 + 语音 Agent 两个领域交叉):静态台词走「预合成+缓存」,
+// 动态内容才走流式 —— 我们的剧情台词 100% 静态(单一源 shared/story-text.mjs,双语各 ~114 条),
+// 缓存命中率可做到 100%,首句延迟从 3.4~5.4s 降到 ~50ms(缓存命中即回)。
+// 机制:①递归收集 story-text.mjs 全部 {en,zh} 台词;②按当前语言优先的顺序,分小批
+// POST /api/tts/batch(服务端低优先级队列,实时台词永远优先,慢慢煮不抢带宽);
+// ③配合 dialog-voice 的逐行预取,形成三层预热(见 gameshell-dialog)。
+// 全程 fire-and-forget:任何失败静默,不影响页面(与全站错误静默铁律一致)。
+import * as ST from '../shared/story-text.mjs';
+import { voiceFor } from './dialog-voice.mjs';
+import { avAllowed } from './av-switch.js';
+
+const BATCH_SIZE = 10; // 每批条数(≤服务端 MAX_BATCH_ITEMS 60)
+const BATCH_GAP_MS = 4000; // 批间隔:给实时请求留空档
+let started = false;
+
+// 递归收集 {en,zh} 形状的台词条目(story-text 的所有导出常量)
+function collectEntries(node, out) {
+  if (!node || typeof node !== 'object') return out;
+  if (typeof node.en === 'string' || typeof node.zh === 'string') {
+    out.push(node);
+    return out;
+  }
+  for (const k of Object.keys(node)) collectEntries(node[k], out);
+  return out;
+}
+
+function allLines() {
+  const entries = [];
+  for (const k of Object.keys(ST)) {
+    const v = ST[k];
+    if (typeof v === 'function') continue;
+    collectEntries(v, entries);
+  }
+  return entries;
+}
+
+function postBatch(items) {
+  try {
+    return fetch('/api/tts/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ items }),
+    }).catch(() => {});
+  } catch (e) {
+    return Promise.resolve();
+  }
+}
+
+// 入口:闸门出现后调用(玩家读协议/看开场电影的死时间,后台慢慢煮缓存)
+export function prewarmDialogs() {
+  if (started) return;
+  started = true;
+  if (!avAllowed('dialogue')) return; // 对白豁免通道恒真;防御性判断
+  try {
+    const entries = allLines();
+    if (!entries.length) return;
+    // 顺序:当前语言优先,另一语言殿后(玩家马上要听的是当前语言)
+    const lang = ST.scriptLang();
+    const ordered = [];
+    for (const e of entries) {
+      const t = e[lang] || e.en || e.zh;
+      if (t) ordered.push({ text: t, voice: voiceFor(null, t) });
+    }
+    const other = lang === 'zh' ? 'en' : 'zh';
+    for (const e of entries) {
+      const t = e[other] || e.en || e.zh;
+      if (t) ordered.push({ text: t, voice: voiceFor(null, t) });
+    }
+    // 分批发送:批间 4s,总 ~23 批 ≈ 90s 内把全部台词煮进缓存
+    let i = 0;
+    (function next() {
+      if (i >= ordered.length) return;
+      const batch = ordered.slice(i, i + BATCH_SIZE);
+      i += BATCH_SIZE;
+      postBatch(batch);
+      setTimeout(next, BATCH_GAP_MS);
+    })();
+  } catch (e) {
+    /* 静默:预合成失败只影响延迟,不影响功能 */
+  }
+}

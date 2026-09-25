@@ -27,11 +27,12 @@ export function createDialogSystem() {
     chEl.innerHTML = '';
     hintEl.style.display = 'none';
     typeLine(dlg.lines[dlg.idx] || '');
-    // 台词朗读(2026-09-24):每行显示即读;只读中文行(英文会话静默),新行顶旧行不排队
+    // 台词朗读(2026-09-24):每行显示即读;新行顶旧行不排队
     speakLine(dlg.lines[dlg.idx] || '', dlg.speakerType);
-    // 下一行预取(2026-09-24 流畅度):当前行朗读的同时,把下一行的语音预热进
-    // 浏览器/服务端缓存 —— 推进到下一行时声音即刻开口,不再等 1-3s 合成空窗
+    // 预取(2026-09-24 建;2026-09-26 窗口 1→2 行):当前行朗读的同时,把后续两行的
+    // 语音预热进浏览器/服务端缓存 —— 推进时声音即刻开口,不再等合成空窗
     if (dlg.idx < dlg.lines.length - 1) prefetchLine(dlg.lines[dlg.idx + 1] || '', dlg.speakerType);
+    if (dlg.idx < dlg.lines.length - 2) prefetchLine(dlg.lines[dlg.idx + 2] || '', dlg.speakerType);
   }
   function typeLine(str) {
     const textEl = dialogEl.querySelector('.gs-text');
