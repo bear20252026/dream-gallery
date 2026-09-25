@@ -24,11 +24,12 @@ const minifySw = () => ({
   },
 });
 
-// 核心链 modulepreload 注入(2026-09-25 加速):解析 world-loader.js 核心链 import 列表,
+// 核心链预热注入(2026-09-25 加速):解析 world-loader.js 核心链 import 列表,
 // 经 dist/.vite/manifest.json 换算真实哈希 chunk 名,在 index.html 头部注入
-// <link rel="modulepreload" crossorigin> 并行预取——26 次串行 import() 瀑布(26×RTT)
-// 塌缩为 1 次并行;modulepreload 只取+编译不执行,执行顺序仍由串行 import 链保证
-// (「顺序即依赖」不破)。deferred 后台链不预载(进图后再拉,不抢揭幕带宽)。
+// <link rel="prefetch"> 低优先级预热——26 次串行 import() 瀑布(26×RTT)在电影期
+// 预加载时塌缩为缓存命中。⚠️ 首版用 modulepreload 实测 HTML 解析期抢占关键路径,
+// 闸门出现 5.4s→14.5s,故改 prefetch(页面 load 后才取,不挡首屏;chunk immutable
+// 缓存一年,import() 链照样秒中缓存)。执行顺序仍由串行 import 链保证(顺序即依赖不破)。
 const corePreloadInject = () => ({
   name: 'core-preload-inject',
   closeBundle() {
@@ -48,14 +49,14 @@ const corePreloadInject = () => ({
       rels.forEach((k) => walk(k));
       if (!files.size) return console.warn('[core-preload] manifest 无匹配 chunk,跳过注入');
       const links = [...files]
-        .map((f) => '<link rel="modulepreload" crossorigin href="/' + f + '">')
+        .map((f) => '<link rel="prefetch" as="script" href="/' + f + '">')
         .join('');
       const htmlPath = resolve(__dirname, 'dist/index.html');
       let html = fs.readFileSync(htmlPath, 'utf8');
       if (html.includes('core-preload-injected')) return;
       html = html.replace('</head>', links + '<!-- core-preload-injected --></head>');
       fs.writeFileSync(htmlPath, html);
-      console.log('[core-preload] 已注入 ' + files.size + ' 个 modulepreload');
+      console.log('[core-preload] 已注入 ' + files.size + ' 个 prefetch');
     } catch (e) {
       console.warn('[core-preload] 注入失败(不影响产物可用性,串行链照常工作):', e.message);
     }
