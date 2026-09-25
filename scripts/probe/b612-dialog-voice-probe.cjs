@@ -1,7 +1,7 @@
-// b612-dialog-voice-probe.cjs — 台词朗读端到端验收(2026-09-24,主人指令"小米语音朗读台词")
-// 验证:①开对话后自动请求 /api/tts 且带说话人声线(prince→Xiaoyi);
-//       ②对话框出现 🔈 静音钮;③静音后新台词不再请求;④换行替换语义不排队;
-//       ⑤无 pageerror。
+// b612-dialog-voice-probe.cjs — 台词朗读端到端验收(2026-09-24 建;2026-09-26 修订音色断言)
+// 验证:①开对话后自动请求 /api/tts 且带说话人声线(prince 中文行→苏打);
+//       ②英文行也朗读(2026-09-26 根因修复:默认英文会话全程无声)→ Milo;
+//       ③对话框出现 🔈 静音钮;④静音后新台词不再请求;⑤无 pageerror。
 const { launch } = require('./browser.js');
 (async () => {
   const URL = process.env.PROBE_URL || 'http://localhost:5173';
@@ -47,8 +47,22 @@ const { launch } = require('./browser.js');
     return { found: !!box, shown: box ? box.style.display !== 'none' : false, hasBtn: !!document.querySelector('#gameDialog .gs-voice') };
   });
   ok('A. 对话框显示且静音钮就位', dlgVisible.shown && dlgVisible.hasBtn, JSON.stringify(dlgVisible));
-  const hit = ttsReqs.find((u) => u.includes('请你') && u.includes('Xiaoyi')); // 列表已解码,直接比中文
-  ok('B. 自动请求 /api/tts 且带王子声线', !!hit, JSON.stringify(ttsReqs.slice(0, 2)));
+  const hit = ttsReqs.find((u) => u.includes('请你') && u.includes('%E8%8B%8F%E6%89%93')); // 苏打 URL 编码
+  ok('B. 自动请求 /api/tts 且带王子声线(中文行→苏打)', !!hit, JSON.stringify(ttsReqs.slice(0, 2)));
+
+  // 1b. 英文行也朗读(2026-09-26 根因修复:旧版只读汉字行,默认英文会话全程无声)
+  ttsReqs.length = 0;
+  await page.evaluate(() => {
+    window.__ctx.ui.openDialog({
+      speaker: '小王子',
+      speakerType: 'prince',
+      lines: ['If you please-- draw me a sheep!'],
+      autoHide: 60000,
+    });
+  });
+  await page.waitForTimeout(1500);
+  const enHit = ttsReqs.find((u) => u.includes('Milo'));
+  ok('B2. 英文行照读且切英文音色(Milo)', !!enHit, JSON.stringify(ttsReqs.slice(0, 2)));
 
   // 2. 静音 → 新台词不再请求
   await page.evaluate(() => document.querySelector('#gameDialog .gs-voice').click());

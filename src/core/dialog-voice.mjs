@@ -3,43 +3,55 @@
 //       文案哈希缓存 —— 同一句台词永不重复合成;2026-09-24 起 AI 调用不再设日限配额)。
 //
 // 设计定夺:
-//   ① **只读含汉字的行**:闸门默认英文(scriptLang=en),英文行不读 —— zh 声线读英文
-//      效果差且白烧配额;切中文后自动开口,零配置。
+//   ① **中英文都读**(2026-09-26 修订:主人报「还是没有声音」→ 根因是闸门默认英文
+//      (scriptLang=en),旧版「只读含汉字行」把英文台词全拦了 → 全程无声)。
+//      音色按文本语言自动分轨(2026-09-26 对齐 MiMo 官方预置音色表):
+//      中文:苏打(男,prince/pilot) / 茉莉(女,sheep/rose/其他)
+//      英文:Milo(男,prince) / Dean(男,pilot) / Mia(女,sheep/rose/其他)
 //   ② **替换语义不排队**:台词朗读自己持有一个 Audio,新行顶掉旧行 —— 对话链推进快于
 //      音频时长时,排队会让声音越落越远(与 hint 通道的队列语义刻意不同)。
 //   ③ **每会话可静音**:对话框角落 🔈 按钮,sessionStorage 记忆(会话级,不进 store 存档)。
-//   ④ 说话人分声线(spk 来自 story-text who 常量):王子=小艺,飞行员=云希,其余=晓晓。
-//      MiMo 不认 edge-tts 声线名时其内部兜底,再不行回落 edge-tts —— 双引擎都在服务端。
+//   ④ 说话人分声线(spk 来自 story-text who 常量);MiMo 预置音色官方文档
+//      https://mimo.mi.com/docs/zh-CN/quick-start/usage-guide/audio/speech-synthesis-v2.5
 //   ⑤ **下一行预取**(2026-09-24 流畅度):当前行朗读时把下一行语音预热进缓存,
 //      推进到下一行时即刻开口,不再有 1-3s 合成空窗(prefetchLine)。
-const SPK_VOICES = {
-  prince: 'zh-CN-XiaoyiNeural',
-  pilot: 'zh-CN-YunxiNeural',
-  sheep: 'zh-CN-XiaoxiaoNeural',
-  rose: 'zh-CN-XiaoxiaoNeural',
+//   ⑥ 对白豁免总闸(2026-09-26):avAllowed('dialogue') 恒真,BGM/视频全静时对白照常。
+const SPK_VOICES_ZH = {
+  prince: '苏打',
+  pilot: '苏打',
+  sheep: '茉莉',
+  rose: '茉莉',
+};
+const SPK_VOICES_EN = {
+  prince: 'Milo',
+  pilot: 'Dean',
+  sheep: 'Mia',
+  rose: 'Mia',
 };
 const OFF_KEY = 'dialogVoiceOff';
 const MAX_SPEAK_LEN = 220; // 与 lib/tts.js MAX_LEN 对齐,超长服务端还会再截
 import { avAllowed } from './av-switch.js'; // 全站音视频总闸(2026-09-26):总闸关闭等同静音
 
-/** 说话人 → 声线(未知说话人走默认晓晓) */
-export function voiceFor(spk) {
-  return SPK_VOICES[spk] || 'zh-CN-XiaoxiaoNeural';
+/** 说话人 → 声线(按文本语言分轨;未知说话人走默认女声) */
+export function voiceFor(spk, text) {
+  const zh = hasCJK(text);
+  const table = zh ? SPK_VOICES_ZH : SPK_VOICES_EN;
+  return table[spk] || (zh ? '茉莉' : 'Mia');
 }
 
-/** 是否含汉字(朗读门槛:纯英文/数字行不读) */
+/** 是否含汉字(声线分轨依据;不再作为朗读门槛) */
 export function hasCJK(text) {
   return /[\u4e00-\u9fff\u3400-\u4dbf]/.test(String(text || ''));
 }
 
 /**
- * 朗读决策(纯函数,单测钉死):静音关 / 无汉字 / 空文案 → 不读
+ * 朗读决策(纯函数,单测钉死):静音关 / 空文案 → 不读
+ * 2026-09-26 修订:去掉「无汉字不读」—— 闸门默认英文,旧逻辑致全程无声(主人亲报)。
  * @returns {{speak: boolean, reason: string}}
  */
 export function speakDecision(text, voiceOff) {
   if (voiceOff) return { speak: false, reason: 'muted' };
   if (!text || !String(text).trim()) return { speak: false, reason: 'empty' };
-  if (!hasCJK(text)) return { speak: false, reason: 'no-cjk' };
   return { speak: true, reason: 'ok' };
 }
 
@@ -61,7 +73,7 @@ export function speakLine(text, spk) {
   if (!d.speak || !avAllowed('dialogue')) return d; // 对白豁免总闸(2026-09-26 主人令:先只让对话进行),仅受对话框🔇钮控制
   stopSpeaking();
   try {
-    cur = new Audio(ttsUrl(text, voiceFor(spk)));
+    cur = new Audio(ttsUrl(text, voiceFor(spk, text)));
     cur.play().catch(() => {}); // 手势限制/缓存未就绪静默(与 kunlunSpeak 同策略)
   } catch (e) {
     cur = null;
@@ -87,7 +99,7 @@ function ttsUrl(text, voice) {
 export function prefetchLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
   if (!d.speak || !avAllowed('dialogue')) return d; // 对白豁免总闸:预取照常(推进到该行零空窗)
-  const url = ttsUrl(text, voiceFor(spk));
+  const url = ttsUrl(text, voiceFor(spk, text));
   if (warmed.has(url)) return d;
   warmed.add(url);
   try {

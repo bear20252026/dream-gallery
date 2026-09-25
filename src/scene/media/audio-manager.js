@@ -15,11 +15,14 @@ skyNote.style.cssText =
 document.body.appendChild(skyNote);
 
 // ===================== TTS:昆仑开口 =====================
+// 2026-09-26 对齐 MiMo 官方预置音色表(https://mimo.mi.com/docs/...speech-synthesis-v2.5):
+// 旧 zh-CN-*Neural 是 edge-tts 声线名,MiMo 不认 → 全部兜底成同一女声,角色感尽失。
+// 现按官方预置:茉莉/苏打(中文);服务端 lib/tts.js 有同名 edge-tts 兜底映射。
 const KUNLUN_VOICES = {
-  spirits: 'zh-CN-XiaoxiaoNeural',
-  ark: 'zh-CN-YunxiNeural',
-  hall: 'zh-CN-XiaoyiNeural',
-  title: 'zh-CN-YunyangNeural',
+  spirits: '茉莉',
+  ark: '苏打',
+  hall: '茉莉',
+  title: '苏打',
 };
 function kunlunSpeak(text, voice, onEnd) {
   try {
