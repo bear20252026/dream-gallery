@@ -168,13 +168,29 @@ loader.load(
   '/models/b612/chibi-prince-rigged-v2.glb',
   (g) => {
     const m = g.scene;
-    // precise=true:three r160 对 SkinnedMesh 走 getVertexPosition(含蒙皮变形)逐顶点取
-    // 真实渲染包围盒。默认 false 用几何原始包围盒,与蒙皮渲染位相差 ~1.4m →
-    // 2026-09-25 主人报「小王子位置有问题」(半埋沙)的根因。
-    const box = new THREE.Box3().setFromObject(m, true);
-    const h = box.max.y - box.min.y;
-    m.scale.setScalar(PRINCE_H / h); // 归一化到 0.8m(chibi 小人影)
-    m.position.y -= box.min.y * (PRINCE_H / h); // 底面贴到轴心(否则半截埋沙)
+    // 尺寸:与原版一致——全 bbox(含隐藏星星层)定标,视觉大小不变。
+    // precise=true:three r160 对 SkinnedMesh 走 getVertexPosition(含蒙皮变形)逐顶点,
+    // 默认 false 的几何原始包围盒与蒙皮渲染位不对应(2026-09-25「小王子半埋沙」根因之一)。
+    const boxAll = new THREE.Box3().setFromObject(m, true);
+    const h = boxAll.max.y - boxAll.min.y;
+    m.scale.setScalar(PRINCE_H / h);
+    m.updateWorldMatrix(true, true);
+    // 贴地:只对「可见网格」的蒙皮真实包围盒取脚底(隐藏星星不参与,否则会被
+    // 比脚更低的星星层抬高 0.5m 悬空)。抽稀采样,装载期一次性开销。
+    const boxBody = new THREE.Box3();
+    const sv = new THREE.Vector3();
+    m.traverse((c) => {
+      if (!c.isMesh || !c.visible) return;
+      const pos = c.geometry.getAttribute('position');
+      if (!pos) return;
+      const step = Math.max(1, Math.floor(pos.count / 400));
+      for (let i = 0; i < pos.count; i += step) {
+        c.getVertexPosition(i, sv);
+        sv.applyMatrix4(c.matrixWorld);
+        boxBody.expandByPoint(sv);
+      }
+    });
+    if (isFinite(boxBody.min.y)) m.position.y -= boxBody.min.y; // 脚底贴到轴心
     // 骨骼动画接线(无动画时 mixer 为 null,自动回落程序化动效)
     if (g.animations && g.animations.length) {
       princeMixer = new THREE.AnimationMixer(m);
