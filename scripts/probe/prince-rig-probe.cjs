@@ -23,26 +23,27 @@ const { launch } = require('./browser.js');
   await page.waitForSelector('#b612film', { timeout: 30000 });
   await page.waitForSelector('#cHat', { timeout: 30000 });
   await page.waitForTimeout(500);
-  await page.click('#cHat').catch(() => console.log('!! 帽子点击失败'));
-  console.log('[probe] 已选帽子,等电影收束…');
-  await page.waitForFunction(() => !document.getElementById('b612film'), null, { timeout: 150000 });
-  console.log('[probe] 电影结束,世界揭幕');
-
-  // 轮询王子状态 30s,每 250ms 采样 clip 名
-  const seen = await page.evaluate(async () => {
-    const out = [];
-    const t0 = Date.now();
-    while (Date.now() - t0 < 30000) {
+  // 采样器先启动:世界在黑场期已预热启动,走路动画发生在电影收束前,必须提前盯
+  await page.evaluate(() => {
+    window.__psamples = [];
+    window.__psTimer = setInterval(() => {
       const d = window.__princeDebug;
-      out.push({
-        t: Date.now() - t0,
+      window.__psamples.push({
+        t: Date.now(),
         state: d ? d.state() : 'no-debug',
         clip: d ? d.clip() : null,
         rigged: d ? d.rigged() : false,
       });
-      await new Promise((r) => setTimeout(r, 250));
-    }
-    return out;
+    }, 250);
+  });
+  await page.click('#cHat').catch(() => console.log('!! 帽子点击失败'));
+  console.log('[probe] 已选帽子,等电影收束…');
+  await page.waitForFunction(() => !document.getElementById('b612film'), null, { timeout: 150000 });
+  console.log('[probe] 电影结束,世界揭幕');
+  await page.waitForTimeout(25000);
+  const seen = await page.evaluate(() => {
+    clearInterval(window.__psTimer);
+    return window.__psamples;
   });
   const riggedEver = seen.some((s) => s.rigged);
   const walkSeen = seen.some((s) => s.clip === 'ChibiWalk');
