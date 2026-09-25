@@ -35,7 +35,15 @@ const { canServeMedia } = require('./lib/siteconfig');
 const { staticDenied, applySecurityHeaders, mediaGate, serveEntryHtml } = require('./lib/security');
 
 const handler = (req, res) => {
-  const u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  // 畸形请求行/Host 头(实测 '//?noopening' 打崩过进程:2026-09-26 pm2 error log
+  // uncaughtException ERR_INVALID_URL,飞行中的语音请求全部腰斩)——必须接住,返回 400
+  let u;
+  try {
+    u = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  } catch {
+    sendJson(res, 400, { error: 'URL 不合法' });
+    return;
+  }
   // 畸形 URL(如 /%)会让 decodeURIComponent 抛 URIError,不接住整个进程就崩
   let pathname;
   try { pathname = decodeURIComponent(u.pathname); }
