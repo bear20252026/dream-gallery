@@ -139,13 +139,10 @@ async function loadErrors() {
   try {
     const type = $('errType').value;
     const q = $('errQ').value.trim();
+    // token 已由 adminFetch 统一走 x-token 头,tk() 恒返空串;查询串必须自起 "?",
+    // 再写 '+ tk() + "&type="' 会拼出 client-errors&type= 畸形 URL → 404(2026-09-25 血泪)
     const r = await adminFetch(
-      '/api/admin/client-errors' +
-        tk() +
-        '&type=' +
-        encodeURIComponent(type) +
-        '&q=' +
-        encodeURIComponent(q)
+      '/api/admin/client-errors?type=' + encodeURIComponent(type) + '&q=' + encodeURIComponent(q)
     );
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || '加载失败');
