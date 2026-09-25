@@ -126,7 +126,18 @@ export function prefetchLine(text, spk) {
 
 export function isVoiceOff() {
   try {
-    return sessionStorage.getItem(OFF_KEY) === '1';
+    const v = sessionStorage.getItem(OFF_KEY);
+    if (!v) return false;
+    // 24h 自动过期(2026-09-26):静音钮太容易被误点,误点后最多哑一天,不再哑到关标签
+    const ts = parseInt(v, 10);
+    if (Number.isFinite(ts)) {
+      if (Date.now() - ts > 24 * 3600 * 1000) {
+        sessionStorage.removeItem(OFF_KEY);
+        return false;
+      }
+      return true;
+    }
+    return v === '1'; // 旧格式(裸 '1')照旧兼容
   } catch (e) {
     return false;
   }
@@ -135,11 +146,37 @@ export function isVoiceOff() {
 export function toggleVoiceOff() {
   const next = !isVoiceOff();
   try {
-    if (next) sessionStorage.setItem(OFF_KEY, '1');
+    if (next) sessionStorage.setItem(OFF_KEY, String(Date.now())); // 存时间戳供 24h 过期
     else sessionStorage.removeItem(OFF_KEY);
   } catch (e) {}
   if (next) stopSpeaking();
   return next;
+}
+
+/** 是否有台词语音正在播(供对白 autoHide 联动:语音播完再开始倒计时关闭) */
+export function isVoicePlaying() {
+  try {
+    return !!(cur && !cur.paused);
+  } catch (e) {
+    return false;
+  }
+}
+
+/** 台词语音结束回调(一次性);never 情形(无语音在播)立即执行 */
+export function onVoiceEnd(cb) {
+  if (!cur) {
+    cb();
+    return;
+  }
+  const fin = () => {
+    try {
+      cb();
+    } catch (e) {}
+  };
+  cur.addEventListener('ended', fin, { once: true });
+  cur.addEventListener('error', fin, { once: true });
+  // 兜底:语音链路任何意外卡住,15s 后强制放行(对白关闭不能被语音无限拖延)
+  setTimeout(fin, 15000);
 }
 
 /** 对话框挂静音钮(gameshell-dialog attach 时调用;防重复安装) */

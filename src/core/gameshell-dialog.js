@@ -1,7 +1,15 @@
 // core/gameshell-dialog.js — GameShell 对话框状态机(2026-08-30 B5 从 gameshell-system.js 外迁)
 // 职责:打字机逐行渲染 / 点击推进 / 选项分支 / 自动隐藏 / 说话人命名 / **台词朗读**(2026-09-24)。
 // 纯表现层:不持有场景/物理状态;DOM 容器由 gameshell-system 创建后经 attach() 注入。
-import { speakLine, stopSpeaking, installMuteBtn, prefetchLine } from './dialog-voice.mjs';
+import {
+  speakLine,
+  stopSpeaking,
+  installMuteBtn,
+  prefetchLine,
+  isVoiceOff,
+  isVoicePlaying,
+  onVoiceEnd,
+} from './dialog-voice.mjs';
 import { dwellFor } from '../shared/typing-rhythm.mjs';
 
 export function createDialogSystem() {
@@ -69,7 +77,24 @@ export function createDialogSystem() {
       if (dlg.choices && dlg.choices.length) {
         showChoices();
       } else if (dlg.autoHide) {
-        dlg.hideTimer = setTimeout(closeDialog, dlg.autoHide);
+        // 语音联动(2026-09-26 主人问「放太快了吗」):对白 autoHide 9s < 长台词朗读时长,
+        // 语音会被 closeDialog 掐断。改为:台词语音播完后再起 autoHide 倒计时;
+        // 静音/无语音时行为照旧。15s 兜底在 onVoiceEnd 内,关闭不会被无限拖延。
+        if (isVoicePlaying()) {
+          onVoiceEnd(() => {
+            if (dlg && dlg.autoHide) dlg.hideTimer = setTimeout(closeDialog, dlg.autoHide);
+          });
+        } else {
+          if (isVoiceOff() && dlg.autoHide > 6000) {
+            // 静音状态下提醒一次:防止主人误点过静音钮而不自知(2026-09-26 主人报台词无声)
+            const hintEl = dialogEl.querySelector('.gs-hint');
+            if (hintEl) {
+              hintEl.textContent = '(台词朗读已静音 — 点右上角 🔇 可恢复)';
+              hintEl.style.display = 'block';
+            }
+          }
+          dlg.hideTimer = setTimeout(closeDialog, dlg.autoHide);
+        }
       }
     }
   }
@@ -173,6 +198,11 @@ export function createDialogSystem() {
       typeTimer: null,
       hideTimer: null,
     };
+    // 整组预取(2026-09-26 真实取证定案):探针证实剧情链对话条与条间隔小于合成时长,
+    // 旧行音频还没开播就被下一条顶掉(AbortError)→ 全程无声。开对话瞬间把**全部行**
+    // 丢进合成队列 —— 本条对话的后续行、以及链式下一条的行,到达时缓存已命中、秒出声。
+    // 自愈覆盖所有对话源(story-text / crash-site 硬编码 / quiz / 菜单),不再依赖预生成清单。
+    for (let pi = 1; pi < lines.length; pi++) prefetchLine(lines[pi] || '', dlg.speakerType);
     dialogEl.style.display = 'block';
     // 说话人视觉类型:prince/pilot/sheep/rose → 不同边框+名字色
     dialogEl.dataset.spk = dlg.speakerType;
