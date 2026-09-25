@@ -58,7 +58,7 @@ export function stopSpeaking() {
 /** 朗读一行台词;返回决策(诊断/探针用) */
 export function speakLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
-  if (!d.speak || !avAllowed()) return d; // 总闸关闭:不开口(决策照返回,探针可见 reason 不变)
+  if (!d.speak || !avAllowed('dialogue')) return d; // 对白豁免总闸(2026-09-26 主人令:先只让对话进行),仅受对话框🔇钮控制
   stopSpeaking();
   try {
     cur = new Audio(ttsUrl(text, voiceFor(spk)));
@@ -86,7 +86,7 @@ function ttsUrl(text, voice) {
  */
 export function prefetchLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
-  if (!d.speak || !avAllowed()) return d; // 总闸关闭:预取一并停(省带宽省合成)
+  if (!d.speak || !avAllowed('dialogue')) return d; // 对白豁免总闸:预取照常(推进到该行零空窗)
   const url = ttsUrl(text, voiceFor(spk));
   if (warmed.has(url)) return d;
   warmed.add(url);

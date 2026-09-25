@@ -24,10 +24,9 @@ const KUNLUN_VOICES = {
 function kunlunSpeak(text, voice, onEnd) {
   try {
     if (!text) return;
-    if (!avAllowed()) {
-      if (onEnd) onEnd(); // 总闸关闭:不出声但对白链照常推进
-      return;
-    }
+    // 对白豁免(2026-09-26 主人令「先只让人物的对话进行」):总闸关闭时本通道照常开口,
+    // 但 playHint 仍闸着提示音 → 传 bypass 让对白走正常队列,提示音通道不放开。
+    const dlgBypass = !avAllowed();
     let v = '';
     if (typeof voice === 'string' && voice) {
       v = KUNLUN_VOICES[voice] || voice;
@@ -36,7 +35,7 @@ function kunlunSpeak(text, voice, onEnd) {
       '/api/tts?text=' + encodeURIComponent(text) + (v ? '&voice=' + encodeURIComponent(v) : '');
     const a = new Audio(url);
     if (ctx.media.audioManager) {
-      ctx.media.audioManager.playHint(a, onEnd);
+      ctx.media.audioManager.playHint(a, onEnd, dlgBypass);
     } else {
       a.play().catch(() => {
         if (onEnd) onEnd();
@@ -186,9 +185,9 @@ audioManager.registerVideo = function (el) {
 audioManager.unregisterVideo = function (el) {
   if (audioManager.videoSound === el) audioManager.videoSound = null;
 };
-audioManager.playHint = function (audio, onEnd) {
-  if (!avAllowed()) {
-    if (onEnd) onEnd(); // 总闸关闭:不播,回调照发(上传/TTS 流程不受阻)
+audioManager.playHint = function (audio, onEnd, bypassSwitch) {
+  if (!avAllowed() && !bypassSwitch) {
+    if (onEnd) onEnd(); // 总闸关闭(且非对白豁免):不播,回调照发(上传/TTS 流程不受阻)
     return;
   }
   const doPlay = () => {
