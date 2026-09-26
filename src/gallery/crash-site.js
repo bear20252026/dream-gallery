@@ -228,9 +228,18 @@ loader.load(
 let bootT = null;
 let wakePlayed = false;
 let wakePitchDone = false;
-setTimeout(function () {
-  window.__crashWakeDone = true; // 兜底:对话链路异常时 16s 后照常放行开场弹窗
-}, 16000);
+// 兜底放行(原 16s 一刀切,2026-09-26 探针实锤修正):互动化后叫醒对话要等玩家开口
+// (30s+),对话开着就置位 = 假收束信号(雅号卡弹窗虽已归档,但探针/外部工具以
+// __crashWakeDone 为「链路收束」依据,假信号让验收在链路中途就开跑)。改为:
+// 对话框开着就一直等,链路死了(无对话)才放行 —— 真收束信号。
+const wakeFallback = function () {
+  if (ctx.ui.dialogOpen && ctx.ui.dialogOpen()) {
+    setTimeout(wakeFallback, 2000);
+    return;
+  }
+  window.__crashWakeDone = true;
+};
+setTimeout(wakeFallback, 16000);
 ctx.onTick(function crashTick(dt) {
   if ((ctx.scene.activeWorld || 'main') !== 'main') return;
   const now = performance.now();
