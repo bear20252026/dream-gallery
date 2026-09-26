@@ -8,6 +8,8 @@ import {
   prefetchLine,
   isVoiceOff,
   isVoicePlaying,
+  isVoiceStarted,
+  onVoiceStart,
   onVoiceEnd,
 } from './dialog-voice.mjs';
 import { dwellFor } from '../shared/typing-rhythm.mjs';
@@ -81,6 +83,20 @@ export function createDialogSystem() {
         // 语音会被 closeDialog 掐断。改为:台词语音播完后再起 autoHide 倒计时;
         // 静音/无语音时行为照旧。15s 兜底在 onVoiceEnd 内,关闭不会被无限拖延。
         if (isVoicePlaying()) {
+          // 加载提示(2026-09-26 主人报「声音加载过慢」):晚高峰跨境开播 15~21s,
+          // 白屏静默像坏了 —— 亮「加载中」提示,首次出声即熄(玩家知道在等什么)
+          const hintEl = dialogEl.querySelector('.gs-hint');
+          if (hintEl && !isVoiceStarted()) {
+            hintEl.textContent = '(♪ 语音加载中…)';
+            hintEl.style.display = 'block';
+            onVoiceStart(() => {
+              const h = dialogEl.querySelector('.gs-hint');
+              if (h) {
+                h.textContent = '';
+                h.style.display = 'none';
+              }
+            });
+          }
           onVoiceEnd(() => {
             if (dlg && dlg.autoHide) dlg.hideTimer = setTimeout(closeDialog, dlg.autoHide);
           });

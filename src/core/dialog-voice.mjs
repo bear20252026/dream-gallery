@@ -122,6 +122,7 @@ export function speakLine(text, spk) {
       audio.src = url;
       audio.play().then(
         () => {
+          audio._started = true; // 真实出声(加载提示/兜底语义依赖此标记)
           stat('ok', text, voice, { ms: Math.round(performance.now() - t0) }); // 真实开播(「播放过」)
         },
         (e) => playFail(audio, url, text, voice, e),
@@ -152,7 +153,10 @@ function playFail(audio, url, text, voice, e) {
     audio._fellBack = true;
     audio.src = legacyTtsUrl(text, voice);
     audio.play().then(
-      () => stat('ok', text, voice), // 回退通道播响也算「真的响了」(audibleRate 口径一致)
+      () => {
+        audio._started = true; // 回退通道出声同样算(加载提示熄灭/兜底按 duration 重置)
+        stat('ok', text, voice); // 回退通道播响也算「真的响了」(audibleRate 口径一致)
+      },
       () => {},
     );
   }
@@ -263,24 +267,67 @@ export function isVoicePlaying() {
   }
 }
 
-/** 台词语音结束回调(一次性);never 情形(无语音在播)立即执行 */
+/** 当前台词是否已真实出声过一次(加载提示用:没出声=还在加载) */
+export function isVoiceStarted() {
+  try {
+    return !!(cur && cur._started);
+  } catch (e) {
+    return false;
+  }
+}
+
+/** 台词首次出声回调(一次性);已出声立即执行。加载提示的熄灭时机。 */
+export function onVoiceStart(cb) {
+  const a = cur;
+  if (!a) return;
+  if (a._started) {
+    try {
+      cb();
+    } catch (e) {}
+    return;
+  }
+  a.addEventListener('playing', () => {
+    try {
+      cb();
+    } catch (e) {}
+  }, { once: true });
+}
+
+/** 台词语音结束回调(一次性);never 情形(无语音在播)立即执行。
+ *  兜底语义(2026-09-26 主人报「部分没声/加载慢/被截断」定案,后台实锤):
+ *  旧版固定 24s 从打字完成起算 —— 晚高峰跨境开播实测 15~21s,ok(ms=16047)同一秒就 cut,
+ *  加载 >24s 的行 play() 被掐死从未出声(fail AbortError 占 fail 全部 26 条)。
+ *  新语义【语音驱动】:①未开播 → 30s 放行(覆盖最坏开播);②已开播 → 等 ended,
+ *  防挂死兜底 = 开播时按 duration+20s 重置;③行被替换/对话已关(cur !== audio)→ 守卫自动
+ *  失效,旧守卫永不掐新行;④不再监听 error —— R2 冷 404 的 error 会在回退通道开播前
+ *  就触发 fin(又一个没声洞),错误路径由①②守卫覆盖。 */
 export function onVoiceEnd(cb) {
-  if (!cur) {
+  const a = cur;
+  if (!a) {
     cb();
     return;
   }
+  let done = false;
   const fin = () => {
+    if (done) return;
+    done = true;
     try {
       cb();
     } catch (e) {}
   };
-  cur.addEventListener('ended', fin, { once: true });
-  cur.addEventListener('error', fin, { once: true });
-  // 兜底:语音链路任何意外卡住,24s 后强制放行(对白关闭不能被语音无限拖延)。
-  // 2026-09-26 主人报「部分对话朗读不了」实锤:晚高峰跨境回源填充 15~21s,
-  // 旧值 15s 必然先于声音开口 → 对白推进把刚要响的台词掐死(cut)。24s 覆盖最坏情形;
-  // 正常路径由 ended/error 先行放行,不受影响。
-  setTimeout(fin, 24000);
+  a.addEventListener('ended', fin, { once: true });
+  let guard = setTimeout(() => {
+    if (cur === a) fin(); // 已被新行替换/已停止 → 新生命周期接管,旧守卫静默退出
+  }, 30000);
+  a.addEventListener('playing', () => {
+    a._started = true;
+    if (done) return;
+    clearTimeout(guard);
+    const d = Number.isFinite(a.duration) ? a.duration : 60;
+    guard = setTimeout(() => {
+      if (cur === a) fin(); // 防挂死:正常由 ended 先行;网络中断 stall 到底也放行
+    }, d * 1000 + 20000);
+  }, { once: true });
 }
 
 /** 对话框挂静音钮(gameshell-dialog attach 时调用;防重复安装) */

@@ -19,8 +19,9 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
     const origPlay = Audio.prototype.play;
     Audio.prototype.play = function () {
       if (String(this.src).includes('tts')) {
-        const rec = { src: String(this.src), t: Date.now(), el: this, maxCur: 0, result: 'pending' };
+        const rec = { src: String(this.src), t: Date.now(), el: this, maxCur: 0, startMs: null, result: 'pending' };
         window.__playLog.push(rec);
+        this.addEventListener('playing', () => { rec.startMs = Date.now() - rec.t; }, { once: true });
         const p = origPlay.call(this);
         p.then(() => { rec.result = 'resolved'; }).catch((e) => { rec.result = 'rejected:' + e.name; });
         return p;
@@ -55,7 +56,10 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
     window.__playLog.map((r) => ({
       key: (r.src.match(/tts-audio\/([0-9a-f]{8})/) || [])[1] || (r.src.match(/text=([^&]{0,10})/) || [])[1] || '?',
       result: r.result,
+      startMs: r.startMs,
       maxCur: r.maxCur,
+      duration: Number.isFinite(r.el.duration) ? +r.el.duration.toFixed(1) : null,
+      truncated: Number.isFinite(r.el.duration) && r.maxCur > 0 && r.maxCur < r.el.duration - 0.5,
       audible: r.result === 'resolved' && r.maxCur > 0,
       via: r.src.includes('/tts-audio/') ? 'edge' : 'legacy',
     }))
@@ -63,7 +67,8 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
   console.log('网络层(近14):', JSON.stringify(netlog.slice(-14)));
   console.log('逐行:', JSON.stringify(report, null, 1));
   const audible = report.filter((r) => r.audible).length;
-  console.log('=== 真出声: ' + audible + ' / ' + report.length + ' 行 ===');
+  const cut = report.filter((r) => r.truncated).length;
+  console.log('=== 真出声: ' + audible + ' / ' + report.length + ' 行,截断: ' + cut + ' ===');
   await b.close();
   process.exit(report.length && audible === report.length ? 0 : audible > 0 ? 1 : 2);
 })().catch((e) => { console.error('探针异常:', e.message); process.exit(2); });
