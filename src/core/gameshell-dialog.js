@@ -127,7 +127,9 @@ export function createDialogSystem() {
       b.onclick = (e) => {
         e.stopPropagation();
         const cb = c.onClick;
-        closeDialog();
+        // suppressDone(2026-09-26 互动化):点选项=玩家接管剧情推进,旧对话的 onDone
+        // (链式收束)必须让位——否则旧链 onDone 与新链 onClick 双线并行,剧情竞态
+        closeDialog(true);
         if (cb) cb(c.value);
       };
       chEl.appendChild(b);

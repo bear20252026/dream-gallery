@@ -266,3 +266,59 @@ export const SCENE5 = {
     { who: SHEEP, en: 'I am glad I am not a rat.', zh: '幸好我不是耗子。' },
   ],
 };
+
+// ============ 玩家互动节点(2026-09-26 主人令「不仅仅是在放台词」) ============
+// 三个「轮到玩家开口」的回应选择:选项标签 → 玩家回应行(pilot,自动朗读) → 王子接话。
+// 所有分支汇合主线,不产生持久分叉(对话感,不做剧情树)。
+export const REPLIES = {
+  // 节点1·叫醒词后(王子:「请你——给我画一只羊!」)
+  wake: {
+    choices: [
+      {
+        label: { en: 'A sheep? What for?', zh: '一只羊？你要羊做什么？' },
+        pilot: { who: PILOT, en: 'A sheep? Whatever for?', zh: '一只羊？你要羊做什么呀？' },
+        prince: { who: PRINCE, en: 'If you draw me one, I will tell you everything.', zh: '你画给我，\n我就把什么都告诉你。' },
+      },
+      {
+        label: { en: 'Alright, let me think how to draw it.', zh: '好，让我想想怎么画。' },
+        pilot: { who: PILOT, en: 'Alright. Let me think how to draw a sheep.', zh: '好，让我想想，\n一只羊该怎么画。' },
+        prince: { who: PRINCE, en: 'You have been thinking about it for six years already. Be quick!', zh: '你已经想了六年啦，\n快一点！' },
+      },
+      {
+        label: { en: 'I draw badly, forgive me.', zh: '我画得不好，见笑了。' },
+        pilot: { who: PILOT, en: 'I draw badly. Forgive me in advance.', zh: '我画得不好，\n你可别嫌弃。' },
+        prince: { who: PRINCE, en: 'It does not matter. Draw the one in your heart.', zh: '没关系。\n画出你心里的那只就好。' },
+      },
+    ],
+  },
+  // 节点2·画羊收束(王子:「瞧!他睡着了……」之后)
+  drawn: {
+    choices: [
+      {
+        label: { en: 'Will it keep you company?', zh: '它会陪着你吗？' },
+        pilot: { who: PILOT, en: 'Will it keep you company?', zh: '它会陪着你吗？' },
+        prince: { who: PRINCE, en: 'At night, it watches the stars with me from its box.', zh: '到了夜里，\n它会在箱子里陪我数星星。' },
+      },
+      {
+        label: { en: 'What if it runs away?', zh: '要是它跑了呢？' },
+        pilot: { who: PILOT, en: 'What if it runs away?', zh: '要是它跑了呢？' },
+        prince: { who: PRINCE, en: 'I have a rope and a stake. -- Just teasing. It will miss me.', zh: '我有绳子和桩子呀。\n——开玩笑的，\n它会想我的。' },
+      },
+    ],
+  },
+  // 节点3·夜里数数仪式(羊:「一……二……三……」之后)
+  night: {
+    choices: [
+      {
+        label: { en: 'What is it counting in there?', zh: '它在里面数什么？' },
+        pilot: { who: PILOT, en: 'What is it counting in there?', zh: '它在里面数什么呢？' },
+        prince: { who: PRINCE, en: 'Its stars. Sheep dream of stars when they sleep.', zh: '数它的星星。\n羊睡着了，\n会梦见星星。' },
+      },
+      {
+        label: { en: 'Is the little fellow asleep?', zh: '小家伙睡了吗？' },
+        pilot: { who: PILOT, en: 'Is the little fellow asleep?', zh: '小家伙睡了吗？' },
+        prince: { who: PRINCE, en: 'Shh-- it is counting. Let it count.', zh: '嘘——它在数数呢。\n让它数完。' },
+      },
+    ],
+  },
+};

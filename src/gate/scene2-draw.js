@@ -6,6 +6,7 @@
 import { ctx } from '../ctx.js';
 import { Z } from '../shared/z-layers.mjs';
 import { SCENE2, tt, whoSpk } from '../shared/story-text.mjs';
+import { replyChoices } from '../shared/dialog-replies.mjs';
 import { TRUTH } from './film-strokes.mjs';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -16,7 +17,11 @@ const BOARD_Z = 60; // 盖过世界与 HUD,低于手绘对话框(80)
 // 垂耳/闭眼/叹气/羊毛卷/羊角纹/山羊胡/落影/草叶;箱子加第三个气孔+孔里飘出的呼吸+暖光。
 // delay=ms(定稿起笔时刻);无 delay 的基础笔按序 110ms 错峰,像一笔一笔画出来的。
 const SHEEP_SICK = [
-  { d: 'M270,300 C285,255 360,240 420,265 C455,280 455,320 425,335 C360,362 295,350 270,300', t: 900, w: 3.4 },
+  {
+    d: 'M270,300 C285,255 360,240 420,265 C455,280 455,320 425,335 C360,362 295,350 270,300',
+    t: 900,
+    w: 3.4,
+  },
   { d: 'M270,300 C240,305 218,325 222,350 C224,362 238,366 248,358', t: 700, w: 3 },
   { d: 'M232,326 C220,318 210,322 208,332', t: 400, w: 2.2, soft: true },
   { d: 'M310,352 L306,395', t: 300, w: 2.6 },
@@ -37,7 +42,11 @@ const SHEEP_SICK = [
   { d: 'M244,402 C310,410 420,410 474,400', t: 600, w: 2, soft: true, delay: 2290 },
 ];
 const RAM = [
-  { d: 'M260,300 C270,255 350,240 420,262 C458,275 462,318 430,335 C365,362 285,352 260,300', t: 900, w: 3.4 },
+  {
+    d: 'M260,300 C270,255 350,240 420,262 C458,275 462,318 430,335 C365,362 285,352 260,300',
+    t: 900,
+    w: 3.4,
+  },
   { d: 'M430,290 C462,282 482,268 490,248', t: 600, w: 3 },
   { d: 'M488,252 C470,215 505,198 522,220 C532,234 522,248 508,246', t: 800, w: 3.2 },
   { d: 'M470,258 C462,232 482,222 494,236', t: 500, w: 2.4, soft: true },
@@ -84,7 +93,9 @@ const ROUNDS = [
 let active = false;
 let root = null;
 let guideStyle = null; // 画板期间的指引卡抑制样式
-let layerGuide = null, layerInk = null, layerPlayer = null;
+let layerGuide = null,
+  layerInk = null,
+  layerPlayer = null;
 let svg = null;
 let roundIdx = 0;
 let drawing = false;
@@ -139,7 +150,9 @@ function open() {
   root = document.createElement('div');
   root.id = 'scene2Board';
   root.style.cssText =
-    'position:fixed;inset:0;z-index:' + BOARD_Z + ';display:flex;align-items:center;justify-content:center;flex-direction:column;' +
+    'position:fixed;inset:0;z-index:' +
+    BOARD_Z +
+    ';display:flex;align-items:center;justify-content:center;flex-direction:column;' +
     'background:radial-gradient(120% 90% at 50% 40%, #f8f1df 0%, #f3ead2 55%, #eadfc2 100%);opacity:0;transition:opacity 1.2s ease';
   svg = document.createElementNS(SVG_NS, 'svg');
   svg.setAttribute('viewBox', '0 0 720 460');
@@ -149,9 +162,16 @@ function open() {
   layerPlayer = document.createElementNS(SVG_NS, 'g');
   svg.append(layerGuide, layerPlayer, layerInk);
   root.appendChild(svg);
-  el('div', 'position:absolute;top:3.5vh;left:0;right:0;text-align:center;color:#8a7a62;font-size:14px;letter-spacing:2px', root)
-    .textContent = tt(SCENE2.hint);
-  const roundTag = el('div', 'position:absolute;top:3.5vh;right:3vw;color:#a04a35;font-size:13px;letter-spacing:3px', root);
+  el(
+    'div',
+    'position:absolute;top:3.5vh;left:0;right:0;text-align:center;color:#8a7a62;font-size:14px;letter-spacing:2px',
+    root
+  ).textContent = tt(SCENE2.hint);
+  const roundTag = el(
+    'div',
+    'position:absolute;top:3.5vh;right:3vw;color:#a04a35;font-size:13px;letter-spacing:3px',
+    root
+  );
   roundTag.id = 'scene2Round';
   const doneBtn = el(
     'button',
@@ -174,7 +194,7 @@ function open() {
 }
 
 function setRoundUi() {
-  $('scene2Round').textContent = (roundIdx + 1) + ' / 4';
+  $('scene2Round').textContent = roundIdx + 1 + ' / 4';
   $('scene2Done').textContent = tt(SCENE2.doneBtn);
 }
 
@@ -349,19 +369,26 @@ let wd = null;
 
 function grow(p, t, isFill, delay) {
   if (isFill) {
-    return p.animate([{ opacity: 0 }, { opacity: 1 }], { duration: t * 2, delay: delay || 0, fill: 'forwards' })
+    return p
+      .animate([{ opacity: 0 }, { opacity: 1 }], {
+        duration: t * 2,
+        delay: delay || 0,
+        fill: 'forwards',
+      })
       .finished.catch(() => {});
   }
   const L = p.getTotalLength();
   p.style.strokeDasharray = L;
   p.style.strokeDashoffset = L;
   p.style.opacity = 1;
-  return p.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], {
-    duration: t,
-    delay: delay || 0,
-    easing: 'cubic-bezier(.42,.08,.58,.92)',
-    fill: 'forwards',
-  }).finished.catch(() => {});
+  return p
+    .animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], {
+      duration: t,
+      delay: delay || 0,
+      easing: 'cubic-bezier(.42,.08,.58,.92)',
+      fill: 'forwards',
+    })
+    .finished.catch(() => {});
 }
 
 // —— 台词队列:逐条手绘对话框,点按或按句长自动下一条;lock 互斥 + 心跳守护 ——
@@ -390,25 +417,41 @@ function speakSeq(seq, i, done) {
     if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
   }, stay + 2600);
 }
-// —— 第四笔后:满意对话 + 羊初声 → 存档 → 画板淡出 → 广播完成(转夜等后续场景就绪) ——
+// —— 第四笔后:满意对话 + 玩家开口(REPLIES.drawn) + 羊初声 → 存档 → 画板淡出 → 广播完成 ——
 function finale() {
-  speakSeq(SCENE2.after.concat(SCENE2.voice), 0, function () {
-    try {
-      ctx.store.mark('scene2');
-      ctx.events.emit('story:scene2done'); // scene3-night 收到后才转夜+羊箱计数
-    } catch (e) {
-      console.error('[scene2] 收束异常:', e.message);
-    }
-    root.style.opacity = '0';
-    setTimeout(function () {
-      root.remove();
-      root = null;
-      active = false;
-      document.body.classList.remove('scene2BoardActive'); // 指引卡解禁
-      if (guideStyle) {
-        guideStyle.remove();
-        guideStyle = null;
-      }
-    }, 1300);
+  // 满意对话的末行(王子「瞧!他睡着了……」)单独拎出挂选项:话音刚落,轮到玩家开口
+  const afterRest = SCENE2.after.slice(0, -1);
+  const lastAfter = SCENE2.after[SCENE2.after.length - 1];
+  speakSeq(afterRest, 0, function () {
+    const finishDrawn = function () {
+      speakSeq(SCENE2.voice, 0, function () {
+        try {
+          ctx.store.mark('scene2');
+          ctx.events.emit('story:scene2done'); // scene3-night 收到后才转夜+羊箱计数
+        } catch (e) {
+          console.error('[scene2] 收束异常:', e.message);
+        }
+        root.style.opacity = '0';
+        setTimeout(function () {
+          root.remove();
+          root = null;
+          active = false;
+          document.body.classList.remove('scene2BoardActive'); // 指引卡解禁
+          if (guideStyle) {
+            guideStyle.remove();
+            guideStyle = null;
+          }
+        }, 1300);
+      });
+    };
+    ctx.openDialog({
+      speaker: tt(lastAfter.who),
+      speakerType: whoSpk(lastAfter.who),
+      lines: [tt(lastAfter)],
+      autoHide: 5200,
+      lock: true,
+      // 轮到玩家开口(2026-09-26 主人令「不仅仅是在放台词」)
+      choices: replyChoices(ctx, 'drawn', finishDrawn),
+    });
   });
 }

@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { SCENE3, tt, whoSpk } from '../shared/story-text.mjs';
+import { replyChoices } from '../shared/dialog-replies.mjs';
 
 let armed = false;
 let boxProp = null;
@@ -118,14 +119,33 @@ ctx.onTick(function scene3NightTick() {
     const d = Math.hypot(pl.p.x - boxProp.position.x, pl.p.z - boxProp.position.z);
     if (d < 5.5) {
       countingShown = true;
-      speakSeq(
-        [
-          { who: SCENE3.countingWho, en: SCENE3.counting.en, zh: SCENE3.counting.zh },
-          { who: { en: 'B612', zh: 'B612' }, en: SCENE3.doorGlowHint.en, zh: SCENE3.doorGlowHint.zh },
-        ],
-        0,
-        armGateGlow
-      );
+      // 数数行 + 轮到玩家开口(REPLIES.night,2026-09-26 主人令「不仅仅是在放台词」):
+      // 羊数完数,选项出现;玩家发问(pilot 朗读)→ 王子答 → 石门提示 → 亮起
+      const countingLine = {
+        who: SCENE3.countingWho,
+        en: SCENE3.counting.en,
+        zh: SCENE3.counting.zh,
+      };
+      ctx.openDialog({
+        speaker: tt(countingLine.who),
+        speakerType: whoSpk(countingLine.who),
+        lines: [tt(countingLine)],
+        autoHide: 4200,
+        lock: true,
+        choices: replyChoices(ctx, 'night', function () {
+          speakSeq(
+            [
+              {
+                who: { en: 'B612', zh: 'B612' },
+                en: SCENE3.doorGlowHint.en,
+                zh: SCENE3.doorGlowHint.zh,
+              },
+            ],
+            0,
+            armGateGlow
+          );
+        }),
+      });
     }
   }
   // 书页一完成:回到黑夜现实,王子叫醒
