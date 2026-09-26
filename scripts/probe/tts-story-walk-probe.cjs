@@ -18,8 +18,10 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
     window.__playLog = [];
     const origPlay = Audio.prototype.play;
     Audio.prototype.play = function () {
-      if (String(this.src).includes('tts')) {
-        const rec = { src: String(this.src), t: Date.now(), el: this, maxCur: 0, startMs: null, result: 'pending' };
+      const s = String(this.src);
+      // blob 常驻版:blob:URL 不含 'tts' 字样,一并记录(via 字段区分通道)
+      if (s.includes('tts') || s.startsWith('blob:')) {
+        const rec = { src: s, t: Date.now(), el: this, maxCur: 0, startMs: null, result: 'pending' };
         window.__playLog.push(rec);
         this.addEventListener('playing', () => { rec.startMs = Date.now() - rec.t; }, { once: true });
         const p = origPlay.call(this);
@@ -61,7 +63,7 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
       duration: Number.isFinite(r.el.duration) ? +r.el.duration.toFixed(1) : null,
       truncated: Number.isFinite(r.el.duration) && r.maxCur > 0 && r.maxCur < r.el.duration - 0.5,
       audible: r.result === 'resolved' && r.maxCur > 0,
-      via: r.src.includes('/tts-audio/') ? 'edge' : 'legacy',
+      via: r.src.startsWith('blob:') ? 'blob' : r.src.includes('/tts-audio/') ? 'edge' : 'legacy',
     }))
   );
   console.log('网络层(近14):', JSON.stringify(netlog.slice(-14)));
