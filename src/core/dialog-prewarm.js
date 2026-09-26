@@ -7,7 +7,7 @@
 // ③配合 dialog-voice 的逐行预取,形成三层预热(见 gameshell-dialog)。
 // 全程 fire-and-forget:任何失败静默,不影响页面(与全站错误静默铁律一致)。
 import * as ST from '../shared/story-text.mjs';
-import { voiceFor } from './dialog-voice.mjs';
+import { voiceFor, warmBlobByKey } from './dialog-voice.mjs';
 import { avAllowed } from './av-switch.js';
 
 const BATCH_SIZE = 20; // 每批条数(≤服务端 MAX_BATCH_ITEMS 60;batch 让位,连续灌不抢实时)
@@ -55,25 +55,18 @@ function postBatch(items) {
   }
 }
 
-// ============ 最后一米:边缘/浏览器双预热(2026-09-26 单行诊断定案) ============
-// 单行诊断(tts-single-line-probe)实锤:台词 .mp3 在 CF 边缘的**首次拉取**要付一次
-// 跨境回源填充(拥塞时 16KB 爬 17s),正好撞上播放窗口 = 该行无声;填充后 Range 请求
-// 也 HIT(~2s)、浏览器 HTTP 缓存内 ~20ms。解法:batch 响应带回「已煮键」,
-// 客户端立刻在后台 load 这些 .mp3 —— 闸门/电影的死时间里把边缘填满 + 浏览器缓存焐热,
-// 剧情开播时每行 <100ms 就绪。静默失败,绝不影响页面。
-const edgeWarmed = new Set();
-const R2_BASE = 'https://cdn.cloudbear.cloud'; // 与 dialog-voice ttsUrl 同源(2026-09-26 音频走 R2 镜像)
+// ============ 最后一米:内存/blob 双预热(2026-09-26 终验定案) ============
+// 终验实锤:Audio load 预热在拥塞下不可靠(浏览器节流/HTTP 缓存逐出),播放期仍 15.9s 开播;
+// 台词小包还与模型大资产共用 cdn 连接池被 h2 挤兑。解法:batch 响应带回「已煮键」→
+// fetch(CORS 全放行)拉成 blob 内存常驻 —— 播放期零网络零缓存博弈,永远秒开。
+// 失败静默:没驻留成功的键,播放期自然走流式路径(与旧行为一致),绝不影响页面。
+const R2_BASE = 'https://cdn.cloudbear.cloud'; // 与 dialog-voice 同源(2026-09-26 音频走 R2 镜像)
 function warmEdge(keys) {
   for (const k of keys || []) {
-    if (edgeWarmed.has(k)) continue;
-    edgeWarmed.add(k);
     try {
-      const a = new Audio();
-      a.preload = 'auto';
-      a.src = R2_BASE + '/tts-audio/' + k + '.mp3';
-      a.load();
+      warmBlobByKey(k).catch(() => {});
     } catch (e) {
-      /* 无 Audio 环境静默 */
+      /* 无 fetch 环境静默 */
     }
   }
 }

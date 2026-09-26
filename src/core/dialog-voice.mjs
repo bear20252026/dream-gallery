@@ -149,7 +149,8 @@ function playFail(audio, url, text, voice, e) {
     }, 120);
     return;
   }
-  if (cur === audio && url.indexOf('/tts-audio/') !== -1 && !audio._fellBack) {
+  if (cur === audio && !audio._fellBack && url.indexOf('/api/tts?') !== 0) {
+    // R2 直链与 blob 播放失败都回退经典通道;经典通道再失败就交给守卫放行
     audio._fellBack = true;
     audio.src = legacyTtsUrl(text, voice);
     audio.play().then(
@@ -192,11 +193,44 @@ async function sha256hex(s) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
-/** 台词音频 URL:R2 镜像优先(主人链路已证明快),环境不支持 subtle(非 https)退回经典 URL */
+// ============ blob 内存常驻(2026-09-26 终验定案) ============
+// 终验实锤:预热 Audio load 在拥塞下不可靠(浏览器可节流/逐出,HTTP 缓存复用不保证),
+// 且台词小包与模型大资产共用 cdn.cloudbear.cloud 连接池,h2 挤兑下 16KB 爬 15.9s。
+// 解法:闸门死时间里 fetch(CORS 全放行)拉成 blob → objectURL 内存常驻,
+// 播放期零网络、零缓存博弈;拥塞窗口付一次钱(后台 idle),之后永远秒开。
+const blobUrls = new Map(); // <20hex键> -> blob: URL
+/** 按 20hex 键拉取并驻留内存;失败返回 false(播放期自然走流式路径) */
+export async function warmBlobByKey(key) {
+  if (!/^[0-9a-f]{20}$/.test(String(key || ''))) return false;
+  if (blobUrls.has(key)) return true;
+  try {
+    const r = await fetch(R2_BASE + '/tts-audio/' + key + '.mp3', { mode: 'cors' });
+    if (!r.ok) return false;
+    const blob = await r.blob();
+    if (!blob.size) return false;
+    blobUrls.set(key, URL.createObjectURL(blob));
+    return true;
+  } catch (e) {
+    return false; // CORS/网络失败静默
+  }
+}
+/** 按文本+音色预热(blob 键 = 缓存键,与 ttsUrl 同一哈希) */
+export async function warmBlob(text, voice) {
+  try {
+    if (!(typeof crypto !== 'undefined' && crypto.subtle)) return false;
+    const key = (await sha256hex(KEY_VER + '|' + voice + '|' + String(text).slice(0, MAX_SPEAK_LEN))).slice(0, 20);
+    return await warmBlobByKey(key);
+  } catch (e) {
+    return false;
+  }
+}
+/** 台词音频 URL:blob 常驻优先 → R2 镜像 → 环境不支持 subtle(非 https)退经典 URL */
 export async function ttsUrl(text, voice) {
   try {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
       const key = (await sha256hex(KEY_VER + '|' + voice + '|' + String(text).slice(0, MAX_SPEAK_LEN))).slice(0, 20);
+      const b = blobUrls.get(key);
+      if (b) return b;
       return R2_BASE + '/tts-audio/' + key + '.mp3';
     }
   } catch (e) { /* 落回经典 URL */ }
@@ -204,10 +238,9 @@ export async function ttsUrl(text, voice) {
 }
 
 /**
- * 预取下一行台词(2026-09-24 流畅度):静默 load 进浏览器缓存(服务端亦有文案哈希缓存),
- * 推进到该行时 speakLine 的 Audio 直接吃 HTTP 缓存,零合成空窗。
- * 复用 speakDecision:静音/空行不预取,浪费带宽为零。预取只吃已煮好的缓存
- * (冷台词 404 静默,不触发合成 —— 合成是 batch 预热流水线的职责)。
+ * 预取下一行台词(2026-09-24 流畅度):静默预载,推进到该行时即刻开口。
+ * 2026-09-26 升级:优先 blob 内存常驻(fetch+CORS,拥塞下最可靠);失败退回
+ * Audio load(HTTP 缓存路径,media 请求不需要 CORS,是 blob 失败时的兜底)。
  */
 export function prefetchLine(text, spk) {
   const d = speakDecision(text, isVoiceOff());
@@ -216,16 +249,19 @@ export function prefetchLine(text, spk) {
   const warmKey = voice + '|' + text;
   if (warmed.has(warmKey)) return d;
   warmed.add(warmKey);
-  ttsUrl(text, voice)
-    .then((url) => {
-      try {
-        const a = new Audio();
-        a.preload = 'auto';
-        a.src = url;
-        a.load();
-      } catch (e) { /* 无 Audio 环境(测试/异常)静默 */ }
-    })
-    .catch(() => {});
+  warmBlob(text, voice).then((ok) => {
+    if (ok) return;
+    try {
+      ttsUrl(text, voice)
+        .then((url) => {
+          const a = new Audio();
+          a.preload = 'auto';
+          a.src = url;
+          a.load();
+        })
+        .catch(() => {});
+    } catch (e) { /* 无 Audio 环境(测试/异常)静默 */ }
+  });
   return d;
 }
 
