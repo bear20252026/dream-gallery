@@ -28,6 +28,32 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
       localStorage.setItem('b612Scene2', '1'); // store SCHEMA: scene2
       localStorage.setItem('b612Page1', '1'); // store SCHEMA: page1
     } catch (e) {}
+    // 信标历史记录器:羊箱信标在旧档路径只存活几秒(armNight→计数触发即撤),
+    // 事后查场景必输 —— 场景一出现就包一层 add/remove,记录信标「曾立起/已撤除」
+    window.__beaconSeen = { box: false, boxRemoved: false, gate: false };
+    const hook = () => {
+      try {
+        const s = window.__ctx && window.__ctx.scene && window.__ctx.scene.s;
+        if (!s || s.__beaconHooked) return;
+        s.__beaconHooked = true;
+        const origAdd = s.add.bind(s);
+        const origRemove = s.remove.bind(s);
+        s.add = function (...o) {
+          for (const x of o) {
+            if (x && x.name === 'storyBeaconBox') window.__beaconSeen.box = true;
+            if (x && x.name === 'storyBeaconGate') window.__beaconSeen.gate = true;
+          }
+          return origAdd(...o);
+        };
+        s.remove = function (...o) {
+          for (const x of o) {
+            if (x && x.name === 'storyBeaconBox') window.__beaconSeen.boxRemoved = true;
+          }
+          return origRemove(...o);
+        };
+      } catch (e) {}
+    };
+    setInterval(hook, 50);
   });
   await page.goto(URL + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
@@ -54,18 +80,18 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
   });
   ok('[进程行] 325 国王之星(storyBeat)', !!beatRow && /325/.test(beatRow), 'v=' + beatRow);
 
-  // ② 转夜:羊箱信标立起(armNight 旧档兜底随 tick 触发)
+  // ② 转夜:羊箱信标「曾立起」(挂钩记录,不赌存活窗口 —— 计数触发即撤)
   const boxBeacon = await page.waitForFunction(
-    () => window.__ctx && window.__ctx.scene && window.__ctx.scene.s.getObjectByName('storyBeaconBox'),
+    () => window.__beaconSeen && window.__beaconSeen.box,
     null,
     { timeout: 30000 }
   ).then(() => true).catch(() => false);
-  ok('[羊箱信标] storyBeaconBox 立起', boxBeacon);
+  ok('[羊箱信标] storyBeaconBox 曾立起', boxBeacon);
 
-  // ③ 计数对话(羊,出生点旁自动触发):选项 + 「轮到你开口」提示 + 呼吸动画
+  // ③ 计数对话(羊,出生点旁自动触发):先等选项渲染完(打字结束才 showChoices),再采样
   await page.waitForFunction(() => {
     const d = document.getElementById('gameDialog');
-    return d && d.style.display !== 'none' && d.dataset.spk === 'sheep';
+    return d && d.style.display !== 'none' && d.dataset.spk === 'sheep' && d.querySelector('.gs-choice');
   }, null, { timeout: 45000 });
   const choiceState = await page.evaluate(() => {
     const d = document.getElementById('gameDialog');
@@ -116,7 +142,8 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
   );
   ok('[石门亮] modeToast 直说下一步', !!gateDone.toast && /石门亮了|stone door is glowing/i.test(gateDone.toast), 'toast=' + gateDone.toast);
   ok('[石门信标] storyBeaconGate 立起', gateDone.gate);
-  ok('[羊箱信标] 玩家开口后即撤', gateDone.boxGone);
+  const boxLife = await page.evaluate(() => window.__beaconSeen);
+  ok('[羊箱信标] 玩家开口后即撤', boxLife.boxRemoved, JSON.stringify(boxLife));
 
   ok('[无页面异常]', errs.length === 0, errs.slice(0, 2).join('||'));
   console.log(fail ? 'FAIL ' + fail : 'PASS 指引三件套 ' + pass + ' 项全绿');
