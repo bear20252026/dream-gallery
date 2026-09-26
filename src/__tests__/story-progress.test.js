@@ -9,7 +9,40 @@ import {
   advanceChapter,
   pagesBonusForChapter,
   decorateSpiritsState,
+  storyBeat,
 } from '../shared/story-progress.mjs';
+
+describe('进程节拍 storyBeat(2026-09-26「情节推进理解困难」单一权威)', () => {
+  it('开场:无任何标志 = 坠机·画一只羊', () => {
+    expect(storyBeat({})).toEqual({
+      code: 'crash',
+      en: 'The crash — draw me a sheep',
+      zh: '坠机 · 画一只羊',
+    });
+    expect(storyBeat()).toEqual(storyBeat({}));
+  });
+  it('画羊完成后(page1 前)= 书页一·夜、羊箱与石门', () => {
+    expect(storyBeat({ scene2: true }).code).toBe('night');
+    expect(storyBeat({ scene2: true }).zh).toContain('书页一');
+  });
+  it('书页一完成后 chapter=0 = 当前章 325 国王(chapter=已完成星数,当前=下一颗)', () => {
+    const b = storyBeat({ scene2: true, page1: true, chapter: 0 });
+    expect(b.code).toBe('planet0');
+    expect(b.zh).toBe('325 · 国王之星');
+    expect(b.en).toBe('325 · The King');
+  });
+  it('chapter 递进:1=326 虚荣 … 5=330 地理学家', () => {
+    expect(storyBeat({ scene2: true, page1: true, chapter: 1 }).zh).toBe('326 · 虚荣之星');
+    expect(storyBeat({ scene2: true, page1: true, chapter: 5 }).zh).toBe('330 · 地理学家之星');
+  });
+  it('六章全完成 = 终章', () => {
+    expect(storyBeat({ scene2: true, page1: true, chapter: 6 }).code).toBe('finale');
+  });
+  it('脏 chapter 钳制后照常给节拍(99→终章,-5→325)', () => {
+    expect(storyBeat({ scene2: true, page1: true, chapter: 99 }).code).toBe('finale');
+    expect(storyBeat({ scene2: true, page1: true, chapter: -5 }).code).toBe('planet0');
+  });
+});
 
 describe('章节钳制 clampChapter', () => {
   it('正常值原样保留', () => {

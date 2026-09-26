@@ -5,6 +5,7 @@
 //   2. 书页换算 planetsChapter → 任务册「书页 x/9」(2026-09-20 起gameshell 展示);
 //   3. 罗盘页 place 装饰:已点亮章节追加「 · 已点亮」(顺序与 spirits SPIRITS 一致)。
 // 回归锚点:书页映射表改动曾只改一处漏另一处(线性映射想当然),此表是唯一权威。
+import { PLANETS } from './planet-logic.mjs';
 
 /** 章节封顶(6 = 六章全部点亮) */
 export const CHAPTER_MAX = 6;
@@ -34,6 +35,34 @@ export function pagesBonusForChapter(chapter) {
 
 /** 任务册书页总数(展示层「x / 9」的分母) */
 export const PAGES_TOTAL = 9;
+
+/**
+ * 进程节拍(2026-09-26 主人报「情节推进理解困难」单一权威)。
+ * 按存档标志算「现在讲到哪」,任务册「进程」行展示 —— 开场弧线(坠机→画羊→夜与石门)
+ * 此前在羊皮卷上不可见(书页数字不讲人名),玩家不知道故事进行到哪一章。
+ * chapter 语义 = 已完成星数(scene6-king 完成时 setChapter(1))→ 当前章 = 下一颗未完成的星。
+ * @param {{scene2?:boolean, page1?:boolean, chapter?:number}} flags 存档标志
+ * @returns {{code:string, en:string, zh:string}} 调用方 tt() 取当前语言
+ */
+export function storyBeat(flags) {
+  const f = flags || {};
+  const ch = clampChapter(f.chapter);
+  if (!f.scene2) {
+    return { code: 'crash', en: 'The crash — draw me a sheep', zh: '坠机 · 画一只羊' };
+  }
+  if (!f.page1) {
+    return {
+      code: 'night',
+      en: 'Page I — the night, the box & the glowing door',
+      zh: '书页一 · 夜、羊箱与石门',
+    };
+  }
+  const p = PLANETS[ch]; // 已完成 ch 颗 → 当前章是下一颗(325 起)
+  if (!p) {
+    return { code: 'finale', en: 'Finale — the book is written', zh: '终章 · 这本书，写完了' };
+  }
+  return { code: 'planet' + ch, en: p.num + ' · ' + p.en, zh: p.num + ' · ' + p.name };
+}
 
 /**
  * 罗盘页(spiritsState)装饰:前 PLANETS.length 项覆盖 name/en,并给已点亮章节

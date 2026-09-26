@@ -11,7 +11,7 @@ import { eventBus } from './event-bus.js';
 import { GLOBAL, tt } from '../shared/story-text.mjs';
 import { defineSystem } from './system.js';
 import { createDialogSystem } from './gameshell-dialog.js'; // 对话框状态机(B5 外迁)
-import { pagesBonusForChapter } from '../shared/story-progress.mjs'; // 书页映射单一权威(2026-09-24 抽出)
+import { pagesBonusForChapter, storyBeat } from '../shared/story-progress.mjs'; // 书页映射+进程节拍单一权威(2026-09-24 抽出;2026-09-26 加 storyBeat)
 
 // ---------- 手绘样式(一次性注入,羊皮纸 + 抖边 + 楷体笔触) ----------
 const STYLE = `
@@ -173,15 +173,21 @@ function createGameShellSystem() {
     if (spirits < 6) main = tt(GLOBAL.questMain);
     else if (picks < 1) main = '在永恒展厅挂上你的画';
     else main = 'B612 已亮，慢慢逛';
-    return { spirits, picks, ark, main, pages };
+    const beat = storyBeat({
+      scene2: !!ctx.store.flag('scene2'),
+      page1: !!ctx.store.flag('page1'),
+      chapter: ctx.store.num('planetsChapter'),
+    });
+    return { spirits, picks, ark, main, pages, beat };
   }
   function refreshQuest() {
     if (!questEl) return;
     const p = readProgress();
     questEl.querySelector('.q-main').textContent = '◈ ' + p.main;
     const pr = questEl.querySelector('.q-rows');
-    const prFirst = pr ? pr.firstChild : null;
     const rows = [
+      // 进程行(2026-09-26 主人报「情节推进理解困难」):现在讲到哪一章,人话+星球编号
+      ['进程', tt(p.beat)],
       ['书页', p.pages + ' / 9'],
       ['星屑', p.spirits + ' / 6'],
       ['展厅挂画', p.picks + ' / 20'],
