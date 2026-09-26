@@ -43,6 +43,13 @@ function startServer() {
       const visible = await page.evaluate(() => {
         const d = document.getElementById('gameDialog');
         if (!d || d.style.display === 'none') return false;
+        // 互动化(2026-09-26):带选项的对话不响应框体点击(设计上等玩家点选项),
+        // 选项在=点第一项(「轮到你开口」的正确回应方式);无选项=点框推进
+        const choice = d.querySelector('.gs-choice');
+        if (choice) {
+          choice.click();
+          return 'choice';
+        }
         d.click();
         return true;
       });
@@ -91,9 +98,21 @@ function startServer() {
   const wakeName = await page.evaluate(() => document.querySelector('#gameDialog .gs-name').textContent);
   ok('[叫醒词] 说话人名', /^(小王子|The Little Prince)$/.test(wakeName), 'name=' + wakeName);
 
-  // ② 点按推进 → __crashWakeDone → 画板淡入
-  ok('[叫醒词] 点按可推进', await clickThrough(4));
-  await page.waitForFunction(() => window.__crashWakeDone === true, null, { timeout: 8000 });
+  // ② 点选回应(互动链:选项→pilot 朗读→王子接话,语音驱动节奏)→ __crashWakeDone → 画板淡入
+  // 语音驱动下对话停留时长不定,这里只断言「点得动」;链路收束由 __crashWakeDone 等待兜底
+  const wakeClicked = await page.evaluate(() => {
+    const d = document.getElementById('gameDialog');
+    if (!d || d.style.display === 'none') return false;
+    const c = d.querySelector('.gs-choice');
+    if (c) {
+      c.click();
+      return true;
+    }
+    d.click();
+    return true;
+  });
+  ok('[叫醒词] 点选可推进', wakeClicked);
+  await page.waitForFunction(() => window.__crashWakeDone === true, null, { timeout: 60000 });
   await page.waitForSelector('#scene2Board', { timeout: 20000 });
   ok('[第2场] 画板淡入', true);
 
@@ -154,7 +173,9 @@ function startServer() {
         const d = document.getElementById('gameDialog');
         if (d && d.style.display !== 'none' && d.dataset.spk) {
           hit.add(d.dataset.spk);
-          d.click(); // 点按加速推进
+          const choice = d.querySelector('.gs-choice');
+          if (choice) choice.click(); // 互动节点:点选项(框体点击不推进是设计)
+          else d.click(); // 点按加速推进
         }
         if (window.__ctx.store.flag('scene2') || Date.now() - t0 > 60000) {
           clearInterval(iv);
@@ -248,7 +269,9 @@ function startServer() {
               seen.push(t);
               last = t;
             }
-            d.click(); // 点按加速链推进
+            const choice = d.querySelector('.gs-choice');
+            if (choice) choice.click(); // 互动节点:点选项(2026-09-26 互动化)
+            else d.click(); // 点按加速链推进
           } else {
             last = '';
           }

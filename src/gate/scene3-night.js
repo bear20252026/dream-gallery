@@ -159,6 +159,20 @@ ctx.onTick(function scene3NightTick() {
     if (ctx.store.flag('scene2')) armNight();
     return;
   }
+  // 书页一完成:回到黑夜现实,王子叫醒 —— 必须先于计数仪式(2026-09-26 指引整改时序):
+  // 计数对话带 choices 永不自动关闭,若它先开,exitBridge 会被 lock 队列压到玩家点选后,
+  // 旧档玩家不点选项就永远听不到「你刚才走了好远」。先欢迎回来,再听羊数数。
+  if (!page1Shown && ctx.store.flag('page1')) {
+    page1Shown = true;
+    if (gateGlow) {
+      ctx.scene.s.remove(gateGlow);
+      gateGlow = null;
+      clearInterval(gateGlowTimer);
+    }
+    removeBeacon(gateBeacon); // 书页一完成:石门指引同样收束
+    gateBeacon = null;
+    speakSeq([SCENE3.exitBridge], 0, null);
+  }
   // 计数仪式:玩家走近羊箱,箱里传出数数声,石门亮起
   if (!countingShown && boxProp) {
     const pl = ctx.player.pl;
@@ -195,17 +209,5 @@ ctx.onTick(function scene3NightTick() {
         }),
       });
     }
-  }
-  // 书页一完成:回到黑夜现实,王子叫醒
-  if (!page1Shown && ctx.store.flag('page1')) {
-    page1Shown = true;
-    if (gateGlow) {
-      ctx.scene.s.remove(gateGlow);
-      gateGlow = null;
-      clearInterval(gateGlowTimer);
-    }
-    removeBeacon(gateBeacon); // 书页一完成:石门指引同样收束
-    gateBeacon = null;
-    speakSeq([SCENE3.exitBridge], 0, null);
   }
 });
