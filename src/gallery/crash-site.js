@@ -294,10 +294,24 @@ ctx.onTick(function crashTick(dt) {
           wakeSpent = true;
           clearInterval(wakeWd);
           window.__crashWakeDone = true; // settings.js 等此标记再弹雅号/指引卡,不盖开场对白
-          // 叫醒词说完 → 第 2 场·画羊四笔(gate/scene2-draw.js 经事件解耦启动)
-          setTimeout(function () {
-            ctx.events.emit('story:scene2');
-          }, 900);
+          // 叫醒词说完 → 第 2 场·画羊四笔(gate/scene2-draw.js 经事件解耦启动)。
+          // 可靠投递(2026-09-26 探针实锤):瞬事件 emit 偶发丢失/落地时 open() 早退
+          // (画板永不来,玩家黑站)—— 发射后自检,画板没起来就补发;
+          // open() 带 active/flag 幂等守卫,重复发射无害。
+          const fireScene2 = function (n) {
+            setTimeout(
+              function () {
+                ctx.events.emit('story:scene2');
+                if (n > 0 && !document.getElementById('scene2Board')) {
+                  setTimeout(function () {
+                    if (!document.getElementById('scene2Board')) fireScene2(n - 1);
+                  }, 1500);
+                }
+              },
+              n === 3 ? 900 : 0
+            );
+          };
+          fireScene2(3);
         };
         ctx.openDialog({
           speaker: tt(STORY.princeWake.who),

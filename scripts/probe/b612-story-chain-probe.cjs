@@ -112,8 +112,71 @@ function startServer() {
     return true;
   });
   ok('[叫醒词] 点选可推进', wakeClicked);
-  await page.waitForFunction(() => window.__crashWakeDone === true, null, { timeout: 60000 });
-  await page.waitForSelector('#scene2Board', { timeout: 20000 });
+  // 互动化后选项可能尚未渲染(打字未完):轮询点选,直到链路收束。
+  // 只点选项不点框体(2026-09-26 去噪):回应链是语音驱动自动收束的,
+  // 高频框体点击会把收束路径打断成手动关,测试噪音掩盖真实时序
+  await page.waitForFunction(
+    () => {
+      if (window.__crashWakeDone === true) return true;
+      const d = document.getElementById('gameDialog');
+      const c = d && d.querySelector('.gs-choice');
+      if (c) c.click();
+      return false;
+    },
+    null,
+    { timeout: 90000, polling: 400 }
+  );
+  // 画板等待带失败现场(超时时把世界状态整个抓出来,抖动可取证)
+  try {
+    await page.waitForSelector('#scene2Board', { timeout: 20000, state: 'attached' });
+  } catch (e) {
+    const dump = await page.evaluate(() => {
+      const out = {
+        board: !!document.getElementById('scene2Board'),
+        dialogOpen: (() => {
+          const d = document.getElementById('gameDialog');
+          return !!(d && d.style.display !== 'none');
+        })(),
+        dialogText: (() => {
+          const d = document.getElementById('gameDialog');
+          return d ? ((d.querySelector('.gs-text') || {}).textContent || '').slice(0, 30) : null;
+        })(),
+        // advance 卡分支取证:末行+choices 非空=永不自动关(等玩家)
+        choicesN: (() => {
+          const d = document.getElementById('gameDialog');
+          return d ? d.querySelectorAll('.gs-choice').length : null;
+        })(),
+        hintText: (() => {
+          const d = document.getElementById('gameDialog');
+          return d ? ((d.querySelector('.gs-hint') || {}).textContent || '').slice(0, 24) : null;
+        })(),
+        activeWorld: window.__ctx && window.__ctx.scene && window.__ctx.scene.activeWorld,
+        scene2Flag: window.__ctx && window.__ctx.store && window.__ctx.store.flag('scene2'),
+        // 心跳守护读数:对话框开着时它必须为 true,否则守护会误判「链断」抢跑
+        uiDialogOpenType: typeof (window.__ctx && window.__ctx.ui && window.__ctx.ui.dialogOpen),
+        uiDialogOpenNow: (() => {
+          try {
+            return window.__ctx.ui.dialogOpen();
+          } catch (e2) {
+            return 'throw:' + e2.message;
+          }
+        })(),
+      };
+      // 决定性实验:手动重发 story:scene2 —— 画板出现=监听在、open() 能跑(此前 emit 丢了);
+      // 不出现=open() 早退/监听缺失
+      try {
+        window.__ctx.events.emit('story:scene2');
+        out.reEmitted = true;
+      } catch (e2) {
+        out.reEmitErr = String(e2).slice(0, 150);
+      }
+      return out;
+    });
+    await page.waitForTimeout(2500);
+    dump.boardAfterReEmit = await page.evaluate(() => !!document.getElementById('scene2Board'));
+    console.log('画板未现现场:', JSON.stringify(dump));
+    throw e;
+  }
   ok('[第2场] 画板淡入', true);
 
   // ③ 四轮:r1 用真实指针手绘(两笔,笔间 0.8s)驱动,r2~r4 点「画好了」
