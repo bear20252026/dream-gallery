@@ -50,6 +50,9 @@ export const GLOBAL = {
     zh: '献给莱昂·维尔特——\n献给那个还是小男孩的他。',
   },
   questMain: { en: 'Finish the book.', zh: '把这本书，写完。' },
+  // 互动选项提示(2026-09-26 主人报「对话对情节的指引不清晰」):轮到玩家开口时,
+  // 对话框底部亮出此行 —— 玩家知道剧情在等自己点选,不再像卡死
+  turnHint: { en: 'Your turn — tap a reply below.', zh: '轮到你开口——点一句回应。' },
   // 三协议并列面板(P1-1,2026-09-23):闸门底行点开后,同一面板内三标签切换
   pact: {
     tos: { en: 'Terms of Service', zh: '用户协议' },
@@ -172,6 +175,12 @@ export const SCENE3 = {
   doorGlowHint: {
     en: 'In the night, the stone door begins to glow...',
     zh: '夜色里，石门亮了起来。',
+  },
+  // 石门亮起后的行动指引(2026-09-26 主人报「指引不清晰」):台词只说「亮了」,
+  // 玩家在黑夜里不知道要走进去 —— toast 直说下一步(夜里 14m 外光晕不够醒目)
+  gotoGate: {
+    en: 'The stone door is glowing— step into the light.',
+    zh: '石门亮了——走进那道光。',
   },
   arrival: [
     { who: PRINCE, en: 'What! You dropped down from the sky?', zh: '什么！你从天上掉下来的？' },

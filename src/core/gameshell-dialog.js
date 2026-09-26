@@ -13,6 +13,7 @@ import {
   onVoiceEnd,
 } from './dialog-voice.mjs';
 import { dwellFor } from '../shared/typing-rhythm.mjs';
+import { tt, GLOBAL } from '../shared/story-text.mjs';
 
 export function createDialogSystem() {
   let dlg = null; // {speaker, lines, idx, choices, onDone, typeTimer, hideTimer, typing}
@@ -36,6 +37,7 @@ export function createDialogSystem() {
     nameEl.textContent = dlg.speaker || 'B612';
     chEl.innerHTML = '';
     hintEl.style.display = 'none';
+    dialogEl.classList.remove('gs-await'); // 选项呼吸动画只属于挂选项的那一行
     typeLine(dlg.lines[dlg.idx] || '');
     // 台词朗读(2026-09-24):每行显示即读;新行顶旧行不排队
     speakLine(dlg.lines[dlg.idx] || '', dlg.speakerType);
@@ -136,6 +138,8 @@ export function createDialogSystem() {
   function showChoices() {
     const chEl = dialogEl.querySelector('.gs-choices');
     chEl.innerHTML = '';
+    // 「轮到你开口」提示 + 呼吸动画(2026-09-26 主人报「对话对情节的指引不清晰」):
+    // 带 choices 的对话永不自动关闭,剧情在等玩家点选 —— 不亮明这一点,玩家像遇到卡死
     dlg.choices.forEach((c) => {
       const b = document.createElement('button');
       b.className = 'gs-choice';
@@ -150,6 +154,12 @@ export function createDialogSystem() {
       };
       chEl.appendChild(b);
     });
+    const hintEl = dialogEl.querySelector('.gs-hint');
+    if (hintEl) {
+      hintEl.textContent = tt(GLOBAL.turnHint);
+      hintEl.style.display = 'block';
+    }
+    dialogEl.classList.add('gs-await');
   }
   function closeDialog(suppressDone) {
     const d = dlg;
@@ -157,6 +167,7 @@ export function createDialogSystem() {
     if (d && d.hideTimer) clearTimeout(d.hideTimer);
     dlg = null;
     dialogEl.style.display = 'none';
+    dialogEl.classList.remove('gs-await');
     delete dialogEl.dataset.spk;
     stopSpeaking(); // 台词朗读随对话框关闭停止(朗读长于阅读时,别让声音拖到下一场)
     // 收束回调(2026-09-07):此前 onDone 只存不调,依赖它的链式对话(剧本第2场)会断链

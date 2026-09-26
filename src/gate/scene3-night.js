@@ -13,11 +13,44 @@ let armed = false;
 let boxProp = null;
 let gateGlow = null;
 let gateGlowTimer = null;
+let boxBeacon = null; // 羊箱光柱信标(2026-09-26 主人报「指引不清晰」):夜里找得到箱子
+let gateBeacon = null; // 石门光柱信标:黑夜里 14m 外的光晕不够醒目,光柱远看可见
 let countingShown = false;
 let page1Shown = false;
 
+const BOX_X = -4.3,
+  BOX_Z = 69.6;
+const GATE_X = 0.1,
+  GATE_Z = 56.4;
+
 function ground(x, z) {
   return ctx.media && ctx.media.desert && ctx.media.desert.getH ? ctx.media.desert.getH(x, z) : 0;
+}
+
+// —— 光柱信标(零 PointLight 铁律:全 MeshBasicMaterial,fog:false 夜里远处可见) ——
+function makeBeacon(x, z, h, r, opacity) {
+  const gy = ground(x, z);
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd9a0,
+      transparent: true,
+      opacity: opacity,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  m.position.set(x, gy + h / 2 + 0.2, z);
+  m.userData.baseOpacity = opacity;
+  ctx.scene.s.add(m);
+  return m;
+}
+function removeBeacon(b) {
+  if (!b) return;
+  ctx.scene.s.remove(b);
+  b.geometry.dispose();
+  b.material.dispose();
 }
 
 function armNight() {
@@ -33,8 +66,8 @@ function armNight() {
 
 // —— 羊箱:玩家画的箱子同款(矮箱+顶面气孔),落在出生点旁的沙地上 ——
 function buildBox() {
-  const bx = -4.3,
-    bz = 69.6;
+  const bx = BOX_X,
+    bz = BOX_Z;
   const gy = ground(bx, bz);
   const box = new THREE.Mesh(
     new THREE.BoxGeometry(0.62, 0.42, 0.5),
@@ -58,6 +91,8 @@ function buildBox() {
     ctx.scene.s.add(hole);
   }
   boxProp = box;
+  // 信标:光柱指箱子(夜里/远处的「去听听」视觉锚点;玩家开口后即撤)
+  if (!boxBeacon) boxBeacon = makeBeacon(BOX_X, BOX_Z, 2.0, 0.22, 0.22);
   // 余烬暖光:残骸旁一点微光,夜里看得见羊箱与残骸的轮廓
   const ember = new THREE.PointLight(0xffb46a, 0.75, 9);
   ember.position.set(-6.2, ground(-6.2, 71.5) + 0.9, 71.5);
@@ -68,13 +103,17 @@ function buildBox() {
 function armGateGlow() {
   if (gateGlow) return;
   gateGlow = new THREE.PointLight(0xffd9a0, 0.4, 14);
-  gateGlow.position.set(0.1, ground(0.1, 56) + 2.2, 56.4);
+  gateGlow.position.set(GATE_X, ground(GATE_X, GATE_Z) + 2.2, GATE_Z);
   ctx.scene.s.add(gateGlow);
   gateGlowTimer = setInterval(function () {
     if (!gateGlow) return;
     const t = Date.now() * 0.001;
     gateGlow.intensity = 1.1 + Math.sin(t * 1.7) * 0.45;
   }, 80);
+  // 行动指引(2026-09-26 主人报「指引不清晰」):台词只说「亮了」,玩家不知道下一步
+  // 是走进去 —— toast 直说 + 光柱信标从远处就能看到门在哪
+  gateBeacon = makeBeacon(GATE_X, GATE_Z, 3.4, 0.42, 0.26);
+  if (ctx.ui && ctx.ui.modeToast) ctx.ui.modeToast(tt(SCENE3.gotoGate), 6000);
 }
 
 function speakSeq(seq, i, done) {
@@ -108,6 +147,13 @@ let wd = null;
 ctx.events.on('story:scene2done', armNight);
 ctx.onTick(function scene3NightTick() {
   if ((ctx.scene.activeWorld || 'main') !== 'main') return;
+  // 信标呼吸(光柱缓慢旋绕+透明度起伏;夜里远看也像「活的」)
+  const bt = Date.now() * 0.001;
+  for (const b of [boxBeacon, gateBeacon]) {
+    if (!b) continue;
+    b.rotation.y += 0.004;
+    b.material.opacity = b.userData.baseOpacity * (0.8 + Math.sin(bt * 1.9) * 0.25);
+  }
   if (!armed) {
     // 旧档兜底:标记已有但本次会话未经历收束事件,直接转夜
     if (ctx.store.flag('scene2')) armNight();
@@ -119,6 +165,8 @@ ctx.onTick(function scene3NightTick() {
     const d = Math.hypot(pl.p.x - boxProp.position.x, pl.p.z - boxProp.position.z);
     if (d < 5.5) {
       countingShown = true;
+      removeBeacon(boxBeacon); // 玩家已到箱边:信标完成使命
+      boxBeacon = null;
       // 数数行 + 轮到玩家开口(REPLIES.night,2026-09-26 主人令「不仅仅是在放台词」):
       // 羊数完数,选项出现;玩家发问(pilot 朗读)→ 王子答 → 石门提示 → 亮起
       const countingLine = {
@@ -156,6 +204,8 @@ ctx.onTick(function scene3NightTick() {
       gateGlow = null;
       clearInterval(gateGlowTimer);
     }
+    removeBeacon(gateBeacon); // 书页一完成:石门指引同样收束
+    gateBeacon = null;
     speakSeq([SCENE3.exitBridge], 0, null);
   }
 });

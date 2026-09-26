@@ -71,6 +71,11 @@ const STYLE = `
 }
 .gs-choice:hover{background:#caa15f;color:#fff5e0;transform:translateX(6px) rotate(-.6deg);}
 .gs-hint{margin-top:8px;text-align:right;font-size:12px;color:#8a6a44;opacity:.7;letter-spacing:2px;}
+/* 「轮到你开口」呼吸(2026-09-26 主人报「对话对情节的指引不清晰」):
+   选项在等玩家点选时轻柔呼吸;只动 box-shadow 不动 transform,与 hover 位移不打架 */
+@keyframes gsAwaitPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(74,53,38,.35),0 0 0 0 rgba(255,214,170,0)}50%{box-shadow:inset 0 0 0 1px rgba(74,53,38,.35),0 0 16px 3px rgba(255,200,140,.45)}}
+#gameDialog.gs-await .gs-choice{animation:gsAwaitPulse 1.7s ease-in-out infinite}
+#gameDialog.gs-await .gs-hint{opacity:1;color:#a35a1e}
 
 /* ===== 任务栏:手绘羊皮卷(左上) ===== */
 #questHud{
