@@ -269,8 +269,11 @@ export function onVoiceEnd(cb) {
   };
   cur.addEventListener('ended', fin, { once: true });
   cur.addEventListener('error', fin, { once: true });
-  // 兜底:语音链路任何意外卡住,15s 后强制放行(对白关闭不能被语音无限拖延)
-  setTimeout(fin, 15000);
+  // 兜底:语音链路任何意外卡住,24s 后强制放行(对白关闭不能被语音无限拖延)。
+  // 2026-09-26 主人报「部分对话朗读不了」实锤:晚高峰跨境回源填充 15~21s,
+  // 旧值 15s 必然先于声音开口 → 对白推进把刚要响的台词掐死(cut)。24s 覆盖最坏情形;
+  // 正常路径由 ended/error 先行放行,不受影响。
+  setTimeout(fin, 24000);
 }
 
 /** 对话框挂静音钮(gameshell-dialog attach 时调用;防重复安装) */

@@ -100,7 +100,27 @@ export function prewarmDialogs() {
     // 分批发送:批间 1.2s,总 ~23 批;服务端煮缓存的同批响应带回已煮键 → 立刻预热边缘
     let i = 0;
     (function next() {
-      if (i >= ordered.length) return;
+      if (i >= ordered.length) {
+        // 补煮一轮(2026-09-26 主人报「部分对话朗读不了」):首轮灌队时若服务端队列已满,
+        // 尾部条目会被静默丢弃;10min 后(服务端 ~9min 煮完首轮)重灌一遍 —— 已煮的直接
+        // 命中(响应带 keys → 预热边缘),漏煮的重新入队。一次会话内把全库煮满。
+        setTimeout(
+          () => {
+            let j = 0;
+            (function repost() {
+              if (j >= ordered.length) return;
+              const batch = ordered.slice(j, j + BATCH_SIZE);
+              j += BATCH_SIZE;
+              postBatch(batch).then((r) => {
+                if (r && Array.isArray(r.keys)) warmEdge(r.keys);
+              });
+              setTimeout(repost, BATCH_GAP_MS);
+            })();
+          },
+          10 * 60 * 1000
+        );
+        return;
+      }
       const batch = ordered.slice(i, i + BATCH_SIZE);
       i += BATCH_SIZE;
       postBatch(batch).then((r) => {
