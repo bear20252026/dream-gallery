@@ -28,7 +28,8 @@ function ground(x, z) {
 }
 
 // —— 光柱信标(零 PointLight 铁律:全 MeshBasicMaterial,fog:false 夜里远处可见) ——
-function makeBeacon(x, z, h, r, opacity) {
+// name 入参给探针断言用(storyBeaconBox / storyBeaconGate)
+function makeBeacon(x, z, h, r, opacity, name) {
   const gy = ground(x, z);
   const m = new THREE.Mesh(
     new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
@@ -43,6 +44,7 @@ function makeBeacon(x, z, h, r, opacity) {
   );
   m.position.set(x, gy + h / 2 + 0.2, z);
   m.userData.baseOpacity = opacity;
+  m.name = name || 'storyBeacon';
   ctx.scene.s.add(m);
   return m;
 }
@@ -92,7 +94,7 @@ function buildBox() {
   }
   boxProp = box;
   // 信标:光柱指箱子(夜里/远处的「去听听」视觉锚点;玩家开口后即撤)
-  if (!boxBeacon) boxBeacon = makeBeacon(BOX_X, BOX_Z, 2.0, 0.22, 0.22);
+  if (!boxBeacon) boxBeacon = makeBeacon(BOX_X, BOX_Z, 2.0, 0.22, 0.22, 'storyBeaconBox');
   // 余烬暖光:残骸旁一点微光,夜里看得见羊箱与残骸的轮廓
   const ember = new THREE.PointLight(0xffb46a, 0.75, 9);
   ember.position.set(-6.2, ground(-6.2, 71.5) + 0.9, 71.5);
@@ -112,7 +114,7 @@ function armGateGlow() {
   }, 80);
   // 行动指引(2026-09-26 主人报「指引不清晰」):台词只说「亮了」,玩家不知道下一步
   // 是走进去 —— toast 直说 + 光柱信标从远处就能看到门在哪
-  gateBeacon = makeBeacon(GATE_X, GATE_Z, 3.4, 0.42, 0.26);
+  gateBeacon = makeBeacon(GATE_X, GATE_Z, 3.4, 0.42, 0.26, 'storyBeaconGate');
   if (ctx.ui && ctx.ui.modeToast) ctx.ui.modeToast(tt(SCENE3.gotoGate), 6000);
 }
 
