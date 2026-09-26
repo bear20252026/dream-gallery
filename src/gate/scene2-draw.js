@@ -137,7 +137,22 @@ let pendingOpen = false;
 function open() {
   if (active || ctx.store.flag('scene2')) return;
   if ((ctx.scene.activeWorld || 'main') !== 'main') {
-    pendingOpen = true; // 挂起:回主世界时由 world:changed 拉起
+    // 挂起:回主世界时再开。自愈轮询(2026-09-26 探针实锤):world:changed 是瞬事件,
+    // 发射可能早于挂起判定 —— 只靠事件会永久悬挂(画板永远不来,叫醒词说完黑站)。
+    if (!pendingOpen) {
+      pendingOpen = true;
+      const iv = setInterval(function () {
+        if (!pendingOpen) {
+          clearInterval(iv);
+          return;
+        }
+        if ((ctx.scene.activeWorld || 'main') === 'main') {
+          clearInterval(iv);
+          pendingOpen = false;
+          open();
+        }
+      }, 1000);
+    }
     return;
   }
   active = true;
@@ -362,7 +377,7 @@ function speakOne(line, done) {
   // 心跳守护:onDone 意外丢失(对话框被外力关掉)时兜底推进,链不悬死
   clearTimeout(wd);
   wd = setTimeout(function () {
-    if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
+    if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
   }, stay + 2600);
 }
 let wd = null;
@@ -414,7 +429,7 @@ function speakSeq(seq, i, done) {
   });
   clearTimeout(wd);
   wd = setTimeout(function () {
-    if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
+    if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
   }, stay + 2600);
 }
 // —— 第四笔后:满意对话 + 玩家开口(REPLIES.drawn) + 羊初声 → 存档 → 画板淡出 → 广播完成 ——

@@ -136,7 +136,7 @@ function speakSeq(seq, i, done) {
   });
   clearTimeout(wd);
   wd = setTimeout(function () {
-    if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
+    if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
   }, 6800);
 }
 let wd = null;

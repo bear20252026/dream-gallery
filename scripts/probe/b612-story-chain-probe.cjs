@@ -194,7 +194,7 @@ function startServer() {
   await waitForDialog('sheep', 20000);
   ok('[转夜] 计数链 spk=sheep', true);
   await clickThrough(8); // 数数声 + 门光提示,点按清链(链尾点亮石门呼吸光)
-  await page.waitForFunction(() => !window.__ctx.dialogOpen || !window.__ctx.dialogOpen(), null, { timeout: 15000 });
+  await page.waitForFunction(() => !window.__ctx.ui.dialogOpen || !window.__ctx.dialogOpen(), null, { timeout: 15000 });
   ok('[转夜] 计数链收束', true);
 
   // ⑥ lock 互斥 / 非 lock 打断后 onDone 补发(单元式断言;前置:故事链空闲)

@@ -286,7 +286,7 @@ ctx.onTick(function crashTick(dt) {
         // 旧的一次性 11.6s 定时会在「玩家还没点」时误判链断。改为周期巡检:对话框关着才放行;
         // 玩家点选后的回应链 lock 互斥持续开着,不会被误杀。总等待无上限(剧情等玩家,应该的)。
         const wakeWd = setInterval(function () {
-          if (ctx.dialogOpen && ctx.dialogOpen()) return; // 链在走(含等待玩家点选)
+          if (ctx.ui.dialogOpen && ctx.ui.dialogOpen()) return; // 链在走(含等待玩家点选)
           wakeFinish();
         }, 1500);
         const wakeFinish = function () {

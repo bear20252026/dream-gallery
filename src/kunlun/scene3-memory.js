@@ -28,9 +28,9 @@ const VOLCANOES = [
 
 // 站位表(顺序引导)
 const STEPS = [
-  { x: -4.6, z: -5.2, r: 2.4 },  // 0: 火山
-  { x: 3.4, z: -2.6, r: 2.2 },   // 1: 面包树苗
-  { x: -3.6, z: -0.6, r: 2.2 },  // 2: 小椅子·日落
+  { x: -4.6, z: -5.2, r: 2.4 }, // 0: 火山
+  { x: 3.4, z: -2.6, r: 2.2 }, // 1: 面包树苗
+  { x: -3.6, z: -0.6, r: 2.2 }, // 2: 小椅子·日落
   { x: 1.23, z: -0.78, r: 2.5 }, // 3: 玫瑰坛
 ];
 
@@ -49,7 +49,11 @@ function build() {
   VOLCANOES.forEach(function (v, i) {
     const cone = new THREE.Mesh(
       new THREE.ConeGeometry(0.55 * v.s, 1.15 * v.s, 7),
-      new THREE.MeshStandardMaterial({ color: i === 2 ? '#4a3a30' : '#5a4436', roughness: 0.95, flatShading: true })
+      new THREE.MeshStandardMaterial({
+        color: i === 2 ? '#4a3a30' : '#5a4436',
+        roughness: 0.95,
+        flatShading: true,
+      })
     );
     cone.position.set(v.x, gy + (1.15 * v.s) / 2, v.z);
     cone.name = 'scene3Volcano' + i;
@@ -77,11 +81,21 @@ function build() {
     if (!v.active) return;
     for (let k = 0; k < 2; k++) {
       const sp = new THREE.Sprite(
-        new THREE.SpriteMaterial({ map: smokeTex, transparent: true, depthWrite: false, opacity: 0.5 })
+        new THREE.SpriteMaterial({
+          map: smokeTex,
+          transparent: true,
+          depthWrite: false,
+          opacity: 0.5,
+        })
       );
       sp.position.set(v.x + k * 0.25, gy + 1.2 * v.s, v.z + k * 0.15);
       sp.scale.set(0.4, 0.4, 1);
-      sp.userData = { baseY: gy + 1.2 * v.s, baseX: v.x + k * 0.25, baseZ: v.z + k * 0.15, phase: k * 2.4 + i * 3.1 };
+      sp.userData = {
+        baseY: gy + 1.2 * v.s,
+        baseX: v.x + k * 0.25,
+        baseZ: v.z + k * 0.15,
+        phase: k * 2.4 + i * 3.1,
+      };
       sp.name = 'scene3Smoke';
       s.add(sp);
       smokeSprites.push(sp);
@@ -102,7 +116,11 @@ function build() {
       new THREE.MeshStandardMaterial({ color: '#6d8a42', roughness: 0.85 })
     );
     leaf.scale.set(1, 0.5, 1.6);
-    leaf.position.set(Math.sin((i * Math.PI * 2) / 3) * 0.1, 0.36, Math.cos((i * Math.PI * 2) / 3) * 0.1);
+    leaf.position.set(
+      Math.sin((i * Math.PI * 2) / 3) * 0.1,
+      0.36,
+      Math.cos((i * Math.PI * 2) / 3) * 0.1
+    );
     leaf.rotation.y = (i * Math.PI * 2) / 3;
     sprout.add(leaf);
   }
@@ -206,7 +224,7 @@ function speakSeq(seq, i, done) {
   });
   clearTimeout(wd);
   wd = setTimeout(function () {
-    if (!ctx.dialogOpen || !ctx.dialogOpen()) finish();
+    if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
   }, 7200);
 }
 
@@ -226,7 +244,9 @@ function checkCompletion() {
   exitStarted = true;
   const veil = document.createElement('div');
   veil.style.cssText =
-    'position:fixed;inset:0;z-index:'+Z.storyVeil+';background:#f8f1df;opacity:0;transition:opacity 1.6s ease;pointer-events:none';
+    'position:fixed;inset:0;z-index:' +
+    Z.storyVeil +
+    ';background:#f8f1df;opacity:0;transition:opacity 1.6s ease;pointer-events:none';
   document.body.appendChild(veil);
   requestAnimationFrame(function () {
     veil.style.opacity = '1';
