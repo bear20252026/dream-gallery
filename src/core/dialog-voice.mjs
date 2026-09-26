@@ -148,7 +148,7 @@ function playFail(audio, url, text, voice, e) {
     }, 120);
     return;
   }
-  if (cur === audio && url.indexOf('/tts-audio/') === 0 && !audio._fellBack) {
+  if (cur === audio && url.indexOf('/tts-audio/') !== -1 && !audio._fellBack) {
     audio._fellBack = true;
     audio.src = legacyTtsUrl(text, voice);
     audio.play().then(
@@ -176,17 +176,24 @@ function legacyTtsUrl(text, voice) {
 // key = sha256('tts1|voice|text截断至220') 前 20 位,与 lib/tts.js ttsKey() 同一算法
 // (契约测试 dialog-voice.test.js / lib-tts.test.js 两端钉死);改键必须两端同步升版本。
 // 冷台词(未煮)404 → playFail 自动回退 legacyTtsUrl 触发服务端合成,下次 .mp3 直接命中。
+//
+// 2026-09-26 二次升级 —— 音频改走 **R2 镜像**(cdn.cloudbear.cloud):主人实测对主域
+// (CF 代理源站)拉 17KB 要 15s+ 开不了口,而模型 4.5MB 走 R2 几秒拉完 = 这条链路已被
+// 证明对主人快。607 个 .mp3 已全量镜像到 R2 tts-audio/ 前缀(lib/r2sync PUT);
+// 新台词合成成功后 lib/tts.js 自动 r2Put 镜像。R2 未命中(极少)→ NotSupportedError
+// → playFail 回退同源 legacyTtsUrl 动态合成,链路永远有兜底。
 const KEY_VER = 'tts1';
+const R2_BASE = 'https://cdn.cloudbear.cloud';
 async function sha256hex(s) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
-/** 台词音频 URL:边缘可缓存优先,环境不支持 subtle(非 https)退回经典 URL */
+/** 台词音频 URL:R2 镜像优先(主人链路已证明快),环境不支持 subtle(非 https)退回经典 URL */
 export async function ttsUrl(text, voice) {
   try {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
       const key = (await sha256hex(KEY_VER + '|' + voice + '|' + String(text).slice(0, MAX_SPEAK_LEN))).slice(0, 20);
-      return '/tts-audio/' + key + '.mp3';
+      return R2_BASE + '/tts-audio/' + key + '.mp3';
     }
   } catch (e) { /* 落回经典 URL */ }
   return legacyTtsUrl(text, voice);

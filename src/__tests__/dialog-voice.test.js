@@ -75,15 +75,15 @@ describe('prefetchLine 下一行预取(2026-09-24 流畅度)', () => {
   });
 });
 
-describe('ttsUrl 边缘可缓存台词 URL(2026-09-26,前后端键契约的客户端半边)', () => {
-  it('直拼 /tts-audio/<key>.mp3,key 与服务端 ttsKey 同一算法(sha256("tts1|voice|text") 前 20 位)', async () => {
+describe('ttsUrl 台词音频 URL(2026-09-26 起走 R2 镜像,前后端键契约的客户端半边)', () => {
+  it('直拼 <R2>/tts-audio/<key>.mp3,key 与服务端 ttsKey 同一算法(sha256("tts1|voice|text") 前 20 位)', async () => {
     const expectKey = crypto
       .createHash('sha256')
       .update('tts1|' + 'Milo' + '|' + 'If you please-- draw me a sheep!')
       .digest('hex')
       .slice(0, 20);
     expect(await ttsUrl('If you please-- draw me a sheep!', 'Milo')).toBe(
-      '/tts-audio/' + expectKey + '.mp3'
+      'https://cdn.cloudbear.cloud/tts-audio/' + expectKey + '.mp3'
     );
   });
   it('中文行同理(苏打轨)', async () => {
@@ -92,7 +92,9 @@ describe('ttsUrl 边缘可缓存台词 URL(2026-09-26,前后端键契约的客�
       .update('tts1|' + '苏打' + '|' + '请你——给我画一只羊！')
       .digest('hex')
       .slice(0, 20);
-    expect(await ttsUrl('请你——给我画一只羊！', '苏打')).toBe('/tts-audio/' + expectKey + '.mp3');
+    expect(await ttsUrl('请你——给我画一只羊！', '苏打')).toBe(
+      'https://cdn.cloudbear.cloud/tts-audio/' + expectKey + '.mp3'
+    );
   });
   it('超长文本按 220 截断后进哈希(与服务端 MAX_LEN 对齐,否则永不命中)', async () => {
     const long = '羊'.repeat(300);
@@ -101,6 +103,8 @@ describe('ttsUrl 边缘可缓存台词 URL(2026-09-26,前后端键契约的客�
       .update('tts1|' + '苏打' + '|' + '羊'.repeat(220))
       .digest('hex')
       .slice(0, 20);
-    expect(await ttsUrl(long, '苏打')).toBe('/tts-audio/' + expectKey + '.mp3');
+    expect(await ttsUrl(long, '苏打')).toBe(
+      'https://cdn.cloudbear.cloud/tts-audio/' + expectKey + '.mp3'
+    );
   });
 });

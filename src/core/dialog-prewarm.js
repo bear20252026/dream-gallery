@@ -62,6 +62,7 @@ function postBatch(items) {
 // 客户端立刻在后台 load 这些 .mp3 —— 闸门/电影的死时间里把边缘填满 + 浏览器缓存焐热,
 // 剧情开播时每行 <100ms 就绪。静默失败,绝不影响页面。
 const edgeWarmed = new Set();
+const R2_BASE = 'https://cdn.cloudbear.cloud'; // 与 dialog-voice ttsUrl 同源(2026-09-26 音频走 R2 镜像)
 function warmEdge(keys) {
   for (const k of keys || []) {
     if (edgeWarmed.has(k)) continue;
@@ -69,7 +70,7 @@ function warmEdge(keys) {
     try {
       const a = new Audio();
       a.preload = 'auto';
-      a.src = '/tts-audio/' + k + '.mp3';
+      a.src = R2_BASE + '/tts-audio/' + k + '.mp3';
       a.load();
     } catch (e) {
       /* 无 Audio 环境静默 */
