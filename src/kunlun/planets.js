@@ -221,12 +221,16 @@ function buildIsland(cfg, idx) {
   const props = buildChapterProps(idx, box, cyl, topY);
   grp.add(props);
 
-  // 星屑(可拾取):八面体,本章节色,呼吸浮动
+  // 星屑(可拾取):八面体,本章节色,呼吸浮动。
+  // 摆在出生点(z=4)正后方 5m:走出 3m 拾取判定圈,「转身走过去拾」真实存在
+  // (2026-09-27 血泪:z=2.6 时距出生点仅 1.4m,台词播完同帧自动拾取,指引信标/toast 全被顶没)。
+  // name='sproutMote' 是 scene6-king 信标/拾取判定的坐标单一源,勿改名。
   const mote = new THREE.Mesh(
     new THREE.OctahedronGeometry(0.42),
     new THREE.MeshBasicMaterial({ color: cfg.color })
   );
-  mote.position.set(0, topY + 1.15, 2.6);
+  mote.name = 'sproutMote';
+  mote.position.set(0, topY + 1.15, 9);
   grp.add(mote);
 
   // 回程门(拾取后才出现):小石环
@@ -255,7 +259,7 @@ function buildIsland(cfg, idx) {
     props,
     topY,
     idx,
-    moteW: { x: 0, y: topY + 1.15, z: 2.6 }, // 星屑本地坐标(独立世界以岛心为原点)
+    moteW: { x: 0, y: topY + 1.15, z: 9 }, // 星屑本地坐标(独立世界以岛心为原点;与 mote.position 同步改)
     doorW: { x: 0, z: -3.4 }, // 回程门本地坐标
   };
   islands.push(isl);

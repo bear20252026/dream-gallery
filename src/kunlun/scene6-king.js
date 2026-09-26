@@ -4,15 +4,23 @@
 //   老耗子/封大使/退场+羊箱吐槽)→ 星屑拾取(3m)→ 章节完成 planetsChapter=1,
 //   门环换色指向 326。台词单一源:story-text SCENE5。章节推进:ctx.kunlun.setChapter
 //   (planets.js 注册,同步 store + 门环)。多人房间冻结;旧灵蕴线休眠不受影响。
+import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { SCENE5, tt, whoSpk } from '../shared/story-text.mjs';
-import { PLANETS } from '../shared/planet-logic.mjs';
+import { PLANETS, ISLAND_R, ISLAND_TOP_K } from '../shared/planet-logic.mjs';
 
 let arrivalDone = false; // 本次进 325 的入梦链已启动
 let sceneDone = false; // 全链+拾星完成(章节已推进)
 let pickupArmed = false; // 台词全部收束,星屑可拾
 let starTaken = false; // 星屑已拾(幂等守卫)
 let speakTimer = null; // 心跳守护句柄
+let moteBeacon = null; // 星屑光柱信标(2026-09-26 指引三件套②③):台词链收束后立起,拾取即撤
+
+// 星屑坐标单一源在 planets.js(网格 name='sproutMote'):armMoteBeacon 时现取,
+// 兜底值仅 worldManager 缺失的降级场使用(与 planets.js 默认摆位一致)
+const MOTE_X = 0,
+  MOTE_Z = 9;
+const ISLE_TOP_Y = ISLAND_R * ISLAND_TOP_K; // 岛顶面高度(m)
 
 // —— 台词队列:lock 互斥 + spent 幂等 + 心跳守护(与 scene3-memory 同规) ——
 function speakSeq(seq, i, done) {
@@ -62,21 +70,73 @@ function sunsetShow(done) {
   setTimeout(function () {
     veil.remove();
     try {
-      ctx.ui.kunlunSpeak && ctx.kunlunSpeak('七点四十分。天边烧起来了。国王抱着手臂,纹丝不动。');
+      ctx.ui.kunlunSpeak && ctx.kunlunSpeak(tt(SCENE5.sunsetVoice));
     } catch (e) {}
     done();
   }, 4400);
 }
 
+// —— 光柱信标(零 PointLight 铁律:全 MeshBasicMaterial,fog:false;同 scene3-night 规制) ——
+// 挂 king325 独立世界场景(岛心原点,星屑在出生点身后偏南,转身才见——光柱远看可见)。
+// name 入参给探针断言用(storyBeaconMote)。
+function makeBeacon(x, z, h, r, opacity, name) {
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd9a0,
+      transparent: true,
+      opacity: opacity,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  m.position.set(x, ISLE_TOP_Y + h / 2 + 0.1, z);
+  m.userData.baseOpacity = opacity;
+  m.name = name || 'storyBeacon';
+  return m;
+}
+function armMoteBeacon() {
+  if (moteBeacon) return;
+  const w = ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('king325') : null;
+  if (!w) return;
+  const mote = w.scene.getObjectByName('sproutMote'); // 坐标单一源(planets.js 摆位)
+  moteBeacon = makeBeacon(
+    mote ? mote.position.x : MOTE_X,
+    mote ? mote.position.z : MOTE_Z,
+    3.0,
+    0.4,
+    0.3,
+    'storyBeaconMote'
+  );
+  w.scene.add(moteBeacon);
+}
+function removeMoteBeacon() {
+  if (!moteBeacon) return;
+  const w = ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('king325') : null;
+  if (w) w.scene.remove(moteBeacon);
+  moteBeacon.geometry.dispose();
+  moteBeacon.material.dispose();
+  moteBeacon = null;
+}
+
 // —— 星屑拾取:3m 判定(planets.js 的 hideSproutMote 负责藏网格) ——
+function motePos() {
+  // 判定坐标单一源:星屑网格现取(隐藏后 position 仍在);worldManager 缺失才退兜底常量
+  const w = ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('king325') : null;
+  const mote = w && w.scene.getObjectByName('sproutMote');
+  return mote ? { x: mote.position.x, z: mote.position.z } : { x: MOTE_X, z: MOTE_Z };
+}
 function tryPickup(pl, onPick) {
-  const dx = pl.p.x - 0,
-    dz = pl.p.z - 2.6;
+  const m = motePos();
+  const dx = pl.p.x - m.x,
+    dz = pl.p.z - m.z;
   if (dx * dx + dz * dz < 9) {
     starTaken = true;
+    removeMoteBeacon(); // 玩家已到:信标完成使命
     ctx.kunlun.hideSproutMote && ctx.kunlun.hideSproutMote();
     try {
-      ctx.ui.modeToast && ctx.ui.modeToast('拾获星屑 · 国王之星');
+      ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.pickedToast));
     } catch (e) {}
     onPick();
   }
@@ -89,10 +149,17 @@ ctx.onTick(function scene6Tick() {
   if (prevWorld === 'king325' && active !== 'king325' && !sceneDone) {
     arrivalDone = false;
     pickupArmed = false;
+    removeMoteBeacon(); // 中途离开:信标一并收走,下次进再立
   }
   prevWorld = active;
   if (active !== 'king325') return;
   if (sceneDone) return;
+  // 信标呼吸(光柱缓慢旋绕+透明度起伏,与 scene3-night 同律)
+  if (moteBeacon) {
+    moteBeacon.rotation.y += 0.004;
+    moteBeacon.material.opacity =
+      moteBeacon.userData.baseOpacity * (0.8 + Math.sin(Date.now() * 0.0019) * 0.25);
+  }
   // 章节已推进过(重访):纯观赏。?storyreset 会把章节清回 0,可完整重走
   if (ctx.store.num('planetsChapter') !== 0) {
     sceneDone = true;
@@ -104,9 +171,12 @@ ctx.onTick(function scene6Tick() {
       tryPickup(ctx.player.pl, function () {
         ctx.kunlun.setChapter && ctx.kunlun.setChapter(1);
         sceneDone = true;
-        try {
-          ctx.ui.modeToast && ctx.ui.modeToast('书页四,写完了。门环换了颜色。');
-        } catch (e) {}
+        // 完成toast 延一拍:单元素 toast 会互相顶替,先让「拾获星屑」独立亮一拍
+        setTimeout(function () {
+          try {
+            ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.doneToast));
+          } catch (e) {}
+        }, 1600);
       });
     return;
   }
@@ -131,8 +201,11 @@ ctx.onTick(function scene6Tick() {
           speakSeq(SCENE5.chain2, 0, function () {
             window.__scene6.stage = 'pickup';
             pickupArmed = true;
+            // 行动指引三件套(2026-09-26 规矩②③ 扩展到 325 章):台词只讲戏,
+            // 「去哪」由 toast 直说 + 光柱信标指(星屑在出生点身后,转身才见)——拾取即撤
+            armMoteBeacon();
             try {
-              ctx.ui.modeToast && ctx.ui.modeToast('岛上有一颗星屑亮了起来——去拾起它');
+              ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.pickupToast), 6000);
             } catch (e) {}
           });
         });

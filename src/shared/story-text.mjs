@@ -274,6 +274,21 @@ export const SCENE5 = {
     { who: SHEEP, en: 'He rules everything, you know. Especially the sunsets.', zh: '你知道的，\n他统治一切——尤其是日落。' },
     { who: SHEEP, en: 'I am glad I am not a rat.', zh: '幸好我不是耗子。' },
   ],
+  // 行动指引与演出旁白(2026-09-26 指引三件套规矩②③ 扩展到 325 章:台词只讲戏,
+  // 「接下来去哪」由 toast 直说 + 光柱信标 storyBeaconMote 指,双语随语言切换)
+  sunsetVoice: {
+    en: 'Seven-forty. The horizon caught fire. The King stood with his arms crossed, motionless.',
+    zh: '七点四十分。天边烧起来了。国王抱着手臂，纹丝不动。',
+  },
+  pickupToast: {
+    en: 'A stardust glows on the isle — go and pick it up',
+    zh: '岛上有一颗星屑亮了起来——去拾起它',
+  },
+  pickedToast: { en: 'Stardust picked · The King', zh: '拾获星屑 · 国王之星' },
+  doneToast: {
+    en: 'Page IV is written. The gate ring has changed its colour.',
+    zh: '书页四，写完了。门环换了颜色。',
+  },
 };
 
 // ============ 玩家互动节点(2026-09-26 主人令「不仅仅是在放台词」) ============
