@@ -10,6 +10,7 @@ import { ctx } from '../ctx.js';
 import { Z } from '../shared/z-layers.mjs';
 import { SCENE5, tt, whoSpk } from '../shared/story-text.mjs';
 import { PLANETS, ISLAND_R, ISLAND_TOP_K } from '../shared/planet-logic.mjs';
+import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
 
 let arrivalDone = false; // 本次进 325 的入梦链已启动
 let sceneDone = false; // 全链+拾星完成(章节已推进)
@@ -19,6 +20,9 @@ let speakTimer = null; // 心跳守护句柄
 let moteBeacon = null; // 星屑光柱信标(2026-09-26 指引三件套②③):台词链收束后立起,拾取即撤
 let doorArmed = false; // 回程石环已可传送(章节完成后置位;走进石环 3m 即回 B612)
 let doorBeacon = null; // 回程石环光柱信标(storyBeaconDoor):拾星后立起,进门即撤
+// 悬浮箭(2026-09-27 3D 箭头指引):一信标一箭,星屑/石环上空各一支,同立同撤
+let arrowMote = null,
+  arrowDoor = null;
 let chapterCached = -1; // 章节快照(-1=未读):tick 每帧读 localStorage 太奢,0.5s 粒度足够
 let tickN = 0;
 
@@ -118,6 +122,15 @@ function armMoteBeacon() {
     'storyBeaconMote'
   );
   w.scene.add(moteBeacon);
+  // 悬浮箭:星屑正上方,转身即见"去拾起";拾取同撤
+  if (!arrowMote)
+    arrowMote = spawnFloatArrow(
+      w.scene,
+      moteBeacon.position.x,
+      moteBeacon.position.y + 1.5 + 0.9,
+      moteBeacon.position.z,
+      { name: 'guideArrowMote' }
+    );
 }
 function removeMoteBeacon() {
   if (!moteBeacon) return;
@@ -126,6 +139,8 @@ function removeMoteBeacon() {
   moteBeacon.geometry.dispose();
   moteBeacon.material.dispose();
   moteBeacon = null;
+  removeFloatArrow(w ? w.scene : null, arrowMote);
+  arrowMote = null;
 }
 
 // —— 回程石环(2026-09-27 点亮死代码):拾星后 planets.js setChapter 点亮石环,
@@ -148,6 +163,15 @@ function armDoorBeacon() {
     'storyBeaconDoor'
   );
   sc.add(doorBeacon);
+  // 悬浮箭:石环正上方,"走进去回 B612";进门同撤
+  if (!arrowDoor)
+    arrowDoor = spawnFloatArrow(
+      sc,
+      doorBeacon.position.x,
+      doorBeacon.position.y + 1.7 + 0.9,
+      doorBeacon.position.z,
+      { name: 'guideArrowDoor' }
+    );
 }
 function removeDoorBeacon() {
   if (!doorBeacon) return;
@@ -156,6 +180,8 @@ function removeDoorBeacon() {
   doorBeacon.geometry.dispose();
   doorBeacon.material.dispose();
   doorBeacon = null;
+  removeFloatArrow(sc, arrowDoor);
+  arrowDoor = null;
 }
 function tryDoorTeleport(pl) {
   const sc = kingScene();
@@ -209,26 +235,31 @@ ctx.onTick(function scene6Tick() {
   if (active !== 'king325') return;
   // 回程石环传送:章节完成后常驻(含重访),走到环 3m 内即回 B612
   if (doorArmed && tryDoorTeleport(ctx.player.pl)) return;
-  // 回程信标呼吸(存活期在 sceneDone 之后,须放在早退之前)
+  // 回程信标呼吸(存活期在 sceneDone 之后,须放在早退之前)+ 悬浮箭同拍
+  const nowSec = Date.now() * 0.001;
   if (doorBeacon) {
     doorBeacon.rotation.y += 0.004;
     doorBeacon.material.opacity =
-      doorBeacon.userData.baseOpacity * (0.8 + Math.sin(Date.now() * 0.0019) * 0.25);
+      doorBeacon.userData.baseOpacity * (0.8 + Math.sin(nowSec * 1.9) * 0.25);
   }
+  if (arrowDoor) tickArrow(arrowDoor, nowSec);
   if (sceneDone) return;
   // 信标呼吸(光柱缓慢旋绕+透明度起伏,与 scene3-night 同律)
   if (moteBeacon) {
     moteBeacon.rotation.y += 0.004;
     moteBeacon.material.opacity =
-      moteBeacon.userData.baseOpacity * (0.8 + Math.sin(Date.now() * 0.0019) * 0.25);
+      moteBeacon.userData.baseOpacity * (0.8 + Math.sin(nowSec * 1.9) * 0.25);
   }
+  if (arrowMote) tickArrow(arrowMote, nowSec);
   // 章节快照:首帧读一次,之后每 30 帧兜底刷新(?storyreset 重开会话=页面重载,自愈)
   tickN = (tickN + 1) % 30;
   if (chapterCached < 0 || tickN === 0) chapterCached = ctx.store.num('planetsChapter');
   // 章节已推进过(重访):纯观赏;回程石环已亮(planets 启动按进度还原),传送静默就位
+  // 重访也立回程光柱+悬浮箭(2026-09-27):否则老玩家回来找不到回去的门
   if (chapterCached !== 0) {
     sceneDone = true;
     doorArmed = true;
+    armDoorBeacon();
     return;
   }
 

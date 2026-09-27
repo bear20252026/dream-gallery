@@ -23,7 +23,12 @@ import {
   spawnFor,
   kingSpawnPoint,
 } from '../shared/planet-logic.mjs';
-import { clampChapter, advanceChapter, decorateSpiritsState } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死)
+import {
+  clampChapter,
+  advanceChapter,
+  decorateSpiritsState,
+  storyNext,
+} from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死;2026-09-27 加 storyNext 下一步权威)
 import { GLOBAL, tt } from '../shared/story-text.mjs'; // 指引文案单一源(2026-09-27 B612 首进下一步)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
@@ -313,7 +318,7 @@ const gargIntro = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-intro.mp3');
 const gargMain = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-main.mp3');
 gargMain.loop = true;
 let gargStarted = false;
-let b612HintShown = false; // B612 首进「下一步」指引只说一次(会话级)
+let b612HintChapter = -1; // B612「下一步」指引已播报到的章节(2026-09-27:每章各说一次,原只说 chapter0 一次)
 ctx.scene.worldChanged &&
   ctx.scene.worldChanged(function (d) {
     if (d && d.to === 'b612') {
@@ -429,6 +434,10 @@ gateNum.position.y = 6.9;
 gateGrp.add(gateNum);
 s.add(gateGrp);
 
+// 星门出场(2026-09-27 主人令:石门不能一开局就摆在那 —— 新档隐藏,
+// 台词走到"石门亮起/再进一次石门"时才现身;chapter>0 的老档开局即见,门对他们只是旧摆设)
+let gateRevealed = chapter > 0;
+let mainPad = null; // 主世界石台垫(与门同隐同现;注意 pads.b612 会被 king 台覆盖,另存一份)
 function refreshGate() {
   const cfg = PLANETS[Math.min(chapter, 5)];
   if (chapter < 6) {
@@ -441,11 +450,12 @@ function refreshGate() {
     x.fillStyle = cfg.color;
     x.fillText(cfg.num, 64, 32);
     gateNum.material.map.needsUpdate = true;
-    gateGrp.visible = true;
   } else {
     gateRingMat.color.set(0xffd88a);
-    gateGrp.visible = false; // 全部完成:星门退役(罗盘页接管 B612 传送)
   }
+  const show = gateRevealed && chapter < 6; // 未现身→隐藏;全完成→退役(罗盘页接管 B612 传送)
+  gateGrp.visible = show;
+  if (mainPad) mainPad.visible = show;
 }
 refreshGate();
 // 章节推进/星屑隐藏钩子(2026-09-20 情节阶段一:scene6-king.js 等剧情模块调用)
@@ -463,10 +473,31 @@ ctx.kunlun.hideSproutMote = function () {
   const isl = islandOfKey('sprout');
   if (isl && isl.mote) isl.mote.visible = false;
 };
+// 石门现身(2026-09-27 按剧情出场):scene3-night 在"石门亮起/再进一次石门"台词点调用,
+// 只进不出;portal.js 凭 isStarGateOut 决定按钮与自动传送是否生效
+ctx.kunlun.revealStarGate = function () {
+  if (gateRevealed) return;
+  gateRevealed = true;
+  refreshGate();
+};
+ctx.kunlun.isStarGateOut = function () {
+  return gateRevealed && chapter < 6;
+};
+// 探针钩子(验收"石门按剧情出场",不进 UI,只读)
+window.__starGate = {
+  visible: function () {
+    return !!gateGrp.visible;
+  },
+};
 // 独立世界双向传送台:main 石门→B612;B612→king;king→B612/main。
 // king 台放在第一座岛中心,玩家进入国王星球后立即可见;B612 台在原点。
-loadPortalPad(worldManager.getWorld('main'), { x: 0.1, y: mainGateY + 0.03, z: 56.0 }, 'b612');
+mainPad = loadPortalPad(
+  worldManager.getWorld('main'),
+  { x: 0.1, y: mainGateY + 0.03, z: 56.0 },
+  'b612'
+);
 loadPortalPad(worldManager.getWorld('king325'), { x: 0, y: 0, z: 0 }, 'b612');
+refreshGate(); // 主台刚建默认可见,按出场规则同步一次(新档即隐)
 
 /* ===================== 指引 HUD(屏顶箭头, spirits 同款自建) ===================== */
 const hud = document.createElement('div');
@@ -723,11 +754,16 @@ onTick(function (dt) {
     // 上下文导航(太空中常驻):B612=回主世界/去国王星球;星球=回 B612/回主世界
     if (activeWorld === 'b612') {
       setNav(true, '返回主世界', goMainWorld, '前往 325 国王星球 →', goKing325);
-      // 首进 B612(章节未开)下一步指引:进程行指着 325,按钮在下——直说一次(指引规矩③)
-      if (!b612HintShown && chapter === 0) {
-        b612HintShown = true;
+      // B612「下一步」指引(2026-09-27 全链补齐):每章进 B612各说一次当前章去向;
+      // chapter0 沿用 GLOBAL.b612NextHint(探针契约),其余走 storyNext 单一权威
+      if (b612HintChapter !== chapter && chapter < 6) {
+        b612HintChapter = chapter;
         try {
-          ctx.ui.modeToast && ctx.ui.modeToast(tt(GLOBAL.b612NextHint), 6000);
+          const hint =
+            chapter === 0
+              ? tt(GLOBAL.b612NextHint)
+              : tt(storyNext({ scene2: true, page1: true, chapter }));
+          ctx.ui.modeToast && ctx.ui.modeToast(hint, 6000);
         } catch (e) {}
       }
     } else if (/^king/.test(activeWorld)) {

@@ -8,6 +8,9 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { SCENE3, tt, whoSpk } from '../shared/story-text.mjs';
 import { replyChoices } from '../shared/dialog-replies.mjs';
+import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
+import { shiftDayTo } from '../scene/time-shift.js';
+import { DAY_HOURS } from '../shared/dayphase-logic.mjs';
 
 let armed = false;
 let boxProp = null;
@@ -15,6 +18,11 @@ let gateGlow = null;
 let gateGlowTimer = null;
 let boxBeacon = null; // 羊箱光柱信标(2026-09-26 主人报「指引不清晰」):夜里找得到箱子
 let gateBeacon = null; // 石门光柱信标:黑夜里 14m 外的光晕不够醒目,光柱远看可见
+let b612Beacon = null; // 书页一完成后去 B612 的石门信标(2026-09-27 补齐:同一扇门现在通 B612)
+// 悬浮箭(2026-09-27 3D 箭头指引):一信标一箭,光柱管远看,箭管精确落点,同立同撤
+let arrowBox = null,
+  arrowGate = null,
+  arrowB612 = null;
 let countingShown = false;
 let page1Shown = false;
 
@@ -58,11 +66,18 @@ function removeBeacon(b) {
 function armNight() {
   if (armed) return;
   armed = true;
+  // 台词⇔时间(2026-09-27):旧实现瞬锁 22 点天光"咔"一下变黑 —— 改 5 秒暮→夜快切,
+  // 画完羊黄昏落幕、数数时正好入夜,台词与天光对上号
   try {
-    ctx.media.dayTimeSource = function () {
-      return 22; // 夜(0-24),现实锁入黑夜直到后续场次解锁
-    };
-  } catch (e) {}
+    shiftDayTo(DAY_HOURS.NIGHT, 5000);
+  } catch (e) {
+    console.debug('[scene3-night] 转夜快切失败(回退瞬锁):', e);
+    try {
+      ctx.media.dayTimeSource = function () {
+        return DAY_HOURS.NIGHT;
+      };
+    } catch (e2) {}
+  }
   buildBox();
 }
 
@@ -95,6 +110,11 @@ function buildBox() {
   boxProp = box;
   // 信标:光柱指箱子(夜里/远处的「去听听」视觉锚点;玩家开口后即撤)
   if (!boxBeacon) boxBeacon = makeBeacon(BOX_X, BOX_Z, 2.0, 0.22, 0.22, 'storyBeaconBox');
+  // 悬浮箭(2026-09-27):落在光柱顶上空,指精确落点;玩家到箱边同撤
+  if (!arrowBox && boxBeacon)
+    arrowBox = spawnFloatArrow(ctx.scene.s, BOX_X, boxBeacon.position.y + 1.0 + 0.9, BOX_Z, {
+      name: 'guideArrowBox',
+    });
   // 余烬暖光:残骸旁一点微光,夜里看得见羊箱与残骸的轮廓
   const ember = new THREE.PointLight(0xffb46a, 0.75, 9);
   ember.position.set(-6.2, ground(-6.2, 71.5) + 0.9, 71.5);
@@ -112,10 +132,46 @@ function armGateGlow() {
     const t = Date.now() * 0.001;
     gateGlow.intensity = 1.1 + Math.sin(t * 1.7) * 0.45;
   }, 80);
+  // 石门现身(2026-09-27 按剧情出场):门实体此刻才出现,之前走近看不见摸不着
+  try {
+    ctx.kunlun.revealStarGate && ctx.kunlun.revealStarGate();
+  } catch (e) {
+    console.debug('[scene3-night] 石门现身失败(信标指引照常):', e);
+  }
   // 行动指引(2026-09-26 主人报「指引不清晰」):台词只说「亮了」,玩家不知道下一步
   // 是走进去 —— toast 直说 + 光柱信标从远处就能看到门在哪
   gateBeacon = makeBeacon(GATE_X, GATE_Z, 3.4, 0.42, 0.26, 'storyBeaconGate');
+  // 悬浮箭(2026-09-27):门洞正上方,走进去即撤
+  if (!arrowGate && gateBeacon)
+    arrowGate = spawnFloatArrow(ctx.scene.s, GATE_X, gateBeacon.position.y + 1.7 + 0.9, GATE_Z, {
+      name: 'guideArrowGate',
+    });
   if (ctx.ui && ctx.ui.modeToast) ctx.ui.modeToast(tt(SCENE3.gotoGate), 6000);
+}
+
+// 书页一完成后去 B612(2026-09-27「剧情发展指引不清」补齐):
+// 同一扇石门现在通 B612 —— 信标复立 + toast 直说,进门即撤(portal 传送后由 tick 收走)
+function armB612() {
+  if (b612Beacon) return;
+  // 石门现身(2026-09-27 按剧情出场):同一扇门现在通 B612,先现身再指
+  try {
+    ctx.kunlun.revealStarGate && ctx.kunlun.revealStarGate();
+  } catch (e) {
+    console.debug('[scene3-night] 石门现身失败(信标指引照常):', e);
+  }
+  b612Beacon = makeBeacon(GATE_X, GATE_Z, 3.4, 0.42, 0.26, 'storyBeaconB612');
+  if (!arrowB612 && b612Beacon)
+    arrowB612 = spawnFloatArrow(ctx.scene.s, GATE_X, b612Beacon.position.y + 1.7 + 0.9, GATE_Z, {
+      name: 'guideArrowB612',
+    });
+  if (ctx.ui && ctx.ui.modeToast) ctx.ui.modeToast(tt(SCENE3.gotoB612), 6000);
+}
+function removeB612() {
+  if (!b612Beacon) return;
+  removeBeacon(b612Beacon);
+  b612Beacon = null;
+  removeFloatArrow(ctx.scene.s, arrowB612);
+  arrowB612 = null;
 }
 
 function speakSeq(seq, i, done) {
@@ -149,12 +205,16 @@ let wd = null;
 ctx.events.on('story:scene2done', armNight);
 ctx.onTick(function scene3NightTick() {
   if ((ctx.scene.activeWorld || 'main') !== 'main') return;
-  // 信标呼吸(光柱缓慢旋绕+透明度起伏;夜里远看也像「活的」)
+  // 信标呼吸(光柱缓慢旋绕+透明度起伏;夜里远看也像「活的」)+ 悬浮箭浮沉自转(同拍)
   const bt = Date.now() * 0.001;
-  for (const b of [boxBeacon, gateBeacon]) {
+  for (const b of [boxBeacon, gateBeacon, b612Beacon]) {
     if (!b) continue;
     b.rotation.y += 0.004;
     b.material.opacity = b.userData.baseOpacity * (0.8 + Math.sin(bt * 1.9) * 0.25);
+  }
+  for (const a of [arrowBox, arrowGate, arrowB612]) {
+    if (!a) continue;
+    tickArrow(a, bt);
   }
   if (!armed) {
     // 旧档兜底:标记已有但本次会话未经历收束事件,直接转夜
@@ -173,7 +233,19 @@ ctx.onTick(function scene3NightTick() {
     }
     removeBeacon(gateBeacon); // 书页一完成:石门指引同样收束
     gateBeacon = null;
-    speakSeq([SCENE3.exitBridge], 0, null);
+    removeFloatArrow(ctx.scene.s, arrowGate);
+    arrowGate = null;
+    // exitBridge 说完 → 立 B612 去向指引(同一扇门现在通 B612)
+    speakSeq([SCENE3.exitBridge], 0, armB612);
+  }
+  // 已在去 B612 路上:走进石门 4m 即传送,信标完成使命(portal 也会传,此处只清信标)
+  if (b612Beacon) {
+    try {
+      const pl = ctx.player.pl;
+      const dx = pl.p.x - GATE_X,
+        dz = pl.p.z - GATE_Z;
+      if (dx * dx + dz * dz < 16) removeB612();
+    } catch (e) {}
   }
   // 计数仪式:玩家走近羊箱,箱里传出数数声,石门亮起
   if (!countingShown && boxProp) {
@@ -183,6 +255,8 @@ ctx.onTick(function scene3NightTick() {
       countingShown = true;
       removeBeacon(boxBeacon); // 玩家已到箱边:信标完成使命
       boxBeacon = null;
+      removeFloatArrow(ctx.scene.s, arrowBox);
+      arrowBox = null;
       // 数数行 + 轮到玩家开口(REPLIES.night,2026-09-26 主人令「不仅仅是在放台词」):
       // 羊数完数,选项出现;玩家发问(pilot 朗读)→ 王子答 → 石门提示 → 亮起
       const countingLine = {

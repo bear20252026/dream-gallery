@@ -58,6 +58,16 @@ ctx.onTick(function portalTick() {
     padBtn.style.display = 'none';
     return;
   }
+  // 石门未现身:按钮不挂、走近不传(2026-09-27 按剧情出场;营地守卫防现身瞬间误传)
+  try {
+    if (ctx.kunlun.isStarGateOut && !ctx.kunlun.isStarGateOut()) {
+      padBtn.style.display = 'none';
+      gateArmed = false;
+      return;
+    }
+  } catch (e) {
+    console.debug('[portal] 石门出场判定失败(按已现身放行):', e);
+  }
   const pl = ctx.player.pl;
   if (!pl) return;
   const step = gateStep(gateArmed, pl.p.x, pl.p.z);

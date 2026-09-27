@@ -8,6 +8,8 @@ import { Z } from '../shared/z-layers.mjs';
 import { SCENE2, tt, whoSpk } from '../shared/story-text.mjs';
 import { replyChoices } from '../shared/dialog-replies.mjs';
 import { TRUTH } from './film-strokes.mjs';
+import { shiftDayTo } from '../scene/time-shift.js';
+import { DAY_HOURS } from '../shared/dayphase-logic.mjs';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const BOARD_Z = 60; // 盖过世界与 HUD,低于手绘对话框(80)
@@ -157,6 +159,19 @@ function open() {
   }
   active = true;
   roundIdx = 0;
+  // 行动指引(2026-09-27「剧情发展指引不清」补齐):画板铺满屏时玩家若没看顶行小字会黑站
+  // toast 再直说一次做什么+怎么提交,板上 hint 文案不变
+  try {
+    ctx.ui.modeToast &&
+      ctx.ui.modeToast(tt(SCENE2.hint) + '——' + tt(SCENE2.doneBtn) + '在右下角', 6000);
+  } catch (e) {}
+  // 台词⇔时间(2026-09-27):画羊是晨光里的事,羊随后问"天亮了吗" —— 先把天光快切到早晨,
+  // 转夜时 scene3-night 再滑向深夜,晨→夜弧线完整
+  try {
+    shiftDayTo(DAY_HOURS.MORNING, 3500);
+  } catch (e) {
+    console.debug('[scene2] 晨光快切失败(保持当前天光):', e);
+  }
   // 画板期间抑制初见指引卡(它在屏幕中央 64% 处,正好压住画纸中心)
   document.body.classList.add('scene2BoardActive');
   guideStyle = document.createElement('style');

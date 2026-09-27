@@ -9,6 +9,8 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { STORY, tt, whoSpk } from '../shared/story-text.mjs';
 import { replyChoices } from '../shared/dialog-replies.mjs';
+import { shiftDayTo } from '../scene/time-shift.js';
+import { DAY_HOURS } from '../shared/dayphase-logic.mjs';
 
 const bag = hotBegin('crash-site');
 const { s } = ctx;
@@ -228,6 +230,7 @@ loader.load(
 let bootT = null;
 let wakePlayed = false;
 let wakePitchDone = false;
+let timeSeeded = false; // 台词⇔时间(2026-09-27):坠机睁眼=荒漠早晨,新档播一次(旧档已有 scene2 的不碰天光)
 // 兜底放行(原 16s 一刀切,2026-09-26 探针实锤修正):互动化后叫醒对话要等玩家开口
 // (30s+),对话开着就置位 = 假收束信号(雅号卡弹窗虽已归档,但探针/外部工具以
 // __crashWakeDone 为「链路收束」依据,假信号让验收在链路中途就开跑)。改为:
@@ -245,6 +248,15 @@ ctx.onTick(function crashTick(dt) {
   const now = performance.now();
   if (bootT === null) bootT = now;
   const t = (now - bootT) / 1000;
+  // 开场天光:默认时间源 60 秒转一圈,睁眼时随机正午/半夜 —— 锁成早晨再讲坠机苏醒
+  if (!timeSeeded) {
+    timeSeeded = true;
+    try {
+      if (!ctx.store.flag('scene2')) shiftDayTo(DAY_HOURS.MORNING, 3000);
+    } catch (e) {
+      console.debug('[crash-site] 开场天光播种失败(保持当前天光):', e);
+    }
+  }
 
   // 睁眼:出生瞬间仰望天空,1.8s 缓缓回正——只在窗口内调 pitch,之后放手交还鼠标,
   // 否则每帧 pl.pi=0 会把玩家俯仰永久锁零("进画廊后无法行动"根因,2026-09-07)

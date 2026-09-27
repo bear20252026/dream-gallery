@@ -65,6 +65,46 @@ export function storyBeat(flags) {
 }
 
 /**
+ * 下一步指引(2026-09-27「剧情发展指引不清」全链补齐)。
+ * 与 storyBeat 同输入,回答「接下来做什么+去哪+怎么去」—— 任务册「下一步」行、
+ * B612 首进 toast、探针断言的唯一权威。改文案只许动这里(双语同行)。
+ * chapter 语义同 storyBeat(已完成星数 → 当前章=下一颗)。
+ * @param {{scene2?:boolean, page1?:boolean, chapter?:number}} flags 存档标志
+ * @returns {{code:string, en:string, zh:string}}
+ */
+export function storyNext(flags) {
+  const f = flags || {};
+  const ch = clampChapter(f.chapter);
+  if (!f.scene2) {
+    return {
+      code: 'next-draw',
+      en: 'Draw on the board — trace the grey lines, then tap Done',
+      zh: '在画板上画一只羊——照着淡灰线描，画完点右下角「画好了」',
+    };
+  }
+  if (!f.page1) {
+    return {
+      code: 'next-night',
+      en: 'Hear the counting at the box, then step into the glowing stone door',
+      zh: '去羊箱边听数数，然后走进亮起的石门',
+    };
+  }
+  const p = PLANETS[ch];
+  if (!p) {
+    return {
+      code: 'next-finale',
+      en: 'The book is written — wander, hang your drawings in the eternal hall',
+      zh: '书已写完——慢慢逛，去永恒展厅挂上你的画',
+    };
+  }
+  return {
+    code: 'next-planet' + ch,
+    en: 'Next: ' + p.num + ' ' + p.en + ' — tap the button below, pick up the stardust',
+    zh: '下一步：去 ' + p.num + ' ' + p.name + '——点屏幕下方按钮进星球，拾起星屑',
+  };
+}
+
+/**
  * 罗盘页(spiritsState)装饰:前 PLANETS.length 项覆盖 name/en,并给已点亮章节
  * 的 place 追加「 · 已点亮」。原数组不动(返回新对象)。
  * @param {Array<{name:string,en:string,place:string}>} arr prevSpiritsState() 结果

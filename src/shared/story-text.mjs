@@ -188,6 +188,12 @@ export const SCENE3 = {
     en: 'The stone door is glowing— step into the light.',
     zh: '石门亮了——走进那道光。',
   },
+  // 书页一完成回到黑夜现实后(2026-09-27「剧情发展指引不清」补齐):
+  // 玩家不知道同一扇石门现在通往 B612 —— toast 直说 + 光柱信标复立
+  gotoB612: {
+    en: 'The story continues on B612 — step into the stone door again.',
+    zh: '故事在 B612 继续——再走进一次石门。',
+  },
   arrival: [
     { who: PRINCE, en: 'What! You dropped down from the sky?', zh: '什么！你从天上掉下来的？' },
     { who: PRINCE, en: 'Oh! That is funny!', zh: '哦！那可真有趣！' },

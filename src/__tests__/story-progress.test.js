@@ -10,6 +10,7 @@ import {
   pagesBonusForChapter,
   decorateSpiritsState,
   storyBeat,
+  storyNext,
 } from '../shared/story-progress.mjs';
 
 describe('进程节拍 storyBeat(2026-09-26「情节推进理解困难」单一权威)', () => {
@@ -41,6 +42,38 @@ describe('进程节拍 storyBeat(2026-09-26「情节推进理解困难」单一�
   it('脏 chapter 钳制后照常给节拍(99→终章,-5→325)', () => {
     expect(storyBeat({ scene2: true, page1: true, chapter: 99 }).code).toBe('finale');
     expect(storyBeat({ scene2: true, page1: true, chapter: -5 }).code).toBe('planet0');
+  });
+});
+
+describe('下一步指引 storyNext(2026-09-27「剧情发展指引不清」单一权威)', () => {
+  it('开场:画板画羊', () => {
+    const n = storyNext({});
+    expect(n.code).toBe('next-draw');
+    expect(n.zh).toContain('画好了');
+  });
+  it('画羊后:羊箱+石门', () => {
+    const n = storyNext({ scene2: true });
+    expect(n.code).toBe('next-night');
+    expect(n.zh).toContain('石门');
+  });
+  it('书页一后 chapter=0:去 325', () => {
+    const n = storyNext({ scene2: true, page1: true, chapter: 0 });
+    expect(n.code).toBe('next-planet0');
+    expect(n.zh).toContain('325');
+    expect(n.zh).toContain('下一步');
+  });
+  it('chapter 递进:1=326 … 5=330', () => {
+    expect(storyNext({ scene2: true, page1: true, chapter: 1 }).zh).toContain('326');
+    expect(storyNext({ scene2: true, page1: true, chapter: 5 }).zh).toContain('330');
+  });
+  it('六章全完成=终章去展厅', () => {
+    const n = storyNext({ scene2: true, page1: true, chapter: 6 });
+    expect(n.code).toBe('next-finale');
+    expect(n.zh).toContain('永恒展厅');
+  });
+  it('脏 chapter 同 storyBeat 钳制(99→终章,-5→325)', () => {
+    expect(storyNext({ scene2: true, page1: true, chapter: 99 }).code).toBe('next-finale');
+    expect(storyNext({ scene2: true, page1: true, chapter: -5 }).code).toBe('next-planet0');
   });
 });
 

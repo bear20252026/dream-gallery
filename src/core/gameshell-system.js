@@ -11,7 +11,7 @@ import { eventBus } from './event-bus.js';
 import { GLOBAL, tt } from '../shared/story-text.mjs';
 import { defineSystem } from './system.js';
 import { createDialogSystem } from './gameshell-dialog.js'; // 对话框状态机(B5 外迁)
-import { pagesBonusForChapter, storyBeat } from '../shared/story-progress.mjs'; // 书页映射+进程节拍单一权威(2026-09-24 抽出;2026-09-26 加 storyBeat)
+import { pagesBonusForChapter, storyBeat, storyNext } from '../shared/story-progress.mjs'; // 书页映射+进程节拍单一权威(2026-09-24 抽出;2026-09-26 加 storyBeat;2026-09-27 加 storyNext)
 
 // ---------- 手绘样式(一次性注入,羊皮纸 + 抖边 + 楷体笔触) ----------
 const STYLE = `
@@ -178,7 +178,12 @@ function createGameShellSystem() {
       page1: !!ctx.store.flag('page1'),
       chapter: ctx.store.num('planetsChapter'),
     });
-    return { spirits, picks, ark, main, pages, beat };
+    const next = storyNext({
+      scene2: !!ctx.store.flag('scene2'),
+      page1: !!ctx.store.flag('page1'),
+      chapter: ctx.store.num('planetsChapter'),
+    });
+    return { spirits, picks, ark, main, pages, beat, next };
   }
   function refreshQuest() {
     if (!questEl) return;
@@ -188,6 +193,8 @@ function createGameShellSystem() {
     const rows = [
       // 进程行(2026-09-26 主人报「情节推进理解困难」):现在讲到哪一章,人话+星球编号
       ['进程', tt(p.beat)],
+      // 下一步行(2026-09-27 主人报「剧情发展指引不清」):只讲到哪不够,要讲做什么+去哪+怎么去
+      ['下一步', tt(p.next)],
       ['书页', p.pages + ' / 9'],
       ['星屑', p.spirits + ' / 6'],
       ['展厅挂画', p.picks + ' / 20'],
@@ -248,6 +255,8 @@ function createGameShellSystem() {
           speaker: '当前任务',
           lines: [
             '主线 · ' + p.main,
+            '进程 · ' + tt(p.beat),
+            '下一步 · ' + tt(p.next),
             '星屑 ' + p.spirits + ' / 6　·　展厅挂画 ' + p.picks + ' / 20　·　飞舟 ' + p.ark,
           ],
         });
