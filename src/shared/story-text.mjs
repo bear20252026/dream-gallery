@@ -341,6 +341,71 @@ export const B612_RETURN = {
   },
 };
 
+// 第 7 场上半·书页五·326 虚荣的人(2026-09-27 情节阶段二;台词照《定稿全本》第 7 场上半)
+// 拍手演出:定稿"拍了五分钟"译成 4s 蒙太奇(toast 三声啪 + 停顿),不做可点击互动 ——
+// 回忆是"看完一页",玩家在回忆里是幽灵,不动手只观看(定稿规则一)。
+const VAIN = { en: 'The Conceited Man', zh: '虚荣的人' };
+export const SCENE7_VANITY = {
+  chainA: [
+    { who: VAIN, en: 'Ah! Ah! I am about to receive a visit from an admirer!', zh: '啊！啊！\n有一位仰慕者，正朝我走来！' },
+    { who: PRINCE, en: 'That is a queer hat you are wearing.', zh: '你戴的这顶帽子真古怪。' },
+    { who: VAIN, en: 'It is a hat for salutes. It is to raise in salute when people acclaim me. Unfortunately, nobody at all ever passes this way.', zh: '这是致意用的帽子。\n人们喝彩时，我便举帽还礼。\n可惜，这里从来没有路人。' },
+    { who: VAIN, en: 'Clap your hands, one against the other.', zh: '请把双手合起来拍——\n一只手，拍另一只手。' },
+  ],
+  clapToast: {
+    en: 'Clap. Clap. Clap — (five minutes pass.)',
+    zh: '啪。啪。啪——（五分钟过去了）',
+  },
+  chainB: [
+    { who: PRINCE, en: 'And what should one do to make the hat come down?', zh: '那么，怎样它才会放下来呢？' },
+    { en: 'Conceited people never hear anything but praise.', zh: '虚荣的人，\n除了赞美，什么也听不见。' },
+    { who: VAIN, en: 'Do you really admire me very much?', zh: '你真的很仰慕我吗？' },
+    { who: PRINCE, en: 'But you are the only man on your planet!', zh: '可这星球上，只有你一个人呀！' },
+    { who: VAIN, en: 'Do me this kindness. Admire me just the same.', zh: '那就劳驾你，\n照样仰慕我吧。' },
+    { who: SHEEP, en: 'I would clap too, but I am asleep.', zh: '我也想拍手，\n可我还睡着呢。' },
+  ],
+  pickupToast: {
+    en: 'A stardust glows on the isle — go and pick it up',
+    zh: '岛上有一颗星屑亮了起来——去拾起它',
+  },
+  pickedToast: { en: 'Stardust picked · The Conceited Man', zh: '拾获星屑 · 虚荣之星' },
+  doneToast: {
+    en: '326 is written. One more star tonight.',
+    zh: '326，写完了。今晚还有一颗星。',
+  },
+};
+
+// 第 7 场下半·书页五·327 酒鬼(2026-09-27 情节阶段二;台词照《定稿全本》第 7 场下半)
+// 流程:进 king327(325 已完成)→ 导语(PLANETS tts)→ 十问答链(王子四问/酒鬼四答)→
+//   沉默演出(酒鬼把自己关进去,2.2s 停顿)→ 羊吐槽 → 独白 → 星屑拾取(3m)→
+//   章节推进 planetsChapter=3(书页五完成;326 留白后补)
+//   → 回程石环亮起 → 走进石环回 B612。TIPPLER 无 spk=默认羊皮卷样式。
+const TIPPLER = { en: 'The Tippler', zh: '酒鬼' };
+export const SCENE7_TIPPLER = {
+  chain: [
+    { who: PRINCE, en: 'What are you doing there?', zh: '你在那儿做什么呢？' },
+    { who: TIPPLER, en: 'I am drinking.', zh: '我在喝酒。' },
+    { who: PRINCE, en: 'Why are you drinking?', zh: '你为什么要喝酒？' },
+    { who: TIPPLER, en: 'So that I may forget.', zh: '为了可以忘记。' },
+    { who: PRINCE, en: 'Forget what?', zh: '忘记什么？' },
+    { who: TIPPLER, en: 'Forget that I am ashamed.', zh: '忘记我的羞愧。' },
+    { who: PRINCE, en: 'Ashamed of what?', zh: '羞愧什么？' },
+    { who: TIPPLER, en: 'Ashamed of drinking!', zh: '羞愧喝酒！' },
+    { who: SHEEP, en: 'I do not drink. Grass is enough for me.', zh: '我不喝酒。\n草就很好。' },
+    { who: PRINCE, en: '(to himself) The grown-ups are certainly very, very odd.', zh: '（自言自语）\n大人们真是非常、非常奇怪。' },
+  ],
+  // 行动指引与完成旁白(同 325 规制:toast 直说 + 光柱信标,双语随语言切换)
+  pickupToast: {
+    en: 'A stardust glows on the isle — go and pick it up',
+    zh: '岛上有一颗星屑亮了起来——去拾起它',
+  },
+  pickedToast: { en: 'Stardust picked · The Tippler', zh: '拾获星屑 · 酒鬼之星' },
+  doneToast: {
+    en: 'Page V is written. The gate ring has changed its colour.',
+    zh: '书页五，写完了。门环换了颜色。',
+  },
+};
+
 // ============ 玩家互动节点(2026-09-26 主人令「不仅仅是在放台词」) ============
 // 三个「轮到玩家开口」的回应选择:选项标签 → 玩家回应行(pilot,自动朗读) → 王子接话。
 // 所有分支汇合主线,不产生持久分叉(对话感,不做剧情树)。

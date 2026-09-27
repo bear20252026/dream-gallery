@@ -494,6 +494,11 @@ ctx.kunlun.hideSproutMote = function () {
   const isl = islandOfKey('sprout');
   if (isl && isl.mote) isl.mote.visible = false;
 };
+// 通用藏星屑(2026-09-27 第7场起:各星球拾取后藏各自星屑,key 与 PLANETS 同序)
+ctx.kunlun.hidePlanetMote = function (key) {
+  const isl = islandOfKey(key);
+  if (isl && isl.mote) isl.mote.visible = false;
+};
 // 石门现身(2026-09-27 按剧情出场):scene3-night 在"石门亮起/再进一次石门"台词点调用,
 // 只进不出;portal.js 凭 isStarGateOut 决定按钮与自动传送是否生效
 ctx.kunlun.revealStarGate = function () {

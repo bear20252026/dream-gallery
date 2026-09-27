@@ -67,14 +67,23 @@ describe('下一步指引 storyNext(2026-09-27「剧情发展指引不清」单�
     expect(n.code).toBe('next-planet0');
     expect(n.zh).toContain('325');
   });
-  it('没建成的站不许指空岛:chapter=1..5 说"在路上"(2026-09-27 诚实指引)', () => {
-    for (const ch of [1, 2, 3, 4, 5]) {
+  it('没建成的站不许指空岛:说"在路上"(2026-09-27 诚实指引)', () => {
+    // 328/329/330 无路可指;326/327 建成后走指路分支
+    for (const ch of [3, 4, 5]) {
       const n = storyNext({ scene2: true, page1: true, chapter: ch });
       expect(n.code).toBe('next-await');
       expect(n.zh).toContain('在路上');
     }
-    expect(storyNext({ scene2: true, page1: true, chapter: 1 }).zh).toContain('326');
+    expect(storyNext({ scene2: true, page1: true, chapter: 3 }).zh).toContain('328');
     expect(storyNext({ scene2: true, page1: true, chapter: 5 }).zh).toContain('330');
+  });
+  it('建成的站照常指路:chapter=1 去 326,chapter=2 去 327(2026-09-27 第7场)', () => {
+    const n1 = storyNext({ scene2: true, page1: true, chapter: 1 });
+    expect(n1.code).toBe('next-planet1');
+    expect(n1.zh).toContain('326');
+    const n2 = storyNext({ scene2: true, page1: true, chapter: 2 });
+    expect(n2.code).toBe('next-planet2');
+    expect(n2.zh).toContain('327');
   });
   it('六章全完成=终章去展厅', () => {
     const n = storyNext({ scene2: true, page1: true, chapter: 6 });

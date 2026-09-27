@@ -12,6 +12,8 @@ import {
   SCENE2,
   SCENE3,
   SCENE4,
+  SCENE7_VANITY,
+  SCENE7_TIPPLER,
 } from '../shared/story-text.mjs';
 
 describe('tt 双语切换', () => {
@@ -85,6 +87,22 @@ describe('数据完整性:全表双语,who 全带 spk', () => {
     expect(Array.isArray(SCENE3.arrival)).toBe(true);
     expect(SCENE3.exitBridge).toBeTruthy();
     expect(Array.isArray(SCENE4.farewell)).toBe(true);
+  });
+  it('第7场上半 326 链完整(2026-09-27 情节阶段二:登场四句+拍手+帽子六句)', () => {
+    expect(SCENE7_VANITY.chainA).toHaveLength(4);
+    expect(SCENE7_VANITY.chainB).toHaveLength(6);
+    expect(SCENE7_VANITY.chainA[0].en).toMatch(/admirer/);
+    expect(SCENE7_VANITY.clapToast.zh).toContain('啪');
+    expect(SCENE7_VANITY.pickedToast.zh).toContain('虚荣');
+    expect(SCENE7_VANITY.doneToast.zh).toContain('326');
+  });
+  it('第7场下半 327 链完整(2026-09-27 情节阶段二:十问答+指引三toast)', () => {
+    expect(SCENE7_TIPPLER.chain).toHaveLength(10);
+    expect(SCENE7_TIPPLER.chain[0].en).toMatch(/What are you doing/);
+    expect(SCENE7_TIPPLER.chain[7].en).toMatch(/Ashamed of drinking/);
+    expect(SCENE7_TIPPLER.pickupToast.zh).toContain('拾起');
+    expect(SCENE7_TIPPLER.pickedToast.zh).toContain('酒鬼');
+    expect(SCENE7_TIPPLER.doneToast.zh).toContain('书页五');
   });
   it('补齐的剧本台词不许再丢(2026-09-27 定稿全本 v2 对稿)', () => {
     // 面包树大祸句在 baobab 末尾

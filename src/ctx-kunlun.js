@@ -16,6 +16,7 @@ export function createKunlunNamespace(vault) {
   const properties = [
     'setChapter',
     'hideSproutMote',
+    'hidePlanetMote', // 通用藏星屑(2026-09-27 第7场起,按 PLANETS key)
     'revealStarGate', // 主世界星门现身(2026-09-27 按剧情出场,scene3-night 台词点调用)
     'isStarGateOut', // 星门是否已现身(portal.js 按钮/自动传送门禁)
     'flightLock',

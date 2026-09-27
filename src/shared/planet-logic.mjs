@@ -40,7 +40,7 @@ export const PLANETS = [
   },
   {
     key: 'flame',
-    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
+    built: true, // 2026-09-27 第7场上半建成(登场四句+拍手蒙太奇+帽子六句+拾取回程)
     num: '326',
     name: '虚荣之星',
     color: '#e8b8c8',
@@ -53,7 +53,7 @@ export const PLANETS = [
   },
   {
     key: 'leaf',
-    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
+    built: true, // 2026-09-27 第7场下半建成(十问答链+沉默演出+拾取回程+酒鬼布景三件套)
     num: '327',
     name: '酒鬼之星',
     color: '#9ab87a',
