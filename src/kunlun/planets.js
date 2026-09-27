@@ -29,7 +29,7 @@ import {
   decorateSpiritsState,
   storyNext,
 } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死;2026-09-27 加 storyNext 下一步权威)
-import { GLOBAL, tt } from '../shared/story-text.mjs'; // 指引文案单一源(2026-09-27 B612 首进下一步)
+import { GLOBAL, B612_RETURN, tt, whoSpk } from '../shared/story-text.mjs'; // 指引文案单一源(2026-09-27 B612 首进下一步/重访入场白)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -319,6 +319,7 @@ const gargMain = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-main.mp3');
 gargMain.loop = true;
 let gargStarted = false;
 let b612HintChapter = -1; // B612「下一步」指引已播报到的章节(2026-09-27:每章各说一次,原只说 chapter0 一次)
+let b612DialogChapter = -1; // B612 入场白已说到的章节(每章每会话一次,不唠叨)
 ctx.scene.worldChanged &&
   ctx.scene.worldChanged(function (d) {
     if (d && d.to === 'b612') {
@@ -331,6 +332,25 @@ ctx.scene.worldChanged &&
           };
         }
       } else if (avAllowed()) gargMain.play().catch(function () {});
+      // B612 入场白(2026-09-27 主人报"进 B612 后没有任何台词"):回忆演出只播一次,
+      // 此后进 B612 是哑巴世界 —— 王子每章亲口欢迎一句 + 下一步(任务册同源);
+      // 回忆演出期(page1 未完成)不打扰,不上锁不阻塞
+      try {
+        if (ctx.store.flag('page1') && b612DialogChapter !== chapter) {
+          b612DialogChapter = chapter;
+          const next = storyNext({ scene2: true, page1: true, chapter: chapter });
+          ctx.openDialog &&
+            ctx.openDialog({
+              speaker: tt(B612_RETURN.who),
+              speakerType: whoSpk(B612_RETURN.who),
+              lines: [tt(B612_RETURN.line), tt(next)],
+              autoHide: 9000,
+              lock: false,
+            });
+        }
+      } catch (e) {
+        console.debug('[planets] B612 入场白失败(世界照常进):', e);
+      }
     } else {
       try {
         gargMain.pause();
@@ -434,9 +454,10 @@ gateNum.position.y = 6.9;
 gateGrp.add(gateNum);
 s.add(gateGrp);
 
-// 星门出场(2026-09-27 主人令:石门不能一开局就摆在那 —— 新档隐藏,
-// 台词走到"石门亮起/再进一次石门"时才现身;chapter>0 的老档开局即见,门对他们只是旧摆设)
-let gateRevealed = chapter > 0;
+// 星门出场(2026-09-27 主人令:石门不能一开局就摆在那 —— 开局一律隐藏,
+// 台词走到"石门亮起/再进一次石门"时才现身;老档的 exitBridge 每会话重播一次,
+// 门在重播收束时现身,不存在"回不去"的死路)
+let gateRevealed = false;
 let mainPad = null; // 主世界石台垫(与门同隐同现;注意 pads.b612 会被 king 台覆盖,另存一份)
 function refreshGate() {
   const cfg = PLANETS[Math.min(chapter, 5)];

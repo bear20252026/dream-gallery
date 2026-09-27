@@ -4,6 +4,7 @@
 //   ② 叫醒词点选 → 画板 #scene2Board 升起(画羊四笔,自动定稿)
 //   ③ scene2 收束 → 转夜快切(dayHour→22)+羊箱信标 storyBeaconBox+悬浮箭 guideArrowBox
 //   ④ 走近自动计数 → 点选回应 → 石门信标 storyBeaconGate+悬浮箭 guideArrowGate
+//   ⑤ 穿过石门进 B612 → 王子入场白两行(欢迎+下一步,世界不再是哑巴)
 // 用法:SMOKE=1 PORT=3311 node server.js & 起服后
 //   BASE_URL=http://127.0.0.1:3311 node scripts/probe/guide-arrow-dayphase-probe.cjs
 // 退出码 0=全绿。重剧情探针,本地跑,不进 CI 门禁。
@@ -170,6 +171,66 @@ let _browser = null; // 失败兜底关浏览器(防孤儿进程),成功路径�
     () => window.__starGate && window.__starGate.visible() === true
   );
   ok('[石门现身] 石门亮起后实体出现', !!gateOut);
+
+  // ⑤ 把玩家摆进石门圈内 → 自动传送进 B612 → 王子入场白第一行(欢迎)
+  // 先注 page1 标记模拟"书页一已完成的老玩家":否则触发的是回忆层 arrival 首演,
+  // 不是重访入场白(两条链互斥,此段只验收后者;回忆首演由 story-chain 探针覆盖)
+  console.log('…穿门进 B612');
+  await page.evaluate(() => {
+    try {
+      localStorage.setItem('b612Page1', '1');
+    } catch (e) {}
+    const pl = window.__ctx && window.__ctx.player && window.__ctx.player.pl;
+    if (pl) {
+      pl.p.x = 0.1;
+      pl.p.z = 56.0;
+    }
+  });
+  const inB612 = await page
+    .waitForFunction(() => (window.__ctx.scene.activeWorld || '') === 'b612', null, {
+      timeout: 120000,
+    })
+    .then(() => true)
+    .catch(() => false);
+  ok('[穿门] 到达 B612 世界', inB612);
+  const welcome1 = await page
+    .waitForFunction(
+      () => {
+        const d = document.getElementById('gameDialog');
+        if (!d || d.style.display === 'none') return false;
+        const t = (d.querySelector('.gs-text') || {}).textContent || '';
+        return /回来了|came back/i.test(t) ? t.slice(0, 40) : false;
+      },
+      null,
+      { timeout: 60000 }
+    )
+    .then((h) => h.jsonValue())
+    .catch(() => null);
+  ok('[B612 入场白①] 王子欢迎', !!welcome1, String(welcome1));
+  // 点两下推进到第二行(下一步,任务册同源):第一下若撞上打字机只补全本行,第二下才翻页
+  await page.evaluate(() => {
+    const d = document.getElementById('gameDialog');
+    if (d) d.click();
+  });
+  await new Promise((r) => setTimeout(r, 2500));
+  await page.evaluate(() => {
+    const d = document.getElementById('gameDialog');
+    if (d) d.click();
+  });
+  const welcome2 = await page
+    .waitForFunction(
+      () => {
+        const d = document.getElementById('gameDialog');
+        if (!d || d.style.display === 'none') return false;
+        const t = (d.querySelector('.gs-text') || {}).textContent || '';
+        return /下一步|Next/i.test(t) ? t.slice(0, 50) : false;
+      },
+      null,
+      { timeout: 30000 }
+    )
+    .then((h) => h.jsonValue())
+    .catch(() => null);
+  ok('[B612 入场白②] 下一步直说', !!welcome2, String(welcome2));
 
   ok('[无页面异常]', errs.length === 0, errs.slice(0, 3).join('||'));
   console.log(fail ? 'FAIL ' + fail : 'PASS 箭头+昼夜石门 ' + pass + ' 项全绿');
