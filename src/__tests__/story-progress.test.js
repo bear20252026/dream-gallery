@@ -62,7 +62,17 @@ describe('下一步指引 storyNext(2026-09-27「剧情发展指引不清」单�
     expect(n.zh).toContain('325');
     expect(n.zh).toContain('下一步');
   });
-  it('chapter 递进:1=326 … 5=330', () => {
+  it('建成的站照常指路:chapter=0 去 325', () => {
+    const n = storyNext({ scene2: true, page1: true, chapter: 0 });
+    expect(n.code).toBe('next-planet0');
+    expect(n.zh).toContain('325');
+  });
+  it('没建成的站不许指空岛:chapter=1..5 说"在路上"(2026-09-27 诚实指引)', () => {
+    for (const ch of [1, 2, 3, 4, 5]) {
+      const n = storyNext({ scene2: true, page1: true, chapter: ch });
+      expect(n.code).toBe('next-await');
+      expect(n.zh).toContain('在路上');
+    }
     expect(storyNext({ scene2: true, page1: true, chapter: 1 }).zh).toContain('326');
     expect(storyNext({ scene2: true, page1: true, chapter: 5 }).zh).toContain('330');
   });

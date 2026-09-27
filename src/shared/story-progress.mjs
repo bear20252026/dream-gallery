@@ -97,6 +97,22 @@ export function storyNext(flags) {
       zh: '书已写完——慢慢逛，去永恒展厅挂上你的画',
     };
   }
+  // 诚实指引(2026-09-27):下一站没建成就不许指路 —— 空岛有去无回,
+  // 说"在路上"并给可做的事(回主世界/重返 325),建成后翻 PLANETS built 位即自动跟随
+  if (!p.built) {
+    return {
+      code: 'next-await',
+      en:
+        'The ' +
+        p.num +
+        ' star is still on its way. Wander the gallery or revisit 325; the gate will tell you when a new chapter opens.',
+      zh:
+        p.num +
+        ' ' +
+        p.name +
+        '还在路上——先回主世界逛逛，或重返 325，石门亮起就是新篇章',
+    };
+  }
   return {
     code: 'next-planet' + ch,
     en: 'Next: ' + p.num + ' ' + p.en + ' — tap the button below, pick up the stardust',

@@ -196,6 +196,34 @@ function hideMarker() {
   if (stepMarker) stepMarker.visible = false;
 }
 
+// —— 日落烧幕(2026-09-27 台词⇔天光):定稿本"天幕烧红"此前只有台词没有演出 ——
+// 小椅子站开场即漫起,本站播完即退;与 king325 的 sunsetShow 同一 z 层(不同时共存)
+let duskVeil = null;
+function showDuskVeil() {
+  if (!duskVeil) {
+    duskVeil = document.createElement('div');
+    duskVeil.style.cssText =
+      'position:fixed;inset:0;z-index:' +
+      Z.storyVeil +
+      ';pointer-events:none;' +
+      'background:radial-gradient(120% 90% at 50% 100%, rgba(255,140,50,.45), rgba(255,90,40,.22) 45%, rgba(40,20,60,.12));' +
+      'opacity:0;transition:opacity 2s ease';
+    document.body.appendChild(duskVeil);
+  }
+  requestAnimationFrame(function () {
+    if (duskVeil) duskVeil.style.opacity = '1';
+  });
+}
+function hideDuskVeil() {
+  if (!duskVeil) return;
+  const v = duskVeil;
+  duskVeil = null;
+  v.style.opacity = '0';
+  setTimeout(function () {
+    v.remove();
+  }, 2100);
+}
+
 // —— 台词播放(独占:一次一条,播完才前进;lock 互斥 + 心跳守护防链断) ——
 let chainBusy = false;
 let wd = null;
@@ -283,7 +311,9 @@ function doStep(stepIdx) {
     ),
   ];
   if (stepIdx >= 0 && stepIdx < seqs.length) {
+    if (stepIdx === 2) showDuskVeil(); // 日落站:天幕先烧起来,再数四十四次
     speakSeq(seqs[stepIdx], 0, function () {
+      if (stepIdx === 2) hideDuskVeil();
       // 台词播完 → 下一站
       curStep++;
       if (curStep < STEPS.length) {

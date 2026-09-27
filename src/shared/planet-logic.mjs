@@ -15,6 +15,8 @@ export const kingSpawnY = () => ISLAND_R * ISLAND_TOP_K + 1.6; // 星球岛面�
 
 /* ===================== 六星章节数据(key 与 spirits SPIRITS 同序同键) ===================== */
 // 剧情权限:完成当前星球后解锁下一颗;已解锁世界之间互相直达。顺序=原著行星(方案A)。
+// built(2026-09-27 诚实指引):只有真做完玩法+台词的星球才标 true —— 指引(storyNext/
+// B612 导航)照此决定"指路"还是"说在路上",杜绝把玩家指向空岛;新星球上线只翻这一位。
 export const WORLD_UNLOCK = [
   { world: 'king326', key: 'flame', num: '326', name: '虚荣之星', done: 'flameDone' },
   { world: 'king327', key: 'leaf', num: '327', name: '酒鬼之星', done: 'leafDone' },
@@ -25,6 +27,7 @@ export const WORLD_UNLOCK = [
 export const PLANETS = [
   {
     key: 'sprout',
+    built: true, // 唯一已建成的星球(玩法+台词+拾取+回程全套)
     num: '325',
     name: '国王之星',
     color: '#d9a441',
@@ -37,6 +40,7 @@ export const PLANETS = [
   },
   {
     key: 'flame',
+    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
     num: '326',
     name: '虚荣之星',
     color: '#e8b8c8',
@@ -49,6 +53,7 @@ export const PLANETS = [
   },
   {
     key: 'leaf',
+    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
     num: '327',
     name: '酒鬼之星',
     color: '#9ab87a',
@@ -61,6 +66,7 @@ export const PLANETS = [
   },
   {
     key: 'snow',
+    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
     num: '328',
     name: '商人之星',
     color: '#c8a86a',
@@ -73,6 +79,7 @@ export const PLANETS = [
   },
   {
     key: 'dawn',
+    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
     num: '329',
     name: '点灯人之星',
     color: '#a8c8e0',
@@ -85,6 +92,7 @@ export const PLANETS = [
   },
   {
     key: 'dusk',
+    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
     num: '330',
     name: '地理学家之星',
     color: '#d0b090',

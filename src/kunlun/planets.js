@@ -592,9 +592,10 @@ const goMainWorld = function () {
   // 回弹解除(gateArmed)与落点外推已随石门职责迁 gallery/portal.js(监听 world:changed)
   ctx.scene.toMainWorld();
 };
-const goKing325 = function () {
+// 进星球世界(2026-09-27 诚实指引:按编号进,只给已建成的站指路;调用方保证 num 对应 built 站)
+const goPlanetNum = function (num) {
   const sp = kingSpawnPoint();
-  worldManager.enter('king325', {
+  worldManager.enter('king' + num, {
     snapshot: {
       camera: null,
       player: {
@@ -772,9 +773,24 @@ onTick(function (dt) {
         isl.props.userData.lampHead.material.color.set(on ? 0xffe9b0 : 0x555044);
       }
     });
-    // 上下文导航(太空中常驻):B612=回主世界/去国王星球;星球=回 B612/回主世界
+    // 上下文导航(太空中常驻):B612=回主世界/去星球;星球=回 B612/回主世界
+    // 诚实指引(2026-09-27):按钮只指向已建成的站 —— 325 完成后指"重返 325",
+    // 不把玩家送进没内容的空岛;新站建成(built)后自动变"前往"
     if (activeWorld === 'b612') {
-      setNav(true, '返回主世界', goMainWorld, '前往 325 国王星球 →', goKing325);
+      const nextBuilt = PLANETS.find(function (p, i) {
+        return i >= chapter && p.built;
+      });
+      const lastBuilt = PLANETS.filter(function (p) {
+        return p.built;
+      }).pop();
+      const goTarget = nextBuilt || lastBuilt;
+      const goLabel = nextBuilt
+        ? '前往 ' + nextBuilt.num + ' ' + nextBuilt.name + ' →'
+        : '重返 ' + lastBuilt.num + ' ' + lastBuilt.name;
+      const goFn = function () {
+        goPlanetNum(goTarget.num);
+      };
+      setNav(true, '返回主世界', goMainWorld, goLabel, goFn);
       // B612「下一步」指引(2026-09-27 全链补齐):每章进 B612各说一次当前章去向;
       // chapter0 沿用 GLOBAL.b612NextHint(探针契约),其余走 storyNext 单一权威
       if (b612HintChapter !== chapter && chapter < 6) {

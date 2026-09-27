@@ -45,6 +45,9 @@ describe('章节数据完整性(与 spirits SPIRITS 同序同键的前提)', () 
       expect(p.pos).toHaveLength(3);
     }
   });
+  it('建成旗 built:眼下只有 325 可玩,其余是空岛(2026-09-27 诚实指引)', () => {
+    expect(PLANETS.map((p) => !!p.built)).toEqual([true, false, false, false, false, false]);
+  });
 });
 
 describe('章节解锁链', () => {
@@ -117,7 +120,10 @@ describe('返回落点外推 exitGateNudge(零向量回归)', () => {
 describe('岛面几何与出生点', () => {
   it('islandTopAt 命中岛心返回顶面高度,岛外返回 null', () => {
     const isl = PLANETS[0];
-    expect(islandTopAt(isl.pos[0], isl.pos[2])).toBeCloseTo(isl.pos[1] + ISLAND_R * ISLAND_TOP_K, 6);
+    expect(islandTopAt(isl.pos[0], isl.pos[2])).toBeCloseTo(
+      isl.pos[1] + ISLAND_R * ISLAND_TOP_K,
+      6
+    );
     expect(islandTopAt(isl.pos[0] + ISLAND_R + 5, isl.pos[2])).toBeNull();
   });
   it('spawnFor b612 用天幕壳内出生点;其余世界用 (0,2,12)', () => {
