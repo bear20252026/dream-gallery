@@ -134,6 +134,15 @@ function startServer() {
       const l = document.getElementById('storyDialogLayer');
       if (l) l.style.display = 'none'; // 气泡轮播文本随时机转,屏蔽保确定性
     });
+    // 瞬态 toast(首进指引/地名提示,2026-09-27 起 B612 有「下一步」指引)随机漂进帧
+    //(实测 b612 检查点 25%+),等它退场(+0.3s 淡出余量)再拍保基线确定性
+    await page
+      .waitForFunction(() => {
+        const t = document.getElementById('modeToast');
+        return !t || !t.textContent || t.style.opacity !== '1';
+      }, null, { timeout: 15000 })
+      .catch(() => {});
+    await page.waitForTimeout(400);
     const world = await page.evaluate(() => window.__ctx.scene.activeWorld);
     ok(`[${name}] 世界=${world}`, worldRe.test(world));
     const shot = await page.screenshot();

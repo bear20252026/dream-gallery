@@ -35,6 +35,7 @@ export const Z = {
 
   // —— 剧情与玩法浮层(2026-09-18 收编,原裸值一一对应) ——
   storyVeil: 560,   // scene3-memory 回忆层白光收幕
+  sunsetVeil: 520,  // scene6-king 325 章日落敕令金光(2026-09-27 收编,原内联裸值)
   finaleBase: 393,  // 终章层1(底)
   finaleMid: 394,   // 终章层2
   finaleTop: 396,   // 终章层3(顶)

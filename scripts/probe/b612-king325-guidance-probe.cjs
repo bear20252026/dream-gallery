@@ -85,6 +85,14 @@ function start() {
   await p.waitForFunction(() => window.__ctx.scene.activeWorld === 'king325', null, { timeout: 20000 });
   ok('[进 325] activeWorld=king325', true);
 
+  // ⓪ B612 首进「下一步」指引(章节=0 时直说一次;采集器留有历史,进 325 后仍可断言)
+  const b612Hint = await p.evaluate(() => window.__toastLog);
+  ok(
+    '[B612 首进] 「下一步:去 325 国王星球」直说',
+    /下一步|Next: the King/i.test(b612Hint),
+    (b612Hint.trim().split('\n')[0] || '').slice(0, 40)
+  );
+
   // 全链等收束:chain1 → sunset → chain2 → pickup(20 行台词,静音节奏约 2.5-4 分钟)
   await p
     .waitForFunction(() => window.__scene6 && window.__scene6.state && window.__scene6.state.pickupArmed, null, { timeout: 360000 })
@@ -138,6 +146,41 @@ function start() {
   await p.waitForTimeout(1800); // 完成 toast 延后 1.6s 才亮
   const toastLog2 = await p.evaluate(() => window.__toastLog);
   ok('[完成 toast] 「书页四,写完了」', /书页四|Page IV/i.test(toastLog2));
+
+  // ④ 回程石环(2026-09-27 点亮死代码):门亮 + 光柱 + 「怎么回去」toast + 走进传送回 B612
+  await p.waitForTimeout(3200); // 返程 toast 在拾星后 4.8s 才亮,等它落进采集器
+  const doorState = await p.evaluate(() => {
+    const w = window.__ctx.scene.worldManager && window.__ctx.scene.worldManager.getWorld('king325');
+    const d = w && w.scene.getObjectByName('sproutDoor');
+    return {
+      visible: !!(d && d.visible),
+      beacon: !!(w && w.scene.getObjectByName('storyBeaconDoor')),
+      doorArmed: window.__scene6 && window.__scene6.state && window.__scene6.state.doorArmed,
+      toast: window.__toastLog,
+    };
+  });
+  ok('[回程石环] 拾星后亮起', doorState.visible);
+  ok('[回程信标] storyBeaconDoor 立起', doorState.beacon);
+  ok('[返程就绪] doorArmed 置位', doorState.doorArmed);
+  ok('[返程 toast] 「走进石环回 B612」', /回 B612|back to B612/i.test(doorState.toast));
+  // 走进石环(石环 x/z=单一源)→ 传送回 B612
+  await p.evaluate(() => {
+    const w = window.__ctx.scene.worldManager.getWorld('king325');
+    const d = w.scene.getObjectByName('sproutDoor');
+    const q = window.__ctx.player.pl.p;
+    q.x = d ? d.position.x : 0;
+    q.z = d ? d.position.z : -3.4;
+  });
+  const backB612 = await p
+    .waitForFunction(() => window.__ctx.scene.activeWorld === 'b612', null, { timeout: 15000 })
+    .then(() => true)
+    .catch(() => false);
+  ok('[回程传送] 走进石环回到 B612', backB612);
+  const beaconClean = await p.evaluate(() => {
+    const w = window.__ctx.scene.worldManager && window.__ctx.scene.worldManager.getWorld('king325');
+    return !(w && w.scene.getObjectByName('storyBeaconDoor'));
+  });
+  ok('[回程信标] 进门即撤', beaconClean);
 
   ok('[无页面异常]', errs.length === 0, errs.slice(0, 2).join('||'));
   console.log(fail ? 'FAIL ' + fail : 'PASS 325 指引三件套 ' + pass + ' 项全绿');

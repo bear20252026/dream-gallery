@@ -53,6 +53,12 @@ export const GLOBAL = {
   // 互动选项提示(2026-09-26 主人报「对话对情节的指引不清晰」):轮到玩家开口时,
   // 对话框底部亮出此行 —— 玩家知道剧情在等自己点选,不再像卡死
   turnHint: { en: 'Your turn — tap a reply below.', zh: '轮到你开口——点一句回应。' },
+  // B612 首进下一步指引(2026-09-27 指引规矩③:进图只报地名不够,直说「去哪+怎么去」;
+  // 章节推进后不再唠叨,planets.js 以 chapter===0 判定)
+  b612NextHint: {
+    en: "Next: the King's star, 325 — tap the button below.",
+    zh: '下一步：去 325 国王星球——点屏幕下方的按钮。',
+  },
   // 三协议并列面板(P1-1,2026-09-23):闸门底行点开后,同一面板内三标签切换
   pact: {
     tos: { en: 'Terms of Service', zh: '用户协议' },
@@ -288,6 +294,11 @@ export const SCENE5 = {
   doneToast: {
     en: 'Page IV is written. The gate ring has changed its colour.',
     zh: '书页四，写完了。门环换了颜色。',
+  },
+  // 回程石环指引(2026-09-27 点亮死代码:拾星后门亮+光柱,toast 直说「怎么回去」)
+  gotoDoor: {
+    en: 'The return ring is lit — step through it to go back to B612.',
+    zh: '回程石环亮了——走进去，回 B612。',
   },
 };
 

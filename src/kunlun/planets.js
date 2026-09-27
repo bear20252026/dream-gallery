@@ -24,6 +24,7 @@ import {
   kingSpawnPoint,
 } from '../shared/planet-logic.mjs';
 import { clampChapter, advanceChapter, decorateSpiritsState } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死)
+import { GLOBAL, tt } from '../shared/story-text.mjs'; // 指引文案单一源(2026-09-27 B612 首进下一步)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -233,11 +234,12 @@ function buildIsland(cfg, idx) {
   mote.position.set(0, topY + 1.15, 9);
   grp.add(mote);
 
-  // 回程门(拾取后才出现):小石环
+  // 回程门(拾取后才出现):小石环。name='sproutDoor' 是 scene6 回程传送判定的坐标单一源
   const door = new THREE.Mesh(
     new THREE.TorusGeometry(1.1, 0.09, 10, 40),
     new THREE.MeshBasicMaterial({ color: 0xffd88a })
   );
+  door.name = 'sproutDoor';
   door.position.set(0, topY + 1.5, -3.4);
   door.visible = false;
   grp.add(door);
@@ -266,6 +268,8 @@ function buildIsland(cfg, idx) {
   return isl;
 }
 PLANETS.forEach(buildIsland);
+// 已完成章节的回程石环常亮(2026-09-27 点亮死代码:拾星后世界内返程提示;启动按进度还原)
+for (let i = 0; i < chapter && i < islands.length; i++) islands[i].door.visible = true;
 
 // 独立世界故事资产:只挂到目标 scene,不进入主世界。
 // B612:「球中球」原样呈现——±22.4 天幕壳(内壁手写英文星空画)之内,绿星球顶坐着小王子+绵羊+玫瑰。
@@ -309,6 +313,7 @@ const gargIntro = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-intro.mp3');
 const gargMain = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-main.mp3');
 gargMain.loop = true;
 let gargStarted = false;
+let b612HintShown = false; // B612 首进「下一步」指引只说一次(会话级)
 ctx.scene.worldChanged &&
   ctx.scene.worldChanged(function (d) {
     if (d && d.to === 'b612') {
@@ -450,6 +455,9 @@ ctx.kunlun.setChapter = function (n) {
     ctx.store.setNum('planetsChapter', chapter);
   } catch (e) {}
   refreshGate();
+  // 刚写完的一章:回程石环亮起(世界内返程指引;scene6 再立光柱+toast 接力)
+  const done = islands[chapter - 1];
+  if (done && done.door) done.door.visible = true;
 };
 ctx.kunlun.hideSproutMote = function () {
   const isl = islandOfKey('sprout');
@@ -715,6 +723,13 @@ onTick(function (dt) {
     // 上下文导航(太空中常驻):B612=回主世界/去国王星球;星球=回 B612/回主世界
     if (activeWorld === 'b612') {
       setNav(true, '返回主世界', goMainWorld, '前往 325 国王星球 →', goKing325);
+      // 首进 B612(章节未开)下一步指引:进程行指着 325,按钮在下——直说一次(指引规矩③)
+      if (!b612HintShown && chapter === 0) {
+        b612HintShown = true;
+        try {
+          ctx.ui.modeToast && ctx.ui.modeToast(tt(GLOBAL.b612NextHint), 6000);
+        } catch (e) {}
+      }
     } else if (/^king/.test(activeWorld)) {
       setNav(true, '← 返回 B612', goB612Back, '返回主世界', goMainWorld);
     } else setNav(false);

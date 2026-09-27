@@ -1,11 +1,13 @@
 // scene6-king.js — B612 剧本第 6 场·书页四·325 国王(2026-09-20,情节阶段一)
 // 流程:进 king325(书页一二三已完成)→ 导语 → 国王台词链 chain1(求日落)→
 //   日落敕令演出(金光收束,国王行使"等时机成熟"的敕令)→ chain2(审判自己/
-//   老耗子/封大使/退场+羊箱吐槽)→ 星屑拾取(3m)→ 章节完成 planetsChapter=1,
-//   门环换色指向 326。台词单一源:story-text SCENE5。章节推进:ctx.kunlun.setChapter
-//   (planets.js 注册,同步 store + 门环)。多人房间冻结;旧灵蕴线休眠不受影响。
+//   老耗子/封大使/退场+羊箱吐槽)→ 星屑拾取(3m)→ 章节完成 planetsChapter=1
+//   (回程石环亮起,planets.js setChapter 点亮)→ 走进石环回 B612(本模块判定传送)。
+// 台词单一源:story-text SCENE5。章节推进:ctx.kunlun.setChapter(planets.js 注册,
+//   同步 store + 门环)。多人房间冻结;旧灵蕴线休眠不受影响。
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
+import { Z } from '../shared/z-layers.mjs';
 import { SCENE5, tt, whoSpk } from '../shared/story-text.mjs';
 import { PLANETS, ISLAND_R, ISLAND_TOP_K } from '../shared/planet-logic.mjs';
 
@@ -15,6 +17,10 @@ let pickupArmed = false; // 台词全部收束,星屑可拾
 let starTaken = false; // 星屑已拾(幂等守卫)
 let speakTimer = null; // 心跳守护句柄
 let moteBeacon = null; // 星屑光柱信标(2026-09-26 指引三件套②③):台词链收束后立起,拾取即撤
+let doorArmed = false; // 回程石环已可传送(章节完成后置位;走进石环 3m 即回 B612)
+let doorBeacon = null; // 回程石环光柱信标(storyBeaconDoor):拾星后立起,进门即撤
+let chapterCached = -1; // 章节快照(-1=未读):tick 每帧读 localStorage 太奢,0.5s 粒度足够
+let tickN = 0;
 
 // 星屑坐标单一源在 planets.js(网格 name='sproutMote'):armMoteBeacon 时现取,
 // 兜底值仅 worldManager 缺失的降级场使用(与 planets.js 默认摆位一致)
@@ -57,7 +63,9 @@ function speakSeq(seq, i, done) {
 function sunsetShow(done) {
   const veil = document.createElement('div');
   veil.style.cssText =
-    'position:fixed;inset:0;z-index:520;pointer-events:none;' +
+    'position:fixed;inset:0;z-index:' +
+    Z.sunsetVeil +
+    ';pointer-events:none;' +
     'background:radial-gradient(120% 90% at 50% 100%, rgba(255,140,50,.55), rgba(255,90,40,.28) 45%, rgba(40,20,60,.18));' +
     'opacity:0;transition:opacity 1.4s ease';
   document.body.appendChild(veil);
@@ -120,6 +128,49 @@ function removeMoteBeacon() {
   moteBeacon = null;
 }
 
+// —— 回程石环(2026-09-27 点亮死代码):拾星后 planets.js setChapter 点亮石环,
+// 这里立光柱 + toast 直说「怎么回去」,走进石环 3m 即传送回 B612 ——
+function kingScene() {
+  const w = ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('king325') : null;
+  return w ? w.scene : null;
+}
+function armDoorBeacon() {
+  if (doorBeacon) return;
+  const sc = kingScene();
+  if (!sc) return;
+  const d = sc.getObjectByName('sproutDoor'); // 坐标单一源(planets.js 摆位)
+  doorBeacon = makeBeacon(
+    d ? d.position.x : 0,
+    d ? d.position.z : -3.4,
+    3.4,
+    0.42,
+    0.26,
+    'storyBeaconDoor'
+  );
+  sc.add(doorBeacon);
+}
+function removeDoorBeacon() {
+  if (!doorBeacon) return;
+  const sc = kingScene();
+  if (sc) sc.remove(doorBeacon);
+  doorBeacon.geometry.dispose();
+  doorBeacon.material.dispose();
+  doorBeacon = null;
+}
+function tryDoorTeleport(pl) {
+  const sc = kingScene();
+  const d = sc && sc.getObjectByName('sproutDoor');
+  const dx = pl.p.x - (d ? d.position.x : 0),
+    dz = pl.p.z - (d ? d.position.z : -3.4);
+  if (dx * dx + dz * dz >= 9) return false;
+  doorArmed = false;
+  removeDoorBeacon(); // 玩家已到:信标完成使命
+  try {
+    ctx.scene.worldManager && ctx.scene.worldManager.back(); // 同 goB612Back
+  } catch (e) {}
+  return true;
+}
+
 // —— 星屑拾取:3m 判定(planets.js 的 hideSproutMote 负责藏网格) ——
 function motePos() {
   // 判定坐标单一源:星屑网格现取(隐藏后 position 仍在);worldManager 缺失才退兜底常量
@@ -146,13 +197,24 @@ let prevWorld = '';
 ctx.onTick(function scene6Tick() {
   const active = ctx.scene.activeWorld || '';
   // 离开 325:复位入梦标记——同会话内再进可重新触发(2026-09-20「没对话」修复②)
-  if (prevWorld === 'king325' && active !== 'king325' && !sceneDone) {
-    arrivalDone = false;
-    pickupArmed = false;
-    removeMoteBeacon(); // 中途离开:信标一并收走,下次进再立
+  if (prevWorld === 'king325' && active !== 'king325') {
+    if (!sceneDone) {
+      arrivalDone = false;
+      pickupArmed = false;
+      removeMoteBeacon(); // 中途离开:信标一并收走,下次进再立
+    }
+    removeDoorBeacon(); // 离岛收回程光柱(重访返程走导航钮/岛心传送垫,不再唠叨)
   }
   prevWorld = active;
   if (active !== 'king325') return;
+  // 回程石环传送:章节完成后常驻(含重访),走到环 3m 内即回 B612
+  if (doorArmed && tryDoorTeleport(ctx.player.pl)) return;
+  // 回程信标呼吸(存活期在 sceneDone 之后,须放在早退之前)
+  if (doorBeacon) {
+    doorBeacon.rotation.y += 0.004;
+    doorBeacon.material.opacity =
+      doorBeacon.userData.baseOpacity * (0.8 + Math.sin(Date.now() * 0.0019) * 0.25);
+  }
   if (sceneDone) return;
   // 信标呼吸(光柱缓慢旋绕+透明度起伏,与 scene3-night 同律)
   if (moteBeacon) {
@@ -160,23 +222,35 @@ ctx.onTick(function scene6Tick() {
     moteBeacon.material.opacity =
       moteBeacon.userData.baseOpacity * (0.8 + Math.sin(Date.now() * 0.0019) * 0.25);
   }
-  // 章节已推进过(重访):纯观赏。?storyreset 会把章节清回 0,可完整重走
-  if (ctx.store.num('planetsChapter') !== 0) {
+  // 章节快照:首帧读一次,之后每 30 帧兜底刷新(?storyreset 重开会话=页面重载,自愈)
+  tickN = (tickN + 1) % 30;
+  if (chapterCached < 0 || tickN === 0) chapterCached = ctx.store.num('planetsChapter');
+  // 章节已推进过(重访):纯观赏;回程石环已亮(planets 启动按进度还原),传送静默就位
+  if (chapterCached !== 0) {
     sceneDone = true;
+    doorArmed = true;
     return;
   }
 
   if (pickupArmed) {
     if (!starTaken)
       tryPickup(ctx.player.pl, function () {
-        ctx.kunlun.setChapter && ctx.kunlun.setChapter(1);
+        ctx.kunlun.setChapter && ctx.kunlun.setChapter(1); // planets:点亮回程石环
         sceneDone = true;
+        doorArmed = true;
         // 完成toast 延一拍:单元素 toast 会互相顶替,先让「拾获星屑」独立亮一拍
         setTimeout(function () {
           try {
             ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.doneToast));
           } catch (e) {}
+          armDoorBeacon(); // 指引三件套:回程光柱立起,进门即撤
         }, 1600);
+        // 「怎么回去」再晚一拍:与前两条 toast 错峰,不互顶
+        setTimeout(function () {
+          try {
+            ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.gotoDoor), 6000);
+          } catch (e) {}
+        }, 4800);
       });
     return;
   }
@@ -223,6 +297,7 @@ Object.defineProperty(window.__scene6, 'state', {
       pickupArmed: pickupArmed,
       starTaken: starTaken,
       sceneDone: sceneDone,
+      doorArmed: doorArmed,
       stage: window.__scene6 && window.__scene6.stage,
     };
   },
