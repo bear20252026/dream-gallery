@@ -38,7 +38,9 @@ describe('whoSpk 说话人视觉类型', () => {
     expect(whoSpk(SCENE2.who.prince)).toBe('prince');
     expect(whoSpk(SCENE2.who.pilot)).toBe('pilot');
     expect(whoSpk(SCENE2.who.sheep)).toBe('sheep');
-    expect(whoSpk(SCENE2.who.prince) === 'prince' && SCENE2.round1.who.en === SCENE2.who.prince.en).toBe(true);
+    expect(
+      whoSpk(SCENE2.who.prince) === 'prince' && SCENE2.round1.who.en === SCENE2.who.prince.en
+    ).toBe(true);
   });
   it('SCENE3.countingWho 是羊(sheep 配色)', () => {
     expect(whoSpk(SCENE3.countingWho)).toBe('sheep');
@@ -83,5 +85,21 @@ describe('数据完整性:全表双语,who 全带 spk', () => {
     expect(Array.isArray(SCENE3.arrival)).toBe(true);
     expect(SCENE3.exitBridge).toBeTruthy();
     expect(Array.isArray(SCENE4.farewell)).toBe(true);
+  });
+  it('补齐的剧本台词不许再丢(2026-09-27 定稿全本 v2 对稿)', () => {
+    // 面包树大祸句在 baobab 末尾
+    expect(SCENE3.baobab[SCENE3.baobab.length - 1].en).toMatch(/catastrophe/);
+    // 日落四问在 fond 之后、44 次之前
+    const sunsetEn = SCENE3.sunset.map((l) => l.en).join('\n');
+    expect(sunsetEn).toMatch(/But we must wait/);
+    expect(sunsetEn).toMatch(/at home/);
+    expect(SCENE3.sunset.findIndex((l) => /forty-four/.test(l.en))).toBeGreaterThan(
+      SCENE3.sunset.findIndex((l) => /must wait/.test(l.en))
+    );
+    // 第4场开篇诘问 7 句 + 眼泪字幕 + 玫瑰初醒在 arrival 首句
+    expect(SCENE4.interrogation.length).toBe(7);
+    expect(SCENE4.interrogation[0].en).toMatch(/does it eat flowers/);
+    expect(SCENE4.tearsCaption.en).toMatch(/land of tears/);
+    expect(SCENE4.arrival[0].en).toMatch(/scarcely awake/);
   });
 });

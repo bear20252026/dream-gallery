@@ -212,9 +212,14 @@ export const SCENE3 = {
     { who: PRINCE, en: 'We would have to put them one on top of the other.', zh: '那得让大象一只叠一只才行。' },
     { who: PRINCE, en: 'Before they grow so big, the baobabs start out by being little.', zh: '猴面包树长到那么大之前，\n也是从小树苗开始的。' },
     { who: PRINCE, en: "It is a question of discipline. When you've finished your own toilet in the morning, then it is time to attend to the toilet of your planet, just so, with the greatest care.", zh: '这是个规矩的问题。\n早晨梳洗完了，\n就该给星球梳洗——\n要仔细，再仔细。' },
+    { who: PRINCE, en: 'Sometimes there is no harm in putting off a piece of work until another day. But when it is a matter of baobabs, that always means a catastrophe.', zh: '有时候，把活儿留到明天做，\n也没什么害处。\n可只要关系到猴面包树，\n那就准是场大祸。' },
   ],
   sunset: [
     { who: PRINCE, en: 'I am very fond of sunsets. Come, let us go look at a sunset now.', zh: '我很喜欢日落。\n走，我们现在就去看一次日落。' },
+    { who: PRINCE, en: 'But we must wait.', zh: '可是得等。' },
+    { who: PRINCE, en: 'Wait? For what?', zh: '等？等什么？' },
+    { who: PRINCE, en: 'For the sunset. We must wait until it is time.', zh: '等日落啊。\n得等到时候。' },
+    { who: PRINCE, en: 'I am always thinking that I am at home!', zh: '我总以为自己还在家里呢！' },
     { who: PRINCE, en: 'One day, I saw the sunset forty-four times!', zh: '有一天，我看了四十四次日落！' },
     { who: PILOT, en: 'You know-- one loves the sunset, when one is so sad...', zh: '你知道的——\n人难过的时候，\n就会爱上日落……' },
     { who: SHEEP, en: 'If you count them, I will count them with you.', zh: '你要数的话，\n我陪你一起数。' },
@@ -227,9 +232,26 @@ export const SCENE3 = {
   questPage: { en: 'Pages of the book', zh: '书页' },
 };
 
-// 第 4 场·书页二·玫瑰(2026-09-07;玫瑰开花+相处+离别,照 Woods/文学译本)
+// 第 4 场·书页二·玫瑰(2026-09-07;玫瑰开花+相处+离别,照 Woods/文学译本;
+// 2026-09-27 补齐定稿全本 v2 第4场开篇:入梦清晨的诘问 7 句 + 眼泪字幕 + 玫瑰初醒,
+// 此前实现从"你多美啊"直接开场,开篇整段缺失)
 export const SCENE4 = {
+  // 入梦,清晨:他想起谁敷衍过他,对着一朵不存在的花生气(说话人归属照定稿本,全王子)
+  interrogation: [
+    { who: PRINCE, en: 'A sheep-- if it eats little bushes, does it eat flowers, too?', zh: '羊要是吃小灌木，\n那它吃不吃花呢？' },
+    { who: PRINCE, en: 'Even flowers that have thorns?', zh: '长了刺的花也吃？' },
+    { who: PRINCE, en: 'Then the thorns-- what use are they?', zh: '那刺——有什么用呢？' },
+    { who: PRINCE, en: "I don't believe you! Flowers are weak creatures. They are naïve. They reassure themselves as best they can. They believe that their thorns are terrible weapons...", zh: '我不信你的话！\n花是弱小的东西。她们天真。\n她们只能尽量壮自己的胆，\n相信自己的刺是可怕的武器……' },
+    { who: PRINCE, en: 'You talk just like the grown-ups!', zh: '你说话就跟那些大人一个样！' },
+    { who: PRINCE, en: 'You mix everything up together... You confuse everything...', zh: '你把什么都搅在一起……\n你把一切都弄混了……' },
+    { who: PRINCE, en: "I know a planet where there is a certain red-faced gentleman. He has never smelled a flower. He has never looked at a star. He has never loved any one. He has never done anything in his life but add up figures. And all day he says over and over, just like you: 'I am busy with matters of consequence!' And that makes him swell up with pride. But he is not a man-- he is a mushroom!", zh: '我知道一颗星球上，\n住着一位红脸膛的先生。\n他从来没有闻过一朵花，\n没有望过一颗星星，从来没有爱过谁。\n他一辈子除了加数字什么也没做过。\n他整天翻来覆去地说——跟你一样——\n“我在忙正经大事！”\n说得自己都骄傲起来。\n可他不是人——他是一朵蘑菇！' },
+  ],
+  tearsCaption: {
+    en: 'It is such a secret place, the land of tears.',
+    zh: '眼泪的国度，\n是多么秘密的地方。',
+  },
   arrival: [
+    { who: ROSE, en: 'Ah! I am scarcely awake. I beg that you will excuse me. My petals are still all disarranged...', zh: '啊……我还没完全醒来。\n请原谅。\n花瓣都还没有理好……' },
     { who: PRINCE, en: 'Oh! How beautiful you are!', zh: '哦！你多美啊！' },
     { who: ROSE, en: 'Am I not? And I was born at the same moment as the sun...', zh: '是吗？我和太阳，是同一刻出生的……' },
     { who: ROSE, en: 'Let the tigers come with their claws!', zh: '让老虎带着爪子来吧！' },

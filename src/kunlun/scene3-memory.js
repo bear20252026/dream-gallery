@@ -272,7 +272,15 @@ function doStep(stepIdx) {
     [SCENE3.volcanoes],
     SCENE3.baobab,
     SCENE3.sunset,
-    SCENE4.arrival.concat(SCENE4.regret, SCENE4.farewell, [SCENE4.farewellCaption]),
+    // 玫瑰站(2026-09-27 补齐定稿全本 v2 第4场开篇):先诘问 7 句 + 眼泪字幕 + 初醒,
+    // 再进原有的相见/追悔/离别(此前从"你多美啊"开场,开篇整段缺失)
+    SCENE4.interrogation.concat(
+      [SCENE4.tearsCaption],
+      SCENE4.arrival,
+      SCENE4.regret,
+      SCENE4.farewell,
+      [SCENE4.farewellCaption]
+    ),
   ];
   if (stepIdx >= 0 && stepIdx < seqs.length) {
     speakSeq(seqs[stepIdx], 0, function () {
