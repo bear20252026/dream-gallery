@@ -87,7 +87,7 @@ npm run test:scene                # 场景截图回归 4 检查点(主世界/B61
   `.registerExtensions(ALL_EXTENSIONS)`(含 `EXT_texture_webp`);
   ② meshopt 还要 `.registerDependencies({'meshopt.decoder':MeshoptDecoder,'meshopt.encoder':MeshoptEncoder})`,漏了几何/量化也全不落地;
   ③ **`targetFormat` 写字符串 `'webp'`,不是 `Format.WEBP`** —— 该枚举只有 `GLTF/GLB`,`Format.WEBP === undefined`,传进去 `textureCompress` 静默不转格式(产物仍是 PNG)。
-  **每次压缩后必须自检**(六行 node 即可):产物里搜 `WEBP` 字节为真、搜 PNG 魔数为假、搜 `EXT_meshopt_compression` 为真,三条齐了才算压过;或 `npx gltf-transform inspect` 看 TEXTURES 表 mimeType 是不是 `image/webp`。修好后酒鬼星三件套 5.85MB→0.75MB(**-87%**)。
+  **每次压缩后必须自检**:跑 `node scripts/optimize/scan-uncompressed.cjs [目录]`(默认 `models/`)——列出所有"仍是 PNG 纹理"的可疑文件;原理就是产物里搜 `WEBP` 字节为真、搜 PNG 魔数为假、搜 `EXT_meshopt_compression` 为真,三条齐了才算压过(也可用 `npx gltf-transform inspect` 看 TEXTURES 表 mimeType 是不是 `image/webp`)。2026-09-28 全库体检(本机 17 个 / 服务器 18 个)**仅酒鬼星三件套中招**,其余均真压缩。修好后酒鬼星三件套 5.85MB→0.75MB(**-87%**)。
   **镜像单个模型到 R2**:`node scripts/r2-upload-models-rest.cjs hall/xxx.glb`(路径相对 `models/`,可多个;不带参数=全量)。在服务器上跑(__dirname 决定 ROOT,须放在 `/opt/gallery/scripts/` 下),凭据从 `/opt/gallery/.env` 取。
 
 ## 优化资产(2026-07-25 九大优化落地)
