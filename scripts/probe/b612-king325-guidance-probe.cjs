@@ -75,10 +75,27 @@ function start() {
       const st = window.__scene6 && window.__scene6.state && window.__scene6.state.stage;
       if (st && window.__stageLog[window.__stageLog.length - 1] !== st) window.__stageLog.push(st);
     }, 300);
+    // 同 327 探针:探针跳过 scene3,途经羊箱触发的「数数行 + 等玩家开口」带 choices 永不
+    // 自动关闭,lock 队列会堵死后续台词链 —— 模拟真实玩家点选消解(scene6 自身无 choices)。
+    window.__autoChoice = setInterval(() => {
+      const st = window.__scene6 && window.__scene6.state;
+      if (st && st.starTaken) return; // 全程最后一拍已到,停手
+      const b = document.querySelector('.gs-choice');
+      if (b && b.offsetParent) b.click();
+    }, 1200);
   });
 
   // main → B612(石门) → king325(导航按钮)
-  await p.evaluate(() => { const q = window.__ctx.player.pl.p; q.x = 0.1; q.z = 56; });
+  // ⚠️ 石门按剧情出场(2026-09-27 起开局恒隐身):探针跳过 scene3,须手动补「石门已亮起」前置。
+  await p.evaluate(() => {
+    window.__ctx.kunlun.revealStarGate && window.__ctx.kunlun.revealStarGate();
+  });
+  await p.waitForTimeout(800);
+  await p.evaluate(() => {
+    const q = window.__ctx.player.pl.p;
+    q.x = 0.1;
+    q.z = 56;
+  });
   await p.waitForFunction(() => window.__ctx.scene.activeWorld === 'b612', null, { timeout: 20000 });
   console.log('PASS main → b612');
   await p.evaluate(() => [...document.querySelectorAll('button')].find((x) => x.textContent.includes('前往 325'))?.click());

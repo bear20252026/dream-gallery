@@ -81,10 +81,29 @@ function start() {
       const sb = window.__scene7b && window.__scene7b.state && window.__scene7b.state.stage;
       if (sb && window.__stageLogB[window.__stageLogB.length - 1] !== sb) window.__stageLogB.push(sb);
     }, 300);
+    // 探针跳过 scene3,途经羊箱会触发「数数行 + 等玩家开口」(带 choices,永不自动关闭),
+    // lock 队列会把它之后的第7场台词链全堵死 —— 模拟真实玩家点选消解。
+    // 第7场自身无 choices(已核实 scene7-vanity/tippler 零 choices),自动点选不会误伤。
+    window.__autoChoice = setInterval(() => {
+      const st = window.__scene7b && window.__scene7b.state;
+      if (st && st.starTaken) return; // 全程最后一拍已到,停手
+      const b = document.querySelector('.gs-choice');
+      if (b && b.offsetParent) b.click();
+    }, 1200);
   });
 
   // main → B612(石门) → king326(导航按钮;chapter=1 时应指 326)
-  await p.evaluate(() => { const q = window.__ctx.player.pl.p; q.x = 0.1; q.z = 56; });
+  // ⚠️ 石门按剧情出场(2026-09-27 起开局恒隐身,scene3-night 台词点才现身):
+  //    探针直测第7场,跳过了 scene3,须手动补「石门已亮起」这一前置,否则 portal.js 守卫不传。
+  await p.evaluate(() => {
+    window.__ctx.kunlun.revealStarGate && window.__ctx.kunlun.revealStarGate();
+  });
+  await p.waitForTimeout(800);
+  await p.evaluate(() => {
+    const q = window.__ctx.player.pl.p;
+    q.x = 0.1;
+    q.z = 56;
+  });
   await p.waitForFunction(() => window.__ctx.scene.activeWorld === 'b612', null, { timeout: 20000 });
   console.log('PASS main → b612');
   // 导航按钮由 planets tick 按帧装配,world 切换同帧采样必空 —— 等 flex 再读
