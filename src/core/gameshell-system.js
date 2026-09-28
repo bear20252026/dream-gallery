@@ -55,6 +55,10 @@ const STYLE = `
 #gameDialog[data-spk='rose'] .gs-name{background:linear-gradient(135deg,#b05050,#8a3030);color:#ffddd0}
 #gameDialog[data-spk='king']{border-color:#7a5a9a}
 #gameDialog[data-spk='king'] .gs-name{background:linear-gradient(135deg,#7a5a9a,#4e3670);color:#f3e8ff}
+#gameDialog[data-spk='vain']{border-color:#c06a9a}
+#gameDialog[data-spk='vain'] .gs-name{background:linear-gradient(135deg,#c06a9a,#8a406a);color:#ffeef5}
+#gameDialog[data-spk='tippler']{border-color:#7a8a5a}
+#gameDialog[data-spk='tippler'] .gs-name{background:linear-gradient(135deg,#7a8a5a,#55603c);color:#f2f5e8}
   transform:rotate(-2deg);
 }
 .gs-text{font-size:19px;line-height:1.85;min-height:1.85em;letter-spacing:.6px;

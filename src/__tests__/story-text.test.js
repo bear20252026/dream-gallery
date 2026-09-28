@@ -12,6 +12,7 @@ import {
   SCENE2,
   SCENE3,
   SCENE4,
+  SCENE5,
   SCENE7_VANITY,
   SCENE7_TIPPLER,
 } from '../shared/story-text.mjs';
@@ -60,7 +61,17 @@ describe('数据完整性:全表双语,who 全带 spk', () => {
     if (typeof node.en === 'string') fn(node, path);
     for (const k of Object.keys(node)) walk(node[k], path + '.' + k, fn);
   };
-  const tables = { FILM, STORY, DIALOG_LINES, SCENE2, SCENE3, SCENE4 };
+  const tables = {
+    FILM,
+    STORY,
+    DIALOG_LINES,
+    SCENE2,
+    SCENE3,
+    SCENE4,
+    SCENE5,
+    SCENE7_VANITY,
+    SCENE7_TIPPLER,
+  };
   it('六大表逐条 {en,zh} 齐备', () => {
     let n = 0;
     for (const [name, t] of Object.entries(tables)) {
@@ -72,12 +83,17 @@ describe('数据完整性:全表双语,who 全带 spk', () => {
     expect(n).toBeGreaterThan(80); // 全表规模护栏(目前 ~110 条)
   });
   it('who 对象全部带 spk(spk 字段存在即校验合法值)', () => {
-    const legal = new Set(['prince', 'pilot', 'sheep', 'rose', '']);
+    const legal = new Set(['prince', 'pilot', 'sheep', 'rose', 'king', 'vain', 'tippler', '']);
     walk(tables, 'root', (e, p) => {
       if (e.spk !== undefined) {
         expect(legal.has(e.spk), p + '.spk=' + e.spk).toBe(true);
       }
     });
+  });
+  it('行星居民 who 必带专属 spk(2026-09-28 声线分层:漏带=朗读走女声)', () => {
+    expect(whoSpk(SCENE5 ? { spk: 'king' } : null)).toBe('king');
+    expect(SCENE7_VANITY.chainA.every((l) => !l.who || l.who.spk)).toBe(true);
+    expect(SCENE7_TIPPLER.chain.every((l) => !l.who || l.who.spk)).toBe(true);
   });
   it('剧情主链的关键键存在(模块消费契约)', () => {
     expect(FILM.question).toBeTruthy();

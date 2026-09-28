@@ -23,6 +23,17 @@ describe('voiceFor 说话人分声线(按文本语言分轨)', () => {
     expect(voiceFor('sheep', 'baa!')).toBe('Mia');
     expect(voiceFor('', 'hello')).toBe('Mia');
   });
+  it('行星居民专属声线(2026-09-28 声线分层):不再是默认女声', () => {
+    // 国王:中文白桦(云扬 威严) / 英文 Ryan(英伦腔)
+    expect(voiceFor('king', '啊！来了一个臣民。')).toBe('白桦');
+    expect(voiceFor('king', 'Ah! Here is a subject.')).toBe('en-GB-RyanNeural');
+    // 虚荣人:中文云健(激情浮夸) / 英文 Roger(Lively)
+    expect(voiceFor('vain', '你真的很仰慕我吗？')).toBe('云健');
+    expect(voiceFor('vain', 'Do you really admire me very much?')).toBe('en-US-RogerNeural');
+    // 酒鬼:与国王跨场复用白桦 / 英文 Eric(平沉)
+    expect(voiceFor('tippler', '我在喝酒。')).toBe('白桦');
+    expect(voiceFor('tippler', 'I am drinking.')).toBe('en-US-EricNeural');
+  });
   it('无 text 时按英文轨兜底(不抛错)', () => {
     expect(voiceFor('prince')).toBe('Milo');
     expect(voiceFor('prince', undefined)).toBe('Milo');

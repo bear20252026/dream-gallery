@@ -344,7 +344,7 @@ export const B612_RETURN = {
 // 第 7 场上半·书页五·326 虚荣的人(2026-09-27 情节阶段二;台词照《定稿全本》第 7 场上半)
 // 拍手演出:定稿"拍了五分钟"译成 4s 蒙太奇(toast 三声啪 + 停顿),不做可点击互动 ——
 // 回忆是"看完一页",玩家在回忆里是幽灵,不动手只观看(定稿规则一)。
-const VAIN = { en: 'The Conceited Man', zh: '虚荣的人' };
+const VAIN = { en: 'The Conceited Man', zh: '虚荣的人', spk: 'vain' };
 export const SCENE7_VANITY = {
   chainA: [
     { who: VAIN, en: 'Ah! Ah! I am about to receive a visit from an admirer!', zh: '啊！啊！\n有一位仰慕者，正朝我走来！' },
@@ -380,7 +380,7 @@ export const SCENE7_VANITY = {
 //   沉默演出(酒鬼把自己关进去,2.2s 停顿)→ 羊吐槽 → 独白 → 星屑拾取(3m)→
 //   章节推进 planetsChapter=3(书页五完成;326 留白后补)
 //   → 回程石环亮起 → 走进石环回 B612。TIPPLER 无 spk=默认羊皮卷样式。
-const TIPPLER = { en: 'The Tippler', zh: '酒鬼' };
+const TIPPLER = { en: 'The Tippler', zh: '酒鬼', spk: 'tippler' };
 export const SCENE7_TIPPLER = {
   chain: [
     { who: PRINCE, en: 'What are you doing there?', zh: '你在那儿做什么呢？' },

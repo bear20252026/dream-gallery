@@ -21,12 +21,21 @@ const SPK_VOICES_ZH = {
   pilot: '苏打',
   sheep: '茉莉',
   rose: '茉莉',
+  // 行星居民专属声线(2026-09-28 主人令「语音要真朗读」):VAIN/TIPPLER 此前没有 spk,
+  // 全走默认女声(虚荣人/酒鬼=女声,严重出戏)。MiMo 预置男声中文仅 苏打/白桦,不够分 →
+  // 新角色用 MiMo 名(白桦/云健)+ edge-tts 原生名补位;同音色只许跨场复用(国王/酒鬼永不同屏)。
+  king: '白桦', // 325 国王:成熟威严(云扬)
+  vain: '云健', // 326 虚荣人:激情浮夸(YunjianNeural)
+  tippler: '白桦', // 327 酒鬼:与国王跨场复用(中文男声只有 4 个)
 };
 const SPK_VOICES_EN = {
   prince: 'Milo',
   pilot: 'Dean',
   sheep: 'Mia',
   rose: 'Mia',
+  king: 'en-GB-RyanNeural', // 英伦腔威严
+  vain: 'en-US-RogerNeural', // Lively 浮夸自恋
+  tippler: 'en-US-EricNeural', // Rational 平沉
 };
 const OFF_KEY = 'dialogVoiceOff';
 const MAX_SPEAK_LEN = 220; // 与 lib/tts.js MAX_LEN 对齐,超长服务端还会再截
