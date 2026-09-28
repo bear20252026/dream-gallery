@@ -30,6 +30,7 @@ import {
   storyNext,
 } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死;2026-09-27 加 storyNext 下一步权威)
 import { GLOBAL, B612_RETURN, tt, whoSpk } from '../shared/story-text.mjs'; // 指引文案单一源(2026-09-27 B612 首进下一步/重访入场白)
+import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js'; // 剧情浮光指引(2026-09-28)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -525,6 +526,89 @@ mainPad = loadPortalPad(
 loadPortalPad(worldManager.getWorld('king325'), { x: 0, y: 0, z: 0 }, 'b612');
 refreshGate(); // 主台刚建默认可见,按出场规则同步一次(新档即隐)
 
+/* ===================== 剧情浮光指引(2026-09-28 主人报「3D 地图没有浮光箭头指引情节发展」) =====================
+   两处缺口补齐(信标管远看 + 悬浮箭管精确落点,同 scene3-night/scene6-king 规制):
+   ① 主世界章节期星门:白天/章节期没有 scene3 的夜信标,玩家在画廊里逛远了找不到回故事的路;
+   ② B612 岛内故事锚点:落岛后下一步只有屏底按钮,3D 里没有视觉锚 —— 箭头立在小王子头顶。
+   零 PointLight 铁律:全 MeshBasicMaterial,fog:false。近了自动撤(按钮/门本身已醒目)。 */
+let gateGuideBeacon = null,
+  gateGuideArrow = null; // 主世界星门
+let princeBeacon = null,
+  princeArrow = null; // B612 小王子
+function makeGuideBeacon(scene, x, z, gy, h, r, opacity, name) {
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
+    new THREE.MeshBasicMaterial({
+      color: 0xffd9a0,
+      transparent: true,
+      opacity: opacity,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+      fog: false,
+    })
+  );
+  m.position.set(x, gy + h / 2 + 0.2, z);
+  m.userData.baseOpacity = opacity;
+  m.name = name;
+  scene.add(m);
+  return m;
+}
+function dropGuideBeacon(scene, b) {
+  if (!b) return;
+  scene.remove(b);
+  b.geometry.dispose();
+  b.material.dispose();
+}
+function updateStoryGuides() {
+  const active = ctx.scene.activeWorld || 'main';
+  const p = ctx.player.pl && ctx.player.pl.p;
+  const t = performance.now() * 0.001;
+  const pulse = 0.75 + Math.sin(t * 1.7) * 0.25;
+  // ① 主世界星门:门已按剧情现身 + 书页一完成(夜信标已退役,不重复)+ 未终章 + 离门 12m 外
+  let page1Done = false;
+  try {
+    page1Done = !!ctx.store.flag('page1');
+  } catch (e) {}
+  const wantGate = !!(
+    p &&
+    active === 'main' &&
+    chapter < 6 &&
+    gateRevealed &&
+    page1Done &&
+    (p.x - 0.1) * (p.x - 0.1) + (p.z - 56) * (p.z - 56) > 144
+  );
+  if (wantGate && !gateGuideArrow) {
+    gateGuideBeacon = makeGuideBeacon(s, 0.1, 56, mainGateY, 4.2, 0.3, 0.25, 'storyBeaconStarGate');
+    gateGuideArrow = spawnFloatArrow(s, 0.1, mainGateY + 5.6, 56, {
+      name: 'guideArrowStarGate',
+      size: 1.4,
+    });
+  } else if (!wantGate && (gateGuideArrow || gateGuideBeacon)) {
+    removeFloatArrow(s, gateGuideArrow);
+    gateGuideArrow = null;
+    dropGuideBeacon(s, gateGuideBeacon);
+    gateGuideBeacon = null;
+  }
+  if (gateGuideBeacon)
+    gateGuideBeacon.material.opacity = gateGuideBeacon.userData.baseOpacity * pulse;
+  if (gateGuideArrow) tickArrow(gateGuideArrow, t);
+  // ② B612 小王子:章节未满即立(故事心脏);走近原点 5m 内撤(入场白/按钮已接管)
+  const wantPrince = !!(p && active === 'b612' && chapter < 6 && p.x * p.x + p.z * p.z > 25);
+  if (wantPrince && !princeArrow) {
+    const bw = worldManager.getWorld('b612').scene;
+    princeBeacon = makeGuideBeacon(bw, 0, 0, 0, 3.2, 0.35, 0.3, 'storyBeaconPrince');
+    princeArrow = spawnFloatArrow(bw, 0, 4.6, 0, { name: 'guideArrowPrince', size: 1.4 });
+  } else if (!wantPrince && (princeArrow || princeBeacon)) {
+    const bw = worldManager.getWorld('b612').scene;
+    removeFloatArrow(bw, princeArrow);
+    princeArrow = null;
+    dropGuideBeacon(bw, princeBeacon);
+    princeBeacon = null;
+  }
+  if (princeBeacon) princeBeacon.material.opacity = princeBeacon.userData.baseOpacity * pulse;
+  if (princeArrow) tickArrow(princeArrow, t);
+}
+
 /* ===================== 指引 HUD(屏顶箭头, spirits 同款自建) ===================== */
 const hud = document.createElement('div');
 hud.style.cssText =
@@ -690,6 +774,7 @@ onTick(function (dt) {
   const p = pl();
   const plRef = ctx.player.pl;
   const activeWorld = ctx.scene.activeWorld || 'main';
+  updateStoryGuides(); // 剧情浮光指引(信标+悬浮箭,按世界/章节/距离同立同撤)
 
   // ==== 太空人模式:非主世界时自由飞行,无重力,3D 全方向移动 ====
   if (activeWorld !== 'main') {
@@ -859,6 +944,14 @@ ctx.kunlun.planetsMark = function () {
 bag.custom.push(function () {
   hud.remove();
   worldNav.remove();
+  // 剧情浮光指引清理(HMR/卸载不泄漏)
+  removeFloatArrow(s, gateGuideArrow);
+  dropGuideBeacon(s, gateGuideBeacon);
+  const bw = worldManager && worldManager.getWorld && worldManager.getWorld('b612');
+  if (bw) {
+    removeFloatArrow(bw.scene, princeArrow);
+    dropGuideBeacon(bw.scene, princeBeacon);
+  }
 });
 hotEnd('planets');
 if (import.meta.hot) import.meta.hot.accept();
