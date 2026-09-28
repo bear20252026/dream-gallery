@@ -80,7 +80,15 @@ npm run test:scene                # 场景截图回归 4 检查点(主世界/B61
 
 ## 模型压缩管线(2026-09-20 审计 v3-P0 落地)
 
-全部 GLB 经 @gltf-transform/cli 压缩(meshopt 几何+webp 纹理+量化+prune,182.6MB→39.3MB,生产开机传输 20MB→4.5MB)。**规矩:①任何 GLB 加载点禁止直接 `new GLTFLoader()`,一律 `import { createGLTFLoader } from '../scene/gltf-loader.js'`(MeshoptDecoder 统一接线,漏接=解析失败);②新模型入库必须过 scripts/optimize 管线压缩;③模型不入 git,服务器 /opt/gallery/models 为源,本地改用 .models-staging 流程后回填双端;④重压缩前先备份(server /tmp tar 或 /opt/backups)。**
+全部 GLB 经 @gltf-transform/cli 压缩(meshopt 几何+webp 纹理+量化+prune,182.6MB→39.3MB,生产开机传输 20MB→4.5MB)。**规矩:①任何 GLB 加载点禁止直接 `new GLTFLoader()`,一律 `import { createGLTFLoader } from '../scene/gltf-loader.js'`(MeshoptDecoder 统一接线,漏接=解析失败);②新模型入库必须过 scripts/optimize 管线压缩;③模型不入 git,服务器 /opt/gallery/models 为源,本地改用 .models-staging 流程后回填双端;④重压缩前先备份(server /tmp tar 或 /opt/backups)。
+  **⚠️ 自写 gltf-transform 脚本必踩的三坑(2026-09-28 酒鬼星实锤:三件套"压过"后仍是裸 PNG,5.85MB 一点没少)**:
+  ① `new NodeIO()` **不注册扩展 = 静默产出完全没压缩的文件**,控制台只给一句软提示
+  `Some extensions were not registered for I/O, and will not be written.`——必须
+  `.registerExtensions(ALL_EXTENSIONS)`(含 `EXT_texture_webp`);
+  ② meshopt 还要 `.registerDependencies({'meshopt.decoder':MeshoptDecoder,'meshopt.encoder':MeshoptEncoder})`,漏了几何/量化也全不落地;
+  ③ **`targetFormat` 写字符串 `'webp'`,不是 `Format.WEBP`** —— 该枚举只有 `GLTF/GLB`,`Format.WEBP === undefined`,传进去 `textureCompress` 静默不转格式(产物仍是 PNG)。
+  **每次压缩后必须自检**(六行 node 即可):产物里搜 `WEBP` 字节为真、搜 PNG 魔数为假、搜 `EXT_meshopt_compression` 为真,三条齐了才算压过;或 `npx gltf-transform inspect` 看 TEXTURES 表 mimeType 是不是 `image/webp`。修好后酒鬼星三件套 5.85MB→0.75MB(**-87%**)。
+  **镜像单个模型到 R2**:`node scripts/r2-upload-models-rest.cjs hall/xxx.glb`(路径相对 `models/`,可多个;不带参数=全量)。在服务器上跑(__dirname 决定 ROOT,须放在 `/opt/gallery/scripts/` 下),凭据从 `/opt/gallery/.env` 取。
 
 ## 优化资产(2026-07-25 九大优化落地)
 

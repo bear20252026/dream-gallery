@@ -13,14 +13,21 @@ const DL = 'C:/Users/17296/Downloads';
 const OUT = path.join(__dirname, '..', '..', 'models', 'hall', 'b612-world');
 
 async function main() {
-  const { NodeIO, Format } = await import('@gltf-transform/core');
+  const { NodeIO } = await import('@gltf-transform/core');
+  const { ALL_EXTENSIONS } = await import('@gltf-transform/extensions');
   const { prune, dedup, quantize, meshopt, textureCompress } = await import(
     '@gltf-transform/functions'
   );
-  const { MeshoptEncoder } = require('meshoptimizer');
+  const { MeshoptDecoder, MeshoptEncoder } = require('meshoptimizer');
   await MeshoptEncoder.ready;
   const sharp = require('sharp');
-  const io = new NodeIO();
+  // ⚠️ 两处必注册(2026-09-28 实锤:不注册则扩展"不会写出",产物仍是裸 PNG + 无 meshopt,
+  //    控制台只给一句 "Some extensions were not registered for I/O" 的软提示):
+  //    ① ALL_EXTENSIONS(含 EXT_texture_webp)② meshopt encoder/decoder 依赖。
+  const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({
+    'meshopt.decoder': MeshoptDecoder,
+    'meshopt.encoder': MeshoptEncoder,
+  });
 
   async function squeeze(doc, maxTex) {
     await doc.transform(
@@ -28,7 +35,7 @@ async function main() {
       dedup(),
       quantize(),
       meshopt({ encoder: MeshoptEncoder }),
-      textureCompress({ encoder: sharp, targetFormat: Format.WEBP, resize: [maxTex, maxTex] })
+      textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [maxTex, maxTex] })
     );
     return doc;
   }
@@ -70,7 +77,7 @@ async function main() {
     await doc.transform(
       prune(),
       dedup(),
-      textureCompress({ encoder: sharp, targetFormat: Format.WEBP, resize: [1024, 1024] })
+      textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [1024, 1024] })
     );
     await write(doc, 'tippler-sky.glb');
   }

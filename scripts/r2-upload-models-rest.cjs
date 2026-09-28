@@ -63,8 +63,19 @@ function walk(dir, out = []) {
 }
 
 (async () => {
-  const files = walk(ROOT);
-  console.log(`[r2-models] 本地 ${files.length} 个文件`);
+  // 命令行给了相对 models/ 的路径就只传这几个(重压/改单个模型时用),否则全量镜像。
+  const only = process.argv.slice(2);
+  const files = only.length
+    ? only.map((p) => {
+        const abs = path.join(ROOT, p);
+        if (!fs.existsSync(abs)) {
+          console.error(`[r2-models] 找不到 ${p}`);
+          process.exit(1);
+        }
+        return abs;
+      })
+    : walk(ROOT);
+  console.log(`[r2-models] 待传 ${files.length} 个文件`);
   let up = 0,
     fail = 0;
   for (const f of files) {
