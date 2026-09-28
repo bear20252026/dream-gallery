@@ -2,12 +2,27 @@
 // 背景:/api/tts?text=.. 响应 Cloudflare 恒不缓存(DYNAMIC)→ 每条音频跨境回源,
 // 晚高峰拥塞时台词链条被拖成「无声」。修法:GET /tts-audio/<key>.mp3 只读出口,
 // key = sha256('tts1|voice|text') 前 20 位,客户端 dialog-voice.mjs 复算同一算法直拼 URL。
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, afterAll, vi } from 'vitest';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Writable, Readable } from 'node:stream';
-import { ttsKey, handleTtsAudio, handleTts, handleTtsBatch } from '../../lib/tts.js';
+import { createRequire } from 'node:module';
+
+// r2Put 隔离(自愈测试不真推 R2):lib/* 是 CJS,require('./r2sync') 走 node require 链,
+// vi.mock 拦不到(实测 0 次调用)。按后端测试惯例 createRequire 加载,并在 tts.js
+// 加载之前打 require.cache 补丁 —— tts.js 顶部解构 r2Put 时拿到的就是 mock。
+const nodeRequire = createRequire(import.meta.url);
+const r2syncId = nodeRequire.resolve('../../lib/r2sync.js');
+const r2PutMock = vi.fn(() => Promise.resolve(true));
+nodeRequire.cache[r2syncId] = {
+  id: r2syncId,
+  filename: r2syncId,
+  loaded: true,
+  path: path.dirname(r2syncId),
+  exports: { r2Put: r2PutMock },
+};
+const { ttsKey, handleTtsAudio, handleTts, handleTtsBatch } = nodeRequire('../../lib/tts.js');
 
 const CACHE_DIR = path.join(process.cwd(), '.tts-cache');
 
@@ -103,6 +118,36 @@ describe('handleTts 经典通道仍工作(回退通道不回归)', () => {
     const res = fakeRes();
     handleTts({ method: 'GET' }, res, { text: '', voice: '' });
     expect(res.code).toBe(400);
+  });
+});
+
+describe('r2Heal 镜像自愈(2026-09-28:r2Put 静默失败的键,缓存命中时补推)', () => {
+  it('缓存命中补推一次;同进程同键去重,不再重复推', async () => {
+    const text = 'lib-tts-test-heal-自愈样本';
+    const voice = '苏打';
+    const key = ttsKey(voice, text);
+    const file = path.join(CACHE_DIR, key + '.mp3');
+    fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(file, Buffer.from('fake-mp3-bytes'));
+    r2PutMock.mockClear();
+    // 第一次命中:补推一次
+    const res = fakeRes();
+    handleTts({ method: 'GET' }, res, { text, voice });
+    await new Promise((r) => res.on('finish', r).on('close', r));
+    expect(res.code).toBe(200);
+    expect(r2PutMock).toHaveBeenCalledTimes(1);
+    expect(r2PutMock).toHaveBeenCalledWith('tts-audio', key + '.mp3', file);
+    // 第二次命中:Set 去重,不再推
+    const res2 = fakeRes();
+    handleTts({ method: 'GET' }, res2, { text, voice });
+    await new Promise((r) => res2.on('finish', r).on('close', r));
+    expect(res2.code).toBe(200);
+    expect(r2PutMock).toHaveBeenCalledTimes(1);
+    try {
+      fs.unlinkSync(file);
+    } catch {
+      /* 忽略 */
+    }
   });
 });
 
