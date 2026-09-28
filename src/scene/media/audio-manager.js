@@ -2,6 +2,7 @@
 import { ctx } from '../../ctx.js';
 import { onMediaChanged } from '../../media-push.js'; // 服务端主动推送:后台增删音乐即刷新(2026-08-29)
 import { avAllowed } from '../../core/av-switch.js'; // 全站音视频总闸(2026-09-26):默认全静,?av=1 恢复
+import { ttsUrl, warmBlob } from '../../core/dialog-voice.mjs'; // 台词音频缓存键三级路径(2026-09-28)
 // 惰性读取 aB:scene.js 在 main.js 第 6 行已执行,vault['aB'] 已填充;
 // 不做顶层解构,直接在事件回调里读 ctx.scene.aB,防御打包器重排。
 
@@ -34,19 +35,35 @@ function kunlunSpeak(text, voice, onEnd) {
     if (typeof voice === 'string' && voice) {
       v = KUNLUN_VOICES[voice] || voice;
     }
-    const url =
-      '/api/tts?text=' + encodeURIComponent(text) + (v ? '&voice=' + encodeURIComponent(v) : '');
-    const a = new Audio(url);
-    if (ctx.media.audioManager) {
-      ctx.media.audioManager.playHint(a, onEnd, dlgBypass);
-    } else {
-      a.play().catch(() => {
-        if (onEnd) onEnd();
-      });
-    }
+    const play = (url) => {
+      const a = new Audio(url);
+      if (ctx.media.audioManager) {
+        ctx.media.audioManager.playHint(a, onEnd, dlgBypass);
+      } else {
+        a.play().catch(() => {
+          if (onEnd) onEnd();
+        });
+      }
+    };
+    // 2026-09-28 缓存键化:与剧情台词同一套 tts-audio 三级路径
+    // (blob 内存常驻 → R2 边缘镜像 cdn.cloudbear.cloud;键算法与 lib/tts.js ttsKey 契约一致)。
+    // warmBlob 兼做预取与 R2 在位探测:未命中(冷台词)退经典 /api/tts 触发合成并自动镜像,
+    // 同一句下次直接命中键,不再每次都动态合成。
+    warmBlob(text, v)
+      .then((ok) => (ok ? ttsUrl(text, v) : legacyTtsUrl(text, v)))
+      .then(play)
+      .catch(() => play(legacyTtsUrl(text, v)));
   } catch (e) {
     if (onEnd) onEnd();
   }
+}
+/** 组经典 TTS 请求 URL(冷台词兜底通道;截断与 lib/tts.js MAX_LEN 对齐) */
+function legacyTtsUrl(text, voice) {
+  return (
+    '/api/tts?text=' +
+    encodeURIComponent(String(text).slice(0, 220)) +
+    (voice ? '&voice=' + encodeURIComponent(voice) : '')
+  );
 }
 
 // 开场欢迎语(2026-09-01 重做防重复):
