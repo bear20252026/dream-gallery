@@ -36,6 +36,14 @@ function start() {
     const t = m.text();
     if (/scene7/.test(t)) logs.push(t);
   });
+  p.on('response', (r) => {
+    if (/tippler/.test(r.url())) {
+      const h = r.headers();
+      logs.push(
+        'NET ' + r.status() + ' ' + r.url().slice(-60) + ' len=' + (h['content-length'] || '?') + ' cc=' + (h['cache-control'] || '?')
+      );
+    }
+  });
   await p.addInitScript(() => {
     try {
       sessionStorage.setItem('nickPopOff', '1');
@@ -46,6 +54,27 @@ function start() {
     } catch (e) {}
   });
   await p.goto(URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  // 审讯 Service Worker:缓存里有没有旧版 tippler 模型
+  try {
+    const sw = await p.evaluate(async () => {
+      if (!navigator.serviceWorker) return { sw: false };
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (!reg) return { sw: false };
+      const keys = await caches.keys();
+      const out = { sw: true, ver: keys, entries: [] };
+      for (const k of keys) {
+        const c = await caches.open(k);
+        const reqs = await c.keys();
+        reqs.forEach((r) => {
+          if (/tippler/.test(r.url)) out.entries.push(r.url.slice(-70));
+        });
+      }
+      return out;
+    });
+    console.log('SW 审计:', JSON.stringify(sw));
+  } catch (e) {
+    console.log('SW 审计失败:', e.message);
+  }
   await p.waitForSelector('#b612Gate', { timeout: 90000 });
   await p.evaluate(() => {
     const c = document.getElementById('gAgreeChk');
