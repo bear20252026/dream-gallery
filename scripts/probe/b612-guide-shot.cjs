@@ -170,6 +170,23 @@ function start() {
     };
   });
   console.log('gate guide:', JSON.stringify(gateGuide));
+  // 进入按钮交接:29m 隐 → 6m 现(与光柱 15m 门控衔接)
+  const btnState = () =>
+    p.evaluate(() => {
+      const b = [...document.querySelectorAll('button')].find((x) =>
+        x.textContent.includes('进入 B612')
+      );
+      return b ? b.style.display : 'missing';
+    });
+  const btnFar = await btnState();
+  await p.evaluate(() => {
+    const q = window.__ctx.player.pl;
+    q.p.x = 0.1;
+    q.p.z = 50;
+  });
+  await p.waitForTimeout(600);
+  const btnNear = await btnState();
+  console.log('portal button far(29m):', btnFar, '| near(6m):', btnNear);
   // 剧情罗盘:主世界应显示「石门」+ 距离 ~29m,且方向指针有旋转量
   const comp2 = await p.evaluate(() => {
     const el = document.getElementById('storyCompass');
@@ -186,7 +203,7 @@ function start() {
   await p.waitForTimeout(1500);
   await p.screenshot({ path: f2 });
   console.log('shot-gate:', f2);
-  const pass = !afterNear && gateGuide.beacon && gateGuide.arrow;
+  const pass = !afterNear && gateGuide.beacon && gateGuide.arrow && btnFar === 'none' && btnNear === 'block';
   console.log(pass ? 'PASS 指引三断言全过' : 'FAIL');
   child.kill();
   process.exit(pass ? 0 : 1);

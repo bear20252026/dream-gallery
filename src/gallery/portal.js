@@ -6,7 +6,13 @@
 import { ctx } from '../ctx.js';
 import { eventBus } from '../event-bus.js';
 import { Z } from '../shared/z-layers.mjs';
-import { GATE_RADIUS, gateStep, spawnFor, exitGateNudge } from '../shared/planet-logic.mjs';
+import {
+  GATE_RADIUS,
+  GATE_POS,
+  gateStep,
+  spawnFor,
+  exitGateNudge,
+} from '../shared/planet-logic.mjs';
 
 let gateArmed = true; // 见 planet-logic.gateStep:触发即解除,走出半径重新武装(防返回回弹)
 
@@ -71,9 +77,14 @@ ctx.onTick(function portalTick() {
   const pl = ctx.player.pl;
   if (!pl) return;
   const step = gateStep(gateArmed, pl.p.x, pl.p.z);
+  // 按钮只在门前 15m 内亮(2026-09-30 主人报「布局混乱」):远处由罗盘+光柱吸引,
+  // 走近才亮按钮交接 —— 旧版任何时候都挂屏底,与罗盘/信标三路同指一块屏幕。
+  // 15m 与 planets.js 光柱门控阈值对齐(>15m 光柱,≤15m 按钮,≤4m 自动传送)。
   if (!step.near) {
     gateArmed = true;
-    padBtn.style.display = 'block';
+    const dx = pl.p.x - GATE_POS.x,
+      dz = pl.p.z - GATE_POS.z;
+    padBtn.style.display = dx * dx + dz * dz < 225 ? 'block' : 'none';
     return;
   }
   if (step.fire) {
