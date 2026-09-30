@@ -181,6 +181,13 @@ function startServer() {
   await freezeDayNoon();
   await checkpoint('main-boot', /^main$/, 4000);
   // ② 石门 → B612
+  // ⚠️ 石门按剧情出场(2026-09-27 起:开局隐藏,台词点到才现身;isStarGateOut 未开则
+  //    走近不传)—— VR 不演剧情,必须显式 revealStarGate,否则等 b612 永远超时(CI 连挂)。
+  //    另:gateStep 需 near=false 才重新武装,故先现门、站远处等一拍再传送进 4m 圈。
+  await page.evaluate(() => {
+    window.__ctx.kunlun.revealStarGate && window.__ctx.kunlun.revealStarGate();
+  });
+  await page.waitForTimeout(800);
   await page.evaluate(() => {
     const q = window.__ctx.player.pl.p;
     q.x = 0.1;
