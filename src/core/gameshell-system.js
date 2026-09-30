@@ -97,8 +97,14 @@ const STYLE = `
   border-bottom:2px dashed rgba(74,53,38,.4);padding-bottom:5px;margin-bottom:9px;}
 #questHud .q-main{font-size:16px;line-height:1.6;margin-bottom:8px;color:#3a2a1c;}
 #questHud .q-row{font-size:14px;line-height:1.7;display:flex;justify-content:space-between;gap:8px;}
-#questHud .q-row .q-k{color:#6b4f37;}
+#questHud .q-row .q-k{color:#6b4f37;white-space:nowrap;}
 #questHud .q-row .q-v{color:#a35a1e;font-weight:700;}
+/* 进程/下一步=整行块(2026-09-30 主人报「任务册不清晰」):长指引曾被塞进右列
+   折成三行、标签竖断行 —— 改标签在上小字、正文整行可换行,一眼读到要做什么 */
+#questHud .q-row.q-block{flex-direction:column;align-items:flex-start;gap:2px;
+  padding:6px 0;border-bottom:1px dashed rgba(74,53,38,.25);}
+#questHud .q-row.q-block .q-k{font-size:11.5px;letter-spacing:2.5px;opacity:.72;}
+#questHud .q-row.q-block .q-v{font-size:14.5px;line-height:1.55;color:#8a4a12;white-space:normal;}
 #questFold{position:absolute;top:9px;right:11px;width:22px;height:22px;border:1px solid rgba(74,53,38,.45);
   border-radius:6px;background:rgba(255,250,235,.88);color:#6b4f37;font-size:13px;line-height:1;
   cursor:pointer;pointer-events:auto;font-family:inherit}
@@ -195,19 +201,18 @@ function createGameShellSystem() {
     questEl.querySelector('.q-main').textContent = '◈ ' + p.main;
     const pr = questEl.querySelector('.q-rows');
     const rows = [
-      // 进程行(2026-09-26 主人报「情节推进理解困难」):现在讲到哪一章,人话+星球编号
-      ['进程', tt(p.beat)],
-      // 下一步行(2026-09-27 主人报「剧情发展指引不清」):只讲到哪不够,要讲做什么+去哪+怎么去
-      ['下一步', tt(p.next)],
-      ['书页', p.pages + ' / 9'],
-      ['星屑', p.spirits + ' / 6'],
-      ['展厅挂画', p.picks + ' / 20'],
-      ['飞舟', p.ark],
+      // 进程/下一步=整行块(2026-09-30);书页/星屑/挂画/飞舟=紧凑双列
+      ['进程', tt(p.beat), 1],
+      ['下一步', tt(p.next), 1],
+      ['书页', p.pages + ' / 9', 0],
+      ['星屑', p.spirits + ' / 6', 0],
+      ['展厅挂画', p.picks + ' / 20', 0],
+      ['飞舟', p.ark, 0],
     ];
     questEl.querySelector('.q-rows').innerHTML = rows
       .map(
         (r) =>
-          `<div class="q-row"><span class="q-k">${r[0]}</span><span class="q-v">${r[1]}</span></div>`
+          `<div class="q-row${r[2] ? ' q-block' : ''}"><span class="q-k">${r[0]}</span><span class="q-v">${r[1]}</span></div>`
       )
       .join('');
   }
