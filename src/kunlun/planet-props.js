@@ -33,18 +33,9 @@ export function buildChapterProps(idx, box, cyl, topY) {
     foot.position.set(0, 0.15, 0);
     props.add(frame, glass, foot);
   } else if (idx === 2) {
-    // 酒鬼:三只歪酒瓶
-    for (let i = 0; i < 3; i++) {
-      const bottle = new THREE.Group();
-      const bd = cyl(0.22, 0.26, 0.9, 0x3a5a3a);
-      bd.position.y = 0.45;
-      const neck = cyl(0.07, 0.14, 0.4, 0x3a5a3a);
-      neck.position.y = 1.05;
-      bottle.add(bd, neck);
-      bottle.position.set(Math.cos(i * 2.1) * 1.3, 0, Math.sin(i * 2.1) * 1.3);
-      bottle.rotation.z = (i - 1) * 0.5;
-      props.add(bottle);
-    }
+    // 酒鬼:程序化三只歪酒瓶已退役(2026-09-30 主人令「资产完全运用」)——
+    // 真 3D 酒瓶/易拉罐/酒鬼全套由 scene7-tippler.js 挂载(tippler-bottles/cans/man.glb),
+    // 这组 0.9m 墨绿圆柱与真瓶同屏打架(截图里那两块"绿板"就是它),留空即可。
   } else if (idx === 3) {
     // 商人:账桌+纸+头顶三道星环(数过的星星锁进环)
     const desk = box(2.2, 0.12, 1.1, 0x6b4c2c);

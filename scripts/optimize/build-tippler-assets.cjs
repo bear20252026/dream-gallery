@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // build-tippler-assets.cjs — 327 酒鬼星球资产流水线(2026-09-27)
-// 输入(主人提供,版权确认后才上线):Downloads/ 下 alcoholic_set.glb / jim_e._brown.glb /
-//   milky_way_skybox_hdri_panorama.glb(另:alcoholic_set (1).glb 是现代易拉罐,
-//   与 1940s 寓言气质不合,弃用)
-// 输出:models/hall/b612-world/tippler-{bottles,man,sky}.glb(压缩版,meshopt+webp)
+// 输入(主人提供,版权确认后才上线):Downloads/ 下 alcoholic_set.glb(15 组酒瓶)/
+//   alcoholic_set (1).glb(8 罐)/ jim_e._brown.glb(酒鬼本人)/
+//   milky_way_skybox_hdri_panorama.glb(银河天幕)。四件全部上线,不丢任何一组
+//   (2026-09-30 主人令:旧版只留 3 瓶+弃用易拉罐,属"没完全运用")。
+// 输出:models/hall/b612-world/tippler-{bottles,cans,man,sky}.glb(压缩版,meshopt+webp)
 // 用法:node scripts/optimize/build-tippler-assets.cjs
 // 复跑幂等(输出覆盖)。源文件不动。
 const fs = require('fs');
@@ -46,22 +47,30 @@ async function main() {
     console.log(name, (buf.byteLength / 1024 / 1024).toFixed(2) + 'MB');
   }
 
-  // —— 1. 三只歪酒瓶:只留 Whiskey 01/02/03 子树,其余 12 组整组移除 ——
+  // —— 1. 全套酒瓶(2026-09-30 主人令「完全运用,不漏下」:旧版只留 Whiskey 01/02/03
+  //       三组,其余 12 组整组丢弃;现 15 组全留,由 scene7-tippler 逐个摆位) ——
   {
     const doc = await io.read(path.join(DL, 'alcoholic_set.glb'));
     const root = doc.getRoot();
     const rootNode = root.listNodes().find((n) => n.getName() === 'RootNode');
     if (!rootNode) throw new Error('RootNode 未找到');
-    for (const child of rootNode.listChildren().slice()) {
-      if (!/^BW BLBS Bottle Whiskey 0[123]$/.test(child.getName() || '')) {
-        rootNode.removeChild(child);
-        child.dispose();
-      }
-    }
     const kept = rootNode.listChildren().map((n) => n.getName());
-    console.log('保留瓶组:', kept.join(' / '));
+    console.log('保留瓶组(' + kept.length + '):', kept.join(' / '));
     await squeeze(doc, 1024);
     await write(doc, 'tippler-bottles.glb');
+  }
+
+  // —— 1b. 易拉罐套装(alcoholic_set (1).glb,8 罐;旧版判「气质不合」弃用,现纳入) ——
+  {
+    const doc = await io.read(path.join(DL, 'alcoholic_set (1).glb'));
+    const root = doc.getRoot();
+    const rootNode = root.listNodes().find((n) => n.getName() === 'RootNode');
+    console.log(
+      '保留罐组(' + (rootNode ? rootNode.listChildren().length : 0) + '):',
+      rootNode ? rootNode.listChildren().map((n) => n.getName()).join(' / ') : ''
+    );
+    await squeeze(doc, 1024);
+    await write(doc, 'tippler-cans.glb');
   }
 
   // —— 2. 酒鬼本人:整体压缩(站姿,入场时倚瓶微倾,见 scene7-tippler.js) ——

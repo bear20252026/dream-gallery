@@ -27,34 +27,99 @@ let assetsLoading = false; // 酒鬼布景只挂一次
 
 const ISLE_TOP_Y = ISLAND_R * ISLAND_TOP_K; // 岛顶面高度(m)
 
-// —— 酒鬼布景(三只歪瓶+酒鬼本人+银河天幕,首进 king327 时挂载) ——
+// —— 酒鬼布景(2026-09-30 主人令「四件资产完全运用,不漏下」) ——
+// 全套 15 组酒瓶 + 8 只易拉罐 + 酒鬼本人 + 银河天幕,首进 king327 时挂载。
+// 源模型所有瓶子/罐子都堆在原点(translation 全 0),故逐个取出子组重新摆位:
+//   ① 3 只歪瓶贴身(剧本"三只歪酒瓶");②其余 12 组在身后成两道弧;③ 8 罐堆在侧前方。
+const BOTTLE_SCALE = 2.6; // 原件 ~0.2m → 0.52m 寓言比例(比写实大,看得见)
+const CAN_SCALE = 2.2;
+// ⚠️ 单位换算:源根节点链带 scale 0.01(cm→m),道具组的局部坐标是**厘米** ——
+//    想摆在世界 X 米,局部要写 X*100(2026-09-30 实测:直接写米数会全挤在原点 2cm 内)。
+const U = 100;
+/** 取出"真正的道具组":沿单子节点下钻,直到某层子节点 >1(那层就是一组一件) */
+function collectProps(root) {
+  let n = root;
+  while (n && n.children && n.children.length === 1) n = n.children[0];
+  if (!n || !n.children || !n.children.length) return [root];
+  return n.children.slice();
+}
 function mountTipplerSet() {
   if (assetsLoading) return;
   assetsLoading = true;
   const w = ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('king327') : null;
   if (!w) return;
   const loader = createGLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  // 三只歪酒瓶:岛心偏北一簇,整体倾倒 0.28(剧本"三只歪酒瓶")
+  // 全套酒瓶(15 组:Wine/Whiskey/Vodka/Monk/Beer 各若干)
   loader.load(
     '/models/hall/b612-world/tippler-bottles.glb',
     (g) => {
       const m = g.scene;
-      m.scale.setScalar(3); // 原件 ~0.2m 高,放大到 0.6m 寓言酒瓶
-      m.position.set(1.8, ISLE_TOP_Y, -1.5);
-      m.rotation.set(0.12, 0.7, 0.28);
+      const props = collectProps(m);
+      const hero = []; // 贴身三只歪瓶
+      const rest = [];
+      props.forEach((p) => {
+        const nm = p.name || '';
+        if (/Whiskey 0[123]/.test(nm)) hero.push(p);
+        else rest.push(p);
+      });
+      // 不够三只就按顺序补足(不漏下任何一件)
+      while (hero.length < 3 && rest.length) hero.push(rest.shift());
+      hero.slice(0, 3).forEach((p, i) => {
+        p.position.set((-1.35 + i * 0.62) * U, ISLE_TOP_Y * U, (1.15 + (i % 2) * 0.22) * U);
+        p.rotation.set(0, 0.4 + i * 0.5, -0.3 - i * 0.06); // 歪倒
+        p.scale.setScalar(BOTTLE_SCALE);
+      });
+      // 其余:身后两道弧(部分躺倒)
+      rest.forEach((p, i) => {
+        const half = Math.ceil(rest.length / 2);
+        const ring = i < half ? 2.35 : 3.15;
+        const k = i % half;
+        const a = -1.0 + (k / Math.max(1, half - 1)) * 2.0;
+        p.position.set(
+          Math.sin(a) * ring * U,
+          ISLE_TOP_Y * U,
+          (-Math.cos(a) * ring + (i < half ? -0.6 : 0.4)) * U
+        );
+        const lying = i % 3 === 2;
+        p.rotation.set(lying ? Math.PI / 2 : 0, a + 1.2, lying ? 1.4 : 0);
+        p.scale.setScalar(BOTTLE_SCALE * (0.9 + ((i * 37) % 5) * 0.05));
+      });
       m.name = 'tipplerBottles';
       w.scene.add(m);
+      console.debug('[scene7] 酒瓶上岛:', props.length, '组(贴身', Math.min(3, hero.length), ')');
     },
     undefined,
-    (e) => console.warn('[scene7] 酒瓶组加载失败(程序化酒瓶兜底):', e.message)
+    (e) => console.warn('[scene7] 酒瓶组加载失败(台词照常):', e.message)
   );
-  // 酒鬼本人:倚瓶微倾(无骨骼静态人偶,lean 读作"醉")
+  // 易拉罐套装(8 罐):侧前方一堆,部分躺倒
+  loader.load(
+    '/models/hall/b612-world/tippler-cans.glb',
+    (g) => {
+      const m = g.scene;
+      const props = collectProps(m);
+      props.forEach((p, i) => {
+        const a = (i / props.length) * Math.PI * 2;
+        const r = 0.28 + (i % 3) * 0.16;
+        p.position.set((2.15 + Math.cos(a) * r) * U, ISLE_TOP_Y * U, (1.35 + Math.sin(a) * r) * U);
+        const lying = i % 2 === 1;
+        p.rotation.set(lying ? Math.PI / 2 : 0, a, lying ? (i % 4) * 0.7 : 0);
+        p.scale.setScalar(CAN_SCALE);
+      });
+      m.name = 'tipplerCans';
+      w.scene.add(m);
+      console.debug('[scene7] 易拉罐上岛:', props.length, '只');
+    },
+    undefined,
+    (e) => console.warn('[scene7] 易拉罐加载失败(台词照常):', e.message)
+  );
+  // 酒鬼本人:根节点 Sketchfab_model 已带 -90°X(源 Z-up 尺寸 1.29×0.91×1.89 → 立正 ~1.8m),
+  // 故**不再**额外旋转(2026-09-30:多转一次会直接躺平)。面朝出生点(+Z),微倾 0.16 读作"醉"
   loader.load(
     '/models/hall/b612-world/tippler-man.glb',
     (g) => {
       const m = g.scene;
       m.position.set(-0.6, ISLE_TOP_Y, 0.8);
-      m.rotation.set(0, -Math.PI / 2, -0.16);
+      m.rotation.set(0, 0, -0.16); // 面朝出生点(+Z);微倾 0.16 读作"醉"
       m.name = 'tipplerMan';
       w.scene.add(m);
     },
