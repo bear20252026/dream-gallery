@@ -51,7 +51,7 @@ function mountTipplerSet() {
   const loader = createGLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   // 全套酒瓶(15 组:Wine/Whiskey/Vodka/Monk/Beer 各若干)
   loader.load(
-    '/models/hall/b612-world/tippler-bottles.glb?v=20260930',
+    '/models/hall/b612-world/tippler-bottles2.glb',
     (g) => {
       const m = g.scene;
       const props = collectProps(m);
