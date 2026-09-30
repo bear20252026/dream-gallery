@@ -66,6 +66,10 @@ function start() {
       if (el && el.offsetParent) el.click();
     }, 1200);
   });
+  // 线上加载慢:玩家对象就绪后再传送(否则 pl undefined)
+  await p.waitForFunction(() => window.__ctx && window.__ctx.player && window.__ctx.player.pl, null, {
+    timeout: 60000,
+  });
   await p.evaluate(() => window.__ctx.kunlun.revealStarGate && window.__ctx.kunlun.revealStarGate());
   await p.waitForTimeout(800);
   await p.evaluate(() => {

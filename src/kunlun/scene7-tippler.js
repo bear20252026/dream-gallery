@@ -51,7 +51,7 @@ function mountTipplerSet() {
   const loader = createGLTFLoader().setMeshoptDecoder(MeshoptDecoder);
   // 全套酒瓶(15 组:Wine/Whiskey/Vodka/Monk/Beer 各若干)
   loader.load(
-    '/models/hall/b612-world/tippler-bottles.glb',
+    '/models/hall/b612-world/tippler-bottles.glb?v=20260930',
     (g) => {
       const m = g.scene;
       const props = collectProps(m);
@@ -93,7 +93,7 @@ function mountTipplerSet() {
   );
   // 易拉罐套装(8 罐):侧前方一堆,部分躺倒
   loader.load(
-    '/models/hall/b612-world/tippler-cans.glb',
+    '/models/hall/b612-world/tippler-cans.glb?v=20260930',
     (g) => {
       const m = g.scene;
       const props = collectProps(m);
@@ -115,7 +115,7 @@ function mountTipplerSet() {
   // 酒鬼本人:根节点 Sketchfab_model 已带 -90°X(源 Z-up 尺寸 1.29×0.91×1.89 → 立正 ~1.8m),
   // 故**不再**额外旋转(2026-09-30:多转一次会直接躺平)。面朝出生点(+Z),微倾 0.16 读作"醉"
   loader.load(
-    '/models/hall/b612-world/tippler-man.glb',
+    '/models/hall/b612-world/tippler-man.glb?v=20260930',
     (g) => {
       const m = g.scene;
       m.position.set(-0.6, ISLE_TOP_Y, 0.8);
@@ -128,7 +128,7 @@ function mountTipplerSet() {
   );
   // 银河天幕:包住整岛的夜空(源球体内法线未知,DoubleSide 保底;fog 关)
   loader.load(
-    '/models/hall/b612-world/tippler-sky.glb',
+    '/models/hall/b612-world/tippler-sky.glb?v=20260930',
     (g) => {
       const m = g.scene;
       m.scale.setScalar(50);
