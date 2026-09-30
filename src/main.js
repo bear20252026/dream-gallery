@@ -197,6 +197,11 @@ async function preloadWorld() {
     const { mountCoordHUD } = await import('./ui/coord-hud.js');
     mountCoordHUD(ctx);
 
+    // 剧情罗盘:常驻目标条(目标名 + 实时距离 + 方向指针,2026-09-30)
+    const { mountStoryCompass } = await import('./ui/story-compass.js');
+    const compass = mountStoryCompass(ctx);
+    if (compass) ctx.ui.storyTarget = compass.setTarget;
+
     // 性别配色(老档案兼容):世界阶段动态取(housecolor 已在 WORLD_MODULES;2026-09-18 外迁回所属模块)
     const savedGender = ctx.store.str('gender');
     if (savedGender) {

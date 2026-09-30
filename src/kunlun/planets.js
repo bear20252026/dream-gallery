@@ -564,18 +564,42 @@ function updateStoryGuides() {
   const p = ctx.player.pl && ctx.player.pl.p;
   const t = performance.now() * 0.001;
   const pulse = 0.75 + Math.sin(t * 1.7) * 0.25;
-  // ① 主世界星门:门已按剧情现身 + 书页一完成(夜信标已退役,不重复)+ 未终章 + 离门 12m 外
+  // —— 目标点解析(罗盘单一权威;2026-09-30 照原神「一步一目标」定式) ——
+  // 星球岛内目标=当前章星屑(chain 收束后 scene6/7 才置 visible,信标也是它们自己立的)。
   let page1Done = false;
   try {
     page1Done = !!ctx.store.flag('page1');
   } catch (e) {}
+  let target = null;
+  if (p && chapter < 6) {
+    if (active === 'main' && gateRevealed && page1Done)
+      target = {
+        world: 'main',
+        x: 0.1,
+        z: 56,
+        en: 'Stone Gate — on to B612',
+        zh: '石门 · 前往 B612',
+      };
+    else if (active === 'b612')
+      target = { world: 'b612', x: 0, z: 0, en: 'The Little Prince', zh: '小王子 · 故事在此' };
+    else if (/^king\d+$/.test(active)) {
+      const i = islands[chapter];
+      if (i && i.mote && i.mote.visible && i.moteW)
+        target = { world: active, x: i.moteW.x, z: i.moteW.z, en: 'Stardust', zh: '星屑' };
+    }
+  }
+  try {
+    ctx.ui.storyTarget && ctx.ui.storyTarget(target);
+  } catch (e) {}
+  // ① 主世界星门:门已按剧情现身 + 书页一完成(夜信标已退役,不重复)+ 未终章 + 离门 15m 外
+  //    (原神:目标 ≥50m 才给黄色光柱,走近交给近距离线索;本世界尺度小取 15m)
   const wantGate = !!(
     p &&
     active === 'main' &&
     chapter < 6 &&
     gateRevealed &&
     page1Done &&
-    (p.x - 0.1) * (p.x - 0.1) + (p.z - 56) * (p.z - 56) > 144
+    (p.x - 0.1) * (p.x - 0.1) + (p.z - 56) * (p.z - 56) > 225
   );
   if (wantGate && !gateGuideArrow) {
     gateGuideBeacon = makeGuideBeacon(s, 0.1, 56, mainGateY, 4.2, 0.3, 0.25, 'storyBeaconStarGate');

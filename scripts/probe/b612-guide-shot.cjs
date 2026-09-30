@@ -80,6 +80,12 @@ function start() {
     return { beacon: find('storyBeaconPrince'), arrow: find('guideArrowPrince') };
   });
   console.log('b612 guide:', JSON.stringify(b612Guide));
+  // 剧情罗盘:B612 内应显示「小王子」+ 距离
+  const comp1 = await p.evaluate(() => {
+    const el = document.getElementById('storyCompass');
+    return el ? { shown: el.style.display !== 'none', text: el.textContent } : null;
+  });
+  console.log('compass(b612):', JSON.stringify(comp1));
   if (!b612Guide.beacon || !b612Guide.arrow) {
     console.error('FAIL: B612 信标/箭头未立');
     child.kill();
@@ -164,6 +170,18 @@ function start() {
     };
   });
   console.log('gate guide:', JSON.stringify(gateGuide));
+  // 剧情罗盘:主世界应显示「石门」+ 距离 ~29m,且方向指针有旋转量
+  const comp2 = await p.evaluate(() => {
+    const el = document.getElementById('storyCompass');
+    if (!el) return null;
+    const ar = el.firstElementChild;
+    return {
+      shown: el.style.display !== 'none',
+      text: el.textContent,
+      rot: ar ? ar.style.transform : '',
+    };
+  });
+  console.log('compass(main):', JSON.stringify(comp2));
   const f2 = path.join(TMP, 'main-gate-guide.png');
   await p.waitForTimeout(1500);
   await p.screenshot({ path: f2 });

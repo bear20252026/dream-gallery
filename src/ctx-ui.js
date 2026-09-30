@@ -12,9 +12,20 @@ import { eventBus } from './event-bus.js';
  * @returns {Object} UI 命名空间代理对象
  */
 export function createUINamespace(vault) {
-  const properties = ['modeToast', 'kunlunSpeak', 'overlay', 'store', 'openDialog', 'dialogOpen', 'showGuideCard', 'stopAgreementMusic'];
+  // storyTarget(2026-09-30):剧情罗盘目标注册位(ui/story-compass.js 挂载后写入)
+  const properties = [
+    'modeToast',
+    'kunlunSpeak',
+    'overlay',
+    'store',
+    'openDialog',
+    'dialogOpen',
+    'showGuideCard',
+    'stopAgreementMusic',
+    'storyTarget',
+  ];
   const proxy = {};
-  
+
   for (const prop of properties) {
     Object.defineProperty(proxy, prop, {
       get() {
@@ -31,7 +42,7 @@ export function createUINamespace(vault) {
       configurable: true,
     });
   }
-  
+
   return Object.freeze(proxy);
 }
 
