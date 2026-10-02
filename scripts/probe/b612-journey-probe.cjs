@@ -223,6 +223,11 @@ async function run() {
     return [[-4.6,-5.2],[-.8,-6.6],[3.8,-5.4],[3.4,-2.6],[-3.6,-.6],[-5.8,-.6],[-5.1,3.1],[-1.4,4.5],[2.46,-1.56]].every(([x,z]) => Number.isFinite(w.ground(x,z)));
   }), '全部观察站位落在原模型真实曲面上');
   await wait(p, () => !!document.body.dataset.homeReveal);
+  // 入场状态由回忆ticker建立，机位在下一帧的星球ticker更新；等待实际渲染机位。
+  await p.waitForFunction(() => {
+    const c = window.__ctx.scene.cam, p = window.__ctx.player.pl.p;
+    return !!document.body.dataset.homeReveal && Math.hypot(c.position.x-p.x, c.position.z-p.z) > 20;
+  }, null, { timeout: 5000 });
   assert(await p.evaluate(() => {
     const c = window.__ctx.scene.cam, p = window.__ctx.player.pl.p;
     return Math.hypot(c.position.x-p.x, c.position.z-p.z) > 20;
