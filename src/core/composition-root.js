@@ -53,6 +53,12 @@ export function createCompositionRoot() {
     list() {
       return ordered().map((s) => `${s.layer}:${s.phase}:${s.order}  ${s.name}`);
     },
+    // 调试/探针:按 name 取系统实例(2026-10-03 为 verify-plane.cjs 补)。
+    // 只读用途 —— 探针要读系统状态(如飞行物理 state)做断言,走 ctx 命名空间
+    // 就得给每个系统都开一个 ctx 属性,那是给探针开的生产后门,不合适。
+    get(name) {
+      return systems.find((s) => s.name === name) || null;
+    },
   };
 }
 

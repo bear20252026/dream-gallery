@@ -11,7 +11,7 @@ import { eventBus } from './event-bus.js';
 import { GLOBAL, tt } from '../shared/story-text.mjs';
 import { defineSystem } from './system.js';
 import { createDialogSystem } from './gameshell-dialog.js'; // 对话框状态机(B5 外迁)
-import { pagesBonusForChapter, storyBeat, storyNext } from '../shared/story-progress.mjs'; // 书页映射+进程节拍单一权威(2026-09-24 抽出;2026-09-26 加 storyBeat;2026-09-27 加 storyNext)
+import { readPages, storyBeat, storyNext, PAGES_TOTAL } from '../shared/story-progress.mjs'; // 书页映射+进程节拍单一权威(2026-09-24 抽出;2026-09-26 加 storyBeat;2026-09-27 加 storyNext;2026-10-03 改用 readPages 单一真相 + PAGES_TOTAL 作分母)
 import { JOURNEY_TEXT, TASKS } from '../shared/journey-logic.mjs';
 
 // ---------- 手绘样式(一次性注入,羊皮纸 + 抖边 + 楷体笔触) ----------
@@ -182,11 +182,17 @@ function createGameShellSystem() {
     let ark = '尚未启程';
     if (spirits >= 6) ark = '六颗星屑归位';
     else if (spirits >= 1) ark = '飞舟已现';
-    let pages = 0;
+    let pages = 1;
     try {
-      if (ctx.store.flag('page1')) pages = 1;
-      // 书页映射单一权威在 shared/story-progress.mjs(单测钉死;5/6 章未映射=回退 page1)
-      pages = Math.max(pages, pagesBonusForChapter(ctx.store.num('planetsChapter')));
+      // 书页单一权威 = shared/story-progress.mjs 的 readPages()(2026-10-03)。
+      // 此前此处自己拼 max(page1?1:0, CHAPTER_TO_PAGES[chapter]),与「进程」行不同源,
+      // 会同时显示「进程:书页五 进行中」和「书页:1 / 9」这种自相矛盾的界面。
+      pages = readPages({
+        scene2: !!ctx.store.flag('scene2'),
+        page1: !!ctx.store.flag('page1'),
+        chapter: ctx.store.num('planetsChapter'),
+        homeMemoryStep: ctx.store.num('homeMemoryStep'),
+      });
     } catch (e) {
       console.debug('[gameshell-system] 任务册书页映射读取失败(用兜底页数):', e);
     }
@@ -244,7 +250,7 @@ function createGameShellSystem() {
       // 进程/下一步=整行块(2026-09-30);书页/星屑/挂画/飞舟=紧凑双列
       [tt({ zh: '进程', en: 'Chapter' }), tt(p.beat), 1],
       [tt({ zh: '下一步', en: 'Next' }), current, 1],
-      [tt({ zh: '书页', en: 'Pages' }), p.pages + ' / 9', 0],
+      [tt({ zh: '书页', en: 'Pages' }), p.pages + ' / ' + PAGES_TOTAL, 0],
       [tt({ zh: '星屑', en: 'Stardust' }), p.spirits + ' / 6', 0],
       [tt({ zh: '展厅挂画', en: 'Gallery' }), p.picks + ' / 20', 0],
     ];

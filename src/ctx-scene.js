@@ -12,7 +12,11 @@ import { eventBus } from './event-bus.js';
  * @returns {Object} 场景命名空间代理对象
  */
 export function createSceneNamespace(vault) {
-  const properties = ['loopManager', 'setLowQuality', 'startWorld', 'setTime',
+  const properties = [
+    'loopManager',
+    'setLowQuality',
+    'startWorld',
+    'setTime',
     's',
     'cam',
     'rnd',
@@ -64,6 +68,11 @@ export function createSceneNamespace(vault) {
     'getActiveGround',
     'getActiveBounds',
     'getActiveAtmosphere',
+    // 可驾驶 Piper PA-18 的调试/探针接口(2026-10-03)。必须在此登记 ——
+    // 本命名空间是 Object.freeze 的白名单代理,未登记的属性赋值会被静默丢弃。
+    'planeApi',
+    // 站五·狐狸(scene10-fox.js)的探针/调试接口,2026-10-03
+    'foxApi',
   ];
 
   const proxy = {};

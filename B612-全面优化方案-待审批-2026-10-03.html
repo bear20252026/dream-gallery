@@ -1,0 +1,1482 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>B612 · 全面优化方案（待审批）· 2026-10-03</title>
+    <style>
+      :root {
+        --bg: #0e1014;
+        --bg2: #15181e;
+        --bg3: #1b1f27;
+        --line: #282e38;
+        --tx: #e6e9ef;
+        --tx2: #a3adbd;
+        --tx3: #6f7b8c;
+        --ok: #5fce9a;
+        --warn: #e8b25c;
+        --bad: #e8776b;
+        --acc: #7fb2ff;
+        --vio: #b79cf0;
+        --r: 10px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--tx);
+        font:
+          15px/1.75 -apple-system,
+          BlinkMacSystemFont,
+          'Segoe UI',
+          'PingFang SC',
+          'Microsoft YaHei',
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 40px 24px 120px;
+      }
+      code,
+      .mono {
+        font-family: ui-monospace, 'SF Mono', Consolas, monospace;
+        font-size: 0.88em;
+      }
+
+      /* header */
+      header {
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 28px;
+        margin-bottom: 36px;
+      }
+      h1 {
+        font-size: 30px;
+        line-height: 1.3;
+        margin: 0 0 10px;
+        letter-spacing: 0.5px;
+      }
+      .sub {
+        color: var(--tx2);
+        font-size: 14px;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+      }
+      .tag {
+        font-size: 11.5px;
+        padding: 4px 10px;
+        border-radius: 20px;
+        background: var(--bg3);
+        border: 1px solid var(--line);
+        color: var(--tx2);
+      }
+      .tag.hot {
+        background: #3a1f1c;
+        border-color: #6b3730;
+        color: var(--bad);
+      }
+
+      /* verdict box */
+      .verdict {
+        background: linear-gradient(150deg, #1a1d24, #191a20);
+        border: 1px solid var(--line);
+        border-left: 3px solid var(--warn);
+        border-radius: var(--r);
+        padding: 22px 24px;
+        margin: 0 0 40px;
+      }
+      .verdict h2 {
+        margin: 0 0 12px;
+        font-size: 18px;
+      }
+      .verdict p {
+        margin: 0 0 10px;
+        color: var(--tx2);
+        font-size: 14.5px;
+      }
+      .verdict p:last-child {
+        margin: 0;
+      }
+
+      /* stat row */
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 12px;
+        margin: 0 0 44px;
+      }
+      .stat {
+        background: var(--bg2);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 16px 18px;
+      }
+      .stat b {
+        display: block;
+        font-size: 27px;
+        line-height: 1.2;
+        font-weight: 650;
+      }
+      .stat span {
+        font-size: 12px;
+        color: var(--tx3);
+        display: block;
+        margin-top: 4px;
+      }
+      .bad {
+        color: var(--bad);
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .acc {
+        color: var(--acc);
+      }
+      .vio {
+        color: var(--vio);
+      }
+
+      /* section */
+      section {
+        margin: 0 0 56px;
+        scroll-margin-top: 20px;
+      }
+      h2.sec {
+        font-size: 13px;
+        letter-spacing: 3px;
+        color: var(--tx3);
+        text-transform: uppercase;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--line);
+        margin: 0 0 22px;
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+      }
+      h2.sec b {
+        color: var(--tx);
+        font-size: 20px;
+        letter-spacing: 0;
+        text-transform: none;
+        font-weight: 600;
+      }
+      h3 {
+        font-size: 18px;
+        margin: 32px 0 12px;
+        padding-left: 12px;
+        border-left: 3px solid var(--acc);
+      }
+      h4 {
+        font-size: 15px;
+        margin: 20px 0 8px;
+        color: var(--tx);
+      }
+
+      /* card */
+      .card {
+        background: var(--bg2);
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 20px 22px;
+        margin: 0 0 16px;
+      }
+      .card.bad {
+        border-left: 3px solid var(--bad);
+      }
+      .card.ok {
+        border-left: 3px solid var(--ok);
+      }
+      .card.warn {
+        border-left: 3px solid var(--warn);
+      }
+      .card.acc {
+        border-left: 3px solid var(--acc);
+      }
+      .card.vio {
+        border-left: 3px solid var(--vio);
+      }
+      .card h4 {
+        margin: 0 0 10px;
+        font-size: 16.5px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .card p {
+        margin: 0 0 10px;
+        color: var(--tx2);
+        font-size: 14.5px;
+      }
+      .card p:last-child {
+        margin: 0;
+      }
+      .card ul {
+        margin: 8px 0 0;
+        padding-left: 20px;
+        color: var(--tx2);
+        font-size: 14px;
+      }
+      .card li {
+        margin: 0 0 6px;
+      }
+      .card li b {
+        color: var(--tx);
+      }
+
+      .pri {
+        font-size: 10.5px;
+        font-weight: 700;
+        letter-spacing: 1.2px;
+        padding: 3px 8px;
+        border-radius: 4px;
+        vertical-align: middle;
+        position: relative;
+        top: -1px;
+      }
+      .p0 {
+        background: #4a1f1b;
+        color: #ff9d90;
+      }
+      .p1 {
+        background: #4a3a15;
+        color: #f5c877;
+      }
+      .p2 {
+        background: #153a2a;
+        color: #7ce0ab;
+      }
+      .p3 {
+        background: #1f2b48;
+        color: #9dc4ff;
+      }
+      .p4 {
+        background: #2a2440;
+        color: #c4b0f5;
+      }
+
+      /* table */
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 12px 0 4px;
+        font-size: 13.5px;
+      }
+      th,
+      td {
+        padding: 9px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+      th {
+        color: var(--tx3);
+        font-weight: 600;
+        font-size: 11.5px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      td code {
+        color: var(--acc);
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+
+      /* evidence */
+      .ev {
+        font-family: ui-monospace, Consolas, monospace;
+        font-size: 11.5px;
+        color: var(--tx3);
+        background: #0b0d10;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 10px 12px;
+        margin: 10px 0 0;
+        overflow-x: auto;
+        white-space: pre;
+        line-height: 1.6;
+      }
+      .ev b {
+        color: var(--tx2);
+        font-weight: 500;
+      }
+
+      /* checkbox list */
+      .chk {
+        list-style: none;
+        padding: 0;
+        margin: 10px 0 0;
+      }
+      .chk li {
+        padding-left: 26px;
+        position: relative;
+        margin: 0 0 8px;
+        color: var(--tx2);
+        font-size: 14px;
+      }
+      .chk li::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 6px;
+        width: 13px;
+        height: 13px;
+        border: 1.5px solid #3d4655;
+        border-radius: 3px;
+      }
+      .chk li b {
+        color: var(--tx);
+      }
+
+      /* mechanism hero */
+      .mech {
+        background: linear-gradient(160deg, #181b23, #1a1720);
+        border: 1px solid #343040;
+        border-radius: 14px;
+        padding: 26px 26px 22px;
+        margin: 0 0 20px;
+      }
+      .mech .kicker {
+        font-size: 11px;
+        letter-spacing: 3.5px;
+        color: var(--vio);
+        margin: 0 0 8px;
+      }
+      .mech h3 {
+        margin: 0 0 6px;
+        font-size: 21px;
+        border: 0;
+        padding: 0;
+      }
+      .mech .quote {
+        font-size: 14px;
+        color: var(--vio);
+        font-style: italic;
+        margin: 0 0 14px;
+        padding-left: 14px;
+        border-left: 2px solid #4a3f63;
+        line-height: 1.7;
+      }
+      .mech p {
+        color: var(--tx2);
+        font-size: 14.5px;
+      }
+      .mech .why {
+        background: #12141a;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 12px 14px;
+        margin: 12px 0 0;
+        font-size: 13.5px;
+        color: var(--tx2);
+      }
+      .mech .why b {
+        color: var(--tx);
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+        margin: 12px 0 0;
+      }
+      @media (max-width: 720px) {
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      /* quote */
+      .orig {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: 14.5px;
+        color: #d9cfa8;
+        background: #15161c;
+        border-left: 3px solid #4a4436;
+        padding: 12px 16px;
+        border-radius: 0 6px 6px 0;
+        margin: 12px 0;
+        line-height: 1.85;
+      }
+      .orig small {
+        display: block;
+        color: var(--tx3);
+        font-family: -apple-system, sans-serif;
+        font-size: 11.5px;
+        margin-top: 6px;
+        font-style: normal;
+      }
+
+      /* timeline */
+      .tl {
+        position: relative;
+        padding-left: 26px;
+        margin: 16px 0 0;
+      }
+      .tl::before {
+        content: '';
+        position: absolute;
+        left: 7px;
+        top: 6px;
+        bottom: 6px;
+        width: 2px;
+        background: var(--line);
+      }
+      .tl .it {
+        position: relative;
+        margin: 0 0 18px;
+      }
+      .tl .it::before {
+        content: '';
+        position: absolute;
+        left: -23px;
+        top: 7px;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--bg);
+        border: 2px solid var(--acc);
+      }
+      .tl .it.p0::before {
+        border-color: var(--bad);
+      }
+      .tl .it.p1::before {
+        border-color: var(--warn);
+      }
+      .tl .it.p2::before {
+        border-color: var(--ok);
+      }
+      .tl b {
+        display: block;
+        font-size: 15px;
+        margin-bottom: 2px;
+      }
+      .tl span {
+        font-size: 13px;
+        color: var(--tx3);
+      }
+
+      /* bar */
+      .bar {
+        height: 7px;
+        background: #0b0d10;
+        border-radius: 4px;
+        overflow: hidden;
+        margin: 6px 0 2px;
+        border: 1px solid var(--line);
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #5fce9a, #7fb2ff);
+      }
+
+      /* decision */
+      .dec {
+        background: var(--bg3);
+        border: 1px solid #3a4250;
+        border-radius: var(--r);
+        padding: 20px 22px;
+        margin-top: 8px;
+      }
+      .dec ol {
+        margin: 0;
+        padding-left: 22px;
+      }
+      .dec li {
+        margin: 0 0 12px;
+        color: var(--tx2);
+        font-size: 14.5px;
+      }
+      .dec li b {
+        color: var(--tx);
+      }
+      .dec .sig {
+        margin-top: 16px;
+        padding-top: 14px;
+        border-top: 1px dashed #3a4250;
+        color: var(--tx3);
+        font-size: 13px;
+      }
+
+      footer {
+        margin-top: 70px;
+        padding-top: 22px;
+        border-top: 1px solid var(--line);
+        color: var(--tx3);
+        font-size: 12.5px;
+      }
+      .no {
+        color: var(--tx3);
+        font-size: 13.5px;
+        font-style: italic;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>《小王子》游戏版 · 全面优化方案</h1>
+        <div class="sub">
+          dream-gallery · 主题「B612 小王子」· 依据 <code>B612-剧本-定稿全本.md</code> v2（13 场）+
+          原著 Woods 英译本
+        </div>
+        <div class="meta">
+          <span class="tag">2026-10-03</span>
+          <span class="tag hot">待审批 · 未动一行代码</span>
+          <span class="tag">勘察方式：git 史 + 源码逐行 + 原著全文比对</span>
+          <span class="tag">基线 commit 2e5042e</span>
+        </div>
+      </header>
+
+      <div class="verdict">
+        <h2>一句话诊断</h2>
+        <p>
+          <b>地基是好的，故事是半截的。</b>前 7
+          场（坠机→画羊→B612→325→326→327）实现扎实、验收严格、台词逐字照搬原著，是可以拿出手的作品。但剧本定稿的
+          <b>后 6 场（328/329/330 星球、沙漠现地五站、找井、告别、六年后的尾声）一行代码都没有</b
+          >，且有 <b>57 条以上剧本原句在代码里找不到</b>。
+        </p>
+        <p>
+          更关键的是：<b>游戏目前是一串"可交互的对白"，还不是一本"可以翻的书"。</b>「书页
+          x/9」只是个计数器，原著最核心的体验——一本画家飞行员的画册——在实现里没有对应物。
+        </p>
+        <p>
+          因此方案的骨架是：<b class="warn">先补齐书（剧情 + 进度契约）</b> →
+          <b class="vio">再让书变成实体（签名机制）</b> →
+          <b class="acc">然后把地基修干净（性能与工程）</b>。不是加更多特效。
+        </p>
+      </div>
+
+      <div class="stats">
+        <div class="stat"><b class="bad">7 / 13</b><span>场次已实现（54%）</span></div>
+        <div class="stat"><b class="bad">57+</b><span>条剧本原句在代码中缺失</span></div>
+        <div class="stat"><b class="bad">3</b><span>进度契约硬 bug（玩家可见）</span></div>
+        <div class="stat"><b class="warn">26</b><span>模块串行阻塞首屏</span></div>
+        <div class="stat"><b class="ok">350</b><span>单测 / 37 文件（覆盖偏业务）</span></div>
+        <div class="stat"><b class="ok">100%</b><span>GLB 已 meshopt+webp 压缩</span></div>
+      </div>
+
+      <!-- ===================== 0 ===================== -->
+      <section id="s0">
+        <h2 class="sec"><b>第 0 层</b>　地基体检</h2>
+
+        <div class="card ok">
+          <h4>先说已经很好的部分（不要动）</h4>
+          <ul>
+            <li>
+              <b>台词逐字照搬原著</b>。抽样 22 条英文原句全部命中 <code>story-text.mjs</code>，与
+              Woods 译本一致。这是这个项目最值钱的资产。
+            </li>
+            <li>
+              <b>模型压缩管线完整</b>。24 个 GLB / 37MB，<b>16/16 全部</b> meshopt +
+              WebP，无一漏压。开机传输已从 20MB 降到 4.5MB。
+            </li>
+            <li>
+              <b>验收文化极强</b>。148 个探针、单测 350 例、checkJs 趋势基线、VR 截图基线在 CI
+              SwiftShader 生成——这个纪律比大多数 3D 项目好。
+            </li>
+            <li>
+              <b>旅途交互三轮迭代</b
+              >（10-02/10-03）。曲面采样、原星球保留、章节交接、罗盘引导，前两天刚做完。
+            </li>
+          </ul>
+        </div>
+
+        <div class="card bad">
+          <h4>问题 1 · 进度契约有 3 个玩家可见的 bug</h4>
+          <p>「书页 x/9」是玩家判断"我读到哪里"的唯一依据，现在它是错的：</p>
+          <table>
+            <tr>
+              <th>Bug</th>
+              <th>现象</th>
+              <th>证据</th>
+            </tr>
+            <tr>
+              <td><b>书页 2/3 永不显示</b></td>
+              <td>
+                剧本的书页一/二/三（第3/4/5场）由 <code>scene3-memory.js:384</code> 一次性写一个
+                <code>page1</code> 标记。玩家完成三页后看到的仍是「1 / 9」，直到 chapter=1 才跳到「4
+                / 9」——<b>中间两页在游戏任何时刻都不存在</b>
+              </td>
+              <td class="mono">scene3-memory.js:384<br />gameshell-system.js:187</td>
+            </tr>
+            <tr>
+              <td><b>chapter≥4 会倒退</b></td>
+              <td>
+                <code>CHAPTER_TO_PAGES</code> 只有 <code>{0:1,1:4,2:5,3:6,4:7}</code>，<b
+                  >缺 5 和 6</b
+                >，回退 0；<code>Math.max(1,0)</code> 兜底会让书页从 <b>7 页倒退回 1 页</b>
+              </td>
+              <td class="mono">story-progress.mjs:33<br />gameshell-system.js:189</td>
+            </tr>
+            <tr>
+              <td><b>分母硬编码</b></td>
+              <td>
+                UI 写死 <code>' / 9'</code>，导出的 <code>PAGES_TOTAL</code> 从未被引用。改总数 UI
+                不会跟随
+              </td>
+              <td class="mono">gameshell-system.js:247</td>
+            </tr>
+          </table>
+          <p class="no" style="margin-top: 10px">
+            注意：同一块 UI 上的「进程」行语义是<b>正确</b>的（走
+            <code>storyBeat</code>）。也就是说玩家会同时看到「进程：书页五 进行中」和「书页：1 /
+            9」这种自相矛盾的界面。
+          </p>
+          <div class="ev">
+            // story-progress.mjs:31 —— 注释自己承认"曾只改一处漏另一处" const CHAPTER_TO_PAGES = {
+            0: 1, 1: 4, 2: 5, 3: 6, 4: 7 }; export function pagesBonusForChapter(chapter) { return
+            CHAPTER_TO_PAGES[clampChapter(chapter)] || 0; // ← 5/6 → 0 }
+          </div>
+        </div>
+
+        <div class="card bad">
+          <h4>问题 2 · chapter 4/5/6 根本不可达</h4>
+          <p>
+            全库只有 3 处 <code>setChapter</code> 调用，分别写入 1/2/3。<b
+              >chapter 4、5、6 没有任何写入方</b
+            >——328/329/330 即使建成了岛，也没有入口，<code>finale</code> 节拍永不触发。
+          </p>
+          <div class="ev">
+            scene6-king.js:413 setChapter(1) // 325 scene7-vanity.js:206 setChapter(2) // 326
+            scene7-tippler.js:332 setChapter(3) // 327 // 无 setChapter(4|5|6) → CHAPTER_MAX=6
+            封顶逻辑仅防脏数据 unlockedWorldIds(3) = PLANETS.slice(0, 2) = [326, 327] // 328/329/330
+            无入口
+          </div>
+        </div>
+
+        <div class="card warn">
+          <h4>问题 3 · 首屏被 26 次串行网络往返阻塞</h4>
+          <p>
+            世界模块用 <code>for...of + await</code> 串行加载，注释里写着「串行，阻塞揭幕」。26 个
+            chunk 逐个 RTT 往返。虽然每个包只有 17–24KB，但
+            <b>26 次往返的累加延迟远大于并行</b>。这是首屏最大瓶颈，而且很好修。
+          </p>
+          <div class="ev">
+            // world-loader.js:61-75 for (const load of loadChain) { await load(); } // 26 个独立
+            RTT
+          </div>
+          <p style="margin-top: 10px">
+            同时，11 处模型加载各自
+            <code>new GLTFLoader().load()</code
+            >，<b>无并发上限、无优先级、无全局进度</b>。每个调用点独立 loader，<code
+              >LoadingManager</code
+            >
+            也各自独立，导致<b>无法汇总加载进度</b>——而项目目前也<b>根本没有面向用户的进度条</b>（<code
+              >onProgress</code
+            >
+            从未使用）。
+          </p>
+        </div>
+
+        <div class="card warn">
+          <h4>问题 4 · 触屏笔记本会被误判成手机，砍掉 2/3 的灯</h4>
+          <p>
+            灯光预算用
+            <code>ontouchstart in window</code> 判移动端。触屏笔记本（含大量二合一本）会被识别为手机
+            → 只保留 1/3 吊顶灯 + 10% 射灯 + 512px
+            贴图上限。<b>项目里其实已经有正确修法，只是没被采用</b>：<code>player.js:374</code> 的
+            <code>isFreshTouch()</code>（800ms 内合成 mouse 事件才判触屏）。
+          </p>
+          <div class="ev">
+            light-sweep.js:10 const isMobile = 'ontouchstart' in window && Math.min(w,h) < 768; // ←
+            误判 light-budget.js:10 keepEvery: 移动3 / 桌面2 spotKeep: 移动4 / 桌面10 player.js:374
+            export function isFreshTouch() { ... } // ← 已有正解，未复用
+          </div>
+          <p style="margin-top: 10px">
+            顺带：<code>loop-manager.js:128</code> 的 lowQuality
+            提示写「PixelRatio=1」，实际最低档是 <b>0.75</b>，文案与行为不符。
+          </p>
+        </div>
+
+        <div class="card warn">
+          <h4>问题 5 · 资源释放不成对（HMR 下会双跑主循环）</h4>
+          <ul>
+            <li>
+              全库 <code>addEventListener</code> 153 处 / <code>removeEventListener</code>
+              <b>24 处</b>；<code>eventBus.on</code> 9 处 / <code>off</code> <b>0 处</b>。
+            </li>
+            <li>
+              <b>13 个 core 系统零 dispose</b>，含主循环 <code>loop.js</code>——<code
+                >loop-manager.js:176</code
+              >
+              的 rAF 自续链没有停止点，<code>_running</code> 无外部置假路径。
+            </li>
+            <li>
+              <code>postprocessing.js:12</code> 的 composer 是模块级单例，持有一整套 RenderTarget 与
+              4 个 pass，<b>无 dispose</b>；星球世界切换时只把引用置 null，GPU 资源不释放。
+            </li>
+            <li>
+              <code>openfilm.js:56</code> 的 <code>script:lang</code> 监听在
+              <code>done()</code> 里漏清理——<b>每次播开场电影泄漏一个 window 监听器</b>。
+            </li>
+            <li>
+              8 处模块级 <code>setInterval</code> 永不清理（<code>mode.js</code> /
+              <code>paintings.js</code>×2 / <code>quizgate.js</code> / <code>upload.js</code>×2 /
+              <code>eternal.js</code> / <code>player.js</code>）。
+            </li>
+          </ul>
+          <p class="no">
+            诚实的说明：单页应用只初始化一次时，"只增不消"是合理的，不会累积到致命。真正的风险在
+            <code>hot.js</code> 的热替换场景——重复执行模块顶层副作用会累积监听器和定时器。这与
+            <code>system.js:22</code> 声明的「dispose 支持热替换」契约相违背。
+          </p>
+        </div>
+
+        <div class="card bad">
+          <h4>问题 6 · 一段死代码：story-dialogs.js 永不可达</h4>
+          <p>
+            <code>story-dialogs.js:173-176</code> 对 <code>world === 'b612' || 'king325'</code> 直接
+            <code>display='none'; return;</code>，而它三个 actor 的 world
+            恰好只有这两者。结果：<code>DIALOG_LINES.prince/rose/king</code> 共 12
+            句循环气泡台词<b>永远不显示</b>。
+          </p>
+          <div class="ev">
+            story-dialogs.js:173 if (w === 'b612' || w === 'king325') { display = 'none'; return; }
+            story-dialogs.js:16-44 ACTORS = prince/rose/king → world 恰好就是 b612 与 king325
+          </div>
+          <p style="margin-top: 10px">
+            要么删掉，要么接上——但<b>现状是「写了、占了 TTS 预热配额、玩家永远看不到」</b
+            >，这是最坏的一种状态。
+          </p>
+        </div>
+
+        <div class="card warn">
+          <h4>问题 7 · 体积已见底，剩 3 个文件占一半</h4>
+          <div class="bar"><i style="width: 54%"></i></div>
+          <p style="margin-top: 8px">
+            前 3 个 GLB 合计 <b>20.03MB / 37MB = 54%</b>：<code>hall.glb</code> 7.59MB、<code
+              >upper_vestibule.glb</code
+            >
+            6.70MB、<code>picture_gallery.glb</code> 5.74MB。后两个<b>各只有 1 张 WebP 贴图</b
+            >——说明它们大是<b>几何体</b>，压缩管线对几何的收益已经见顶。
+          </p>
+          <p>
+            项目<b>完全没有 <code>THREE.LOD</code></b
+            >。替代手段是 35m 距离懒加载 + 7 处
+            <code>frustumCulled = false</code
+            >（<b>反向滥用，等于关闭剔除</b>）。自适应降级<b>只调像素比</b>，不降后处理、不降灯数、不降
+            draw call。
+          </p>
+        </div>
+      </section>
+
+      <!-- ===================== 1 ===================== -->
+      <section id="s1">
+        <h2 class="sec"><b>第 1 层</b>　进度契约：让「书页」先变成真的</h2>
+        <p class="no" style="margin-bottom: 16px">
+          这是所有后续工作的前置。不修，后面接再多剧情，玩家看到的进度都是错的。
+        </p>
+
+        <div class="card acc">
+          <h4><span class="pri p0">P0</span> 1.1　重写章节→书页映射，补全 5/6 章</h4>
+          <p>
+            按剧本场次总表重写为：<code>{0:3, 1:4, 2:5, 3:5, 4:6, 5:6, 6:7}</code>。注意
+            <b>326 与 327 同属书页五</b>，chapter 2→5、3→5（不是 6）。
+          </p>
+          <p>
+            把 <code>PAGES_TOTAL</code> 变成唯一分母来源，删掉 UI 里的硬编码 <code>' / 9'</code>。
+          </p>
+          <p>
+            <b>验收：</b>单测钉死 chapter 0..6 全部 7 个值（现有
+            <code>story-progress.test.js</code> 已有 29 例，照扩即可）；任务册 UI 渲染不出现倒退。
+          </p>
+        </div>
+
+        <div class="card acc">
+          <h4><span class="pri p0">P0</span> 1.2　把书页 2/3 拆出来</h4>
+          <p>
+            给 <code>scene3-memory.js</code> 的三个段落各写一个独立 flag（<code>pageHouse</code> /
+            <code>pageRose</code> / <code>pageFarewell</code>），<code>page1</code>
+            保留为兼容旧存档的总闸。旧玩家读档不强迫重玩。
+          </p>
+          <p>
+            <b>验收：</b>探针逐步推进并截图「书页 1→2→3→4」四态；老存档（只有
+            <code>page1</code>）能正常读入。
+          </p>
+        </div>
+
+        <div class="card acc">
+          <h4><span class="pri p0">P0</span> 1.3　让「书页」与「进程」用同一份真相</h4>
+          <p>
+            现在两者语义不同源，才有第 0 层那个矛盾界面。改为：书页进度 =
+            <code>storyBeat()</code> 输出的单一函数，UI 只消费它。
+          </p>
+        </div>
+
+        <div class="card ok">
+          <h4><span class="pri p0">P0</span> 1.4　修 3 个小 bug（顺手，10 分钟）</h4>
+          <ul class="chk">
+            <li>
+              <b>chapter 4/5/6 入口</b>：<code>unlockedWorldIds</code> 改为按「已建成星球」而非
+              <code>slice(0, chapter-1)</code> 解锁，与 <code>built</code> 标志对齐。
+            </li>
+            <li>
+              <b>lowQuality 提示文案</b>：<code>PixelRatio=1</code> → 实际值，或把
+              <code>PR_STEPS</code> 最低档改成 1。
+            </li>
+            <li>
+              <b>死代码处置</b>：<code>story-dialogs.js</code>
+              二选一——接上循环气泡（推荐，可给静止画面加呼吸感）或整体删除（含清理 story-text 中 12
+              句 + 检查 TTS 预热清单）。
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ===================== 2 ===================== -->
+      <section id="s2">
+        <h2 class="sec"><b>第 2 层</b>　剧情补全：把 13 场写完</h2>
+        <p style="color: var(--tx2); font-size: 14.5px; margin-bottom: 20px">
+          这是最大的工作量，也是最大的回报。原则遵守剧本定稿的两层世界规则：<b>回忆里的台词一字不改</b>，玩家是看不见听得见的幽灵，<b>只观察、不改变</b>。
+        </p>
+
+        <div class="card acc">
+          <h4><span class="pri p1">P1</span> 2.1　书页六 · 328 商人 + 329 点灯人</h4>
+          <p>
+            <b>为什么先做这两颗：</b
+            >空岛和定位数据已经现成（<code>planet-logic.mjs:69/82</code>，坐标
+            <code>[-400,82,90]</code> 和 <code>[200,90,330]</code>），TTS
+            简介文案也写好了。<b>只缺对白和演出</b>。是投入产出比最高的一批。
+          </p>
+          <table>
+            <tr>
+              <th>星球</th>
+              <th>核心机制</th>
+              <th>缺失台词（剧本行号）</th>
+            </tr>
+            <tr>
+              <td><b>328 商人</b></td>
+              <td>
+                数星星。<b>刻意做成徒劳的计数</b>——玩家数了五亿零一百万颗，星星不会因此属于任何人
+              </td>
+              <td class="mono">
+                :651 "Three and two make five"<br />:675 "Nothing. I own them."<br />:698 "I myself
+                own a flower"<br />:706 羊 "He counts them, I count grass"
+              </td>
+            </tr>
+            <tr>
+              <td><b>329 点灯人</b></td>
+              <td>
+                星球一分钟自转一圈。他点亮、熄灭、再点亮，<b>不敢停</b>——全项目唯一的"忙碌有意义"的角色
+              </td>
+              <td class="mono">
+                :713 "Why have you just put out your lamp?"<br />:730 "That is the tragedy!"<br />:740
+                "A day lasts only one minute"<br />:776 "1440 sunsets"
+              </td>
+            </tr>
+          </table>
+          <div class="orig">
+            "I write the number of my stars on a little paper, and I put the paper in a drawer. But
+            the stars are not in the drawer."<small>剧本 2.1 · 328 商人 · 逐字照搬</small>
+          </div>
+          <p>
+            <b>验收：</b>两场各写一份 25–30 项探针（照
+            <code>b612-king325-guidance-probe.cjs</code> 的 17 项规格）；<code>setChapter(4)</code>
+            / <code>setChapter(5)</code> 落地；书页显示 6/9 不倒退。
+          </p>
+        </div>
+
+        <div class="card acc">
+          <h4><span class="pri p1">P1</span> 2.2　书页七 · 330 地理学家</h4>
+          <p><b>这是全书最重要的一场戏，因为它让王子第一次后悔。</b>整场的戏剧核心是一个否定句——</p>
+          <div class="orig">
+            "We do not record flowers. We do not record them because they are ephemeral."<br /><br />"My
+            flower is ephemeral, and she has only four thorns to defend herself against the world.
+            And I have left her on my planet, all alone!"<small
+              >剧本 2.2 · 330 地理学家 · 逐字照搬</small
+            >
+          </div>
+          <p>
+            地理学家的"不记录花"是<b>无意的、不是恶意的</b>——他只是遵循方法论。玩家（作为幽灵）能看见他桌上摊着的那本巨著里，<b>恰好缺了这一页</b>。这和第
+            4 场玫瑰站的手札形成闭环。
+          </p>
+          <p>
+            <b>验收：</b>22 项探针；<code>setChapter(6)</code> 落地后 <code>storyBeat()</code> 走
+            <code>finale</code> 分支（这条分支目前是死代码，从未被执行过）。
+          </p>
+        </div>
+
+        <div class="card vio">
+          <h4>
+            <span class="pri p1">P1</span> 2.3　书页八 · 沙漠现地五站　<span
+              class="tag"
+              style="margin-left: 4px"
+              >剧本最大缺口</span
+            >
+          </h4>
+          <p>
+            这是全项目<b>唯一一段在现实层长途行走</b>的剧情，也是节奏上最需要的呼吸段。当前<b
+              >连一个 3D 站体都没有</b
+            >——不是缺台词，是缺场景。
+          </p>
+          <p><b>好消息：三个站可以复用现成建筑，等于零新建成本。</b></p>
+          <table>
+            <tr>
+              <th>站</th>
+              <th>原著章节</th>
+              <th>落位方案</th>
+              <th>成本</th>
+            </tr>
+            <tr>
+              <td>站一 · 蛇</td>
+              <td>Ch.24-27</td>
+              <td>坠机点（<code>crash-site.js</code> 已建）— 一环金影贴沙滑过，色如月光</td>
+              <td class="ok">极低</td>
+            </tr>
+            <tr>
+              <td>站二 · 三瓣小花</td>
+              <td>Ch.23</td>
+              <td>坠机点附近新增一株程序化小花</td>
+              <td class="ok">低</td>
+            </tr>
+            <tr>
+              <td>站三 · 山与回声</td>
+              <td>Ch.24</td>
+              <td>
+                <b>昆仑巅</b>（<code>peaks.js</code>）— 剧本决议 4 指定占用此位，需从"海拔≥90m
+                播《登飞来峰》"改造
+              </td>
+              <td class="warn">中（改既有彩蛋）</td>
+            </tr>
+            <tr>
+              <td>站四 · 玫瑰园</td>
+              <td>Ch.20</td>
+              <td>
+                <b class="ok">玫瑰花瓣展馆</b>（<code>rose-gallery.js</code>，(144,-60)，直径 42m
+                六瓣花形）— <b>建筑壳体已在，只需换内装 + 放角色</b>
+              </td>
+              <td class="ok">低</td>
+            </tr>
+            <tr>
+              <td>站五 · 狐狸</td>
+              <td>Ch.21</td>
+              <td>苹果树下新增（程序化）</td>
+              <td class="warn">中</td>
+            </tr>
+          </table>
+          <p>
+            <b>验收：</b>新探针
+            <code>b612-stations-probe.cjs</code
+            >，覆盖五站顺序、每站入梦/退梦、错误顺序有提示、现地与回忆层的切换表现。
+          </p>
+          <p class="no" style="margin-top: 10px">
+            提醒：站三要改
+            <code>peaks.js</code>
+            既有彩蛋。这属于"替换既有内容"，按项目规矩需要你明确拍板，因为《登飞来峰》和"山与回声"是两种完全不同的气质。
+          </p>
+        </div>
+
+        <div class="card acc">
+          <h4><span class="pri p1">P1</span> 2.4　书页九 · 找井 + 告别</h4>
+          <p>原著最长、最动人的两场，也是结局的入口。缺 36 条以上台词。</p>
+          <div class="orig">
+            "The desert is beautiful," said the little prince. "It is beautiful because it hides a
+            well somewhere."<small>剧本 2.4 · 找井 · 逐字照搬</small>
+          </div>
+          <p>
+            「告别」是全书情绪的顶点：毒药、蛇、"你只有你会有会笑的星星"、五亿只铃铛换成眼泪。<b
+              >第 13 场六年后的"你画的是蟒蛇吗"必须靠它铺垫</b
+            >——所以这一段不能省。
+          </p>
+          <p><b>验收：</b>两场各一份探针；结尾必须能自然接进 2.6 的闭环。</p>
+        </div>
+
+        <div class="card vio">
+          <h4>
+            <span class="pri p1">P1</span> 2.5　尾声 · 六年后　<span
+              class="tag"
+              style="margin-left: 4px"
+              >闭环</span
+            >
+          </h4>
+          <p>八条台词（剧本 :1447–1517），是整个项目的收尾。</p>
+          <p>
+            核心机制：<b>第 1 场玩家画的是帽子还是蟒蛇，在这里被那个金发小孩问回来。</b
+            >玩家的选择穿越全书回到自己面前。这一步做完，整个游戏才从"一串场景"变成"一个故事"。
+          </p>
+          <p>
+            <b>验收：</b>读档时能取到开场选择；两种开场各有 2–3
+            项断言（可在纯逻辑层测，不依赖渲染）。
+          </p>
+        </div>
+      </section>
+
+      <!-- ===================== 3 ===================== -->
+      <section id="s3">
+        <h2 class="sec">
+          <b>第 3 层</b>　签名机制　<span
+            style="font-size: 12px; letter-spacing: 0; color: var(--vio)"
+            >—— 这一层是我的重点提案</span
+          >
+        </h2>
+        <p style="color: var(--tx2); font-size: 14.5px; margin-bottom: 22px">
+          前面两层是「把缺的补上」。这一层是回答一个问题：<b
+            >为什么这个游戏必须是 3D 的，而不是一本电子书？</b
+          ><br />
+          答案是——<b>原著里有些东西只有在三维空间里才成立</b>：走远的距离、越来越小的星球、只能靠听寻找的井、五千朵一模一样的玫瑰、以及"驯养"所承诺的<b>时间</b>。
+        </p>
+
+        <div class="mech">
+          <div class="kicker">机制 A</div>
+          <h3>书本身就是 UI：九页对开画册</h3>
+          <div class="quote">
+            "To Leon Werth, when he was a little boy." —— 献词背后，是一本画册
+          </div>
+          <p>现在 J 键打开的「旅途手札」是一列 7 张卡片。把整个交互模型换掉：</p>
+          <ul>
+            <li>
+              <b>J 键打开的不是任务列表，是一本你正在写的书。</b>对开两页：左页原著英文（逐字，取自
+              Woods 译本），右页中文自译——<b>双语同时可见，不再是切换按钮</b>。
+            </li>
+            <li>
+              每完成一段，右页留白处浮现玩家"看到"的那一笔。<b>不是通用图标</b>，是那一段专属的手绘插画（沿用现有
+              <code>sketch()</code> 铅笔线稿风格，每段一幅）。
+            </li>
+            <li><b>九页 = 九次开屏</b>。翻书本身就是奖励，不需要额外成就系统。</li>
+            <li>
+              页脚留一个空白页——<b>留给玩家自己写</b>。可输入，存本地。这是最小成本的"私人化"。
+            </li>
+          </ul>
+          <div class="why">
+            <b>为什么这个改动小、收益大：</b>它不需要新系统，<code>journeyNotebook</code>
+            已经有渲染函数、存本地、跟随语言切换。改的是<b>呈现</b>，不是数据。相当于把一张清单换成一本书。
+          </div>
+        </div>
+
+        <div class="mech">
+          <div class="kicker">机制 B</div>
+          <h3>五千朵玫瑰：一场不可能通过的挑战</h3>
+          <div class="quote">
+            "He thought he was rich, with a flower; but he was only poor, with a single flower." ——
+            Ch.20
+          </div>
+          <p>
+            进入玫瑰园，用 <code>InstancedMesh</code> 铺 5000 朵（<b>1 个 draw call</b
+            >，性能上完全可行）。然后：
+          </p>
+          <ul>
+            <li><b>你那一朵没有任何视觉标记。</b>没有高亮、没有光柱、没有唯一颜色。</li>
+            <li>
+              唯一线索是你<b>此前在玫瑰站亲手记下</b>的那一笔（香气 / 四根刺 /
+              藏起的眼泪）的抽象描述。
+            </li>
+            <li>
+              玩家走遍全园按
+              E，<b>每次"找到"的都不是他那一朵</b>——因为"你以为是你的是哪一朵"本身就是原著的答案。
+            </li>
+            <li>
+              刻意设计成<b>无法被"刷任务"的心智完成</b>。走完全园后由王子一句话收束，然后离开。
+            </li>
+          </ul>
+          <div class="why">
+            <b>为什么值得做：</b
+            >这是全书唯一一处<b>玩家必须接受"得到即失去"</b>的关卡。别的关卡教机制，这一关教态度。放在书页八的末尾，从玫瑰园走回沙漠的十几步路上什么都不说，效果最好。<br />并且它完美利用了已有的
+            <code>rose-gallery.js</code>——建筑壳体已在，只差内容和那 5000 朵花。
+          </div>
+        </div>
+
+        <div class="mech">
+          <div class="kicker">机制 C</div>
+          <h3>只能靠听的井：把罗盘反过来用</h3>
+          <div class="quote">"You must listen. The well is singing." —— Ch.20</div>
+          <p>找井段落做三件事：</p>
+          <ul>
+            <li>
+              <b>主动关掉罗盘。</b
+              >它灰掉并显示"有些东西不是目标，是礼物"。这是对"游戏给你一切答案"的一次有意识的拒绝。
+            </li>
+            <li>
+              用<b>声音</b>导航：屏幕边缘极淡的水波脉动，随距离衰减。<b>不是箭头</b>——是"听得见"的可视化。
+            </li>
+            <li>玩家必须<b>真正静止 3 秒</b>去听，脉动才会变清晰。风、虫、然后是很轻的水声。</li>
+            <li>
+              找到时：全黑，只有水声；然后水面反光铺开，倒映星。井边拾到的线索是第 12
+              场"画嘴套"的道具。
+            </li>
+          </ul>
+          <div class="why">
+            <b>为什么值得做：</b
+            >"重要的东西用眼睛是看不见的"在原著里是一句台词，在这里可以<b>变成一个输入方式</b>。这是
+            3D
+            和音频唯一不可替代的地方——纸书可以让你"想到安静"，但游戏能真的<b>让你安静下来</b>，而安静下来才听得见。
+          </div>
+        </div>
+
+        <div class="mech">
+          <div class="kicker">机制 D</div>
+          <h3>驯养：让真实时间进入游戏</h3>
+          <div class="quote">"Please — tame me. Let us be friends." —— Ch.21</div>
+          <p>狐狸要求「每天同一时刻来」。这是全书唯一一处让玩家的<b>现实生活节奏</b>成为机制：</p>
+          <ul>
+            <li>第一次在苹果树下按 E「约定」，玩家选一个时刻（游戏内显示，如"每天黄昏"）。</li>
+            <li>
+              此后<b>每天那个真实时刻</b>，苹果树下出现一个光点，狐狸在，来一次推进一天，共 4
+              天。存档跨会话持久化。
+            </li>
+            <li>
+              第 4
+              天，狐狸说"我每天都在等"。<b>如果玩家错过当天——狐狸仍在原地等</b>。不扣分、不惩罚，<b>但错过就是错过</b>，次日可再来。
+            </li>
+            <li>
+              诚实处理：允许玩家选「明天真的再来」或「缩短一天」。<b>承诺过的等待权重更高，缩短的也仍然完整，但手札上会如实记录你选的是哪一种</b>。
+            </li>
+          </ul>
+          <div class="why">
+            <b>为什么值得做：</b
+            >这是唯一让玩家和"过去"建立<b>非游戏内时间关系</b>的地方。前四天之后，苹果树下那个光点会变成整个游戏里最重的一个像素。<br />风险要说清：真实时间机制<b>只对愿意每天回来的人有意义</b>，对一次性访客是空的。所以必须设计成<b>跳过也能完整通关</b>——四天可以压缩，甚至可以在同一会话内快进，只是手札上的措辞不同。
+          </div>
+        </div>
+
+        <div class="mech">
+          <div class="kicker">机制 E</div>
+          <h3>星屑有了用途：手札 → 空画框</h3>
+          <p>6 颗星屑现在只是任务册里的一个计数器（<code>星屑 x / 6</code>）。给它们终点：</p>
+          <ul>
+            <li>
+              每颗星屑 = 手札里一页的边框插画。<b>凑齐 6 颗，手札会变成一本完整的画册</b>（与机制 A
+              同一个奖励出口）。
+            </li>
+            <li>
+              回 B612 走完第 12
+              场"告别"后，玩家在<b>永恒展厅</b>挂出的画作旁，会出现一个<b>空画框</b>——第 13
+              场六年后的那个空框。
+            </li>
+            <li>
+              尾声的"你画的是蟒蛇吗"由<b>玩家在第 1 场的选择</b>回答。这个选择存进
+              <code>store</code>，是全项目最长的一条因果链。
+            </li>
+          </ul>
+          <div class="why">
+            <b>为什么值得做：</b>把已有的三个系统（星屑计数 / 手札 /
+            展厅挂画）串成<b>同一条线</b>。这不需要新系统，只需要接线——但完成之后，项目第一次有了"从头到尾"的完整形状。
+          </div>
+        </div>
+
+        <div class="mech">
+          <div class="kicker">机制 F</div>
+          <h3>原景回收：让"曾经路过"变成机制</h3>
+          <p>把机制的注意力反过来：不只看"我要去哪"，也看<b>"我是不是来过这里"</b>。</p>
+          <ul>
+            <li>
+              同一颗星球<b>在回忆层和现实层各出现一次</b>时，罗盘指针用两种颜色区分（"记忆中的位置"
+              / "此刻的位置"）。
+            </li>
+            <li>
+              第 10
+              场五站里，站三"山与回声"是唯一<b>现实中存在过的地方</b>——把之前彩蛋里播过的《登飞来峰》换掉，让山自己回应一次。这里是全项目唯一"改写既有内容"的地方，<b>需要你拍板</b>。
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ===================== 4 ===================== -->
+      <section id="s4">
+        <h2 class="sec"><b>第 4 层</b>　性能与工程</h2>
+
+        <div class="card warn">
+          <h4><span class="pri p2">P2</span> 4.1　首屏：26 串行 → 并行 + 真实进度条</h4>
+          <p>
+            把 <code>world-loader.js</code> 的 <code>for...of await</code> 改为受控并发（<code
+              >Promise.all</code
+            >
+            分批，或 <code>p-limit</code>）。<b>注意：<code>planets.js</code> 必须在核心链</b
+            >（顶层副作用注册 worldManager），漏载会静默失败——石门消失。这是改造时唯一不能碰的红线。
+          </p>
+          <p>
+            同时把 11 处分散的模型加载收进<b>一个统一调度器</b>，接上
+            <code>LoadingManager.onProgress</code
+            >，做<b>真正面向用户的进度条</b>。目前项目<b>没有任何进度条</b>，而 37MB 模型 + 26 个
+            chunk 值得一个。
+          </p>
+          <p>
+            <b>验收：</b><code>load-timing-probe.cjs</code> 接入
+            <code>npm test</code>，首屏总耗时设上限防退化。改动前后各测 3 次取中位数。
+          </p>
+        </div>
+
+        <div class="card warn">
+          <h4><span class="pri p2">P2</span> 4.2　统一移动端判定（复用已有正解）</h4>
+          <p>
+            把 <code>player.js:374</code> 的 <code>isFreshTouch()</code> 提为共享工具，<code
+              >light-sweep.js:10</code
+            >
+            / <code>scene.js:54</code> / <code>light-budget.js</code> /
+            <code>ark-freeflight-hud.js:56</code> / <code>music-canvas.js:288</code> 全部改用它。
+          </p>
+          <p>
+            顺带把断点体系统一：CSS 侧收敛为 <b>600 / 960</b> 两个（现在 600/640/768 三套并存，JS 与
+            CSS 还各用各的）。<b><code>coord-hud.js</code> 零响应式</b>——固定 <code>top:50%</code> +
+            <code>min-width:138px</code>，而它精心避让的任务卡和小地图<b>在移动端都会移动</b>，375px
+            宽下大概率重叠。补 <code>@media</code>。
+          </p>
+          <p>
+            <b>验收：</b><code>verify-hybrid.js</code> 覆盖触屏笔记本；375 / 768 / 1440
+            三档截图无重叠。
+          </p>
+        </div>
+
+        <div class="card warn">
+          <h4><span class="pri p2">P2</span> 4.3　大模型分块 + 真正的 LOD</h4>
+          <p>
+            前 3 个 GLB 占 54%，且都是几何体大、贴图少。<b>继续压缩收益已经见底</b>（已全
+            meshopt+webp）。两条路：
+          </p>
+          <ul>
+            <li>
+              <b>优先做 <code>upper_vestibule.glb</code> / <code>picture_gallery.glb</code></b
+              >——它们<b>不总是需要</b>。用现有 35m 距离懒加载扩成
+              <code>THREE.LOD</code>：近处全几何，远处换低模或直接不画。
+            </li>
+            <li>
+              <b><code>hall.glb</code> 暂不动</b>——它是建筑本体，几乎全程可见，分块收益低而风险高。
+            </li>
+            <li>
+              把 7 处 <code>frustumCulled = false</code> 逐个审查，其中 <code>sky-shader.js</code> /
+              <code>fireplace.js</code> 可能是必要的（超大或贴附地面），其余大概率是调试遗留。
+            </li>
+          </ul>
+          <p>
+            <b>验收：</b>画质回归探针四检查点不劣化；<code>perf-catwalk</code> 移动场景 draw call
+            下降记录。
+          </p>
+        </div>
+
+        <div class="card warn">
+          <h4><span class="pri p2">P2</span> 4.4　让 dispose 契约真的成立</h4>
+          <p><b>优先级从低往高排：</b></p>
+          <ul>
+            <li>
+              <code>openfilm.js:56</code> 的
+              <code>script:lang</code> 漏清理（<b>每次播电影泄漏一个</b>）——顺手修。
+            </li>
+            <li><code>postprocessing.js</code> composer 加 dispose，<b>星球世界切换时释放</b>。</li>
+            <li>8 处模块级 <code>setInterval</code> 收进系统生命周期。</li>
+            <li>
+              <code>loop.js</code> 给 rAF 自续链加停止点（<b>这条是 HMR 双跑的直接成因</b>，<code
+                >perf-monitor-system.js:4</code
+              >
+              的注释里记着这个历史踩坑）。
+            </li>
+          </ul>
+          <p>
+            <b>验收：</b>新增 <code>dispose-contract.test.js</code>——每个 core 系统 dispose 后
+            <code>renderer.info.memory</code> 的 texture/geometry
+            计数不增长。<b>这条测试会长期保护整个项目</b>，比修 153 处监听器本身更值。
+          </p>
+        </div>
+
+        <div class="card warn">
+          <h4><span class="pri p2">P2</span> 4.5　自适应降级做完整</h4>
+          <p>
+            现在 <code>adaptiveQuality()</code> 只调像素比，<b
+              >不降后处理、不降灯数、不降 draw call</b
+            >。改成四档阶梯：
+          </p>
+          <div class="ev">
+            档 1（满） pixelRatio 2 + bloom + 全灯 档 2 pixelRatio 1.5 + bloom + 全灯 档 3
+            pixelRatio 1.25 + 无 bloom + 灯 ×0.6 档 4（保命）pixelRatio 0.75 + 无后处理 + 灯 ×0.35 +
+            阴影关
+          </div>
+          <p>
+            阈值（<code>loop-manager.js:160/164</code> 的 25 /
+            45）历史上收紧过两次却没有测试守护——<b>把这段纯逻辑抽出来补单测</b>，比调数字本身重要。
+          </p>
+        </div>
+
+        <div class="card">
+          <h4><span class="pri p3">P3</span> 4.6　测试与探针治理</h4>
+          <ul>
+            <li>
+              <b>148 个探针里 144 个没进 <code>package.json</code></b
+              >，靠手工 <code>node</code>。至少把 10 个关键验收探针（journey / story-chain /
+              dialog-voice / scene-regression / 5 个剧情探针）接进 CI。
+            </li>
+            <li>
+              <b>补 3 类零覆盖区</b>：<code>adaptiveQuality</code> 阈值逻辑、dispose 契约、8 个
+              <code>@media</code> 断点的视口重叠检测。
+            </li>
+            <li>
+              <b>设覆盖率下限</b>（<code>vitest.config.js</code> 已装 v8 provider 但没
+              <code>thresholds</code>），先设一个不痛的数字卡住下滑。
+            </li>
+            <li>
+              <b>设 dispose 后 <code>renderer.info.memory</code> 回归断言</b>（见 4.4）。
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ===================== 5 ===================== -->
+      <section id="s5">
+        <h2 class="sec"><b>第 5 层</b>　收尾与长期</h2>
+        <div class="card">
+          <h4><span class="pri p4">P4</span> 5.1　一句台词也不改的原则</h4>
+          <p>
+            补全 6 场时，<b>英文逐字照搬 Woods 译本</b>，与现有
+            <code>story-text.mjs</code>
+            的做法保持一致。中文自译。这个项目最值钱的资产就是"台词准确"，一旦掺进改写，信用就崩了。
+          </p>
+          <p>
+            新增内容（机制 B/C/D 的原创提示语）<b>必须是玩家界面语言</b>，绝不冒充角色对白——现有
+            <code>journey-logic.mjs</code>
+            已经有这个自觉（"小插画是手札里的铅笔图，不冒充剧情中的真实物件"），保持它。
+          </p>
+        </div>
+        <div class="card">
+          <h4><span class="pri p4">P4</span> 5.2　双语不是切换按钮</h4>
+          <p>
+            机制 A 落地后，对开页让双语<b>同屏</b>。<code>body[data-script-lang]</code>
+            的现有机制继续服务 UI
+            标签，但<b>故事原文应该永远双语并列</b>——这也顺带解决"英文玩家看不懂中文提示"的问题。
+          </p>
+        </div>
+        <div class="card">
+          <h4><span class="pri p4">P4</span> 5.3　不做什么（防止方案膨胀）</h4>
+          <p class="no" style="margin-bottom: 8px">按"简洁优先"原则，明确划出边界：</p>
+          <ul class="chk">
+            <li><b>不改</b>第 0–7 场的任何既有演出。它们是已经验收过的资产。</li>
+            <li>
+              <b>不拆</b> <code>planets.js</code>（1092
+              行）——它因顶层副作用钉在关键路径，拆分风险远大于收益。只加注释说明为什么不能拆。
+            </li>
+            <li>
+              <b>不重写</b> <code>admin.js</code>（1605 行）——它和 3D
+              引擎无依赖，是后台单页，拆它对本项目零收益。
+            </li>
+            <li>
+              <b>不做</b> 成就系统 / 排行榜 / 社交 / 联机。手札（第 3 层机制
+              A）已经是完整的情感出口，再加就是系统噪音。
+            </li>
+            <li><b>不压缩</b> <code>hall.glb</code>（7.59MB）——已全压缩，收益见底。</li>
+            <li>
+              <b>不改</b>已退役的灵蕴门槛分档方案、<code>WEDDING_SHELL</code> 落位偏移（用户 09-04
+              已拍板）、博物馆 <code>mxY=30.1</code>。
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ===================== 6 ===================== -->
+      <section id="s6">
+        <h2 class="sec"><b>排期</b>　四段里程碑</h2>
+        <div class="stats" style="margin-bottom: 24px">
+          <div class="stat"><b>1–2 天</b><span>M0 契约修对（玩家不再看到矛盾界面）</span></div>
+          <div class="stat"><b>6–9 天</b><span>M1 书页六/七（328·329·330）</span></div>
+          <div class="stat"><b>8–12 天</b><span>M2 书页八/九/尾声（现地五站·井·告别）</span></div>
+          <div class="stat"><b>4–6 天</b><span>M3 首屏 + 性能 + 契约测试</span></div>
+        </div>
+
+        <div class="tl">
+          <div class="it p0">
+            <b>M0 · 契约修对　<span class="pri p0">P0</span></b>
+            <span
+              >1.1 映射表重写 → 1.2 拆分书页 2/3 → 1.3 单一真相 → 1.4 三个小 bug　·　单测扩到 42
+              例</span
+            >
+          </div>
+          <div class="it p1">
+            <b>M1 · 补完书页六、七　<span class="pri p1">P1</span></b>
+            <span
+              >328 商人 → 329 点灯人 → 330 地理学家（王子第一次后悔）　·　setChapter(4/5/6)
+              打通　·　~70 项新探针</span
+            >
+          </div>
+          <div class="it p1">
+            <b>M2 · 补完书页八、九、尾声　<span class="pri p1">P1</span></b>
+            <span
+              >沙漠五站（复用玫瑰馆/昆仑巅）→ 找井 → 告别 → 六年后的闭环　·　<b
+                >这是最大的一块</b
+              ></span
+            >
+          </div>
+          <div class="it p2">
+            <b>M3 · 签名机制　<span class="pri p2">P2</span></b>
+            <span
+              >机制 A 对开画册 → B 五千朵玫瑰 → C 只能靠听的井 → D 驯养 → E
+              星屑接线　·　每项独立可交付</span
+            >
+          </div>
+          <div class="it p2">
+            <b>M4 · 性能与契约　<span class="pri p2">P2</span></b>
+            <span
+              >并行加载 + 进度条 → 移动端判定统一 → LOD → dispose 契约 → 四档降级 → 探针接 CI</span
+            >
+          </div>
+        </div>
+
+        <p style="color: var(--tx2); font-size: 14px; margin-top: 20px">
+          <b>依赖关系：</b>M0 必须先做（否则后面全部显示错误进度）→ M1/M2
+          可并行（不同星球、不同场次）→ M3 依赖 M2 的段落结构 → M4 独立，随时可插。
+        </p>
+        <p class="no">
+          <b>工作量说明：</b>以上按"1 人日 = 1 个有效工作日"估算，含实现 + 探针 + 单测 +
+          线上验收。<b>不含模型采购与美术外包。</b>签名机制（M3）里，机制 B 需要 5000
+          朵花的美术方案评估，机制 D 的真实时间机制需要你明确是否接受——这两项我给的区间最宽。
+        </p>
+      </section>
+
+      <!-- ===================== 7 ===================== -->
+      <section id="s7">
+        <h2 class="sec"><b>需要你拍板</b>的 6 件事</h2>
+        <div class="dec">
+          <ol>
+            <li>
+              <b>整体方向</b>：认可「先补书、再让书变成实体、最后修地基」这个顺序吗？还是想先做第 3
+              层的签名机制（因为它们最"有意思"），接受进度显示暂时不准？
+            </li>
+            <li>
+              <b>站三·山与回声</b>：占用昆仑巅意味着改掉现有《登飞来峰》彩蛋。剧本决议 4
+              是这么写的，但那是"改别人的东西"。<b>你接受吗？</b>
+            </li>
+            <li>
+              <b>机制 D 驯养</b>：真实时间机制（每天同一时刻来，连续 4 天）。<b
+                >你接受"玩家可能永远拿不到 4 天"这个风险吗？</b
+              >（我的设计是跳过也能通关，但手札措辞会诚实反映。）
+            </li>
+            <li>
+              <b>机制 B 五千朵玫瑰</b
+              >：这一关<b>刻意设计成无法用"刷任务"完成</b>。有些玩家会认为这是坏
+              UX。你要保留这个锋利度，还是加一个不破坏立场的兜底？
+            </li>
+            <li>
+              <b>场次优先级</b>：M2 里"现地五站"是最大工作量（要建 3
+              个新场景）。如果你更想先看到<b>找井和告别</b>（情绪顶点），可以把五站拆到 M2.5 之后。
+            </li>
+            <li>
+              <b>止损线</b>：如果做到 M2 发现工作量超出预期，你希望在哪里停？<b
+                >M0+M1 结束时是一个干净的交付点</b
+              >（13 场补到 9 场，界面全对）。
+            </li>
+          </ol>
+          <div class="sig">
+            批准哪几项、砍掉哪几项、调整哪个顺序，告诉我即可。方案未获批前我不动任何代码。
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        本方案基于 commit <code>2e5042e</code>（2026-10-03
+        00:36）实测。所有"证据"条目均可在源码中定位到
+        file:line，<b>未做任何推测性结论</b>；标注"未能确认"的三处（chapter≥4
+        的线上表现、story-dialogs 历史行为、昆仑巅决议是否有意保留）已在对应卡片说明。<br />
+        勘察方式：<code>git log</code> × 3 份源码域逐行阅读 + 原著 Woods 英译本全文比对 +
+        线上服务器状态核实。<b>本轮未修改任何文件。</b>
+      </footer>
+    </div>
+  </body>
+</html>

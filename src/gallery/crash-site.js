@@ -2,7 +2,9 @@
 // 电影结尾纸飞机贴沙即"变成"这架真飞机(Piper PA-18 残骸, CC BY 4.0, 署名见 CREDITS.md);
 // 玩家在残骸旁睁眼(视野从仰望天空缓缓回正),小王子从沙丘跳步走下,
 // 说出第一句 "If you please— draw me a sheep!"(原著 Woods 译,书内原句)。
-// 模型: models/b612/piper-pa18.glb(无动画,程序化) / chibi-prince-rigged-v2.glb(2026-09-25 骨骼动画版:Idle/Walk/Wave/Hop)。
+// 模型: chibi-prince-rigged-v2.glb(2026-09-25 骨骼动画版:Idle/Walk/Wave/Hop)。
+// 2026-10-03:真飞机已移交给 scene/plane-flight.js(可驾驶版 piper-pa18-full.glb,
+// 同一坐标 -9/76)。本文件保留残骸点的告示牌、小王子出场引导、地形与碰撞辅助。
 import * as THREE from 'three';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
@@ -35,34 +37,12 @@ function addBox(b) {
 }
 
 // ===================== 残骸 =====================
-loader.load(
-  '/models/b612/piper-pa18.glb',
-  (g) => {
-    const m = g.scene;
-    // 真机比例(6.9×2.7×10.7m),机头下俯扎沙、侧倾、机身半埋
-    const box = new THREE.Box3().setFromObject(m);
-    m.position.y -= box.min.y; // 先贴地
-    const wrap = new THREE.Group();
-    wrap.add(m);
-    wrap.rotation.y = WRECK.yaw;
-    wrap.rotation.z = 0.34; // 机头下俯(绕自身翼展轴,姿态经截图校验)
-    wrap.rotation.x = 0.1; // 轻微侧倾
-    wrap.position.set(WRECK.x, getH(WRECK.x, WRECK.z) - 0.32, WRECK.z); // 半埋
-    wrap.name = 'crashWreck';
-    s.add(wrap);
-    // 碰撞:机身实心一盒(座舱玻璃按惯例可穿,不单独立柱)
-    wrap.updateMatrixWorld(true);
-    const bb = new THREE.Box3().setFromObject(wrap);
-    addBox({
-      mnX: bb.min.x + 2.6, // 只保留机身段(座舱),机翼下可穿行——否则整个翼展圈住出生点
-      mxX: bb.max.x - 2.6,
-      mnZ: bb.min.z + 0.6,
-      mxZ: bb.max.z - 0.6,
-    });
-  },
-  undefined,
-  (e) => console.error('[crash-site] 残骸模型加载失败:', e.message)
-);
+// 2026-10-03:此处原本加载 piper-pa18.glb 简化残骸(机头扎沙、机身半埋)。
+// 现已由 scene/plane-flight.js 接管同一位置(-9/76)——换成可驾驶的完整真机
+// (piper-pa18-full.glb,1.74MB→0.31MB 压缩版),并接管座舱段碰撞盒。
+// 叙事理由:第 1 场你坠机的地方,现在是你能再起飞的地方。
+// 旧残骸不再加载(避免同位置两架飞机重叠);碰撞盒在 plane-flight.js 内按
+// 模型世界 AABB 重建(与此处旧逻辑一致:只保留机身段,机翼下可穿行)。
 
 // ===================== 坠机残骸告示牌(双语木牌) =====================
 function makeSign() {

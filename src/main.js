@@ -22,6 +22,8 @@ import './visitor-fp.js'; // 访客身份采集+踢出通知(轻量 IIFE,含 SSE
 import { createToastSystem } from './core/toast-system.js'; // 示范积木:事件驱动 toast
 import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外壳:手绘对话框+任务栏+系统菜单(2026-08-29)
 import { createJourneySystem } from './core/journey-system.js'; // 原著旅途交互与观察手札，组合根统一装配
+import { createPlaneFlight } from './scene/plane-flight.js'; // 可驾驶 Piper PA-18(2026-10-03)
+import { createFoxScene } from './kunlun/scene10-fox.js'; // 站五·狐狸(2026-10-03)
 import { createInputSystem } from './core/input.js'; // 统一输入 facade(阶段1·P1-3)
 import { createAudioSystem } from './core/audio-system.js'; // 阶段2 垂直切片:空间音频积木(依赖注入,取代冻结 ctx 写)
 import { createPerfMonitorSystem } from './core/perf-monitor-system.js'; // 阶段3 切片:性能监控积木(单循环驱动,删死 ctx import)
@@ -181,6 +183,11 @@ async function preloadWorld() {
     compositionRoot.register(createGameShellSystem()); // 手绘游戏外壳(对话框/任务栏/菜单)
     const journeyInput = createInputSystem(ctx.input);
     compositionRoot.register(createJourneySystem({ input: journeyInput }));
+    // 可驾驶 Piper PA-18(2026-10-03):坠机点旁的真飞机。物理核 src/scene/plane-physics.mjs(26 项单测),
+    // 本系统只管 3D 姿态/输入/相机/HUD。玩家冻结走 gs.flightLock 既有通道(与飞舟同一条)。
+    compositionRoot.register(createPlaneFlight({ input: journeyInput }));
+    // 站五·狐狸(2026-10-03):剧本第10场,布景用主人提供的 fox-scene.glb(含王子与狐狸)。
+    compositionRoot.register(createFoxScene());
     compositionRoot.register(createLoopSystem());
     compositionRoot.register(journeyInput);
     compositionRoot.init();

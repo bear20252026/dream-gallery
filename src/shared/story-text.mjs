@@ -127,6 +127,10 @@ const PRINCE = { en: 'The Little Prince', zh: '小王子', spk: 'prince' };
 const PILOT = { en: 'The Pilot', zh: '飞行员', spk: 'pilot' };
 const SHEEP = { en: 'The Sheep (in the box)', zh: '箱子里的羊', spk: 'sheep' };
 const ROSE = { en: 'The Rose', zh: '玫瑰', spk: 'rose' };
+// 狐狸(2026-10-03 新增,站五·苹果树下)。音色复用 king 的 edge-tts 跨场声线
+// (prince=Milo / sheep=Mia / king=en-GB-RyanNeural / tippler=en-US-EricNeural);
+// 狐狸与国王永不同屏,故可跨场复用,见 AGENTS.md 声线分配条。
+const FOX = { en: 'The Fox', zh: '狐狸', spk: 'en-US-RogerNeural' };
 const KING = { en: 'The King', zh: '国王', spk: 'king' };
 // 说话人视觉类型查询(who 缺 spk 时回退空串=默认羊皮卷样式)
 export function whoSpk(who) {
@@ -460,4 +464,126 @@ export const REPLIES = {
       },
     ],
   },
+};
+
+// ============================================================================
+// 站五·狐狸(2026-10-03,剧本定稿第 10 场站五 / 原著 Ch.21)
+// 英文逐字照搬剧本定稿(Woods 译本口径),中文为文学自译。一句不改。
+// 场景资产:models/hall/b612-world/fox-scene.glb(主人提供的"小王子与狐狸"整场布景,
+// 25 meshes:Escenario 地面 / Nubes 云 / Hojas 叶簇 1792 面 / Principito 王子 / Zorro 狐狸)。
+// ============================================================================
+export const SCENE_FOX = {
+  who: { fox: FOX, prince: PRINCE, sheep: SHEEP },
+
+  // —— 初遇:草地上的一问一答 ——
+  greet: [
+    {
+      who: FOX,
+      en: 'Good morning. I am right here, under the apple tree.',
+      zh: '早上好。我就在这儿，苹果树下。',
+    },
+    { who: PRINCE, en: 'Come and play with me. I am so unhappy.', zh: '来跟我玩吧。我好难过。' },
+    {
+      who: FOX,
+      en: 'I cannot play with you. I am not tamed.',
+      zh: '我不能陪你玩。\n我还没有被驯养。',
+    },
+    { who: PRINCE, en: "What does that mean-- 'tame'?", zh: '“驯养”，是什么意思？' },
+    { who: FOX, en: 'It means to establish ties.', zh: '意思是：建立联系。' },
+  ],
+  // —— 驯养的意义(原著最长一段,逐字) ——
+  meaning: [
+    {
+      who: FOX,
+      en:
+        'To me, you are still nothing more than a little boy who is just like a hundred thousand other little boys. And I have no need of you. And you, on your part, have no need of me. To you, I am nothing more than a fox like a hundred thousand other foxes. But if you tame me, then we shall need each other. To me, you will be unique in all the world. To you, I shall be unique in all the world...',
+      zh:
+        '对我来说，你不过是个小男孩，\n和千万个小男孩没有分别。\n你对我，也和千万只狐狸没有分别。\n可一旦你驯养了我，\n我们便彼此需要——\n你于我，是天下独一个；\n我于你，也是天下独一个。',
+    },
+    {
+      who: PRINCE,
+      en: 'I am beginning to understand. There is a flower... I think that she has tamed me...',
+      zh: '我有点儿懂了。\n有一朵花……\n我想，她已经把我驯养了……',
+    },
+    {
+      who: FOX,
+      en: 'The grain, which is also golden, will bring me back the thought of you. And I shall love to listen to the wind in the wheat...',
+      zh: '麦子也是金黄色的，\n它会让我想起你。\n从此我会爱上，\n听风吹麦浪的声音。',
+    },
+    { who: FOX, en: 'Please-- tame me!', zh: '求你——驯养我吧！' },
+  ],
+  // —— 仪式:耐心与语言 ——
+  rite: [
+    {
+      who: FOX,
+      en:
+        'You must be very patient. First you will sit down at a little distance from me-- like that-- in the grass. I shall look at you out of the corner of my eye, and you will say nothing. Words are the source of misunderstandings. But you will sit a little closer to me, every day...',
+      zh:
+        '你要有耐心。\n先在离我不远处坐下——就这样——\n坐在草里，什么也别说。\n我用眼角看你。\n语言，是误会的根源。\n而你每天，\n都可以坐得更近一点……',
+    },
+    {
+      who: FOX,
+      en:
+        'It would have been better to come back at the same hour. If, for example, you come at four o’clock in the afternoon, then at three o’clock I shall begin to be happy. I shall feel happier and happier as the hour advances. At four o’clock, I shall already be worrying and jumping about. I shall show you how happy I am!',
+      zh:
+        '你最好还在同一个时辰来。\n比方说，你四点来，\n三点起我就开始幸福；\n时间越近，我越幸福；\n到了四点，我早已坐立不安、\n欢蹦乱跳——\n我要让你看看，我有多快活！',
+    },
+    {
+      who: FOX,
+      en: 'One must observe the proper rites. They are what make one day different from other days, one hour from other hours.',
+      zh: '人得守仪式……\n是仪式，让这一天不同于那一天，\n让这一刻，不同于那一刻。',
+    },
+  ],
+  // —— 秘密:全书的题眼 ——
+  secret: [
+    {
+      who: FOX,
+      en:
+        'Go and look again at the roses. You will understand now that yours is unique in all the world. Then come back to say goodbye to me, and I will make you a present of a secret.',
+      zh:
+        '回去，再看一眼那些玫瑰。\n你现在就会明白，\n你的那朵是天下无双的。\n然后回来同我道别——\n我要送你一件礼物，\n一个秘密。',
+    },
+    {
+      who: FOX,
+      en: 'It is only with the heart that one can see rightly; what is essential is invisible to the eye.',
+      zh: '只有用心，才看得真切；\n要紧的东西，眼睛看不见。',
+    },
+    {
+      who: PRINCE,
+      en: 'What is essential is invisible to the eye.',
+      zh: '要紧的东西，眼睛看不见。',
+    },
+    {
+      who: FOX,
+      en: 'It is the time you have wasted for your rose that makes your rose so important.',
+      zh: '正是你为玫瑰虚掷的时光，\n才使她变得如此重要。',
+    },
+    { who: PRINCE, en: 'It is the time I have wasted for my rose--', zh: '是我为玫瑰虚掷的时光——' },
+    {
+      who: FOX,
+      en: 'Men have forgotten this truth. But you must not forget it. You become responsible, forever, for what you have tamed. You are responsible for your rose...',
+      zh: '人们忘了这条真理。\n可你不能忘。\n你对你驯养的东西，永远负有责任。\n你要为你的玫瑰负责……',
+    },
+    { who: PRINCE, en: 'I am responsible for my rose...', zh: '我要为我的玫瑰负责……' },
+    { who: SHEEP, en: 'I did not understand. But I will remember.', zh: '我没听懂。\n可是我会记住。' },
+  ],
+};
+
+// —— 站五 UI 文案(玩家界面语言,不冒充角色对白) ——
+export const FOX_UI = {
+  title: { en: 'The Fox — under the apple tree', zh: '狐狸 · 苹果树下' },
+  rule: {
+    en: 'The past cannot hear you. Sit with the fox, and keep what you notice.',
+    zh: '过去听不见你。坐在狐狸身边，把你看见的留在手札里。',
+  },
+  // 驯养仪式:三次靠近(这是原著的核心机制,不是任务清单)
+  approach: { en: 'Sit a little closer', zh: '再坐近一点' },
+  arrived: { en: 'You are close enough. The fox stays.', zh: '够近了。狐狸留下了。' },
+  patience: {
+    en: 'Words are the source of misunderstandings. Say nothing for a while.',
+    zh: '语言，是误会的根源。有一会儿，什么也别说。',
+  },
+  riteDone: { en: 'The rite is observed. Four days, one hour each.', zh: '仪式守住了。四天，每天同一个时辰。' },
+  secret: { en: 'The fox has a secret for you.', zh: '狐狸要送你一个秘密。' },
+  memory: { en: 'The secret, kept', zh: '那个秘密，收好了' },
 };

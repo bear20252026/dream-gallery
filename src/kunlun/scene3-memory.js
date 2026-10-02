@@ -262,6 +262,9 @@ function hideDuskVeil() {
 // —— 台词播放(独占:一次一条,播完才前进;lock 互斥 + 心跳守护防链断) ——
 let chainBusy = false;
 let wd = null;
+// 书页分界哨兵(2026-10-03):不是台词,是"读到书页二末尾"的进度标记。
+// speakSeq 见到它只写 store 不开对话框,玩家看不到任何提示。
+const PAGE_TWO_MARK = { __pageMark: 'page2done' };
 function speakSeq(seq, i, done, ticket = visit) {
   if (ticket !== visit || ctx.scene.activeWorld !== 'b612') return;
   if (i >= seq.length) {
@@ -270,6 +273,14 @@ function speakSeq(seq, i, done, ticket = visit) {
     return;
   }
   const item = seq[i];
+  if (item && item.__pageMark) {
+    try {
+      ctx.store.setNum('homeMemoryStep', Math.max(2, curStep));
+      ctx.store.mark('page2');
+    } catch (e) {}
+    speakSeq(seq, i + 1, done, ticket);
+    return;
+  }
   chainBusy = true;
   let spent = false; // onDone 与心跳守护只许一个推进(晚到的重复收束吞掉)
   const finish = function () {
@@ -413,9 +424,12 @@ function doStep(stepIdx) {
     SCENE3.sunset,
     // 玫瑰站(2026-09-27 补齐定稿全本 v2 第4场开篇):先诘问 7 句 + 眼泪字幕 + 初醒,
     // 再进原有的相见/追悔/离别(此前从"你多美啊"开场,开篇整段缺失)
+    // 2026-10-03:在 regret(追悔)前插 mark —— 剧本书页二=玫瑰相见,书页三=离别,
+    // 分界正是这里。此前整段共用一个 page1 标记,玩家永远看不到书页二/三(见 story-progress.mjs)。
     SCENE4.interrogation.concat(
       [SCENE4.tearsCaption],
       SCENE4.arrival,
+      [PAGE_TWO_MARK],
       SCENE4.regret,
       SCENE4.farewell,
       [SCENE4.farewellCaption]

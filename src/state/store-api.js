@@ -34,6 +34,17 @@ const SCHEMA = {
   roomName: { key: 'roomName', type: 'str' }, // 大厅:上次使用的房间昵称(lobby.html 独立入口预填用)
   scene2: { key: 'b612Scene2', type: 'flag' }, // 画羊四笔完成标记(B612 剧本第2场)
   page1: { key: 'b612Page1', type: 'flag' }, // 书页一完成(第3场 B612 回忆夜)
+  // 书页二(玫瑰相见)完成标记,2026-10-03 新增。此前书页一/二/三共用一个 page1,
+  // 玩家永远看不到书页二/三;现由 scene3-memory 的 PAGE_TWO_MARK 哨兵写入。
+  // 旧存档(只有 page1)照常读入,readPages() 会按 page1 兜底到 3 页,不强迫重玩。
+  page2: { key: 'b612Page2', type: 'flag' },
+  // 可驾驶 Piper PA-18 首次飞行记录(2026-10-03)。存 {flew, at}。
+  // ⚠️ 必须在此登记 —— ctx.store.setJson 对未登记键会抛,而 plane-flight 的
+  // try/catch 会静默吞掉,结果 everFlew 永远为 false(探针实测过一次假阴性)。
+  planeFlown: { key: 'b612PlaneFlown', type: 'json' },
+  // 站五·狐狸的驯养仪式进度(2026-10-03)。存 {days, lastDay, hour, honest}。
+  // lastDay 用于"每天一次";hour 是玩家约定的时辰(原著"你最好同一个时辰来")。
+  foxRite: { key: 'b612FoxRite', type: 'json' },
   lang: { key: 'scriptLang', type: 'str' }, // 剧情语言 en/zh(2026-09-07 主人定双语可切换)
   // JSON
   spiritsKeys: { key: 'kunlunSpiritsKeys', type: 'json' }, // 已集灵蕴 key 数组(乱序拾取后为权威存档)

@@ -15,6 +15,7 @@ import {
   SCENE5,
   SCENE7_VANITY,
   SCENE7_TIPPLER,
+  SCENE_FOX,
 } from '../shared/story-text.mjs';
 
 describe('tt 双语切换', () => {
@@ -135,5 +136,62 @@ describe('数据完整性:全表双语,who 全带 spk', () => {
     expect(SCENE4.interrogation[0].en).toMatch(/does it eat flowers/);
     expect(SCENE4.tearsCaption.en).toMatch(/land of tears/);
     expect(SCENE4.arrival[0].en).toMatch(/scarcely awake/);
+  });
+});
+
+// 站五·狐狸(2026-10-03):英文必须逐字照搬原著。
+// 这是项目最值钱的资产(台词准确),一旦掺进改写,信用就崩了 —— 故钉死单测。
+describe('狐狸站台词 SCENE_FOX 逐字核对(原著 Ch.21 / 剧本定稿第10场站五)', () => {
+  const all = [
+    ...SCENE_FOX.greet,
+    ...SCENE_FOX.meaning,
+    ...SCENE_FOX.rite,
+    ...SCENE_FOX.secret,
+  ].map((l) => l.en);
+
+  it('开场白逐字', () => {
+    expect(all[0]).toBe('Good morning. I am right here, under the apple tree.');
+  });
+  it('"我还没有被驯养"逐字', () => {
+    expect(all).toContain('I cannot play with you. I am not tamed.');
+  });
+  it('"建立联系"逐字', () => {
+    expect(all).toContain('It means to establish ties.');
+  });
+  it('"驯养我吧"逐字(狐狸唯一主动请求)', () => {
+    expect(all).toContain('Please-- tame me!');
+  });
+  it('全书题眼"用心才看得真切"逐字', () => {
+    expect(all).toContain(
+      'It is only with the heart that one can see rightly; what is essential is invisible to the eye.'
+    );
+  });
+  it('"你永远负有责任"逐字', () => {
+    expect(
+      all.some((e) => e.indexOf('You become responsible, forever, for what you have tamed') > 0)
+    ).toBe(true);
+  });
+  it('"语言是误会的根源"逐字', () => {
+    expect(all.some((e) => e.indexOf('Words are the source of misunderstandings') > 0)).toBe(true);
+  });
+  it('"同一个时辰"逐字(驯养机制的原话)', () => {
+    expect(all.some((e) => e.indexOf('better to come back at the same hour') > 0)).toBe(true);
+  });
+  it('每句都有 en 与 zh,且说话人齐备', () => {
+    for (const l of [
+      ...SCENE_FOX.greet,
+      ...SCENE_FOX.meaning,
+      ...SCENE_FOX.rite,
+      ...SCENE_FOX.secret,
+    ]) {
+      expect(typeof l.en === 'string' && l.en.length).toBeGreaterThan(0);
+      expect(typeof l.zh === 'string' && l.zh.length).toBeGreaterThan(0);
+      expect(l.who).toBeTruthy();
+    }
+  });
+  it('狐狸音色与国王不同屏复用(AGENTS 声线规矩)', () => {
+    // king=en-GB-RyanNeural,fox=en-US-RogerNeural —— 不同音色,且二者永不同屏
+    expect(SCENE_FOX.who.fox.spk).not.toBe('en-GB-RyanNeural');
+    expect(SCENE_FOX.who.fox.spk).toBe('en-US-RogerNeural');
   });
 });

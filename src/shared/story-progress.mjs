@@ -1,10 +1,12 @@
 // story-progress.mjs — B612 剧情进度纯逻辑(2026-09-24 自 planets.js / gameshell-system.js 抽出)
 // 目的:剧情域大文件每次改都是回归裸奔——把不依赖 3D 的进度契约钉进单测。
-// 三条契约:
+// 四条契约:
 //   1. 章节只前进不回退,封顶 6(setChapter/存档回读共用);
-//   2. 书页换算 planetsChapter → 任务册「书页 x/9」(2026-09-20 起gameshell 展示);
-//   3. 罗盘页 place 装饰:已点亮章节追加「 · 已点亮」(顺序与 spirits SPIRITS 一致)。
-// 回归锚点:书页映射表改动曾只改一处漏另一处(线性映射想当然),此表是唯一权威。
+//   2. 书页换算(已读页数,0..9)→ 任务册「书页 x/9」;语义 = **已完成页数**,单调不减;
+//   3. 罗盘页 place 装饰:已点亮章节追加「 · 已点亮」(顺序与 spirits SPIRITS 一致);
+//   4. readPages() 是书页的唯一真相(2026-10-03):任务册「书页」行与「进程」行必须同源。
+// 回归锚点:书页映射表改动曾只改一处漏另一处(线性映射想当然),此表是唯一权威;
+// 2026-10-03 又发现缺 5/6 两行会让书页从 7 倒退到 1,故补全 + 单测钉死单调不减。
 import { PLANETS } from './planet-logic.mjs';
 
 /** 章节封顶(6 = 六章全部点亮) */
@@ -23,18 +25,59 @@ export function advanceChapter(current, n) {
 }
 
 /**
- * 章节 → 任务册书页加成(9 页制)。
- * ⚠️ 忠实钉住 2026-09-24 线上行为:仅 0..4 有映射;章节 5/6 **未映射返回 0**
- * (调用方 Math.max 兜底回 page1 标记 = 1 页)——这是剧情进行中的现状,不是 bug;
- * 后续场次推进时在此表补行,勿"优化"成线性式。
+ * 章节 → 任务册书页数(9 页制)。语义 = **已完成页数**。
+ *
+ * ⚠️ 2026-10-03 重写。此前此表缺 5/6 两行,回退 0,被调用方 Math.max(1, 0) 兜底,
+ * 会让书页从 7 **倒退到 1** ——玩家可见的倒退。现按剧本场次总表逐场对齐:
+ *   剧本 3/4/5 场 = 书页一/二/三(B612 家与日常 → 玫瑰 → 离别)→ 由 homeMemoryStep 细分
+ *   剧本   6 场   = 书页四(325 国王)          → chapter 1 完成才进 4 页
+ *   剧本   7 场   = 书页五(326 **与** 327 同页)→ chapter 2 停在 4 页,3 才进 5 页
+ *   剧本   8 场   = 书页六(328 **与** 329 同页)→ chapter 4 停在 5 页,5 才进 6 页
+ *   剧本   9 场   = 书页七(330 地理学家)      → chapter 6 完成才进 7 页
+ * 语义 = **已完成页数**,单调不减是硬要求(玩家重进旧星球不得看到进度回退,单测钉死)。
+ *
+ * ⚠️ started=false 返回 0,且**必须在 B612(page1)完成后才让章节值参与**(见 readPages):
+ * chapter 0 是存档初值(325 未完成),不代表 B612 三页已读完。若无条件取用,
+ * 画羊刚完成、还没进石门的玩家会看到「书页 3 / 9」——他连第一页都没读到。
  */
-const CHAPTER_TO_PAGES = { 0: 1, 1: 4, 2: 5, 3: 6, 4: 7 };
-export function pagesBonusForChapter(chapter) {
-  return CHAPTER_TO_PAGES[clampChapter(chapter)] || 0;
+const CHAPTER_TO_PAGES = { 0: 3, 1: 4, 2: 4, 3: 5, 4: 5, 5: 6, 6: 7 };
+export function pagesBonusForChapter(chapter, started = true) {
+  if (!started) return 0;
+  return CHAPTER_TO_PAGES[clampChapter(chapter)] ?? 3;
 }
 
-/** 任务册书页总数(展示层「x / 9」的分母) */
+/** 任务册书页总数(展示层「x / 9」的分母)。唯一来源,禁止再硬编码。 */
 export const PAGES_TOTAL = 9;
+
+/**
+ * B612 家的三页细分(2026-10-03)。剧本第 3/4/5 场 = 书页一/二/三,
+ * 但三场在实现里是 scene3-memory 的 4 个 STEPS(volcano/baobab/sunset/rose),
+ * 玫瑰那一站内部又含 相见(regret 前)与 离别 两段。
+ * → 用 homeMemoryStep(0..4 已完成站数)换算"已完成页数":
+ *   0 站→0 页 · 1 站→1 页 · 2 站→2 页 · 3 站(日落)→2 页 · 4 站(玫瑰/离别)→3 页
+ * 站三(日落)与站二(树苗)同属剧本书页一(家与日常),故两站都只到 2 页。
+ * @param {number} homeMemoryStep 已完成的 B612 站数
+ */
+export function pagesFromHomeStep(homeMemoryStep) {
+  const s = Math.max(0, Math.min(4, Math.floor(Number(homeMemoryStep) || 0)));
+  return [0, 1, 2, 2, 3][s];
+}
+
+/**
+ * 书页数单一真相(2026-10-03)。任务册「书页 x / 9」与「进程」行必须同源,
+ * 否则会出现「进程:书页五 进行中」与「书页:1 / 9」自相矛盾(2026-10-03 修)。
+ * 三段进度取最大:开场弧线(B612 三页) / 星球章节 / 已完成 B612 站数。
+ * @param {{scene2?:boolean,page1?:boolean,chapter?:number,homeMemoryStep?:number}} flags
+ * @returns {number} 0..PAGES_TOTAL
+ */
+export function readPages(flags) {
+  const f = flags || {};
+  const home = f.page1 ? pagesFromHomeStep(4) : pagesFromHomeStep(f.homeMemoryStep);
+  // 章节值只在 B612 三页完成后参与。chapter 0 是存档初值,此刻玩家连第一页都没开始读;
+  // 剧本书页一二三 = B612 三场,书页四起才是星球线,所以 page1 之前一律不看章节。
+  const chapterPages = f.page1 ? pagesBonusForChapter(f.chapter, true) : 0;
+  return Math.max(1, home, chapterPages);
+}
 
 /**
  * 进程节拍(2026-09-26 主人报「情节推进理解困难」单一权威)。

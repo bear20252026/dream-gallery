@@ -125,7 +125,10 @@ export class LoopManager {
     this.ctx.scene.rnd.setPixelRatio(this.PR_STEPS[this.prIdx]);
     if (this.ctx.ui.modeToast) {
       this.ctx.ui.modeToast(
-        this.lowQuality ? '已切到「低画质·流畅」(PixelRatio=1)' : '已恢复「高画质·自动」'
+        // 2026-10-03:此前写死「PixelRatio=1」,与实际最低档 0.75 不符,玩家按提示对不上号。
+        this.lowQuality
+          ? '已切到「低画质·流畅」(PixelRatio=' + this.PR_STEPS[this.prIdx] + ')'
+          : '已恢复「高画质·自动」'
       );
     }
     eventBus.emit('loop:qualityChanged', this.lowQuality);

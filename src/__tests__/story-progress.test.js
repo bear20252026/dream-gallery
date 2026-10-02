@@ -1,6 +1,7 @@
 // story-progress.test.js — B612 剧情进度纯逻辑契约(2026-09-24 批3 抽取)
 // 回归锚点:章节推进若允许回退,玩家重进旧星球会"倒退"全书进度;
 // 书页映射若被"优化"成线性式,任务册显示立刻错位(文案契约不是数学)。
+// 2026-10-03:书页表缺 5/6 行导致倒退,故加"单调不减"专项断言;新增 readPages 单一真相。
 import { describe, it, expect } from 'vitest';
 import {
   CHAPTER_MAX,
@@ -8,6 +9,8 @@ import {
   clampChapter,
   advanceChapter,
   pagesBonusForChapter,
+  pagesFromHomeStep,
+  readPages,
   decorateSpiritsState,
   storyBeat,
   storyNext,
@@ -131,20 +134,104 @@ describe('章节推进 advanceChapter(只前进不回退)', () => {
   });
 });
 
-describe('书页换算 pagesBonusForChapter(忠实线上现状)', () => {
-  it('0..4 按文案映射表', () => {
-    expect(pagesBonusForChapter(0)).toBe(1);
-    expect(pagesBonusForChapter(1)).toBe(4);
-    expect(pagesBonusForChapter(2)).toBe(5);
-    expect(pagesBonusForChapter(3)).toBe(6);
-    expect(pagesBonusForChapter(4)).toBe(7);
+// 2026-10-03 重写:旧表缺 5/6 两行 → 回退 0 → 被调用方 Math.max(1,0) 兜底 →
+// 书页从 7 倒退到 1(玩家可见)。现按剧本场次总表逐场对齐,并钉死单调不减。
+describe('书页换算 pagesBonusForChapter(按剧本场次总表,已读页数)', () => {
+  it('0..6 全部有映射,无一回落', () => {
+    expect(pagesBonusForChapter(0)).toBe(3); // B612 三页已完成,325 正在演
+    expect(pagesBonusForChapter(1)).toBe(4); // 剧本 6 场 = 书页四(325)
+    expect(pagesBonusForChapter(2)).toBe(4); // 剧本 7 场 = 书页五,326 刚完 → 仍未满
+    expect(pagesBonusForChapter(3)).toBe(5); // 326 与 327 同属书页五,327 完成才满
+    expect(pagesBonusForChapter(4)).toBe(5); // 剧本 8 场 = 书页六,328 刚完
+    expect(pagesBonusForChapter(5)).toBe(6); // 328 与 329 同属书页六,329 完成才满
+    expect(pagesBonusForChapter(6)).toBe(7); // 剧本 9 场 = 书页七(330 地理学家)
   });
-  it('章节 5/6 未映射 → 0(调用方回退 page1 标记,勿擅自补值)', () => {
-    expect(pagesBonusForChapter(5)).toBe(0);
-    expect(pagesBonusForChapter(6)).toBe(0);
+  it('单调不减:重进旧星球不得看到书页倒退(2026-10-03 修的核心 bug)', () => {
+    let prev = 0;
+    for (let ch = 0; ch <= CHAPTER_MAX; ch++) {
+      const n = pagesBonusForChapter(ch);
+      expect(n).toBeGreaterThanOrEqual(prev);
+      prev = n;
+    }
+  });
+  it('started=false(故事未开始)→ 0,别让全新存档一进游戏就显示「3 / 9」', () => {
+    expect(pagesBonusForChapter(0, false)).toBe(0);
+    expect(pagesBonusForChapter(6, false)).toBe(0);
+  });
+  it('钳制:负数/超界/脏数据都落在映射表内,不返回 0', () => {
+    expect(pagesBonusForChapter(-5)).toBe(3);
+    expect(pagesBonusForChapter(99)).toBe(7);
+    expect(pagesBonusForChapter(undefined)).toBe(3);
+    expect(pagesBonusForChapter(NaN)).toBe(3);
   });
   it('PAGES_TOTAL = 9(九书页进行中)', () => {
     expect(PAGES_TOTAL).toBe(9);
+  });
+});
+
+describe('B612 三页细分 pagesFromHomeStep', () => {
+  it('站数 → 已读页数(站二树苗与站三日落同属剧本书页一「家与日常」)', () => {
+    expect(pagesFromHomeStep(0)).toBe(0);
+    expect(pagesFromHomeStep(1)).toBe(1);
+    expect(pagesFromHomeStep(2)).toBe(2);
+    expect(pagesFromHomeStep(3)).toBe(2); // 日落站仍属书页一
+    expect(pagesFromHomeStep(4)).toBe(3); // 玫瑰站 = 书页二(相见)+书页三(离别)
+  });
+  it('脏数据钳进 0..4', () => {
+    expect(pagesFromHomeStep(-3)).toBe(0);
+    expect(pagesFromHomeStep(88)).toBe(3);
+    expect(pagesFromHomeStep(NaN)).toBe(0);
+  });
+});
+
+describe('书页单一真相 readPages(2026-10-03)', () => {
+  it('B612 途中:按 homeMemoryStep 细分显示,不再恒为 1', () => {
+    expect(readPages({ scene2: true, homeMemoryStep: 0 })).toBe(1);
+    expect(readPages({ scene2: true, homeMemoryStep: 1 })).toBe(1);
+    expect(readPages({ scene2: true, homeMemoryStep: 2 })).toBe(2);
+    expect(readPages({ scene2: true, homeMemoryStep: 3 })).toBe(2);
+    expect(readPages({ scene2: true, homeMemoryStep: 4 })).toBe(3);
+  });
+  it('page1 未完成时章节值不参与(chapter 0 是初值,玩家还没读第一页)', () => {
+    expect(readPages({ scene2: true, chapter: 0 })).toBe(1);
+    expect(readPages({ scene2: true, chapter: 3 })).toBe(1);
+  });
+  it('page1 总闸优先(旧存档只有 page1 → 满 3 页,不强迫重玩)', () => {
+    expect(readPages({ page1: true })).toBe(3);
+    expect(readPages({ page1: true, homeMemoryStep: 1 })).toBe(3);
+  });
+  it('B612 完成后章节线接管', () => {
+    expect(readPages({ page1: true, chapter: 0 })).toBe(3);
+    expect(readPages({ page1: true, chapter: 1 })).toBe(4);
+    expect(readPages({ page1: true, chapter: 3 })).toBe(5);
+    expect(readPages({ page1: true, chapter: 6 })).toBe(7);
+  });
+  it('全程单调不减:从开场一路推进到六章全完成', () => {
+    let prev = 0;
+    const path = [
+      {},
+      { scene2: true },
+      { scene2: true, homeMemoryStep: 2 },
+      { scene2: true, homeMemoryStep: 4 },
+      { scene2: true, page1: true, homeMemoryStep: 4, chapter: 0 },
+      { scene2: true, page1: true, chapter: 1 },
+      { scene2: true, page1: true, chapter: 2 },
+      { scene2: true, page1: true, chapter: 3 },
+      { scene2: true, page1: true, chapter: 4 },
+      { scene2: true, page1: true, chapter: 5 },
+      { scene2: true, page1: true, chapter: 6 },
+    ];
+    for (const f of path) {
+      const n = readPages(f);
+      expect(n).toBeGreaterThanOrEqual(prev);
+      expect(n).toBeLessThanOrEqual(PAGES_TOTAL);
+      prev = n;
+    }
+    expect(prev).toBe(7);
+  });
+  it('空存档返回 1(不是 0:开场已在读第一页)', () => {
+    expect(readPages({})).toBe(1);
+    expect(readPages()).toBe(1);
   });
 });
 

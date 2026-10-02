@@ -169,15 +169,19 @@ window.__storyDialogs = {
 let lastWorld = '';
 ctx.onTick(function storyDialogTick() {
   const w = ctx.scene.activeWorld || 'main';
-  // 这两站由正式主线完整讲述；循环旧气泡会在幼苗站谈玫瑰、在对话中抢词。
-  if (w === 'b612' || w === 'king325') {
-    labelRenderer.domElement.style.display = 'none';
-    return;
-  }
   const isStory = w === 'b612' || /^king\d+/.test(w);
   labelRenderer.domElement.style.display = isStory ? '' : 'none';
   if (!isStory) {
     lastWorld = '';
+    return;
+  }
+  // 2026-10-03 修死代码:此前上面两行直接 return,三个 actor 的 world 恰好只有
+  // b612 与 king325,故整段永不执行 —— 12 句原著台词白占 TTS 预热配额,玩家永远看不到。
+  // 当年关它的理由是"循环气泡会在对话中抢词",那是对的;但解法是**加对话闸**而不是全禁。
+  // 规则:主线对白/旅程任务进行中一律不显示,空闲时才轮播 —— 静止画面因此有呼吸感。
+  if (ctx.ui.dialogOpen?.() || ctx.ui.journey?.busy?.()) {
+    labelRenderer.domElement.style.display = 'none';
+    lastWorld = w;
     return;
   }
   const pl = ctx.player.pl;
