@@ -512,7 +512,7 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
     restPos = plane.position.clone();
     // 收尾三拍(2026-09-07 对稿):坠机字幕 → 晕(失焦下沉) → 黑场落「睡去」字幕
     later(() => {
-      $('fSleep').textContent = FILM.crash;
+      $('fSleep').textContent = tt(FILM.crash);
       $('fSleep').classList.add('show');
     }, 1300);
     later(() => {

@@ -8,8 +8,10 @@
 import * as THREE from 'three';
 import { buildChapterProps } from './planet-props.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
+import { createModelSurface } from '../scene/model-surface.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { ctx } from '../ctx.js';
+import { memoryWalkPosition as kingWalkPosition } from '../shared/journey-guidance.mjs';
 import { hotBegin, hotEnd } from '../hot.js';
 import { Z } from '../shared/z-layers.mjs';
 import { initSceneManager } from '../core/scene-manager.js';
@@ -23,13 +25,8 @@ import {
   spawnFor,
   kingSpawnPoint,
 } from '../shared/planet-logic.mjs';
-import {
-  clampChapter,
-  advanceChapter,
-  decorateSpiritsState,
-  storyNext,
-} from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死;2026-09-27 加 storyNext 下一步权威)
-import { GLOBAL, B612_RETURN, tt, whoSpk } from '../shared/story-text.mjs'; // 指引文案单一源(2026-09-27 B612 首进下一步/重访入场白)
+import { clampChapter, advanceChapter, decorateSpiritsState } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死;2026-09-27 加 storyNext 下一步权威)
+import { tt } from '../shared/story-text.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js'; // 剧情浮光指引(2026-09-28)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
@@ -97,10 +94,62 @@ const worldManager = initSceneManager({
 const b612World = worldManager.registerWorld('b612', {
   scene: new THREE.Scene(),
   meta: { title: 'B612' },
+  ground: (x, z) => homeSurface?.height(x, z),
 });
 b612World.scene.background = new THREE.Color(0x05050f);
 addWorldLights(b612World.scene, true);
 addStarfield(b612World.scene);
+
+// 沿原模型的曲面行走，保留球体轮廓、贴图与整套场景的相对比例。
+let homeSurface = null,
+  homeReveal = null,
+  homeFocus = null;
+b612World.meta.focusTarget = (x, z) => {
+  homeFocus = { x, z, start: performance.now(), yaw: ctx.player.pl.y, pitch: ctx.player.pl.pi };
+};
+b612World.meta.showOverview = () =>
+  new Promise((resolve) => {
+    homeReveal?.resolve(false);
+    homeReveal = { start: performance.now(), resolve, fov: ctx.scene.cam.fov };
+    b612World.meta.revealing = true;
+    document.body.dataset.homeReveal = '1';
+  });
+function finishHomeReveal(result) {
+  const current = homeReveal;
+  homeReveal = null;
+  delete document.body.dataset.homeReveal;
+  b612World.meta.revealing = false;
+  if (current && ctx.scene.activeWorld === 'b612') {
+    ctx.scene.cam.fov = current.fov;
+    ctx.scene.cam.updateProjectionMatrix();
+  } else if (current && b612World.camera) b612World.camera.fov = current.fov;
+  current?.resolve(result);
+}
+function tickHomeReveal() {
+  if (!homeReveal || !homeSurface) return;
+  const progress = Math.min(1, (performance.now() - homeReveal.start) / 3600);
+  const angle = 1.05 + progress * 0.2;
+  const c = homeSurface.center;
+  const portrait = ctx.scene.cam.aspect < 0.7;
+  const fov = portrait ? 85 : homeReveal.fov;
+  const distance = portrait ? 34 : 30;
+  if (ctx.scene.cam.fov !== fov) {
+    ctx.scene.cam.fov = fov;
+    ctx.scene.cam.updateProjectionMatrix();
+  }
+  ctx.scene.cam.position.set(
+    c.x + Math.sin(angle) * distance,
+    c.y + 15,
+    c.z + Math.cos(angle) * distance
+  );
+  ctx.scene.cam.lookAt(c.x, c.y + 3, c.z);
+  if (progress >= 1) finishHomeReveal(true);
+}
+bag.custom.push(() => finishHomeReveal(false));
+ctx.events.on('world:changed', ({ from, to }) => {
+  if (from === 'b612' && to !== 'b612') finishHomeReveal(false);
+  if (from === 'b612' && to !== 'b612') homeFocus = null;
+});
 
 const assetLoader = createGLTFLoader();
 assetLoader.setMeshoptDecoder(MeshoptDecoder);
@@ -137,7 +186,7 @@ ctx.kunlun.planetsMode = true; // spirits.js:沙漠光柱系统休眠,questActiv
 const prevOverride = ctx.kunlun.groundOverride; // 可能是 eternal 的链(导入顺序在其后)
 ctx.kunlun.groundOverride = function (x, z) {
   const active = ctx.scene.activeWorld;
-  if (active === 'b612') return 0;
+  if (active === 'b612') return homeSurface?.height(x, z);
   if (active && /^king\d+$/.test(active)) {
     return planetByNum(active.replace('king', '')) ? R * 0.42 : 0;
   }
@@ -196,7 +245,7 @@ function numSprite(txt, color) {
       depthWrite: false,
     })
   );
-  sp.scale.set(5, 2.5, 1);
+  sp.scale.set(1.8, 0.9, 1); // 章节号留作小标识，不挡住人物和目标
   return sp;
 }
 
@@ -289,11 +338,20 @@ bag.custom.push(function () {
 });
 loadWorldAsset('models/hall/b612-world/b612-storybook-pbr.glb', b612World, {
   name: 'b612Storybook',
-  maxSize: 44.85,
+  maxSize: 89.7,
   x: 0,
-  y: -22.45, // 天幕壳中心落在 y≈0,星球顶面贴近地面高度
+  y: -44.9, // 全场等比2倍；原星球顶部仍贴近0m，星幕与人物比例不变
   z: 0,
   onLoad: function (model, gltf) {
+    model.updateWorldMatrix(true, true);
+    const terrain = [];
+    model.traverse((o) => {
+      if (o.isMesh && /^PlanetLP_[12]_/.test(o.name)) terrain.push(o);
+    });
+    if (terrain.length) {
+      homeSurface = createModelSurface(terrain);
+      b612World.meta.surface = homeSurface;
+    }
     if (gltf.animations && gltf.animations.length) {
       storybookMixer = new THREE.AnimationMixer(model);
       storybookMixer.clipAction(gltf.animations[0]).play(); // SceneFull2:小王子坐姿 idle(6.7s 循环)
@@ -319,8 +377,6 @@ const gargIntro = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-intro.mp3');
 const gargMain = new Audio(AUDIO_CDN + 'media/gargantua/gargantua-main.mp3');
 gargMain.loop = true;
 let gargStarted = false;
-let b612HintChapter = -1; // B612「下一步」指引已播报到的章节(2026-09-27:每章各说一次,原只说 chapter0 一次)
-let b612DialogChapter = -1; // B612 入场白已说到的章节(每章每会话一次,不唠叨)
 ctx.scene.worldChanged &&
   ctx.scene.worldChanged(function (d) {
     if (d && d.to === 'b612') {
@@ -336,22 +392,7 @@ ctx.scene.worldChanged &&
       // B612 入场白(2026-09-27 主人报"进 B612 后没有任何台词"):回忆演出只播一次,
       // 此后进 B612 是哑巴世界 —— 王子每章亲口欢迎一句 + 下一步(任务册同源);
       // 回忆演出期(page1 未完成)不打扰,不上锁不阻塞
-      try {
-        if (ctx.store.flag('page1') && b612DialogChapter !== chapter) {
-          b612DialogChapter = chapter;
-          const next = storyNext({ scene2: true, page1: true, chapter: chapter });
-          ctx.openDialog &&
-            ctx.openDialog({
-              speaker: tt(B612_RETURN.who),
-              speakerType: whoSpk(B612_RETURN.who),
-              lines: [tt(B612_RETURN.line), tt(next)],
-              autoHide: 9000,
-              lock: false,
-            });
-        }
-      } catch (e) {
-        console.debug('[planets] B612 入场白失败(世界照常进):', e);
-      }
+      // 回忆里的角色听不见玩家；下一站由界面指引，不再插入另一条欢迎对白。
     } else {
       try {
         gargMain.pause();
@@ -580,14 +621,16 @@ function updateStoryGuides() {
         en: 'Stone Gate — on to B612',
         zh: '石门 · 前往 B612',
       };
-    else if (active === 'b612')
-      target = { world: 'b612', x: 0, z: 0, en: 'The Little Prince', zh: '小王子 · 故事在此' };
+    else if (active === 'b612') target = null;
     else if (/^king\d+$/.test(active)) {
       const i = islands[chapter];
-      if (i && i.mote && i.mote.visible && i.moteW)
+      const ready = active !== 'king325' || !!window.__scene6?.state?.pickupArmed;
+      if (ready && i && i.mote && i.mote.visible && i.moteW)
         target = { world: active, x: i.moteW.x, z: i.moteW.z, en: 'Stardust', zh: '星屑' };
     }
   }
+  const journeyGoal = ctx.ui.journey?.goal();
+  if (journeyGoal && journeyGoal.world === active) target = journeyGoal;
   try {
     ctx.ui.storyTarget && ctx.ui.storyTarget(target);
   } catch (e) {}
@@ -617,7 +660,13 @@ function updateStoryGuides() {
     gateGuideBeacon.material.opacity = gateGuideBeacon.userData.baseOpacity * pulse;
   if (gateGuideArrow) tickArrow(gateGuideArrow, t);
   // ② B612 小王子:章节未满即立(故事心脏);走近原点 5m 内撤(入场白/按钮已接管)
-  const wantPrince = !!(p && active === 'b612' && chapter < 6 && p.x * p.x + p.z * p.z > 25);
+  const wantPrince = !!(
+    p &&
+    active === 'b612' &&
+    page1Done &&
+    chapter < 6 &&
+    p.x * p.x + p.z * p.z > 25
+  );
   if (wantPrince && !princeArrow) {
     const bw = worldManager.getWorld('b612').scene;
     princeBeacon = makeGuideBeacon(bw, 0, 0, 0, 3.2, 0.35, 0.3, 'storyBeaconPrince');
@@ -798,14 +847,29 @@ onTick(function (dt) {
   const p = pl();
   const plRef = ctx.player.pl;
   const activeWorld = ctx.scene.activeWorld || 'main';
+  const previousHome = activeWorld === 'b612' ? p.clone() : null;
   updateStoryGuides(); // 剧情浮光指引(信标+悬浮箭,按世界/章节/距离同立同撤)
 
   // ==== 太空人模式:非主世界时自由飞行,无重力,3D 全方向移动 ====
   if (activeWorld !== 'main') {
-    const dt2 = Math.min(dt || 0.016, 0.05);
-    const speed = spaceKeys['ShiftLeft'] || spaceKeys['ShiftRight'] ? 22 : 9;
+    const guidedWalk = activeWorld === 'b612' || (activeWorld === 'king325' && chapter === 0);
+    if (guidedWalk) document.body.dataset.journeyWalking = activeWorld;
+    else delete document.body.dataset.journeyWalking;
+    const dt2 =
+      ctx.overlay.anyOpen() ||
+      ctx.ui.dialogOpen?.() ||
+      (activeWorld === 'b612' && (!homeSurface || homeReveal || homeFocus))
+        ? 0
+        : Math.min(dt || 0.016, 0.05);
+    const speed = guidedWalk
+      ? spaceKeys['ShiftLeft'] || spaceKeys['ShiftRight']
+        ? 5.8
+        : 3.8
+      : spaceKeys['ShiftLeft'] || spaceKeys['ShiftRight']
+        ? 22
+        : 9;
     const yaw = plRef.y || 0;
-    const pitch = plRef.pi || 0;
+    const pitch = guidedWalk ? 0 : plRef.pi || 0;
     // 相机方向 3D 向量
     const fx = -Math.sin(yaw) * Math.cos(pitch);
     const fy = Math.sin(pitch);
@@ -864,20 +928,50 @@ onTick(function (dt) {
       p.x += (fx2 * nz + rx2 * nx) * js;
       p.z += (fz2 * nz + rz2 * nx) * js;
     }
-    // B612 天幕壳即世界边界:软钳在半径 21 内(壳 ±22.4),不会飞出壳外掉进空背景
+    // 放大后的天幕壳半径约44m；步行区另由原模型地表收束。
     if (activeWorld === 'b612') {
       const rr = Math.hypot(p.x, p.y, p.z);
-      if (rr > 21) {
-        const k = 21 / rr;
+      if (rr > 42) {
+        const k = 42 / rr;
         p.x *= k;
         p.y *= k;
         p.z *= k;
       }
     }
+    if (guidedWalk) {
+      const ground =
+        activeWorld === 'b612' ? homeSurface?.place(p, previousHome) : kingWalkPosition(p);
+      if (ground) {
+        p.x = ground.x;
+        p.y = ground.y;
+        p.z = ground.z;
+      } else if (previousHome) p.copy(previousHome);
+      plRef.boostT = 0;
+      plRef.boostDownT = 0;
+    }
     // 阻止重力:物理步不施加下落
     plRef.vy = 0;
     plRef.onGround = true;
     plRef.gliding = false;
+    if (activeWorld === 'b612') {
+      if (homeFocus && homeSurface) {
+        const f = homeFocus,
+          t = Math.min(1, (performance.now() - f.start) / 700),
+          smooth = t * t * (3 - 2 * t);
+        const dx = f.x - p.x,
+          dz = f.z - p.z;
+        const angle = Math.atan2(-dx, -dz) - f.yaw;
+        plRef.y = f.yaw + Math.atan2(Math.sin(angle), Math.cos(angle)) * smooth;
+        const pitch = Math.atan2(
+          (homeSurface.height(f.x, f.z) ?? p.y - 2) + 0.8 - p.y,
+          Math.max(1, Math.hypot(dx, dz))
+        );
+        plRef.pi = f.pitch + (Math.max(-0.65, Math.min(0.4, pitch)) - f.pitch) * smooth;
+        if (ctx.player.viewMode === 1 && ctx.player.orbit) ctx.player.orbit.yaw = plRef.y;
+        if (t >= 1) homeFocus = null;
+      }
+      tickHomeReveal();
+    }
     // 星屑呼吸 + 点灯人路灯
     islands.forEach(function (isl, i) {
       isl.mote.rotation.y += 0.01;
@@ -891,6 +985,12 @@ onTick(function (dt) {
     // 诚实指引(2026-09-27):按钮只指向已建成的站 —— 325 完成后指"重返 325",
     // 不把玩家送进没内容的空岛;新站建成(built)后自动变"前往"
     if (activeWorld === 'b612') {
+      // 小王子的家必须先走完，离别之后才前往 325。边界与物理仍正常更新。
+      if (!ctx.store.flag('page1')) {
+        setNav(true, tt({ zh: '返回沙漠', en: 'Back to the desert' }), goMainWorld);
+        hud.style.display = 'none';
+        return;
+      }
       const nextBuilt = PLANETS.find(function (p, i) {
         return i >= chapter && p.built;
       });
@@ -899,26 +999,36 @@ onTick(function (dt) {
       }).pop();
       const goTarget = nextBuilt || lastBuilt;
       const goLabel = nextBuilt
-        ? '前往 ' + nextBuilt.num + ' ' + nextBuilt.name + ' →'
-        : '重返 ' + lastBuilt.num + ' ' + lastBuilt.name;
+        ? tt({ zh: '前往 ', en: 'Visit ' }) +
+          nextBuilt.num +
+          ' ' +
+          tt({ zh: nextBuilt.name, en: nextBuilt.en }) +
+          ' →'
+        : tt({ zh: '重返 ', en: 'Revisit ' }) +
+          lastBuilt.num +
+          ' ' +
+          tt({ zh: lastBuilt.name, en: lastBuilt.en });
       const goFn = function () {
         goPlanetNum(goTarget.num);
       };
-      setNav(true, '返回主世界', goMainWorld, goLabel, goFn);
-      // B612「下一步」指引(2026-09-27 全链补齐):每章进 B612各说一次当前章去向;
-      // chapter0 沿用 GLOBAL.b612NextHint(探针契约),其余走 storyNext 单一权威
-      if (b612HintChapter !== chapter && chapter < 6) {
-        b612HintChapter = chapter;
-        try {
-          const hint =
-            chapter === 0
-              ? tt(GLOBAL.b612NextHint)
-              : tt(storyNext({ scene2: true, page1: true, chapter }));
-          ctx.ui.modeToast && ctx.ui.modeToast(hint, 6000);
-        } catch (e) {}
-      }
+      setNav(true, tt({ zh: '返回沙漠', en: 'Back to the desert' }), goMainWorld, goLabel, goFn);
+      ctx.ui.journey?.setPhase('travel-hub', {
+        world: 'b612',
+        chapter: { zh: '回忆旅途 · 下一站', en: 'Memory journey · next stop' },
+        hint: {
+          zh: '家的回忆已完成。点下方「' + goLabel + '」继续小王子的旅途。',
+          en: 'Memories of home are complete. Use the button below to continue his journey.',
+        },
+        lock: chapter === 0,
+      });
     } else if (/^king/.test(activeWorld)) {
-      setNav(true, '← 返回 B612', goB612Back, '返回主世界', goMainWorld);
+      setNav(
+        true,
+        tt({ zh: '← 返回 B612', en: '← Back to B612' }),
+        goB612Back,
+        tt({ zh: '返回沙漠', en: 'Back to the desert' }),
+        goMainWorld
+      );
     } else setNav(false);
     hud.style.display = 'none';
     return;
@@ -926,6 +1036,7 @@ onTick(function (dt) {
 
   // ==== 主世界:石门自动传送已迁 gallery/portal.js,此处只收起本章 UI ====
   if (activeWorld === 'main') {
+    delete document.body.dataset.journeyWalking;
     setNav(false); // 主世界导航隐藏(进 B612 走石门 portal)
     hud.style.display = 'none';
     return;

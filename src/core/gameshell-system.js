@@ -12,6 +12,7 @@ import { GLOBAL, tt } from '../shared/story-text.mjs';
 import { defineSystem } from './system.js';
 import { createDialogSystem } from './gameshell-dialog.js'; // 对话框状态机(B5 外迁)
 import { pagesBonusForChapter, storyBeat, storyNext } from '../shared/story-progress.mjs'; // 书页映射+进程节拍单一权威(2026-09-24 抽出;2026-09-26 加 storyBeat;2026-09-27 加 storyNext)
+import { JOURNEY_TEXT, TASKS } from '../shared/journey-logic.mjs';
 
 // ---------- 手绘样式(一次性注入,羊皮纸 + 抖边 + 楷体笔触) ----------
 const STYLE = `
@@ -59,8 +60,6 @@ const STYLE = `
 #gameDialog[data-spk='vain'] .gs-name{background:linear-gradient(135deg,#c06a9a,#8a406a);color:#ffeef5}
 #gameDialog[data-spk='tippler']{border-color:#7a8a5a}
 #gameDialog[data-spk='tippler'] .gs-name{background:linear-gradient(135deg,#7a8a5a,#55603c);color:#f2f5e8}
-  transform:rotate(-2deg);
-}
 .gs-text{font-size:19px;line-height:1.85;min-height:1.85em;letter-spacing:.6px;
   text-shadow:0 1px 0 rgba(255,250,235,.6);}
 .gs-caret{display:inline-block;width:.5em;color:#a35a1e;animation:gsBlink 1s steps(1) infinite;}
@@ -75,6 +74,8 @@ const STYLE = `
 }
 .gs-choice:hover{background:#caa15f;color:#fff5e0;transform:translateX(6px) rotate(-.6deg);}
 .gs-hint{margin-top:8px;text-align:right;font-size:12px;color:#8a6a44;opacity:.7;letter-spacing:2px;}
+.gs-next{display:block;margin:12px 0 0 auto;min-height:44px;padding:9px 20px;border:1px solid #8a6a44;border-radius:22px;background:#6b5634;color:#fff0cc;font:inherit;cursor:pointer}
+.q-guidance{font-size:12px;line-height:1.6;color:#cbb99b;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.q-guidance:empty{display:none}
 /* 「轮到你开口」呼吸(2026-09-26 主人报「对话对情节的指引不清晰」):
    选项在等玩家点选时轻柔呼吸;只动 box-shadow 不动 transform,与 hover 位移不打架 */
 @keyframes gsAwaitPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(74,53,38,.35),0 0 0 0 rgba(255,214,170,0)}50%{box-shadow:inset 0 0 0 1px rgba(74,53,38,.35),0 0 16px 3px rgba(255,200,140,.45)}}
@@ -111,6 +112,12 @@ const STYLE = `
 #questHud.folded{width:auto;padding:9px 14px;}
 #questHud.folded .q-main,#questHud.folded .q-rows{display:none}
 #questHud.folded .q-title{border-bottom:none;margin-bottom:0;padding-bottom:0;font-size:13px}
+#questHud .q-current{display:none}
+#questHud.folded{width:min(225px,calc(100vw - 180px));transform:none;background:rgba(27,28,37,.9);border:1px solid #ae9263;color:#f4e7c8;border-radius:4px 16px;box-shadow:0 5px 18px #0004;padding:13px 16px}
+#questHud.folded .q-title{font-size:10px;letter-spacing:3px;color:#c2aa7d;margin-right:22px}
+#questHud.folded .q-current{display:block;font-size:15px;line-height:1.65;margin-top:7px;color:#f5e5bd}
+body[data-dialog-open] #questHud.folded .q-current{font-size:13px}
+@media(max-width:600px){#questHud.folded{left:10px;top:12px;width:calc(100vw - 174px);min-width:145px;padding:10px 12px}#questHud.folded .q-current{font-size:12px}#gameDialog{bottom:12px;width:calc(100vw - 28px);max-height:48dvh;overflow:auto;padding:18px 18px 12px}.gs-text{font-size:16px;line-height:1.65}.gs-choice{font-size:14px;min-height:44px}.gs-name{position:static;width:fit-content;margin:-8px 0 8px}.gs-choices{gap:7px}.gs-hint{font-size:10px}}
 
 /* ===== 系统菜单按钮(右上毛笔印) ===== */
 #gsMenuBtn{
@@ -155,7 +162,11 @@ function createGameShellSystem() {
   let acc = 0; // 任务栏刷新节流
 
   // 对话框状态机已外迁 core/gameshell-dialog.js(B5 整改)
-  const dialogApi = createDialogSystem();
+  let unsubWorld;
+  const dialogApi = createDialogSystem({
+    getWorld: () => ctx.scene.activeWorld || 'main',
+    isStoryBusy: () => !!ctx.ui.journey?.busy(),
+  });
 
   // ---- 任务栏进度 ----
   function readProgress() {
@@ -197,17 +208,45 @@ function createGameShellSystem() {
   }
   function refreshQuest() {
     if (!questEl) return;
+    refreshMenu();
     const p = readProgress();
+    const world = ctx.scene.activeWorld || 'main';
+    const task = ctx.ui.journey?.state();
+    const goal = ctx.ui.journey?.goal();
+    const phase = ctx.ui.journey?.phase();
+    const current =
+      goal?.world === world
+        ? tt(goal)
+        : task
+          ? tt(TASKS[task.id].title)
+          : world === 'b612' && !ctx.store.flag('page1')
+            ? tt({
+                zh: '走近光点，听小王子讲他的家',
+                en: 'Follow the light through memories of home',
+              })
+            : /^king/.test(world)
+              ? tt({ zh: '陪小王子走完这段回忆', en: 'Witness this memory with the little prince' })
+              : tt(p.next);
+    const currentPhase = phase?.world === world ? phase : null;
+    questEl.querySelector('.q-title').textContent = currentPhase
+      ? tt(currentPhase.chapter) +
+        (currentPhase.total ? ' · ' + currentPhase.step + '/' + currentPhase.total : '')
+      : tt(JOURNEY_TEXT.action);
+    questEl.querySelector('.q-current').textContent = current;
+    questEl.querySelector('.q-guidance').textContent = task?.feedback
+      ? tt(task.feedback)
+      : currentPhase?.hint
+        ? tt(currentPhase.hint)
+        : '';
     questEl.querySelector('.q-main').textContent = '◈ ' + p.main;
     const pr = questEl.querySelector('.q-rows');
     const rows = [
       // 进程/下一步=整行块(2026-09-30);书页/星屑/挂画/飞舟=紧凑双列
-      ['进程', tt(p.beat), 1],
-      ['下一步', tt(p.next), 1],
-      ['书页', p.pages + ' / 9', 0],
-      ['星屑', p.spirits + ' / 6', 0],
-      ['展厅挂画', p.picks + ' / 20', 0],
-      ['飞舟', p.ark, 0],
+      [tt({ zh: '进程', en: 'Chapter' }), tt(p.beat), 1],
+      [tt({ zh: '下一步', en: 'Next' }), current, 1],
+      [tt({ zh: '书页', en: 'Pages' }), p.pages + ' / 9', 0],
+      [tt({ zh: '星屑', en: 'Stardust' }), p.spirits + ' / 6', 0],
+      [tt({ zh: '展厅挂画', en: 'Gallery' }), p.picks + ' / 20', 0],
     ];
     questEl.querySelector('.q-rows').innerHTML = rows
       .map(
@@ -218,6 +257,18 @@ function createGameShellSystem() {
   }
 
   // ---- 菜单 ----
+  function refreshMenu() {
+    if (!menuEl) return;
+    const labels = {
+      ask: { zh: '问 昆 仑', en: 'About this journey' },
+      help: { zh: '操 作 指 引', en: 'How to play' },
+      quest: { zh: '任 务 册', en: 'Story progress' },
+      notebook: { zh: '旅 途 手 札', en: 'Travel notebook' },
+      close: { zh: '继 续 游 历', en: 'Continue journey' },
+    };
+    for (const [act, label] of Object.entries(labels))
+      menuEl.querySelector('[data-act="' + act + '"]').textContent = tt(label);
+  }
   function buildMenu() {
     menuEl = document.createElement('div');
     menuEl.id = 'gameMenu';
@@ -230,45 +281,27 @@ function createGameShellSystem() {
         <button class="m-btn" data-act="ask">问 昆 仑</button>
         <button class="m-btn" data-act="help">操 作 指 引</button>
         <button class="m-btn" data-act="quest">任 务 册</button>
+        <button class="m-btn" data-act="notebook">旅 途 手 札</button>
         <button class="m-btn" data-act="close">继 续 游 历</button>
       </div>`;
     document.body.appendChild(menuEl);
+    refreshMenu();
+    menuEl.querySelector('[data-act="notebook"]').onclick = () => {
+      menuApi.close();
+      ctx.ui.journey?.openNotebook();
+    };
     menuEl.querySelector('[data-act="ask"]').onclick = () => {
       menuApi.close();
-      ctx.openDialog &&
-        ctx.openDialog({
-          speaker: 'B612',
-          lines: [
-            'Welcome to B612 — a gallery for unfinished drawings.',
-            '收集六颗星屑罢——天、地、风、火、水、心。集齐了，飞舟自会来接你。',
-          ],
-        });
+      ctx.ui.journey?.openHelp();
     };
     menuEl.querySelector('[data-act="help"]').onclick = () => {
       menuApi.close();
-      ctx.openDialog &&
-        ctx.openDialog({
-          speaker: 'B612',
-          lines: [
-            'W A S D 行走，鼠标转望，空格起跳。',
-            '走近发光的光柱即可拾取星屑；登上山巅的飞舟可巡游天穹。',
-            '右上那枚朱印，随时唤出这本手札。',
-          ],
-        });
+      ctx.ui.journey?.openHelp();
     };
     menuEl.querySelector('[data-act="quest"]').onclick = () => {
       menuApi.close();
-      const p = readProgress();
-      ctx.openDialog &&
-        ctx.openDialog({
-          speaker: '当前任务',
-          lines: [
-            '主线 · ' + p.main,
-            '进程 · ' + tt(p.beat),
-            '下一步 · ' + tt(p.next),
-            '星屑 ' + p.spirits + ' / 6　·　展厅挂画 ' + p.picks + ' / 20　·　飞舟 ' + p.ark,
-          ],
-        });
+      questEl.classList.remove('folded');
+      questEl.querySelector('#questFold').textContent = '－';
     };
     menuEl.querySelector('[data-act="close"]').onclick = () => menuApi.close();
     menuApi = ctx.overlay.register(menuEl, {
@@ -300,18 +333,24 @@ function createGameShellSystem() {
         <div class="gs-name">B612</div>
         <div class="gs-text"></div>
         <div class="gs-choices"></div>
-        <div class="gs-hint">▷ 点击继续</div>`;
+        <div class="gs-hint">▷ 点击继续</div>
+        <button type="button" class="gs-next">继续 →</button>`;
       dialogEl.addEventListener('click', dialogApi.advance);
+      dialogEl.querySelector('.gs-next').onclick = (e) => {
+        e.stopPropagation();
+        dialogApi.advance();
+      };
       document.body.appendChild(dialogEl);
       dialogApi.attach(dialogEl);
 
       questEl = document.createElement('div');
       questEl.id = 'questHud';
-      questEl.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
       questEl.innerHTML = `
         <button id="questFold" type="button" aria-label="收起/展开任务册" title="收起/展开">－</button>
         <div class="q-title">任 务 册</div>
         <div class="q-main">◈ 收集六颗星屑</div>
+        <div class="q-current"></div>
+        <div class="q-guidance"></div>
         <div class="q-rows"></div>`;
       document.body.appendChild(questEl);
       // 收纳(2026-09-20 UI 清理):折叠成小签,偏好入 store
@@ -321,7 +360,8 @@ function createGameShellSystem() {
         qFoldBtn.textContent = folded ? '＋' : '－';
       };
       try {
-        applyFold((ctx.store.json('uiFold', {}) || {}).quest);
+        const pref = ctx.store.json('uiFold', {}) || {};
+        applyFold(pref.quest !== false);
       } catch (e) {
         console.debug('[gameshell-system] 任务册折叠偏好读取失败(保持展开):', e);
       }
@@ -339,7 +379,9 @@ function createGameShellSystem() {
       };
       refreshQuest();
 
-      menuBtn = document.createElement('div');
+      menuBtn = document.createElement('button');
+      menuBtn.type = 'button';
+      menuBtn.setAttribute('aria-label', '菜单 / Menu');
       menuBtn.id = 'gsMenuBtn';
       menuBtn.textContent = '印';
       menuBtn.title = '唤出手札';
@@ -351,11 +393,13 @@ function createGameShellSystem() {
 
       // 对话事件总线:其他模块可 ctx.events.emit('ui:dialog', {...})
       unsub = eventBus.on('ui:dialog', (o) => dialogApi.open(o));
+      unsubWorld = eventBus.on('world:changed', ({ from }) => dialogApi.cancelWorld(from));
       window.addEventListener('script:lang', refreshQuest);
 
       // 升级昆仑开口:既播 TTS,又落进手绘框(所有现有 kunlunSpeak 调用自动生效)
       prevKunlunSpeak = ctx.ui.kunlunSpeak;
       ctx.ui.kunlunSpeak = (/** @type {string} */ text, /** @type {string} */ voice) => {
+        if (ctx.ui.journey?.busy() || dialogApi.locked()) return;
         if (prevKunlunSpeak) {
           try {
             prevKunlunSpeak(text, voice);
@@ -367,6 +411,8 @@ function createGameShellSystem() {
       };
       ctx.ui.openDialog = dialogApi.open; // 剧本链统一入口(2026-09-18 收编;扁平读 ctx.openDialog 仍等价)
       ctx.ui.dialogOpen = dialogApi.isOpen; // 剧本链心跳守护用:对话框是否开着
+      ctx.ui.cancelDialogScope = dialogApi.cancelScope;
+      ctx.ui.advanceDialog = dialogApi.advance;
     },
     update(dt) {
       acc += dt;
@@ -377,6 +423,8 @@ function createGameShellSystem() {
     },
     dispose() {
       if (unsub) unsub();
+      unsubWorld?.();
+      window.removeEventListener('script:lang', refreshQuest);
       if (prevKunlunSpeak) ctx.ui.kunlunSpeak = prevKunlunSpeak;
       if (menuApi) menuApi.unregister();
       [styleEl, dialogEl, questEl, menuBtn, menuEl].forEach((n) => n && n.remove());

@@ -111,6 +111,9 @@ if (new URLSearchParams(location.search).has('storyreset')) {
   ctx.store.unmark('scene2');
   ctx.store.unmark('page1');
   ctx.store.setNum('planetsChapter', 0); // 章节同步归零:325 剧情可重走
+  ctx.store.setJson('journeyMemories', []);
+  ctx.store.setNum('homeMemoryStep', 0);
+  ctx.store.setNum('kingMemoryStep', 0);
 }
 
 function el(tag, css, parent) {
@@ -213,10 +216,7 @@ function open() {
   doneBtn.onclick = function () {
     submit(); // 画好了:停笔定稿(玩家可画可不画,零输入也能推进)
   };
-  // 停笔 6s 自动提交(画板不给卡死机会;玩家随时可点「画好了」提前)
-  submitTimer = setTimeout(function () {
-    if (document.getElementById('scene2Done')) submit();
-  }, 6000);
+  // 画纸等待玩家，不再在零输入六秒后替玩家作画。可主动点“画好了”接受线稿。
   root.appendChild(doneBtn);
   document.body.appendChild(root);
   requestAnimationFrame(() => (root.style.opacity = '1'));
@@ -224,6 +224,17 @@ function open() {
 }
 
 function setRoundUi() {
+  ctx.ui.journey?.clearGoal('desert-wake');
+  ctx.ui.journey?.setPhase('drawing', {
+    world: 'main',
+    chapter: { zh: '沙漠 · 给小王子画羊', en: 'Desert · draw him a sheep' },
+    step: roundIdx + 1,
+    total: 4,
+    hint: {
+      zh: '在淡灰线稿上画，点右下角「画好了」。对白点「继续」，没有倒计时。',
+      en: 'Draw over the grey lines, then tap Done. Continue the dialogue when you are ready.',
+    },
+  });
   $('scene2Round').textContent = roundIdx + 1 + ' / 4';
   $('scene2Done').textContent = tt(SCENE2.doneBtn);
 }
@@ -240,11 +251,9 @@ function round() {
   busy = false;
   drawing = true;
   setRoundUi();
-  // 每轮重挂 6s 自动提交(零输入也不卡死;玩家随时可点「画好了」提前)
+  // 每轮都由玩家确认；没有阅读或绘画倒计时。
   if (submitTimer) clearTimeout(submitTimer);
-  submitTimer = setTimeout(function () {
-    if (document.getElementById('scene2Done')) submit();
-  }, 6000);
+  submitTimer = null;
   // 常驻淡灰线稿:定稿路径先以浅灰完整铺底(暖光垫底层不进线稿)
   guidePaths = [];
   ROUNDS[roundIdx].strokes.forEach((st) => {
@@ -313,7 +322,7 @@ function bindDraw() {
 
 function scheduleSubmit() {
   if (submitTimer) clearTimeout(submitTimer);
-  submitTimer = setTimeout(submit, 1600); // 停笔 1.6s 自动定稿
+  submitTimer = null; // 收笔后仍可继续画，点“画好了”才定稿。
 }
 
 // —— 定稿:玩家笔迹淡为浅底,深色定稿线逐笔生长(基础笔 110ms 错峰起笔,
@@ -385,7 +394,9 @@ function speakOne(line, done) {
     speaker: tt(SCENE2.who.prince),
     speakerType: whoSpk(SCENE2.who.prince),
     lines: [tt(line)],
-    autoHide: stay,
+    autoHide: 0,
+    world: 'main',
+    scope: 'desert-drawing',
     lock: true,
     onDone: finish,
   });
@@ -438,7 +449,9 @@ function speakSeq(seq, i, done) {
     speaker: tt(item.who),
     speakerType: whoSpk(item.who),
     lines: [tt(item)],
-    autoHide: stay,
+    autoHide: 0,
+    world: 'main',
+    scope: 'desert-drawing',
     lock: true,
     onDone: finish,
   });
@@ -478,7 +491,9 @@ function finale() {
       speaker: tt(lastAfter.who),
       speakerType: whoSpk(lastAfter.who),
       lines: [tt(lastAfter)],
-      autoHide: 5200,
+      autoHide: 0,
+      world: 'main',
+      scope: 'desert-drawing',
       lock: true,
       // 轮到玩家开口(2026-09-26 主人令「不仅仅是在放台词」)
       choices: replyChoices(ctx, 'drawn', finishDrawn),

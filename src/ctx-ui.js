@@ -23,6 +23,9 @@ export function createUINamespace(vault) {
     'showGuideCard',
     'stopAgreementMusic',
     'storyTarget',
+    'journey',
+    'cancelDialogScope',
+    'advanceDialog',
   ];
   const proxy = {};
 

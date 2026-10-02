@@ -65,6 +65,8 @@ export function mountCoordHUD(ctx) {
 
   el.append(head, body, copyBtn);
   document.body.appendChild(el);
+  // 游玩时让人物和场景占据画面；F3 或 ?debugcoords 随时恢复定位读数。
+  if (!new URLSearchParams(location.search).has('debugcoords')) el.style.display = 'none';
 
   let last = '';
   copyBtn.addEventListener('click', async () => {

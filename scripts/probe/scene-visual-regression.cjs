@@ -61,6 +61,11 @@ function startServer() {
   });
   await page.addInitScript(() => {
     sessionStorage.setItem('nickPopOff', '1'); // 雅号弹窗
+    sessionStorage.setItem('dialogVoiceOff', String(Date.now()));
+    // 画面验收使用已完成的剧情夹具；完整进程另由旅途探针覆盖。
+    localStorage.setItem('b612Scene2', '1');
+    localStorage.setItem('b612Page1', '1');
+    localStorage.setItem('b612PlanetChapter', '1');
     try {
       localStorage.setItem('kunlunWelcomed', String(Date.now())); // 首点欢迎词(24h 一次)
     } catch (e) {}
@@ -177,7 +182,19 @@ function startServer() {
 
   // ① 主世界开世界(等场景/后处理稳定;昼夜钉正午保跨环境可比)
   await page.waitForTimeout(1200);
-  await page.evaluate(() => { try { window.__ctx.store.str('nick', 'vr'); window.__ctx.store.mark('scene2'); } catch (e) {} }); // 灭指引卡+画板标记(VR 不测画板)
+  await page.evaluate(() => { try { window.__ctx.store.str('nick', 'vr'); window.__ctx.store.mark('scene2'); window.__ctx.store.mark('page1'); } catch (e) {} }); // VR测世界渲染；家的回忆全链由journey探针验收
+  // 现实重逢仍按玩家点击读完，不依赖旧版自动关闭，也不越过锁定对白传送。
+  await page.evaluate(() => {
+    window.__vrDialogPump = setInterval(() => {
+      const d = document.getElementById('gameDialog');
+      if (d && getComputedStyle(d).display !== 'none') {
+        const choice = d.querySelector('.gs-choice');
+        if (choice) choice.click(); else d.click();
+      }
+      document.querySelector('#journeyTransition [data-journey-action="continue"]')?.click();
+    }, 220);
+  });
+  await page.waitForTimeout(6000);
   await freezeDayNoon();
   await checkpoint('main-boot', /^main$/, 4000);
   // ② 石门 → B612
@@ -196,14 +213,19 @@ function startServer() {
   await page.waitForFunction(() => window.__ctx.scene.activeWorld === 'b612', null, { timeout: 20000 });
   await checkpoint('b612', /^b612$/, 2500);
   // ③ B612 → 325 国王星球
-  await page.evaluate(() =>
-    [...document.querySelectorAll('button')].find((x) => x.textContent.includes('前往 325'))?.click()
-  );
+  // 完成325的夹具默认导航已转往326；本项只拍325，不伪造“下一站”按钮。
+  await page.evaluate(async () => {
+    const { kingSpawnPoint } = await import('/src/shared/planet-logic.mjs');
+    const sp = kingSpawnPoint();
+    await window.__ctx.scene.worldManager.enter('king325', { snapshot: { camera: null, player: {
+      position: { x: sp.x, y: sp.y, z: sp.z }, yaw: sp.yaw, pitch: sp.pitch, vy: 0,
+    } } });
+  });
   await page.waitForFunction(() => /^king325$/.test(window.__ctx.scene.activeWorld), null, { timeout: 20000 });
   await checkpoint('king325', /^king325$/, 2500);
   // ④ 星球 → B612 → 主世界(直接返回按钮;回主世界先解冻昼夜再锁,防中途回到漂移相位)
   await page.evaluate(() =>
-    [...document.querySelectorAll('button')].find((x) => x.textContent.includes('返回主世界'))?.click()
+    [...document.querySelectorAll('button')].find((x) => /返回沙漠|Back to the desert/.test(x.textContent))?.click()
   );
   await page.waitForFunction(() => window.__ctx.scene.activeWorld === 'main', null, { timeout: 20000 });
   await freezeDayNoon();

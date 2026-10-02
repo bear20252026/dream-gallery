@@ -66,6 +66,9 @@ const SCHEMA = {
   musicHistory: { key: 'musicHistory', type: 'json' }, // 音乐子页播放历史(music.html 经典脚本内联 onclick 依赖,不改模块)
   kunlunVer: { key: 'kunlunVer', type: 'str' }, // 存档版本迁移标记(index.html 开机块写入,先于一切模块)
   uiFold: { key: 'b612UiFold', type: 'json' }, // 大站位 UI 收纳状态(questHud 折叠等)
+  journeyMemories: { key: 'b612JourneyMemories', type: 'json' }, // 旅途观察手札；只存已完成的回忆
+  homeMemoryStep: { key: 'b612HomeMemoryStep', type: 'num' }, // 家的四站；完成互动后才保存
+  kingMemoryStep: { key: 'b612KingMemoryStep', type: 'num' }, // 国王对白/互动的六段检查点
 };
 function entry(name) {
   const e = SCHEMA[name];

@@ -72,18 +72,15 @@ function startServer(port) {
   });
   await page.click('#b612Gate .gEnter');
   await page.waitForSelector('#b612film', { timeout: 20000 });
+  await page.waitForFunction(() => typeof document.getElementById('fSkip')?.onclick === 'function', null, { timeout: 30000 });
   // 手机视口下 skip 按钮带动画,playwright 稳定性检查过不了 → evaluate 直点
   await page.evaluate(() => {
     const s = document.getElementById('fSkip');
     if (s) s.click();
   });
-  // 等场景初始化(无头环境偏慢,轮询等 canvas 出现)
-  let canvases = 0;
-  for (let i = 0; i < 10; i++) {
-    await page.waitForTimeout(3000);
-    canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
-    if (canvases > 0) break;
-  }
+  // 入口已有canvas；等待电影收束和真实世界启动，避免把入口误认为渲染成功。
+  await page.waitForFunction(() => !document.getElementById('b612film') && window.__bootState?.worldStarted && window.__ctx?.loopManager?.getFPS() > 0, null, { timeout: 90000 });
+  const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
   ok(canvases > 0, `3D 画布已创建 (${canvases} 个 canvas)`);
 
   await page.waitForTimeout(8000); // 给区块地形/模块充分加载

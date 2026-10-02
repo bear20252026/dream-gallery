@@ -8,14 +8,17 @@
 // 在 3D 里始终缺一个「我现在该去哪 + 多远 + 往哪转」的常驻读数。本模块补②④:
 //   - 目标点由剧情模块注册(ctx.ui.storyTarget),坑位单一,谁注册谁撤;
 //   - 10Hz 刷新距离与方向指针,指针 0° = 正前方,负角=右偏、正角=左偏;
-//   - 到点(≤3m)显示「就在眼前」并隐去指针,避免贴脸还在转。
+//   - 到点(≤1.8m)显示行动提示并隐去指针,避免贴脸还在转。
+import { guideBearing } from '../shared/journey-guidance.mjs';
+import { tt } from '../shared/story-text.mjs';
+
 export function mountStoryCompass(ctx) {
   if (typeof document === 'undefined') return null;
   const el = document.createElement('div');
   el.id = 'storyCompass';
   // 位置:屏幕左中(原神同侧),避开左上任务卡、右上小地图、右中坐标栏、底部按钮
   el.style.cssText =
-    'position:fixed;left:14px;top:50%;transform:translateY(-50%);z-index:58;pointer-events:none;' +
+    'position:fixed;left:14px;top:172px;z-index:58;pointer-events:auto;' +
     'display:none;align-items:center;gap:9px;' +
     'background:rgba(22,15,20,0.82);border:1px solid rgba(255,214,170,0.32);' +
     'border-radius:10px;padding:8px 12px;color:#ffe2c4;' +
@@ -23,7 +26,7 @@ export function mountStoryCompass(ctx) {
     'text-shadow:0 1px 2px rgba(0,0,0,.8);user-select:none;backdrop-filter:blur(3px);max-width:230px';
 
   const arrow = document.createElement('div');
-  arrow.textContent = '➤';
+  arrow.textContent = '↑';
   arrow.style.cssText =
     'font-size:16px;line-height:16px;color:#ffd88a;text-shadow:0 0 8px rgba(255,200,100,.8);' +
     'transform-origin:50% 50%;transition:transform .18s linear';
@@ -34,8 +37,15 @@ export function mountStoryCompass(ctx) {
   const dist = document.createElement('div');
   dist.style.cssText = 'opacity:.62;font-size:11px;font-variant-numeric:tabular-nums';
   txt.append(label, dist);
-  el.append(arrow, txt);
+  const look = document.createElement('button');
+  look.type = 'button';
+  look.dataset.journeyAction = 'face-target';
+  look.style.cssText =
+    'min-height:44px;padding:8px 12px;border:1px solid #b49561;border-radius:20px;background:#58482c;color:#fff0cc;font:inherit;cursor:pointer';
+  look.onclick = () => ctx.ui.journey?.lookAtGoal();
+  el.append(arrow, txt, look);
   document.body.appendChild(el);
+  ctx.overlay.register(el, { touchOnly: true, closeOnOutside: false });
 
   let target = null;
   /** 剧情模块注册当前目标;{world,x,z,en,zh};传 null 撤销 */
@@ -56,17 +66,35 @@ export function mountStoryCompass(ctx) {
       if (el.style.display !== 'none') el.style.display = 'none';
       return;
     }
+    if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen()) {
+      el.style.display = 'none';
+      return;
+    }
     const dx = target.x - pl.p.x,
       dz = target.z - pl.p.z;
     const d = Math.hypot(dx, dz);
     el.style.display = 'flex';
+    const quest = document.getElementById('questHud');
+    if (quest)
+      el.style.top = Math.min(quest.getBoundingClientRect().bottom + 12, innerHeight - 210) + 'px';
     // 到点:隐指针,只留「就在眼前」
-    if (d <= 3) {
+    if (d <= 1.8) {
       arrow.style.opacity = '0';
-      dist.textContent = '就在眼前';
+      dist.textContent = tt(
+        ctx.ui.journey?.state()
+          ? { zh: '已到目标 · E 观察', en: 'At the target · E to observe' }
+          : { zh: '已到目标 · 跟随剧情提示', en: 'At the target · follow the story prompt' }
+      );
     } else {
       arrow.style.opacity = '1';
-      dist.textContent = Math.round(d) + ' m';
+      const bearing = guideBearing(pl, target);
+      const directions = {
+        forward: { zh: '向前走', en: 'Walk forward' },
+        left: { zh: '向左转', en: 'Turn left' },
+        right: { zh: '向右转', en: 'Turn right' },
+        behind: { zh: '转身寻找', en: 'Turn around' },
+      };
+      dist.textContent = tt(directions[bearing.direction]) + ' · ' + Math.round(d) + ' m';
       // 目标所需 yaw(前方向量 = (-sin y, -cos y))与当前朝向之差
       const want = Math.atan2(-dx, -dz);
       let rel = want - (pl.y || 0);
@@ -75,6 +103,7 @@ export function mountStoryCompass(ctx) {
       // yaw 增大=向左(俯视逆时针),CSS 正角=顺时针 → 取反
       arrow.style.transform = 'rotate(' + (-(rel * 180) / Math.PI).toFixed(0) + 'deg)';
     }
+    look.textContent = tt({ zh: '看向目标', en: 'Face target' });
     const s = zh() ? target.zh : target.en;
     const key = s + '|' + Math.round(d);
     if (key !== lastKey) {

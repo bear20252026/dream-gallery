@@ -25,6 +25,15 @@ let arrowBox = null,
   arrowB612 = null;
 let countingShown = false;
 let page1Shown = false;
+let visit = 0;
+const OWNER = 'desert-night';
+const phase = (hint) =>
+  ctx.ui.journey?.setPhase(OWNER, {
+    world: 'main',
+    chapter: { zh: '沙漠 · 现实中的夜晚', en: 'Desert · the present night' },
+    hint,
+    lock: ctx.store.num('planetsChapter') === 0,
+  });
 
 const BOX_X = -4.3,
   BOX_Z = 69.6;
@@ -79,6 +88,17 @@ function armNight() {
     } catch (e2) {}
   }
   buildBox();
+  phase({
+    zh: '画羊已完成。走近身旁的羊箱，听听箱里的声音。',
+    en: 'Your sheep drawing is complete. Approach the box and listen.',
+  });
+  ctx.ui.journey?.setGoal(OWNER, {
+    world: 'main',
+    x: BOX_X,
+    z: BOX_Z,
+    zh: '走近羊箱，听它数数',
+    en: 'Approach the sheep box and listen',
+  });
 }
 
 // —— 羊箱:玩家画的箱子同款(矮箱+顶面气孔),落在出生点旁的沙地上 ——
@@ -123,6 +143,7 @@ function buildBox() {
 
 // —— 石门夜光(呼吸脉动) ——
 function armGateGlow() {
+  if (ctx.scene.activeWorld !== 'main') return;
   if (gateGlow) return;
   gateGlow = new THREE.PointLight(0xffd9a0, 0.4, 14);
   gateGlow.position.set(GATE_X, ground(GATE_X, GATE_Z) + 2.2, GATE_Z);
@@ -146,12 +167,23 @@ function armGateGlow() {
     arrowGate = spawnFloatArrow(ctx.scene.s, GATE_X, gateBeacon.position.y + 1.7 + 0.9, GATE_Z, {
       name: 'guideArrowGate',
     });
-  if (ctx.ui && ctx.ui.modeToast) ctx.ui.modeToast(tt(SCENE3.gotoGate), 6000);
+  phase({
+    zh: '羊箱的声音让石门亮起。走向门光，进入小王子的家的回忆。',
+    en: 'The counting has lit the stone gate. Follow its light into memories of his home.',
+  });
+  ctx.ui.journey?.setGoal(OWNER, {
+    world: 'main',
+    x: GATE_X,
+    z: GATE_Z,
+    zh: '走进石门 · B612 家的回忆',
+    en: 'Cross the gate · memories of B612',
+  });
 }
 
 // 书页一完成后去 B612(2026-09-27「剧情发展指引不清」补齐):
 // 同一扇石门现在通 B612 —— 信标复立 + toast 直说,进门即撤(portal 传送后由 tick 收走)
 function armB612() {
+  if (ctx.scene.activeWorld !== 'main') return;
   if (b612Beacon) return;
   // 石门现身(2026-09-27 按剧情出场):同一扇门现在通 B612,先现身再指
   try {
@@ -164,7 +196,17 @@ function armB612() {
     arrowB612 = spawnFloatArrow(ctx.scene.s, GATE_X, b612Beacon.position.y + 1.7 + 0.9, GATE_Z, {
       name: 'guideArrowB612',
     });
-  if (ctx.ui && ctx.ui.modeToast) ctx.ui.modeToast(tt(SCENE3.gotoB612), 6000);
+  phase({
+    zh: '家的回忆已经结束。这次穿过同一扇门，在 B612 选择前往国王星，继续小王子的旅途。',
+    en: 'Memories of home are complete. Cross the same gate, then choose the King on B612 to continue his journey.',
+  });
+  ctx.ui.journey?.setGoal(OWNER, {
+    world: 'main',
+    x: GATE_X,
+    z: GATE_Z,
+    zh: '再次穿门 · 准备拜访国王',
+    en: 'Cross again · next, the King',
+  });
 }
 function removeB612() {
   if (!b612Beacon) return;
@@ -174,7 +216,8 @@ function removeB612() {
   arrowB612 = null;
 }
 
-function speakSeq(seq, i, done) {
+function speakSeq(seq, i, done, ticket = visit) {
+  if (ticket !== visit || ctx.scene.activeWorld !== 'main') return;
   if (i >= seq.length) return done && done();
   const item = seq[i];
   let spent = false; // onDone 与心跳守护只许一个推进(晚到的重复收束吞掉)
@@ -182,20 +225,25 @@ function speakSeq(seq, i, done) {
     if (spent) return;
     spent = true;
     clearTimeout(wd);
-    speakSeq(seq, i + 1, done);
+    speakSeq(seq, i + 1, done, ticket);
   };
   ctx.openDialog({
     speaker: tt(item.who),
     speakerType: whoSpk(item.who),
     lines: [tt(item)],
-    autoHide: 4200,
+    autoHide: 0,
     lock: true,
+    scope: OWNER,
+    world: 'main',
     onDone: finish,
   });
   clearTimeout(wd);
-  wd = setTimeout(function () {
+  const guard = () => {
+    if (ticket !== visit || spent) return;
     if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
-  }, 6800);
+    else wd = setTimeout(guard, 2600);
+  };
+  wd = setTimeout(guard, 6800);
 }
 let wd = null;
 
@@ -203,6 +251,13 @@ let wd = null;
 // 画羊四笔收束(scene2-draw 广播 story:scene2done)后,现实才转入黑夜;
 // 画板未收束就转夜,计数对话会打断羊初声(时序竞态,2026-09-07 修复)
 ctx.events.on('story:scene2done', armNight);
+ctx.events.on('world:changed', ({ from, to }) => {
+  if (from !== 'main' || to === 'main') return;
+  visit++;
+  clearTimeout(wd);
+  ctx.ui.cancelDialogScope?.(OWNER);
+  ctx.ui.journey?.cancel(OWNER);
+});
 ctx.onTick(function scene3NightTick() {
   if ((ctx.scene.activeWorld || 'main') !== 'main') return;
   // 信标呼吸(光柱缓慢旋绕+透明度起伏;夜里远看也像「活的」)+ 悬浮箭浮沉自转(同拍)
@@ -247,6 +302,10 @@ ctx.onTick(function scene3NightTick() {
       if (dx * dx + dz * dz < 16) removeB612();
     } catch (e) {}
   }
+  // 回忆完成后不再重播第一次入梦的数数与门光对白。
+  if (ctx.store.flag('page1')) return;
+  if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen() || document.getElementById('scene2Board'))
+    return;
   // 计数仪式:玩家走近羊箱,箱里传出数数声,石门亮起
   if (!countingShown && boxProp) {
     const pl = ctx.player.pl;
@@ -265,10 +324,12 @@ ctx.onTick(function scene3NightTick() {
         zh: SCENE3.counting.zh,
       };
       ctx.openDialog({
+        scope: OWNER,
+        world: 'main',
         speaker: tt(countingLine.who),
         speakerType: whoSpk(countingLine.who),
         lines: [tt(countingLine)],
-        autoHide: 4200,
+        autoHide: 0,
         lock: true,
         choices: replyChoices(ctx, 'night', function () {
           speakSeq(

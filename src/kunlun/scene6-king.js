@@ -9,7 +9,8 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { Z } from '../shared/z-layers.mjs';
 import { SCENE5, tt, whoSpk } from '../shared/story-text.mjs';
-import { PLANETS, ISLAND_R, ISLAND_TOP_K } from '../shared/planet-logic.mjs';
+import { ISLAND_R, ISLAND_TOP_K } from '../shared/planet-logic.mjs';
+import { kingCheckpoint } from '../shared/journey-guidance.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
 
 let arrivalDone = false; // 本次进 325 的入梦链已启动
@@ -25,6 +26,16 @@ let arrowMote = null,
   arrowDoor = null;
 let chapterCached = -1; // 章节快照(-1=未读):tick 每帧读 localStorage 太奢,0.5s 粒度足够
 let tickN = 0;
+let visit = 0;
+let sunsetVeil = null;
+let observationBeacon = null;
+const OWNER = 'king-memory';
+function later(fn, ms) {
+  const ticket = visit;
+  return setTimeout(() => {
+    if (ticket === visit && ctx.scene.activeWorld === 'king325') fn();
+  }, ms);
+}
 
 // 星屑坐标单一源在 planets.js(网格 name='sproutMote'):armMoteBeacon 时现取,
 // 兜底值仅 worldManager 缺失的降级场使用(与 planets.js 默认摆位一致)
@@ -33,7 +44,8 @@ const MOTE_X = 0,
 const ISLE_TOP_Y = ISLAND_R * ISLAND_TOP_K; // 岛顶面高度(m)
 
 // —— 台词队列:lock 互斥 + spent 幂等 + 心跳守护(与 scene3-memory 同规) ——
-function speakSeq(seq, i, done) {
+function speakSeq(seq, i, done, ticket = visit) {
+  if (ticket !== visit || ctx.scene.activeWorld !== 'king325') return;
   if (i >= seq.length) {
     if (done) done();
     return;
@@ -44,28 +56,31 @@ function speakSeq(seq, i, done) {
     if (spent) return;
     spent = true;
     clearTimeout(speakTimer);
-    speakSeq(seq, i + 1, done);
+    speakSeq(seq, i + 1, done, ticket);
   };
   ctx.openDialog({
     speaker: tt(item.who),
     speakerType: whoSpk(item.who),
     lines: [tt(item)],
-    autoHide: Math.max(4600, ((item.en || '').length * 65) | 0),
+    autoHide: 0,
+    world: 'king325',
     lock: true,
+    scope: OWNER,
     onDone: finish,
   });
   clearTimeout(speakTimer);
-  speakTimer = setTimeout(
-    function () {
-      if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
-    },
-    Math.max(4600, ((item.en || '').length * 65) | 0) + 2600
-  );
+  const guard = () => {
+    if (ticket !== visit || spent) return;
+    if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
+    else speakTimer = later(guard, 2600);
+  };
+  speakTimer = later(guard, Math.max(4600, ((item.en || '').length * 65) | 0) + 2600);
 }
 
 // —— 日落敕令演出:金光漫起又退去(国王"等时机成熟"后,天边果然烧起来) ——
 function sunsetShow(done) {
   const veil = document.createElement('div');
+  sunsetVeil = veil;
   veil.style.cssText =
     'position:fixed;inset:0;z-index:' +
     Z.sunsetVeil +
@@ -76,15 +91,21 @@ function sunsetShow(done) {
   requestAnimationFrame(function () {
     veil.style.opacity = '1';
   });
-  setTimeout(function () {
+  later(function () {
     veil.style.opacity = '0';
   }, 2600);
-  setTimeout(function () {
+  later(function () {
     veil.remove();
-    try {
-      ctx.ui.kunlunSpeak && ctx.kunlunSpeak(tt(SCENE5.sunsetVoice));
-    } catch (e) {}
-    done();
+    sunsetVeil = null;
+    ctx.ui.openDialog({
+      speaker: 'B612',
+      lines: [tt(SCENE5.sunsetVoice)],
+      lock: true,
+      scope: OWNER,
+      world: 'king325',
+      autoHide: 0,
+      onDone: done,
+    });
   }, 4400);
 }
 
@@ -154,6 +175,13 @@ function armDoorBeacon() {
   const sc = kingScene();
   if (!sc) return;
   const d = sc.getObjectByName('sproutDoor'); // 坐标单一源(planets.js 摆位)
+  ctx.ui.journey?.setGoal(OWNER, {
+    world: 'king325',
+    x: d ? d.position.x : 0,
+    z: d ? d.position.z : -3.4,
+    zh: '走进石环，回到 B612',
+    en: 'Step into the ring, back to B612',
+  });
   doorBeacon = makeBeacon(
     d ? d.position.x : 0,
     d ? d.position.z : -3.4,
@@ -220,6 +248,122 @@ function tryPickup(pl, onPick) {
 }
 
 let prevWorld = '';
+ctx.events.on('world:changed', ({ from, to }) => {
+  if (from !== 'king325' || to === 'king325') return;
+  visit++;
+  clearTimeout(speakTimer);
+  ctx.ui.cancelDialogScope?.(OWNER);
+  ctx.ui.journey?.cancel(OWNER);
+  sunsetVeil?.remove();
+  sunsetVeil = null;
+  removeObservationBeacon();
+  if (!sceneDone) {
+    arrivalDone = false;
+    pickupArmed = false;
+    removeMoteBeacon();
+  }
+  removeDoorBeacon();
+});
+
+function removeObservationBeacon() {
+  if (!observationBeacon) return;
+  observationBeacon.parent?.remove(observationBeacon);
+  observationBeacon.geometry.dispose();
+  observationBeacon.material.dispose();
+  observationBeacon = null;
+}
+function runObservation(id, done) {
+  const ticket = visit;
+  window.__scene6.stage = id === 'rat' ? 'listen' : 'almanac';
+  if (!ctx.ui.journey) {
+    done();
+    return;
+  }
+  ctx.ui.journey
+    .beginTask(OWNER, id, {
+      onTarget(point) {
+        removeObservationBeacon();
+        const sc = kingScene();
+        if (!sc) return;
+        observationBeacon = makeBeacon(point.x, point.z, 1.5, 0.3, 0.3, 'kingObservationBeacon');
+        sc.add(observationBeacon);
+      },
+    })
+    .then((result) => {
+      removeObservationBeacon();
+      if (result && ticket === visit && ctx.scene.activeWorld === 'king325') done();
+    });
+}
+
+function runKingStep(step) {
+  const ticket = visit;
+  if (ctx.scene.activeWorld !== 'king325') return;
+  ctx.ui.journey?.setPhase(OWNER, {
+    world: 'king325',
+    chapter: { zh: '325 · 国王的回忆', en: '325 · memory of the King' },
+    step: step + 1,
+    total: 6,
+    hint: {
+      zh: '按「继续」读完当前对白，再完成这一段观察。',
+      en: 'Continue the current dialogue, then complete this observation.',
+    },
+  });
+  const next = () => {
+    if (ticket !== visit || ctx.scene.activeWorld !== 'king325') return;
+    ctx.store.setNum('kingMemoryStep', step + 1);
+    runKingStep(step + 1);
+  };
+  if (step === 0) {
+    window.__scene6.stage = 'chain1';
+    speakSeq(SCENE5.chain1, 0, next);
+  } else if (step === 1) runObservation('almanac', next);
+  else if (step === 2) {
+    window.__scene6.stage = 'sunset';
+    sunsetShow(() => {
+      window.__scene6.stage = 'chain2';
+      speakSeq(SCENE5.chain2.slice(0, 2), 0, next);
+    });
+  } else if (step === 3) runObservation('rat', next);
+  else if (step === 4) {
+    window.__scene6.stage = 'departure';
+    speakSeq(SCENE5.chain2.slice(2), 0, next);
+  } else {
+    window.__scene6.stage = 'pickup';
+    pickupArmed = true;
+    armMoteBeacon();
+    const m = motePos();
+    ctx.ui.journey?.setGoal(OWNER, {
+      world: 'king325',
+      x: m.x,
+      z: m.z,
+      zh: '拾起国王之星的星屑',
+      en: 'Pick up the King’s stardust',
+    });
+  }
+}
+
+async function beginKingMemory() {
+  const ticket = visit,
+    saved = kingCheckpoint(ctx.store.num('kingMemoryStep'), ctx.store.json('journeyMemories', []));
+  const ready = await ctx.ui.journey?.transition(OWNER, {
+    world: 'king325',
+    chapter: { zh: '回忆二 · 国王的星球', en: 'Memory II · the King’s planet' },
+    title: {
+      zh: saved ? '继续拜访国王' : '小王子的第一站',
+      en: saved ? 'Continue visiting the King' : 'His first stop',
+    },
+    hint: {
+      zh: '家的回忆结束后，小王子开始拜访别的星球。你将见证他与国王的对话，读历书，再留意王座后的声音。每段由你点「继续」推进。',
+      en: 'After leaving home, he visits other planets. Witness his conversation with the King, read the almanac and listen behind the throne. Continue each part at your own pace.',
+    },
+    action: {
+      zh: saved ? '从上次完成的段落继续' : '开始拜访国王',
+      en: saved ? 'Resume the visit' : 'Begin the visit',
+    },
+  });
+  if (ready === false || ticket !== visit) return;
+  runKingStep(saved);
+}
 ctx.onTick(function scene6Tick() {
   const active = ctx.scene.activeWorld || '';
   // 离开 325:复位入梦标记——同会话内再进可重新触发(2026-09-20「没对话」修复②)
@@ -267,17 +411,18 @@ ctx.onTick(function scene6Tick() {
     if (!starTaken)
       tryPickup(ctx.player.pl, function () {
         ctx.kunlun.setChapter && ctx.kunlun.setChapter(1); // planets:点亮回程石环
+        ctx.ui.journey?.remember('king', null, false);
         sceneDone = true;
         doorArmed = true;
         // 完成toast 延一拍:单元素 toast 会互相顶替,先让「拾获星屑」独立亮一拍
-        setTimeout(function () {
+        later(function () {
           try {
             ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.doneToast));
           } catch (e) {}
           armDoorBeacon(); // 指引三件套:回程光柱立起,进门即撤
         }, 1600);
         // 「怎么回去」再晚一拍:与前两条 toast 错峰,不互顶
-        setTimeout(function () {
+        later(function () {
           try {
             ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.gotoDoor), 6000);
           } catch (e) {}
@@ -288,35 +433,14 @@ ctx.onTick(function scene6Tick() {
 
   if (arrivalDone) return;
   arrivalDone = true;
-  setTimeout(function () {
-    // 入梦导语(planet-logic 为 325 写好的星球导语,首次接线)
-    const cfg = PLANETS.find(function (p) {
-      return p.num === '325';
-    });
-    try {
-      ctx.ui.kunlunSpeak && ctx.kunlunSpeak(tt({ en: 'The King', zh: cfg.tts }));
-    } catch (e) {}
-    setTimeout(function () {
-      window.__scene6 = window.__scene6 || {};
-      window.__scene6.stage = 'chain1';
-      speakSeq(SCENE5.chain1, 0, function () {
-        window.__scene6.stage = 'sunset';
-        sunsetShow(function () {
-          window.__scene6.stage = 'chain2';
-          speakSeq(SCENE5.chain2, 0, function () {
-            window.__scene6.stage = 'pickup';
-            pickupArmed = true;
-            // 行动指引三件套(2026-09-26 规矩②③ 扩展到 325 章):台词只讲戏,
-            // 「去哪」由 toast 直说 + 光柱信标指(星屑在出生点身后,转身才见)——拾取即撤
-            armMoteBeacon();
-            try {
-              ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.pickupToast), 6000);
-            } catch (e) {}
-          });
-        });
-      });
-    }, 1400);
-  }, 1200);
+  ctx.ui.journey?.setGoal(OWNER, {
+    world: 'king325',
+    x: 0,
+    z: 0,
+    zh: '聆听国王与小王子的对话',
+    en: 'Listen to the King and the little prince',
+  });
+  later(beginKingMemory, 700);
 });
 
 // 探针钩子

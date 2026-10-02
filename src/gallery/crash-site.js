@@ -251,6 +251,23 @@ ctx.onTick(function crashTick(dt) {
   // 开场天光:默认时间源 60 秒转一圈,睁眼时随机正午/半夜 —— 锁成早晨再讲坠机苏醒
   if (!timeSeeded) {
     timeSeeded = true;
+    if (!ctx.store.flag('scene2')) {
+      ctx.ui.journey?.setPhase('desert-wake', {
+        world: 'main',
+        chapter: { zh: '沙漠 · 初遇', en: 'Desert · first encounter' },
+        hint: {
+          zh: '小王子正从残骸旁走来。听他说话，选一句回应，再为他画羊。',
+          en: 'The little prince is approaching the wreck. Hear him, choose a reply, then draw his sheep.',
+        },
+      });
+      ctx.ui.journey?.setGoal('desert-wake', {
+        world: 'main',
+        x: PRINCE_DEST.x,
+        z: PRINCE_DEST.z,
+        zh: '小王子在飞机残骸旁',
+        en: 'The little prince beside the wreck',
+      });
+    }
     try {
       if (!ctx.store.flag('scene2')) shiftDayTo(DAY_HOURS.MORNING, 3000);
     } catch (e) {
@@ -335,10 +352,12 @@ ctx.onTick(function crashTick(dt) {
           fireScene2(3);
         };
         ctx.openDialog({
+          world: 'main',
+          scope: 'desert-wake',
           speaker: tt(STORY.princeWake.who),
           speakerType: whoSpk(STORY.princeWake.who),
           lines: [tt(STORY.princeWake)],
-          autoHide: 9000,
+          autoHide: 0,
           lock: true,
           // 轮到玩家开口(2026-09-26 主人令「不仅仅是在放台词」):叫醒词说完,
           // 选项按钮出现;点选 → 飞行员回应朗读 → 王子接话 → 汇合 scene2

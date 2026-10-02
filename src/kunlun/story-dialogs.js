@@ -46,7 +46,9 @@ const ACTORS = [
 // ===================== CSS2DRenderer 层 =====================
 const labelRenderer = new CSS2DRenderer();
 labelRenderer.domElement.style.cssText =
-  'position:fixed;inset:0;z-index:' + Z.worldFx + ';pointer-events:none;display:none;overflow:hidden';
+  'position:fixed;inset:0;z-index:' +
+  Z.worldFx +
+  ';pointer-events:none;display:none;overflow:hidden';
 labelRenderer.domElement.innerHTML = `
 <style>
 #storyDialogLayer .b612-bubble{
@@ -69,7 +71,8 @@ labelRenderer.domElement.id = 'storyDialogLayer';
 // CSS2DRenderer 在渲染时会往 domElement 追加 position:absolute 的对象 div,
 // 内层用绝对定位 + translate 实现"锚点上方"与"居中"
 const DIALOG_WRAP = document.createElement('style');
-DIALOG_WRAP.textContent = '#storyDialogLayer .b612-anchor{position:absolute;left:0;top:0;transform:translate(-50%,-110%);will-change:transform}';
+DIALOG_WRAP.textContent =
+  '#storyDialogLayer .b612-anchor{position:absolute;left:0;top:0;transform:translate(-50%,-110%);will-change:transform}';
 labelRenderer.domElement.appendChild(DIALOG_WRAP);
 document.body.appendChild(labelRenderer.domElement);
 bag.custom.push(() => labelRenderer.domElement.remove());
@@ -158,13 +161,19 @@ function resolveAnchor(actor) {
 bag.custom.push(() => anchorCache.clear());
 // 调试钩子:探针可读锚点精确传送到角色旁(生产零影响)
 window.__storyDialogs = {
-  anchors: () => Object.fromEntries([...anchorCache].map(([k, v]) => [k, { x: v.x, y: v.y, z: v.z }])),
+  anchors: () =>
+    Object.fromEntries([...anchorCache].map(([k, v]) => [k, { x: v.x, y: v.y, z: v.z }])),
 };
 
 // ===================== 每帧:就近 Actor 触发 + 轮播 + 渲染 =====================
 let lastWorld = '';
 ctx.onTick(function storyDialogTick() {
   const w = ctx.scene.activeWorld || 'main';
+  // 这两站由正式主线完整讲述；循环旧气泡会在幼苗站谈玫瑰、在对话中抢词。
+  if (w === 'b612' || w === 'king325') {
+    labelRenderer.domElement.style.display = 'none';
+    return;
+  }
   const isStory = w === 'b612' || /^king\d+/.test(w);
   labelRenderer.domElement.style.display = isStory ? '' : 'none';
   if (!isStory) {

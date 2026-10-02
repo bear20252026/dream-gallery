@@ -11,6 +11,7 @@ import * as THREE from 'three';
 import { Z } from '../shared/z-layers.mjs';
 import { ctx } from '../ctx.js';
 import { SCENE3, SCENE4, tt, whoSpk } from '../shared/story-text.mjs';
+import { homeCheckpoint } from '../shared/journey-guidance.mjs';
 
 let built = false;
 let arrivalDone = false;
@@ -19,6 +20,11 @@ let stepMarker = null;
 let exitStarted = false;
 let smokeSprites = [];
 let bgDusk = null;
+let interactionBusy = false;
+let visit = 0;
+let memorySun = null;
+let focusedStep = -1;
+const OWNER = 'home-memory';
 
 const VOLCANOES = [
   { x: -4.6, z: -5.2, s: 1.15, active: true },
@@ -31,7 +37,7 @@ const STEPS = [
   { x: -4.6, z: -5.2, r: 2.4 }, // 0: 火山
   { x: 3.4, z: -2.6, r: 2.2 }, // 1: 面包树苗
   { x: -3.6, z: -0.6, r: 2.2 }, // 2: 小椅子·日落
-  { x: 1.23, z: -0.78, r: 2.5 }, // 3: 玫瑰坛
+  { x: 2.46, z: -1.56, r: 2.5 }, // 3: 原模型玫瑰随整场2倍放大
 ];
 
 function world() {
@@ -43,10 +49,11 @@ function build() {
   if (!w) return;
   built = true;
   const s = w.scene;
-  const gy = 0.05;
+  const groundAt = (x, z) => w.ground(x, z) + 0.03;
 
   // —— 三座小火山(两活一熄) ——
   VOLCANOES.forEach(function (v, i) {
+    const gy = groundAt(v.x, v.z);
     const cone = new THREE.Mesh(
       new THREE.ConeGeometry(0.55 * v.s, 1.15 * v.s, 7),
       new THREE.MeshStandardMaterial({
@@ -59,7 +66,11 @@ function build() {
     cone.name = 'scene3Volcano' + i;
     s.add(cone);
     if (v.active) {
-      const glow = new THREE.PointLight(0xff8a4a, 0.5, 3.5);
+      const glow = new THREE.Mesh(
+        new THREE.CircleGeometry(0.2 * v.s, 16),
+        new THREE.MeshBasicMaterial({ color: 0xff8a4a, transparent: true, opacity: 0.7 })
+      );
+      glow.rotation.x = -Math.PI / 2;
       glow.position.set(v.x, gy + 1.15 * v.s + 0.1, v.z);
       s.add(glow);
     }
@@ -79,6 +90,7 @@ function build() {
   })();
   VOLCANOES.forEach(function (v, i) {
     if (!v.active) return;
+    const gy = groundAt(v.x, v.z);
     for (let k = 0; k < 2; k++) {
       const sp = new THREE.Sprite(
         new THREE.SpriteMaterial({
@@ -124,7 +136,7 @@ function build() {
     leaf.rotation.y = (i * Math.PI * 2) / 3;
     sprout.add(leaf);
   }
-  sprout.position.set(STEPS[1].x, gy, STEPS[1].z);
+  sprout.position.set(STEPS[1].x, groundAt(STEPS[1].x, STEPS[1].z), STEPS[1].z);
   sprout.name = 'scene3Baobab';
   s.add(sprout);
 
@@ -150,7 +162,7 @@ function build() {
     leg.position.set(i & 1 ? 0.17 : -0.17, 0.17, i & 2 ? 0.17 : -0.17);
     chair.add(leg);
   }
-  chair.position.set(STEPS[2].x, gy, STEPS[2].z);
+  chair.position.set(STEPS[2].x, groundAt(STEPS[2].x, STEPS[2].z), STEPS[2].z);
   chair.rotation.y = 2.3;
   chair.name = 'scene3Chair';
   s.add(chair);
@@ -160,13 +172,31 @@ function build() {
     const bgDusk = new THREE.Color(0x241532);
     w.scene.background.lerp(bgDusk, 0.9);
   }
-  const duskLamp = new THREE.PointLight(0xffc890, 0.55, 16);
-  duskLamp.position.set(0, 3.2, -1.5);
-  s.add(duskLamp);
 }
 
 // —— 金色光标 ——
-function placeMarker(x, z) {
+function placeMarker(x, z, registerGoal = true) {
+  if (registerGoal)
+    ctx.ui.journey?.setGoal(OWNER, {
+      world: 'b612',
+      x,
+      z,
+      en:
+        [
+          'Visit the volcanoes',
+          'Observe the little sprout',
+          'Follow the sunset',
+          'Remember the rose',
+        ][Math.max(0, curStep)] || 'Memories of home',
+      zh:
+        ['走近三座火山', '走近面包树苗', '走近看日落的小椅子', '走近玫瑰，听她告别'][
+          Math.max(0, curStep)
+        ] || '家的回忆',
+    });
+  if (registerGoal && focusedStep !== curStep) {
+    focusedStep = curStep;
+    world()?.meta.focusTarget?.(x, z);
+  }
   if (!stepMarker) {
     const c = document.createElement('canvas');
     c.width = c.height = 64;
@@ -190,10 +220,15 @@ function placeMarker(x, z) {
     world().scene.add(stepMarker);
   }
   stepMarker.visible = true;
-  stepMarker.position.set(x, 1.2 + Math.sin(Date.now() * 0.002) * 0.15, z);
+  stepMarker.position.set(
+    x,
+    (world().ground(x, z) ?? 0) + 1.2 + Math.sin(Date.now() * 0.002) * 0.15,
+    z
+  );
 }
 function hideMarker() {
   if (stepMarker) stepMarker.visible = false;
+  ctx.ui.journey?.clearGoal(OWNER);
 }
 
 // —— 日落烧幕(2026-09-27 台词⇔天光):定稿本"天幕烧红"此前只有台词没有演出 ——
@@ -227,7 +262,8 @@ function hideDuskVeil() {
 // —— 台词播放(独占:一次一条,播完才前进;lock 互斥 + 心跳守护防链断) ——
 let chainBusy = false;
 let wd = null;
-function speakSeq(seq, i, done) {
+function speakSeq(seq, i, done, ticket = visit) {
+  if (ticket !== visit || ctx.scene.activeWorld !== 'b612') return;
   if (i >= seq.length) {
     chainBusy = false;
     if (done) done();
@@ -240,26 +276,73 @@ function speakSeq(seq, i, done) {
     if (spent) return;
     spent = true;
     clearTimeout(wd);
-    speakSeq(seq, i + 1, done);
+    speakSeq(seq, i + 1, done, ticket);
   };
   ctx.openDialog({
     speaker: tt(item.who),
     speakerType: whoSpk(item.who),
     lines: [tt(item)],
-    autoHide: 4600,
+    autoHide: 0,
+    world: 'b612',
     lock: true,
+    scope: OWNER,
     onDone: finish,
   });
   clearTimeout(wd);
-  wd = setTimeout(function () {
+  const guard = () => {
+    if (ticket !== visit || spent) return;
     if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
-  }, 7200);
+    else wd = setTimeout(guard, 2600);
+  };
+  wd = setTimeout(guard, 7200);
 }
 
 // —— 到达演出 ——
-function arrival() {
+async function arrival() {
   if (arrivalDone) return;
   arrivalDone = true;
+  const ticket = visit;
+  const saved = homeCheckpoint(
+    ctx.store.num('homeMemoryStep'),
+    ctx.store.json('journeyMemories', [])
+  );
+  ctx.ui.journey?.setPhase(OWNER, {
+    world: 'b612',
+    chapter: { zh: 'B612 · 家的回忆', en: 'B612 · memories of home' },
+    step: Math.min(saved + 1, 4),
+    total: 4,
+    hint: {
+      zh: '一次探索一处。对白点「继续」，观察时跟随金色光点。',
+      en: 'One place at a time. Continue the dialogue, then follow the golden light.',
+    },
+  });
+  if (!saved) {
+    const seen = await world()?.meta.showOverview?.();
+    if (seen === false || ticket !== visit) return;
+  }
+  const ready = await ctx.ui.journey?.transition(OWNER, {
+    world: 'b612',
+    chapter: { zh: '回忆一 · 小王子的家', en: 'Memory I · his home' },
+    title: {
+      zh: saved ? '继续家的回忆' : '来到 B612',
+      en: saved ? 'Continue the memory' : 'Arriving on B612',
+    },
+    hint: {
+      zh: '这是小王子离开以前的家。你是旁观者，过去听不见你。按顺序探索火山、幼苗、日落和玫瑰。',
+      en: 'This is his home before he left. The past cannot hear you. Explore the volcanoes, sprouts, sunsets and rose, in order.',
+    },
+    action: {
+      zh: saved ? '从上次完成的地方继续' : '开始这段回忆',
+      en: saved ? 'Resume the journey' : 'Begin the memory',
+    },
+  });
+  if (ready === false || ticket !== visit) return;
+  if (saved) {
+    curStep = saved;
+    if (saved < 4) placeMarker(STEPS[saved].x, STEPS[saved].z);
+    else checkCompletion();
+    return;
+  }
   speakSeq(SCENE3.arrival, 0, function () {
     curStep = 0;
     placeMarker(STEPS[0].x, STEPS[0].z);
@@ -267,9 +350,22 @@ function arrival() {
 }
 
 // —— 完成检测 ——
-function checkCompletion() {
+async function checkCompletion() {
   if (exitStarted || curStep < 4) return;
   exitStarted = true;
+  ctx.ui.journey?.clearGoal(OWNER);
+  const ticket = visit;
+  const ready = await ctx.ui.journey?.transition(OWNER, {
+    world: 'b612',
+    chapter: { zh: '家的回忆 · 已完成', en: 'Memories of home · complete' },
+    title: { zh: '把她的告别留在手札里', en: 'Keep her farewell' },
+    hint: {
+      zh: '你已走完火山、幼苗、日落和玫瑰。现在回到沙漠听小王子说话，再穿过石门，继续前往国王的星球。',
+      en: 'You have seen the volcanoes, sprouts, sunsets and rose. Return to the desert, hear him speak, then cross the gate again to visit the King.',
+    },
+    action: { zh: '回到沙漠', en: 'Return to the desert' },
+  });
+  if (ready === false || ticket !== visit) return;
   const veil = document.createElement('div');
   veil.style.cssText =
     'position:fixed;inset:0;z-index:' +
@@ -280,6 +376,10 @@ function checkCompletion() {
     veil.style.opacity = '1';
   });
   setTimeout(function () {
+    if (ticket !== visit || ctx.scene.activeWorld !== 'b612') {
+      veil.remove();
+      return;
+    }
     try {
       ctx.store.mark('page1');
       ctx.events.emit('story:page1done');
@@ -296,6 +396,17 @@ function checkCompletion() {
 
 // —— 各站触发动作 ——
 function doStep(stepIdx) {
+  const ticket = visit;
+  ctx.ui.journey?.setPhase(OWNER, {
+    world: 'b612',
+    chapter: { zh: 'B612 · 家的回忆', en: 'B612 · memories of home' },
+    step: stepIdx + 1,
+    total: 4,
+    hint: {
+      zh: '先听这一段，再完成当前观察。下一处会在完成后亮起。',
+      en: 'Hear this part, then observe. The next place opens after you finish.',
+    },
+  });
   const seqs = [
     [SCENE3.volcanoes],
     SCENE3.baobab,
@@ -313,23 +424,99 @@ function doStep(stepIdx) {
   if (stepIdx >= 0 && stepIdx < seqs.length) {
     if (stepIdx === 2) showDuskVeil(); // 日落站:天幕先烧起来,再数四十四次
     speakSeq(seqs[stepIdx], 0, function () {
-      if (stepIdx === 2) hideDuskVeil();
-      // 台词播完 → 下一站
-      curStep++;
-      if (curStep < STEPS.length) {
-        placeMarker(STEPS[curStep].x, STEPS[curStep].z);
-      } else {
-        hideMarker();
+      const next = () => {
+        if (ticket !== visit || ctx.scene.activeWorld !== 'b612') return;
+        interactionBusy = false;
+        if (stepIdx === 2) {
+          hideDuskVeil();
+          removeMemorySun();
+        }
+        curStep++;
+        ctx.store.setNum('homeMemoryStep', curStep);
+        if (curStep < STEPS.length) placeMarker(STEPS[curStep].x, STEPS[curStep].z);
+        else hideMarker();
+        checkCompletion();
+      };
+      const ids = ['volcano', 'baobab', 'sunset', 'rose'];
+      interactionBusy = true;
+      if (!ctx.ui.journey) {
+        next();
+        return;
       }
-      checkCompletion();
+      ctx.ui.journey
+        .beginTask(OWNER, ids[stepIdx], {
+          onTarget(point, index) {
+            if (ticket !== visit) return;
+            // 光点随当前观察点移动；玩家改变的是观看位置，不是过去的星球。
+            placeMarker(point.x, point.z, false);
+            if (stepIdx === 2) showMemorySun(index);
+          },
+        })
+        .then((result) => {
+          if (result) next();
+        });
     });
   }
 }
+
+function showMemorySun(index) {
+  const sc = world()?.scene;
+  if (!sc) return;
+  if (!memorySun) {
+    memorySun = new THREE.Mesh(
+      new THREE.SphereGeometry(1.15, 20, 12),
+      new THREE.MeshBasicMaterial({ color: 0xf7bd79, transparent: true, opacity: 0.85, fog: false })
+    );
+    memorySun.name = 'homeMemorySun';
+    sc.add(memorySun);
+  }
+  memorySun.position.set(-12 + index * 1.5, 3.5 - index * 0.8, -5 + index * 4);
+  memorySun.material.color.set([0xf7bd79, 0xed955b, 0xda6b55][index] || 0xda6b55);
+}
+function removeMemorySun() {
+  if (!memorySun) return;
+  memorySun.parent?.remove(memorySun);
+  memorySun.geometry.dispose();
+  memorySun.material.dispose();
+  memorySun = null;
+}
+
+ctx.events.on('world:changed', ({ from, to }) => {
+  if (from !== 'b612' || to === 'b612') return;
+  visit++;
+  clearTimeout(wd);
+  ctx.ui.cancelDialogScope?.(OWNER);
+  ctx.ui.journey?.cancel(OWNER);
+  chainBusy = false;
+  interactionBusy = false;
+  hideMarker();
+  hideDuskVeil();
+  removeMemorySun();
+  if (curStep < 0) {
+    arrivalDone = false;
+    scene3MemoryTickStart = 0;
+  }
+  if (curStep >= 4 && !ctx.store.flag('page1')) exitStarted = false;
+});
+
+let scene3MemoryTickStart = 0;
+window.__homeMemory = { state: () => ({ step: curStep, chainBusy, interactionBusy }) };
 
 // —— 主循环 ——
 ctx.onTick(function scene3MemoryTick(dt) {
   if ((ctx.scene.activeWorld || 'b612') !== 'b612') return;
   if (ctx.store.flag('page1')) return;
+  if (!world()?.meta.surface) {
+    ctx.ui.journey?.setPhase(OWNER, {
+      world: 'b612',
+      chapter: { zh: 'B612 · 小王子的家', en: 'B612 · his home' },
+      hint: {
+        zh: '正在展开原来的小星球，请稍候……',
+        en: 'Unfolding the little planet. Please wait…',
+      },
+    });
+    return;
+  }
   if (!built) {
     build();
     return;
@@ -338,22 +525,19 @@ ctx.onTick(function scene3MemoryTick(dt) {
 
   // 到达演出(1.2s 延迟)
   if (curStep < 0) {
-    if (!scene3MemoryTick._a) scene3MemoryTick._a = performance.now();
-    if (performance.now() - scene3MemoryTick._a > 1200) {
+    if (!scene3MemoryTickStart) scene3MemoryTickStart = performance.now();
+    if (performance.now() - scene3MemoryTickStart > 1200) {
       arrival();
-      // 安全兜底:如果 speakSeq 链条断了(autoHide 竞态等),5s 后强制推进
-      setTimeout(function () {
-        if (arrivalDone && curStep < 0) {
-          curStep = 0;
-          placeMarker(STEPS[0].x, STEPS[0].z);
-        }
-      }, 5000);
     }
     return;
   }
 
   // 对话链播放中 → 不检测新站
-  if (chainBusy) return;
+  if (chainBusy || interactionBusy || ctx.overlay.anyOpen() || ctx.ui.dialogOpen?.()) return;
+  if (curStep >= 4) {
+    checkCompletion();
+    return;
+  }
 
   // 顺序引导:检测当前目标站
   if (curStep >= 0 && curStep < STEPS.length) {

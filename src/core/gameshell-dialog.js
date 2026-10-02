@@ -14,11 +14,14 @@ import {
 } from './dialog-voice.mjs';
 import { dwellFor } from '../shared/typing-rhythm.mjs';
 import { tt, GLOBAL } from '../shared/story-text.mjs';
+import { allowJourneyDialog } from '../shared/journey-guidance.mjs';
 
-export function createDialogSystem() {
+export function createDialogSystem({ getWorld = () => 'main', isStoryBusy = () => false } = {}) {
   let dlg = null; // {speaker, lines, idx, choices, onDone, typeTimer, hideTimer, typing}
   let dialogEl = null;
   let lockQueue = []; // lock 占用时的剧本对话排队(2026-09-10 衔接修复:丢弃=断链)
+  const scopeVersions = new Map();
+  const worldVersions = new Map();
 
   function attach(element) {
     dialogEl = element;
@@ -38,6 +41,7 @@ export function createDialogSystem() {
     chEl.innerHTML = '';
     hintEl.style.display = 'none';
     dialogEl.classList.remove('gs-await'); // 选项呼吸动画只属于挂选项的那一行
+    refreshNext();
     typeLine(dlg.lines[dlg.idx] || '');
     // 台词朗读(2026-09-24):每行显示即读;新行顶旧行不排队
     speakLine(dlg.lines[dlg.idx] || '', dlg.speakerType);
@@ -56,11 +60,13 @@ export function createDialogSystem() {
     caret.textContent = '✎';
     textEl.appendChild(caret);
     let i = 0;
+    const current = dlg;
+    refreshNext();
     // 自适应节奏(2026-09-24 流畅度):普通字恒速,标点驻留(逗号轻顿/句末重顿),
     // 台词打字从"机关枪"变成"说话的呼吸感"。setTimeout 递归取代 setInterval。
     const step = () => {
       // 打字过程中对话可能已被关闭/切换(onDone 链会立刻开下一条)——空手而归
-      if (!dlg) return;
+      if (dlg !== current) return;
       if (i >= str.length) {
         dlg.typing = false;
         textEl.textContent = str;
@@ -75,6 +81,9 @@ export function createDialogSystem() {
     dlg.typeTimer = setTimeout(step, 0);
   }
   function onLineDone() {
+    if (!dlg) return;
+    const current = dlg;
+    refreshNext();
     clearTimeout(dlg.hideTimer);
     const last = dlg.idx >= dlg.lines.length - 1;
     if (last) {
@@ -92,6 +101,7 @@ export function createDialogSystem() {
             hintEl.textContent = '(♪ 语音加载中…)';
             hintEl.style.display = 'block';
             onVoiceStart(() => {
+              if (dlg !== current) return;
               const h = dialogEl.querySelector('.gs-hint');
               if (h) {
                 h.textContent = '';
@@ -100,7 +110,10 @@ export function createDialogSystem() {
             });
           }
           onVoiceEnd(() => {
-            if (dlg && dlg.autoHide) dlg.hideTimer = setTimeout(closeDialog, dlg.autoHide);
+            if (dlg === current && current.autoHide)
+              current.hideTimer = setTimeout(() => {
+                if (dlg === current) closeDialog();
+              }, current.autoHide);
           });
         } else {
           if (isVoiceOff() && dlg.autoHide > 6000) {
@@ -111,7 +124,9 @@ export function createDialogSystem() {
               hintEl.style.display = 'block';
             }
           }
-          dlg.hideTimer = setTimeout(closeDialog, dlg.autoHide);
+          dlg.hideTimer = setTimeout(() => {
+            if (dlg === current) closeDialog();
+          }, dlg.autoHide);
         }
       }
     }
@@ -134,6 +149,14 @@ export function createDialogSystem() {
     } else {
       closeDialog();
     }
+  }
+  function refreshNext() {
+    const b = dialogEl?.querySelector('.gs-next');
+    if (!b || !dlg) return;
+    b.style.display = dlg.choices?.length ? 'none' : 'block';
+    b.textContent = tt(
+      dlg.typing ? { zh: '显示完整台词', en: 'Show full line' } : { zh: '继续 →', en: 'Continue →' }
+    );
   }
   function showChoices() {
     const chEl = dialogEl.querySelector('.gs-choices');
@@ -167,6 +190,7 @@ export function createDialogSystem() {
     if (d && d.hideTimer) clearTimeout(d.hideTimer);
     dlg = null;
     dialogEl.style.display = 'none';
+    delete document.body.dataset.dialogOpen;
     dialogEl.classList.remove('gs-await');
     delete dialogEl.dataset.spk;
     stopSpeaking(); // 台词朗读随对话框关闭停止(朗读长于阅读时,别让声音拖到下一场)
@@ -182,11 +206,21 @@ export function createDialogSystem() {
     // 经 openDialog 重入:若 onDone 链已抢先开新锁,这里会自动回队,不硬抢
     if (!suppressDone && !dlg && lockQueue.length) {
       const next = lockQueue.shift();
-      setTimeout(() => openDialog(next), 60); // 小让位:给 onDone 链的开窗留一拍
+      const version = scopeVersions.get(next.scope) || 0;
+      const worldVersion = worldVersions.get(next.world) || 0;
+      setTimeout(() => {
+        if (
+          (scopeVersions.get(next.scope) || 0) === version &&
+          (worldVersions.get(next.world) || 0) === worldVersion
+        )
+          openDialog(next);
+      }, 60); // 离开世界后，已排定但尚未打开的对话也不能漏回来
     }
   }
   function openDialog(opts) {
     if (!opts) return;
+    if (!allowJourneyDialog(dlg, opts, getWorld(), isStoryBusy())) return;
+    opts = { ...opts, world: opts.world || getWorld() };
     // lock 互斥(2026-09-07 剧本对话容错;2026-09-10 由丢弃改排队):
     // 上一条 lock 对话未收束时,后来的 lock 对话进 FIFO 队尾等锁空补播——
     // 静默丢弃会让该链永远停在这一步(旧档叫醒词吞掉桥段台词/chainBusy 死锁的根因)
@@ -223,6 +257,8 @@ export function createDialogSystem() {
         opts.autoHide != null ? opts.autoHide : opts.choices && opts.choices.length ? 0 : 9000,
       onDone: opts.onDone || null,
       lock: !!opts.lock,
+      scope: opts.scope || null,
+      world: opts.world,
       typing: false,
       typeTimer: null,
       hideTimer: null,
@@ -233,6 +269,7 @@ export function createDialogSystem() {
     // 自愈覆盖所有对话源(story-text / crash-site 硬编码 / quiz / 菜单),不再依赖预生成清单。
     for (let pi = 1; pi < lines.length; pi++) prefetchLine(lines[pi] || '', dlg.speakerType);
     dialogEl.style.display = 'block';
+    document.body.dataset.dialogOpen = '1';
     // 说话人视觉类型:prince/pilot/sheep/rose → 不同边框+名字色
     dialogEl.dataset.spk = dlg.speakerType;
     renderDialog();
@@ -244,5 +281,25 @@ export function createDialogSystem() {
     return 'B612';
   }
 
-  return { attach, open: openDialog, close: closeDialog, advance, speakerFor, isOpen: () => !!dlg };
+  function cancelScope(scope) {
+    scopeVersions.set(scope, (scopeVersions.get(scope) || 0) + 1);
+    lockQueue = lockQueue.filter((entry) => entry.scope !== scope);
+    if (dlg && dlg.scope === scope) closeDialog(true);
+  }
+  function cancelWorld(world) {
+    worldVersions.set(world, (worldVersions.get(world) || 0) + 1);
+    lockQueue = lockQueue.filter((entry) => entry.world !== world);
+    if (dlg?.world === world) closeDialog(true);
+  }
+  return {
+    attach,
+    open: openDialog,
+    close: closeDialog,
+    advance,
+    speakerFor,
+    cancelScope,
+    cancelWorld,
+    isOpen: () => !!dlg,
+    locked: () => !!dlg?.lock,
+  };
 }

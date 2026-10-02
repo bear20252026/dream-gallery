@@ -69,6 +69,12 @@ ctx.scene.avatar = avatar;
 // 原 hT/rs 单步检测只查终点 → 低帧率/滑翔加速时单步位移超过碰撞体厚度 → 穿模。
 // 现在 resolveMove 内部做子步进(每步 ≤0.12m)+ 逐轴滑行。
 function mv(wx, wz, dt) {
+  if (
+    ctx.overlay.anyOpen() ||
+    ctx.ui.dialogOpen?.() ||
+    document.body.classList.contains('scene2BoardActive')
+  )
+    return;
   if (ctx.kunlun.flightLock) return; // 飞舟巡礼中(ark.js):移动冻结,航线接管
   // 多世界切割(2026-09-06):非主世界由 planets 太空模式接管移动——
   // 主世界碰撞体照常解算会在小世界里形成"隐形墙"(B612 出生点恰在主世界建筑脚印内)

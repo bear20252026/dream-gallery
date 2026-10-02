@@ -20,13 +20,26 @@ let camRig = null; // 第三人称相机推拉状态(2026-09-18 自 ctx._camRig 
 // 返回沿 (dx,dy,dz) 方向自 (ox,oy,oz) 起到命中 AABB 的距离;
 // 起点在盒内返回 0,未命中返回 Infinity。用于 Spring Arm 相机的遮挡裁决。
 function rayAABB(ox, oy, oz, dx, dy, dz, mnX, mxX, mnY, mxY, mnZ, mxZ) {
-  let tmin = -Infinity, tmax = Infinity;
-  if (dx !== 0) { const t1 = (mnX - ox) / dx, t2 = (mxX - ox) / dx; tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2)); }
-  else if (ox < mnX || ox > mxX) return Infinity;
-  if (dy !== 0) { const t1 = (mnY - oy) / dy, t2 = (mxY - oy) / dy; tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2)); }
-  else if (oy < mnY || oy > mxY) return Infinity;
-  if (dz !== 0) { const t1 = (mnZ - oz) / dz, t2 = (mxZ - oz) / dz; tmin = Math.max(tmin, Math.min(t1, t2)); tmax = Math.min(tmax, Math.max(t1, t2)); }
-  else if (oz < mnZ || oz > mxZ) return Infinity;
+  let tmin = -Infinity,
+    tmax = Infinity;
+  if (dx !== 0) {
+    const t1 = (mnX - ox) / dx,
+      t2 = (mxX - ox) / dx;
+    tmin = Math.max(tmin, Math.min(t1, t2));
+    tmax = Math.min(tmax, Math.max(t1, t2));
+  } else if (ox < mnX || ox > mxX) return Infinity;
+  if (dy !== 0) {
+    const t1 = (mnY - oy) / dy,
+      t2 = (mxY - oy) / dy;
+    tmin = Math.max(tmin, Math.min(t1, t2));
+    tmax = Math.min(tmax, Math.max(t1, t2));
+  } else if (oy < mnY || oy > mxY) return Infinity;
+  if (dz !== 0) {
+    const t1 = (mnZ - oz) / dz,
+      t2 = (mxZ - oz) / dz;
+    tmin = Math.max(tmin, Math.min(t1, t2));
+    tmax = Math.min(tmax, Math.max(t1, t2));
+  } else if (oz < mnZ || oz > mxZ) return Infinity;
   return tmax >= tmin && tmax >= 0 ? Math.max(tmin, 0) : Infinity;
 }
 // 角色模型朝向(弧度,heading 语义:-sin/-cos 方向)。第三人称下平滑转向移动方向。
@@ -51,7 +64,7 @@ export class LoopManager {
     this._lastPosT = 0;
     this._lastDayT = 0;
     this._lastPlsT = 0;
-    
+
     // 自适应画质
     // 低档位 0.75(2026-08-30 按用户要求撤掉 0.5 档):第三人称角色(12 万三角面蒙皮
     // +全场景光照)会把弱 GPU 拖到个位数帧率,需要降档兜底;但 0.5 倍渲染分辨率
@@ -62,7 +75,7 @@ export class LoopManager {
     this.fpsAcc = 0;
     this.fpsCnt = 0;
     this.lowQuality = false;
-    
+
     // 性能监控
     this.frameCount = 0;
     this.fps = 0;
@@ -78,7 +91,7 @@ export class LoopManager {
     this._running = true;
     this._lastTime = performance.now();
     this._frame();
-    
+
     // 触发循环启动事件
     eventBus.emit('loop:started');
   }
@@ -132,15 +145,15 @@ export class LoopManager {
       }
       return;
     }
-    
+
     this.fpsAcc += dt;
     this.fpsCnt++;
     if (this.fpsAcc < 2) return; // 每 2 秒评估一次
-    
+
     const avg = this.fpsCnt / this.fpsAcc;
     this.fpsAcc = 0;
     this.fpsCnt = 0;
-    
+
     if (now - this.prLastChange < 3000) return;
     // 阈值(2026-08-30 收紧):<25 才降档(此前 35 太激进,流畅时也降糊);
     // >45 即回升(此前 52 太苛刻,升不回去,长期停留在糊档)。
@@ -167,22 +180,22 @@ export class LoopManager {
     this._lastTime = now;
     // 兼容暂停:timeScale 由 LoopManager.pause/resume 写入 ctx.loop.timeScale
     dt *= this.ctx.loop.timeScale ?? 1;
-    
+
     // 更新 FPS 计数
     this.frameCount++;
     if (now - this.lastFpsUpdate > this.fpsUpdateInterval) {
-      this.fps = Math.round(this.frameCount * 1000 / (now - this.lastFpsUpdate));
+      this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
       this.frameCount = 0;
       this.lastFpsUpdate = now;
       eventBus.emit('loop:fps', this.fps);
     }
-    
+
     // 自适应画质
     this.adaptiveQuality(now, dt);
 
     // 执行游戏循环阶段
     this._executePhases(dt, now);
-    
+
     // 触发帧完成事件
     eventBus.emit('loop:frame', { dt, now, fps: this.fps });
   }
@@ -200,13 +213,13 @@ export class LoopManager {
 
     // 1. INPUT 阶段 - 处理输入
     this._executeInputPhase(dt, now);
-    
+
     // 2. UPDATE 阶段 - 游戏逻辑更新
     this._executeUpdatePhase(dt, now);
-    
+
     // 3. RENDER 阶段 - GPU 渲染
     this._executeRenderPhase(dt, now);
-    
+
     // 4. UI 阶段 - DOM 层更新
     this._executeUIPhase(dt, now);
   }
@@ -239,32 +252,36 @@ export class LoopManager {
 
     // 画廊移动逻辑
     if (world === 'main') {
-    let mx = jD.x, mz = jD.z;
-    if (ks.w || ks.arrowup) mz += 1;
-    if (ks.s || ks.arrowdown) mz -= 1;
-    if (ks.a || ks.arrowleft) mx -= 1;
-    if (ks.d || ks.arrowright) mx += 1;
-    const mg = Math.sqrt(mx * mx + mz * mz);
-    if (mg > 0.1) {
-      mx /= mg;
-      mz /= mg;
-      // 移动基准朝向:第一人称=玩家朝向 pl.y;第三人称=轨道相机朝向(所见即所往)
-      const yawSrc = ctx.player.viewMode === 1 && ctx.player.orbit ? ctx.player.orbit.yaw : pl.y;
-      const fx = -Math.sin(yawSrc), fz = -Math.cos(yawSrc),
-            rx = Math.cos(yawSrc), rz = -Math.sin(yawSrc);
-      const wx = fx * mz + rx * mx, wz = fz * mz + rz * mx;
-      mv(wx, wz, dt);
-      // 角色平滑转向实际移动方向(最短弧,≈0.7s 转 90°),消除"横移滑步"观感;
-      // 静止时不转向(保持原地朝向,环绕相机可自由看正脸/背影)
-      const target = Math.atan2(-wx, -wz);
-      _modelYaw = lerpAngle(_modelYaw, target, Math.min(dt * 9, 1));
-      // pl.y 跟随角色朝向:切回第一人称视角无缝、滑翔方向计算保持一致
-      if (ctx.player.viewMode === 1) pl.y = _modelYaw;
-    } else if (ctx.player.viewMode !== 1) {
-      _modelYaw = pl.y; // 第一人称:角色朝向即玩家朝向
+      let mx = jD.x,
+        mz = jD.z;
+      if (ks.w || ks.arrowup) mz += 1;
+      if (ks.s || ks.arrowdown) mz -= 1;
+      if (ks.a || ks.arrowleft) mx -= 1;
+      if (ks.d || ks.arrowright) mx += 1;
+      const mg = Math.sqrt(mx * mx + mz * mz);
+      if (mg > 0.1) {
+        mx /= mg;
+        mz /= mg;
+        // 移动基准朝向:第一人称=玩家朝向 pl.y;第三人称=轨道相机朝向(所见即所往)
+        const yawSrc = ctx.player.viewMode === 1 && ctx.player.orbit ? ctx.player.orbit.yaw : pl.y;
+        const fx = -Math.sin(yawSrc),
+          fz = -Math.cos(yawSrc),
+          rx = Math.cos(yawSrc),
+          rz = -Math.sin(yawSrc);
+        const wx = fx * mz + rx * mx,
+          wz = fz * mz + rz * mx;
+        mv(wx, wz, dt);
+        // 角色平滑转向实际移动方向(最短弧,≈0.7s 转 90°),消除"横移滑步"观感;
+        // 静止时不转向(保持原地朝向,环绕相机可自由看正脸/背影)
+        const target = Math.atan2(-wx, -wz);
+        _modelYaw = lerpAngle(_modelYaw, target, Math.min(dt * 9, 1));
+        // pl.y 跟随角色朝向:切回第一人称视角无缝、滑翔方向计算保持一致
+        if (ctx.player.viewMode === 1) pl.y = _modelYaw;
+      } else if (ctx.player.viewMode !== 1) {
+        _modelYaw = pl.y; // 第一人称:角色朝向即玩家朝向
+      }
     }
-    }
-    
+
     // 跳跃/滑翔/重力物理(player.js tickPhysics,经 Object.assign 挂 ctx.player)
     // ⚠️ 2026-08-30 B2 收敛:历史上函数被挂到扁平 ctx.tickPhysics 而此处读
     //   ctx.player.tickPhysics,断链导致物理从未运行(角色"贴地飞行")。
@@ -276,10 +293,11 @@ export class LoopManager {
       this._warnedNoPhysics = true;
       console.warn('[loop-manager] 未找到 tickPhysics,重力/跳跃/滑翔物理未启用');
     }
-    
+
     // 相机每帧同步
-    this._updateCamera(dt, now);
-    
+    // B612曲面位移在旧ticker中完成，相机与角色模型随后统一同步。
+    if (world !== 'b612') this._updateCamera(dt, now);
+
     // 沙漠区块/水面/飞鸟/沙暴逐帧更新(多世界切割:仅主世界)
     if (desert && world === 'main') desert.update(dt, now * 0.001);
 
@@ -331,6 +349,11 @@ export class LoopManager {
         console.warn('[loop:tickers]', e.message);
       }
     }
+    if (
+      ctx.scene.activeWorld === 'b612' &&
+      !ctx.scene.worldManager?.getWorld('b612')?.meta.revealing
+    )
+      this._updateCamera(dt, now);
   }
 
   /**
@@ -353,14 +376,24 @@ export class LoopManager {
       // 相机只拥有"臂长 curDist"一个量 —— 碰撞立即收缩,畅通后指数弹回;
       // 用户缩放意图 ob.dist 永不被污染(收缩量不回写,避开 OrbitControls 回写坑)。
       // 时序契约:本段在 UPDATE 阶段执行 —— 玩家移动/tickPhysics 之后、渲染之前。
-      const ob = ctx.player.orbit || { yaw: pl.y, pitch: ORBIT_DEFAULTS.pitch, dist: ORBIT_DEFAULTS.dist };
-      const cp = Math.cos(ob.pitch), sp = Math.sin(ob.pitch);
+      const ob = ctx.player.orbit || {
+        yaw: pl.y,
+        pitch: ORBIT_DEFAULTS.pitch,
+        dist: ORBIT_DEFAULTS.dist,
+      };
+      const cp = Math.cos(ob.pitch),
+        sp = Math.sin(ob.pitch);
       const footY = pl.p.y - EYE_HEIGHT; // 角色脚底世界高度
-      const px = pl.p.x, py = footY + 0.9, pz = pl.p.z; // 射线原点 = 角色胸口(与 lookAt 同轴)
+      const px = pl.p.x,
+        py = footY + 0.9,
+        pz = pl.p.z; // 射线原点 = 角色胸口(与 lookAt 同轴)
 
       // -- 1) 理想机位(未收缩) --
-      const fx = Math.sin(ob.yaw) * cp, fz = Math.cos(ob.yaw) * cp;
-      const ix = px + fx * ob.dist, iy = py + sp * ob.dist, iz = pz + fz * ob.dist;
+      const fx = Math.sin(ob.yaw) * cp,
+        fz = Math.cos(ob.yaw) * cp;
+      const ix = px + fx * ob.dist,
+        iy = py + sp * ob.dist,
+        iz = pz + fz * ob.dist;
 
       // -- 2) 射线碰撞:胸口 → 理想机位,对建筑碰撞盒求交(解析 slab 法,零分配) --
       // bounds 盒只有 XZ 脚印(墙体足够高),Y 覆盖 0~8m 全楼层。
@@ -370,10 +403,19 @@ export class LoopManager {
       const rig = camRig;
       let safeDist = ob.dist;
       {
-        const vx = ix - px, vy = iy - py, vz = iz - pz;
+        const vx = ix - px,
+          vy = iy - py,
+          vz = iz - pz;
         const len = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1;
-        const dx = vx / len, dy = vy / len, dz = vz / len;
-        const boxes = world === 'main' ? ctx.scene.bounds || [] : ctx.scene.getActiveBounds ? ctx.scene.getActiveBounds() || [] : [];
+        const dx = vx / len,
+          dy = vy / len,
+          dz = vz / len;
+        const boxes =
+          world === 'main'
+            ? ctx.scene.bounds || []
+            : ctx.scene.getActiveBounds
+              ? ctx.scene.getActiveBounds() || []
+              : [];
         for (let i = 0; i < boxes.length; i++) {
           const b = boxes[i];
           const t = rayAABB(px, py, pz, dx, dy, dz, b.mnX, b.mxX, 0, 8, b.mnZ, b.mxZ);
@@ -386,14 +428,23 @@ export class LoopManager {
       else rig.curDist += (safeDist - rig.curDist) * (1 - Math.exp(-6 * dt));
       const dist = rig.curDist;
 
-      const bx = px + fx * dist, bz = pz + fz * dist;
+      const bx = px + fx * dist,
+        bz = pz + fz * dist;
 
       // -- 4) 地面兜底(解析法,不做地形射线):全局地板 y=0 与室外沙丘取高者 --
       // 展厅室内地板是 y≈0 平板而 desert.getH 返回室外地形(可至 -0.23),
       // 旧版只钳 getH → 相机钻进室内地板下;取 max 后室内外都不会穿。
-      // 多世界切割(2026-09-06):非主世界用当前世界的地面(如 B612 平面 0)
-      let floorY = world === 'main' ? (desert ? desert.getH(bx, bz) : 0) : ctx.scene.getActiveGround ? ctx.scene.getActiveGround(bx, bz) || 0 : 0;
-      if (floorY < 0) floorY = 0;
+      // B612的原模型坡面低于0m；只在主世界保留展厅地板的0m兜底。
+      const worldFloor = world === 'main' ? undefined : ctx.scene.getActiveGround?.(bx, bz);
+      let floorY =
+        world === 'main'
+          ? desert
+            ? desert.getH(bx, bz)
+            : 0
+          : Number.isFinite(worldFloor)
+            ? worldFloor
+            : footY;
+      if (world === 'main' && floorY < 0) floorY = 0;
       let cy = py + sp * dist; // pitch>0:相机升高俯视;pitch<0:压低仰视
       if (cy < floorY + 0.3) cy = floorY + 0.3; // 安全距离 0.3m
 
@@ -458,7 +509,7 @@ export class LoopManager {
           'X:' + pl.p.x.toFixed(2) + ' | Y:' + pl.p.y.toFixed(2) + ' | Z:' + pl.p.z.toFixed(2);
       }
     }
-    
+
     // 小地图重绘(多世界切割:仅主世界;非主世界 #m 已隐藏但每帧重绘仍耗 CPU)
     if (drawMap && (ctx.scene.activeWorld || 'main') === 'main') drawMap();
   }

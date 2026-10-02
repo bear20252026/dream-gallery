@@ -23,6 +23,7 @@ padBtn.style.cssText =
   Z.navBtn +
   ';display:none;padding:14px 36px;border-radius:24px;border:2px solid rgba(255,214,130,.9);background:rgba(30,18,8,.92);color:#ffe9c4;font-size:18px;letter-spacing:4px;cursor:pointer;font-family:inherit';
 padBtn.onclick = function () {
+  if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen()) return;
   const wm = ctx.scene.worldManager;
   if (!wm || wm.transitioning) return; // navGuard 语义:切换中不重复触发
   padBtn.style.display = 'none';
@@ -50,6 +51,10 @@ eventBus.on('world:changed', function (e) {
   gateArmed = false;
   const pl = ctx.player.pl;
   if (!pl) return;
+  if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen()) {
+    padBtn.style.display = 'none';
+    return;
+  }
   const np = exitGateNudge(pl.p.x, pl.p.z, GATE_RADIUS + 2);
   if (np.moved) {
     pl.p.x = np.x;

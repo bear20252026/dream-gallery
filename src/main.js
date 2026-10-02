@@ -21,6 +21,7 @@ import { expose } from './debug-hooks.js';
 import './visitor-fp.js'; // 访客身份采集+踢出通知(轻量 IIFE,含 SSE 踢出监听,不依赖 3D)
 import { createToastSystem } from './core/toast-system.js'; // 示范积木:事件驱动 toast
 import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外壳:手绘对话框+任务栏+系统菜单(2026-08-29)
+import { createJourneySystem } from './core/journey-system.js'; // 原著旅途交互与观察手札，组合根统一装配
 import { createInputSystem } from './core/input.js'; // 统一输入 facade(阶段1·P1-3)
 import { createAudioSystem } from './core/audio-system.js'; // 阶段2 垂直切片:空间音频积木(依赖注入,取代冻结 ctx 写)
 import { createPerfMonitorSystem } from './core/perf-monitor-system.js'; // 阶段3 切片:性能监控积木(单循环驱动,删死 ctx import)
@@ -56,7 +57,7 @@ const _sl = applySavedLang();
 document.body.dataset.scriptLang = _sl;
 // 主世界常驻语言切换钮:同一位置只显示当前语言标签(EN/中文)
 {
-  const tb = makeLangToggle({ placement: 'top:14px;right:14px', z: Z.navBtn });
+  const tb = makeLangToggle({ placement: 'top:22px;right:80px', z: Z.menuBtn });
   tb.style.position = 'fixed';
   document.body.appendChild(tb);
 }
@@ -178,8 +179,10 @@ async function preloadWorld() {
 
     compositionRoot.register(createToastSystem());
     compositionRoot.register(createGameShellSystem()); // 手绘游戏外壳(对话框/任务栏/菜单)
+    const journeyInput = createInputSystem(ctx.input);
+    compositionRoot.register(createJourneySystem({ input: journeyInput }));
     compositionRoot.register(createLoopSystem());
-    compositionRoot.register(createInputSystem(ctx.input));
+    compositionRoot.register(journeyInput);
     compositionRoot.init();
     expose('compositionRoot', compositionRoot);
     expose('gameState', getGameState());

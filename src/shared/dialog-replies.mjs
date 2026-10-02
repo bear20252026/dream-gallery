@@ -10,30 +10,35 @@ import { tt, whoSpk, REPLIES } from './story-text.mjs';
  * @param done 王子接话播完后的回调(汇合原主线)
  * @returns choices 数组(直接传 openDialog 的 choices)
  */
-export function replyChoices(ctx, key, done) {
+export function replyChoices(ctx, key, done, options = {}) {
   const node = REPLIES[key];
   if (!node || !node.choices) return null;
+  const world = ctx.scene.activeWorld || 'main';
   return node.choices.map((c, i) => ({
     label: tt(c.label),
     value: i,
     onClick: (idx) => {
+      if (ctx.scene.activeWorld !== world) return;
       const pick = node.choices[idx] || node.choices[0];
       // 玩家回应(飞行员,自动朗读)
       ctx.openDialog({
+        ...options, world,
         speaker: tt(pick.pilot.who),
         speakerType: whoSpk(pick.pilot.who),
         lines: [tt(pick.pilot)],
-        autoHide: 4200,
+        autoHide: 0,
         lock: true,
         onDone: () => {
+          if (ctx.scene.activeWorld !== world) return;
           // 王子接话
           ctx.openDialog({
+            ...options, world,
             speaker: tt(pick.prince.who),
             speakerType: whoSpk(pick.prince.who),
             lines: [tt(pick.prince)],
-            autoHide: 5200,
+            autoHide: 0,
             lock: true,
-            onDone: () => done && done(),
+            onDone: () => ctx.scene.activeWorld === world && done && done(),
           });
         },
       });
