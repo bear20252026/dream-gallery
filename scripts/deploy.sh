@@ -9,7 +9,7 @@
 #    此前换模型必须手工 scp,忘一次线上就缺模型 → 本脚本第 6 步只补传"服务器没有的"文件。
 #    ⚠️ 不用 rsync:Windows Git Bash 不带 rsync(实测 2026-09-23 `rsync: command not found`),
 #    改用 md5 清单比对 + tar 打包上传,只用 ssh/scp/tar/find/md5sum 这些一定有的工具。
-set -e
+set -e -o pipefail
 cd "$(dirname "$0")/.."
 ROOT_DIR="$PWD"
 KEY="/tmp/gk.pem"
@@ -32,6 +32,8 @@ scp -i "$KEY" -o StrictHostKeyChecking=no /tmp/dist.tar.gz "root@$HOST:/tmp/"
 echo "=== 4/7 解压到服务目录 + 清理历史 chunk ==="
 ssh -i "$KEY" -o StrictHostKeyChecking=no "root@$HOST" bash -s <<'EOF'
 cd /opt/gallery
+# 先落新分包，再切换HTML入口，避免入口短暂引用尚未解包的哈希资源。
+tar -xzf /tmp/dist.tar.gz ./assets
 tar -xzf /tmp/dist.tar.gz
 rm -f /tmp/dist.tar.gz
 # 清理:保留 index.html 当前引用的 chunk,删掉其余历史 main-*.js
