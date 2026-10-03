@@ -377,7 +377,11 @@ export function createSheepCompanion() {
         anchor && p && Math.hypot(p.x - anchor.position.x, p.z - anchor.position.z) <= 2.6;
       // 任务卡(如火山三选一)打开时不显示,避免玩家把两个按钮混在一起
       const taskOpen = !!document.body.dataset.journeyTask;
-      panel.style.display = near && !stop && !taskOpen ? 'block' : 'none';
+      // 有路要赶时(罗盘在指路/石门按钮亮着)也不显示:小羊是空闲时的乐趣,不和主线抢屏幕
+      const compass = document.getElementById('storyCompass');
+      const guiding =
+        (compass && compass.style.display === 'flex') || !!document.body.dataset.gateReady;
+      panel.style.display = near && !stop && !taskOpen && !guiding ? 'block' : 'none';
       button.disabled = time - lastPat < 2.5;
       language();
     },

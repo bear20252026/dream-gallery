@@ -75,6 +75,11 @@ const STYLE = `
 .gs-choice:hover{background:#caa15f;color:#fff5e0;transform:translateX(6px) rotate(-.6deg);}
 .gs-hint{margin-top:8px;text-align:right;font-size:12px;color:#8a6a44;opacity:.7;letter-spacing:2px;}
 .gs-next{display:block;margin:12px 0 0 auto;min-height:44px;padding:9px 20px;border:1px solid #8a6a44;border-radius:22px;background:#6b5634;color:#fff0cc;font:inherit;cursor:pointer}
+/* 一次只给一条指令(2026-10-03 首访实测:对白/画板期间屏幕上同时有 3 处在说同一件事)
+   对白中:任务卡只留一行「此刻该做什么」;画板上:画板自带说明,任务卡/罗盘/任务面板全部让位 */
+body[data-dialog-open] #questHud .q-guidance{display:none}
+body.scene2BoardActive #questHud,body.scene2BoardActive #storyCompass,body.scene2BoardActive #journeyTask,body.scene2BoardActive #gsMenuBtn{display:none!important}
+body.scene2BoardActive #hudLang{top:auto!important;right:auto!important;left:16px!important;bottom:22px!important}
 .q-guidance{font-size:12px;line-height:1.6;color:#cbb99b;margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.q-guidance:empty{display:none}
 /* 「轮到你开口」呼吸(2026-09-26 主人报「对话对情节的指引不清晰」):
    选项在等玩家点选时轻柔呼吸;只动 box-shadow 不动 transform,与 hover 位移不打架 */
@@ -121,14 +126,16 @@ body[data-dialog-open] #questHud.folded .q-current{font-size:13px}
 
 /* ===== 系统菜单按钮(右上毛笔印) ===== */
 #gsMenuBtn{
-  position:fixed;right:16px;top:16px;z-index:70;width:52px;height:52px;
+  /* 2026-10-03 测试反馈「不知道『印』是什么」:改成带字的「☰ 菜单 / Menu」药丸,保留朱砂印章配色 */
+  position:fixed;right:16px;top:16px;z-index:70;height:46px;padding:0 16px 0 13px;gap:7px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;
-  color:#fff5e0;font-size:24px;font-family:inherit;
+  color:#fff5e0;font-size:16px;letter-spacing:1px;font-family:inherit;white-space:nowrap;
   background:radial-gradient(circle at 38% 32%,#b9743a,#7c441f);
-  border:2.5px solid #4a3526;border-radius:50% 46% 52% 44% / 48% 52% 44% 56%;
+  border:2.5px solid #4a3526;border-radius:24px 20px 26px 18px / 20px 26px 18px 24px;
   box-shadow:0 4px 14px rgba(0,0,0,.35), inset 0 0 0 1.5px rgba(255,240,210,.35);
-  transform:rotate(4deg);transition:transform .2s ease;
+  transform:rotate(2deg);transition:transform .2s ease;
 }
+#gsMenuBtn .mb-icon{font-size:19px;line-height:1}
 #gsMenuBtn:hover{transform:rotate(0deg) scale(1.06);}
 
 /* ===== 系统菜单:手绘卷轴弹层 ===== */
@@ -137,7 +144,7 @@ body[data-dialog-open] #questHud.folded .q-current{font-size:13px}
   background:rgba(20,12,18,.55);backdrop-filter:blur(2px);
 }
 .gs-menu-card{
-  width:min(360px,88vw);padding:26px 28px 22px;color:#3a2a1c;text-align:center;
+  width:min(360px,88vw);padding:26px 28px 22px;color:#3a2a1c;text-align:center;max-height:92dvh;overflow:auto;box-sizing:border-box;
   background:radial-gradient(130% 150% at 50% 0%,rgba(255,250,235,.97),rgba(244,233,208,.97) 60%,rgba(230,214,180,.97));
   border:2.5px solid #4a3526;border-radius:24px 200px 22px 200px / 200px 22px 200px 24px;
   box-shadow:0 10px 36px rgba(0,0,0,.5), inset 0 0 0 1.4px #6b4f37;
@@ -242,8 +249,13 @@ function createGameShellSystem() {
       ? tt(currentPhase.chapter) +
         (currentPhase.total ? ' · ' + currentPhase.step + '/' + currentPhase.total : '')
       : tt(JOURNEY_TEXT.action);
+    // 对白期间任务卡只说「此刻该按什么」:有选项=选一句;否则=点继续(2026-10-03 首访实测:
+    // 选项在等玩家时卡片仍写「点继续」,与对话框自相矛盾)
+    const awaitingChoice = !!dialogEl?.classList.contains('gs-await');
     questEl.querySelector('.q-current').textContent = ctx.ui.dialogOpen?.()
-      ? tt({ zh: '聆听这一段 · 点「继续」', en: 'Listen · tap Continue' })
+      ? awaitingChoice
+        ? tt({ zh: '轮到你 · 在下方选一句回应', en: 'Your turn · pick a reply below' })
+        : tt({ zh: '聆听这一段 · 点「继续」', en: 'Listen · tap Continue' })
       : current;
     questEl.querySelector('.q-guidance').textContent = task?.feedback
       ? tt(task.feedback)
@@ -271,15 +283,23 @@ function createGameShellSystem() {
   // ---- 菜单 ----
   function refreshMenu() {
     if (!menuEl) return;
+    const n = ctx.ui.portfolio?.count() || 0;
     const labels = {
-      ask: { zh: '问 昆 仑', en: 'About this journey' },
+      map: { zh: '章 节 地 图', en: 'Chapter map' },
+      portfolio: { zh: '作 品 集 · ' + n + '/4', en: 'Portfolio · ' + n + '/4' },
       help: { zh: '操 作 指 引', en: 'How to play' },
       quest: { zh: '任 务 册', en: 'Story progress' },
       notebook: { zh: '旅 途 手 札', en: 'Travel notebook' },
+      leave: { zh: '离 开 这 段 回 忆', en: 'Leave this memory' },
       close: { zh: '继 续 游 历', en: 'Continue journey' },
     };
     for (const [act, label] of Object.entries(labels))
       menuEl.querySelector('[data-act="' + act + '"]').textContent = tt(label);
+    const mbLabel = menuBtn?.querySelector('.mb-label');
+    if (mbLabel) mbLabel.textContent = tt({ zh: '菜单', en: 'Menu' });
+    // 回忆世界里才有「离开」(取代原先屏幕中央常驻的「返回沙漠」大按钮,防新玩家误点)
+    const leaveBtn = /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="leave"]'));
+    leaveBtn.style.display = (ctx.scene.activeWorld || 'main') === 'main' ? 'none' : '';
   }
   function buildMenu() {
     menuEl = document.createElement('div');
@@ -290,10 +310,12 @@ function createGameShellSystem() {
       <div class="gs-menu-card">
         <div class="m-title">B 6 1 2</div>
         <div class="m-sub">a gallery for unfinished drawings</div>
-        <button class="m-btn" data-act="ask">问 昆 仑</button>
+        <button class="m-btn" data-act="map">章 节 地 图</button>
+        <button class="m-btn" data-act="portfolio">作 品 集</button>
         <button class="m-btn" data-act="help">操 作 指 引</button>
         <button class="m-btn" data-act="quest">任 务 册</button>
         <button class="m-btn" data-act="notebook">旅 途 手 札</button>
+        <button class="m-btn" data-act="leave">离 开 这 段 回 忆</button>
         <button class="m-btn" data-act="close">继 续 游 历</button>
       </div>`;
     document.body.appendChild(menuEl);
@@ -302,9 +324,13 @@ function createGameShellSystem() {
       menuApi.close();
       ctx.ui.journey?.openNotebook();
     };
-    menuEl.querySelector('[data-act="ask"]').onclick = () => {
+    /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="map"]')).onclick = () => {
       menuApi.close();
-      ctx.ui.journey?.openHelp();
+      ctx.ui.chapterMap?.open();
+    };
+    /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="portfolio"]')).onclick = () => {
+      menuApi.close();
+      ctx.ui.portfolio?.open();
     };
     menuEl.querySelector('[data-act="help"]').onclick = () => {
       menuApi.close();
@@ -314,6 +340,11 @@ function createGameShellSystem() {
       menuApi.close();
       questEl.classList.remove('folded');
       questEl.querySelector('#questFold').textContent = '－';
+    };
+    /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="leave"]')).onclick = () => {
+      menuApi.close();
+      // 进度按段保存(homeMemoryStep 等),回来从当前段继续
+      if ((ctx.scene.activeWorld || 'main') !== 'main') ctx.scene.toMainWorld?.();
     };
     menuEl.querySelector('[data-act="close"]').onclick = () => menuApi.close();
     menuApi = ctx.overlay.register(menuEl, {
@@ -395,8 +426,9 @@ function createGameShellSystem() {
       menuBtn.type = 'button';
       menuBtn.setAttribute('aria-label', '菜单 / Menu');
       menuBtn.id = 'gsMenuBtn';
-      menuBtn.textContent = '印';
-      menuBtn.title = '唤出手札';
+      menuBtn.innerHTML =
+        '<span class="mb-icon" aria-hidden="true">☰</span><span class="mb-label">菜单</span>';
+      menuBtn.title = '菜单 / Menu';
       menuBtn.onclick = () => {
         menuApi ? menuApi.open() : null;
       };

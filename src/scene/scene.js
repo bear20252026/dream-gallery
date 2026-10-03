@@ -6,6 +6,7 @@ import { ctx } from '../ctx.js';
 import { createPaperTerrainMaterial, updatePaperTerrain } from './paper-floor.js'; // 山河舆图·纸质地形地板(2026-08-29)
 import { createGLTFLoader } from './gltf-loader.js'; // 婚礼拱廊外壳加载(museum.js 同款静态导入,项目验证过)
 import { LAYOUT } from './layout.mjs'; // 建筑布局尺寸唯一源(2026-09-07 P4)
+import { showGlLost, watchGlContext } from '../ui/gl-lost.js'; // WebGL 失效友好提示(2026-10-03)
 
 const L = document.getElementById('l'),
   C = document.getElementById('c'),
@@ -14,12 +15,19 @@ const L = document.getElementById('l'),
   aB = document.getElementById('ab'),
   hP = document.getElementById('hp');
 // 电脑端显示操作提示
-if (!('ontouchstart' in window)) hP.style.display = 'block';
+// 旧的一行操作提示(只有中文、字很淡)已由 ui/controls-lesson.js 首次小课 +「?」取代(2026-10-03),不再显示
 
 const s = new THREE.Scene();
 s.background = null; // 天空球提供背景
 s.fog = new THREE.FogExp2('#C8B88A', 0.006); // 指数雾(密度对齐西域线性雾手感;挂画放大景深虚化依赖 density)
-const rnd = new THREE.WebGLRenderer({ antialias: true });
+let rnd;
+try {
+  rnd = new THREE.WebGLRenderer({ antialias: true });
+} catch (e) {
+  // 浏览器起不来 WebGL:给一张说清原因的纸面提示,而不是白屏/「世界没能落进画里」
+  showGlLost('unsupported');
+  throw e;
+}
 rnd.setPixelRatio(Math.min(devicePixelRatio, 2));
 rnd.setSize(innerWidth, innerHeight);
 rnd.outputColorSpace = THREE.SRGBColorSpace;
@@ -32,11 +40,9 @@ C.appendChild(rnd.domElement);
 rnd.debug.checkShaderErrors = location.search.includes('shaderdebug');
 // 诊断钩子:perf-probe.js 读 renderer.info(程序数/帧数)用
 window.__rnd = rnd;
-// 手机 WebView 内存吃紧时 WebGL 上下文可能被系统回收:自动刷新恢复,避免停在"页面已崩溃"
-rnd.domElement.addEventListener('webglcontextlost', (e) => {
-  e.preventDefault();
-  location.reload();
-});
+// 手机 WebView 内存吃紧时 WebGL 上下文可能被系统回收。旧做法立刻 reload(白屏一闪、可能反复刷);
+// 现在停在友好提示页,告诉玩家进度已存,由玩家点「继续」或「换流畅画质」(ui/gl-lost.js)
+watchGlContext(rnd.domElement);
 const cam = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 2000);
 cam.rotation.order = 'YXZ';
 

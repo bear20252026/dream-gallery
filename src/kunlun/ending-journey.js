@@ -1004,8 +1004,19 @@ async function playEpilogue() {
   stageEl.querySelector('.hint').textContent = '';
   cap.innerHTML = `<div class="kick">B612</div><div class="end txt on">${esc(tt(ENDING_UI.theEnd))}</div>
     <div class="btns on"><button type="button" data-e="again">${esc(tt(ENDING_UI.again))}</button>
-    <button type="button" data-e="share">${esc(tt(ENDING_UI.share))}</button></div>`;
+    <button type="button" data-e="share">${esc(tt(ENDING_UI.share))}</button>
+    <button type="button" data-e="portfolio">${esc(tt({ zh: '翻开我的作品集', en: 'Open my portfolio' }))}</button></div>
+    <div class="txt on pf-note">${esc(
+      tt({
+        zh: '每一幅未完成的画,都在等一个人。你画给他的画,收在作品集里。',
+        en: 'Every unfinished drawing waits for someone. The drawings you made for him are in your portfolio.',
+      })
+    )}</div>`;
   sky.laugh(8000);
+  /** @type {HTMLElement} */ (cap.querySelector('[data-e="portfolio"]')).onclick = (ev) => {
+    ev.stopPropagation();
+    ctx.ui.portfolio?.open();
+  };
   cap.querySelector('[data-e="share"]').onclick = (ev) => {
     ev.stopPropagation();
     saveStarCard();

@@ -173,15 +173,15 @@ function startServer() {
   await page.waitForTimeout(400);
   await page.screenshot({ path: path.join(ROOT, 'scripts', 'artifacts', 'minimap-building.png'), clip: { x: 1040, y: 0, width: 240, height: 240 } });
 
-  // ⑧ 放大切换 ⌀260
+  // ⑧ 放大切换(2026-10-03 起放大档随视口:桌面 320,窄屏 220~320)
   await page.click('#m button');
   await page.waitForTimeout(500);
   const bigW = await page.evaluate(() => document.getElementById('m').offsetWidth);
-  await page.screenshot({ path: path.join(ROOT, 'scripts', 'artifacts', 'minimap-big.png'), clip: { x: 930, y: 0, width: 350, height: 350 } });
+  await page.screenshot({ path: path.join(ROOT, 'scripts', 'artifacts', 'minimap-big.png'), clip: { x: 900, y: 0, width: 380, height: 380 } });
   await page.click('#m button');
   await page.waitForTimeout(500);
   const smallW = await page.evaluate(() => document.getElementById('m').offsetWidth);
-  ok('[放大] ⤢ 切 260 / 回 150', bigW === 260 && smallW === 150, bigW + '→' + smallW);
+  ok('[放大] ⤢ 切大 / 回 150', bigW >= 220 && bigW <= 320 && smallW === 150, bigW + '→' + smallW);
 
   // ⑨ 世界隐藏声明(data-world-ui 机制;完整切换链由 b612-prod-worlds 覆盖)
   const worldUi = await page.evaluate(() => document.getElementById('m').dataset.worldUi);

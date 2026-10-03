@@ -3,7 +3,7 @@
 import { Z } from '../shared/z-layers.mjs';
 
 export function showWorldLoadError() {
-  if (document.getElementById('worldErr')) return;
+  if (document.getElementById('worldErr') || document.getElementById('glLost')) return; // WebGL 提示页已在说明原因
   const d = document.createElement('div');
   d.id = 'worldErr';
   d.style.cssText =

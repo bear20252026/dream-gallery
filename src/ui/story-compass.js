@@ -21,9 +21,9 @@ export function mountStoryCompass(ctx) {
     'position:fixed;left:14px;top:172px;z-index:58;pointer-events:auto;' +
     'display:none;align-items:center;gap:9px;' +
     'background:rgba(22,15,20,0.82);border:1px solid rgba(255,214,170,0.32);' +
-    'border-radius:10px;padding:8px 12px;color:#ffe2c4;' +
+    'border-radius:10px;padding:8px 12px;color:#ffe2c4;flex-wrap:wrap;' +
     'font:12px/1.5 inherit;letter-spacing:1px;' +
-    'text-shadow:0 1px 2px rgba(0,0,0,.8);user-select:none;backdrop-filter:blur(3px);max-width:230px';
+    'text-shadow:0 1px 2px rgba(0,0,0,.8);user-select:none;backdrop-filter:blur(3px);max-width:300px';
 
   const arrow = document.createElement('div');
   arrow.textContent = '↑';
@@ -31,11 +31,15 @@ export function mountStoryCompass(ctx) {
     'font-size:16px;line-height:16px;color:#ffd88a;text-shadow:0 0 8px rgba(255,200,100,.8);' +
     'transform-origin:50% 50%;transition:transform .18s linear';
   const txt = document.createElement('div');
-  txt.style.cssText = 'flex:1;min-width:0';
+  txt.style.cssText = 'flex:1;min-width:120px';
   const label = document.createElement('div');
-  label.style.cssText = 'opacity:.95;white-space:nowrap;overflow:hidden;text-overflow:ellipsis';
+  // 目标名与左上任务卡同一句,这里不再重复(2026-10-03 首访实测:窄屏上被截成「Cro…」,
+  // 和任务卡叠在一起像两条指令)。只留方向+距离+按钮;读屏仍可读到目标名。
+  label.style.cssText =
+    'position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap';
   const dist = document.createElement('div');
-  dist.style.cssText = 'opacity:.62;font-size:11px;font-variant-numeric:tabular-nums';
+  dist.style.cssText =
+    'opacity:.62;font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap';
   txt.append(label, dist);
   const look = document.createElement('button');
   look.type = 'button';
@@ -48,15 +52,101 @@ export function mountStoryCompass(ctx) {
   act.dataset.journeyAction = 'activate-goal';
   act.style.cssText = look.style.cssText;
   act.onclick = () => ctx.ui.journey?.activateGoal();
-  el.append(arrow, txt, look, act);
+  // 「自动走过去」(2026-10-03 测试反馈:转视角 + 走路组合太难):点一下,角色自己转向目标走过去;
+  // 按任何移动键/推摇杆/到达/开对白即停。和「看向目标」同一个目标点,不传送、不跳过行走。
+  const auto = document.createElement('button');
+  auto.type = 'button';
+  auto.dataset.journeyAction = 'auto-walk';
+  auto.style.cssText = look.style.cssText + ';background:#7a5a2c;border-color:#d9b46e';
+  auto.onclick = () => (walking ? stopWalk() : startWalk());
+  const btns = document.createElement('div');
+  btns.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap';
+  btns.append(auto, look, act);
+  el.append(arrow, txt, btns);
   document.body.appendChild(el);
   ctx.overlay.register(el, { touchOnly: true, closeOnOutside: false });
 
   let target = null;
   /** 剧情模块注册当前目标;{world,x,z,en,zh};传 null 撤销 */
   function setTarget(t) {
+    if (
+      walking &&
+      (!t || !target || t.x !== target.x || t.z !== target.z || t.world !== target.world)
+    )
+      stopWalk();
     target = t || null;
   }
+
+  // —— 自动走 ——
+  let walking = false,
+    bestD = Infinity,
+    stuckT = 0;
+  function startWalk() {
+    if (!target) return;
+    walking = true;
+    bestD = Infinity;
+    stuckT = 0;
+    document.body.dataset.autoWalk = '1';
+  }
+  function stopWalk(msg) {
+    if (!walking) return;
+    walking = false;
+    delete document.body.dataset.autoWalk;
+    const j = ctx.player && ctx.player.jD;
+    if (j) {
+      j.x = 0;
+      j.z = 0;
+    }
+    if (msg) ctx.ui.modeToast?.(tt(msg));
+  }
+  const MOVE_KEYS = /^(w|a|s|d|arrowup|arrowdown|arrowleft|arrowright)$/i;
+  window.addEventListener('keydown', (e) => {
+    if (walking && MOVE_KEYS.test(e.key || '')) stopWalk();
+  });
+  const stick = document.getElementById('j');
+  if (stick) stick.addEventListener('touchstart', () => stopWalk(), { passive: true });
+  // 每帧转向 + 推虚拟摇杆向前(摇杆是主世界与太空世界共用的输入源)
+  ctx.onTick((dt) => {
+    if (!walking) return;
+    const pl = ctx.player && ctx.player.pl;
+    const active = ctx.scene.activeWorld || 'main';
+    if (
+      !pl ||
+      !target ||
+      target.world !== active ||
+      ctx.ui.dialogOpen?.() ||
+      ctx.overlay.anyOpen()
+    ) {
+      stopWalk();
+      return;
+    }
+    const dx = target.x - pl.p.x,
+      dz = target.z - pl.p.z;
+    const d = Math.hypot(dx, dz);
+    if (d <= 1.5) {
+      stopWalk();
+      return;
+    }
+    const want = Math.atan2(-dx, -dz);
+    let rel = want - (pl.y || 0);
+    rel = Math.atan2(Math.sin(rel), Math.cos(rel));
+    pl.y += rel * Math.min(1, (dt || 0.016) * 5);
+    if (ctx.player.viewMode === 1 && ctx.player.orbit) ctx.player.orbit.yaw = pl.y;
+    // 先转得差不多再迈步,免得绕大圈
+    const j = ctx.player.jD;
+    j.x = 0;
+    j.z = Math.abs(rel) < 0.6 ? 1 : 0.25;
+    // 卡住检测:3 秒没靠近 0.5m 就停下,请玩家自己绕一下
+    if (d < bestD - 0.5) {
+      bestD = d;
+      stuckT = 0;
+    } else if ((stuckT += dt || 0.016) > 3) {
+      stopWalk({
+        zh: '前面好像过不去——自己绕一下,再点「自动走过去」',
+        en: 'Something is in the way — walk around it, then tap Walk there again',
+      });
+    }
+  });
 
   const zh = () => (document.body && document.body.dataset.scriptLang) !== 'en';
   let acc = 0;
@@ -114,6 +204,10 @@ export function mountStoryCompass(ctx) {
       arrow.style.transform = 'rotate(' + (-(rel * 180) / Math.PI).toFixed(0) + 'deg)';
     }
     look.textContent = tt({ zh: '看向目标', en: 'Face target' });
+    auto.textContent = walking
+      ? tt({ zh: '■ 停下', en: '■ Stop' })
+      : tt({ zh: '▶ 自动走过去', en: '▶ Walk there' });
+    auto.style.display = d <= 1.8 ? 'none' : 'block';
     const s = zh() ? target.zh : target.en;
     const key = s + '|' + Math.round(d);
     if (key !== lastKey) {

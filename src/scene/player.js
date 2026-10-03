@@ -5,7 +5,7 @@ import { EYE_HEIGHT } from '../shared/constants.js';
 import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
 const gs = getGameState();
 const { cam, rnd, bounds, jT, jB, onC3D, zoomOut, OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
-import { mapCanvas, bUnmap, isBig, drawMap } from './minimap.js';
+import { mapCanvas, bUnmap, isBig, toggleBig, drawMap } from './minimap.js';
 
 // ===================== 移动状态机(2026-08-01) =====================
 import { StateMachine } from '../player/StateMachine.js';
@@ -588,6 +588,12 @@ mapCanvas.addEventListener('pointerdown', (e) => {
   const ddx = e.clientX - (r.left + r.width / 2),
     ddy = e.clientY - (r.top + r.height / 2);
   if (ddx * ddx + ddy * ddy > (r.width / 2) * (r.width / 2)) return;
+  // 小图上点 = 先放大(2026-10-03:小图点一下就被传走,新玩家既看不清也不知道发生了什么);
+  // 放大后再点 = 走到那里
+  if (!isBig()) {
+    toggleBig();
+    return;
+  }
   const inZone = Math.abs(pl.p.x) < 34 && pl.p.z > -13 && pl.p.z < 60;
   let wx, wz;
   if (inZone) {

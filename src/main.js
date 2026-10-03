@@ -21,6 +21,9 @@ import { expose } from './debug-hooks.js';
 import './visitor-fp.js'; // 访客身份采集+踢出通知(轻量 IIFE,含 SSE 踢出监听,不依赖 3D)
 import { createToastSystem } from './core/toast-system.js'; // 示范积木:事件驱动 toast
 import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外壳:手绘对话框+任务栏+系统菜单(2026-08-29)
+import { createControlsLesson } from './ui/controls-lesson.js'; // 首次操作小课 +「?」(2026-10-03 测试反馈)
+import { createPortfolio } from './ui/portfolio.js'; // 作品集「未完成的画」(2026-10-03)
+import { createChapterMap } from './ui/chapter-map.js'; // 章节地图 + 存档码(2026-10-03)
 import { createJourneySystem } from './core/journey-system.js'; // 原著旅途交互与观察手札，组合根统一装配
 import { createPlaneFlight } from './scene/plane-flight.js'; // 可驾驶 Piper PA-18(2026-10-03)
 import { createSheepCompanion } from './scene/sheep-companion.js';
@@ -61,8 +64,9 @@ const _sl = applySavedLang();
 document.body.dataset.scriptLang = _sl;
 // 主世界常驻语言切换钮:同一位置只显示当前语言标签(EN/中文)
 {
-  const tb = makeLangToggle({ placement: 'top:22px;right:80px', z: Z.menuBtn });
+  const tb = makeLangToggle({ placement: 'top:22px;right:132px', z: Z.menuBtn });
   tb.style.position = 'fixed';
+  tb.id = 'hudLang'; // 画板期间挪到左下,不压画板顶部说明(gameshell-system 样式)
   document.body.appendChild(tb);
 }
 // 加载屏引言(2026-09-07 对稿《中文文学译本》全局文案件)
@@ -185,6 +189,9 @@ async function preloadWorld() {
     compositionRoot.register(createGameShellSystem()); // 手绘游戏外壳(对话框/任务栏/菜单)
     const journeyInput = createInputSystem(ctx.input);
     compositionRoot.register(createJourneySystem({ input: journeyInput }));
+    compositionRoot.register(createControlsLesson());
+    compositionRoot.register(createPortfolio());
+    compositionRoot.register(createChapterMap());
     // 可驾驶 Piper PA-18(2026-10-03):坠机点旁的真飞机。物理核 src/scene/plane-physics.mjs(26 项单测),
     // 本系统只管 3D 姿态/输入/相机/HUD。玩家冻结走 gs.flightLock 既有通道(与飞舟同一条)。
     compositionRoot.register(createPlaneFlight({ input: journeyInput }));

@@ -777,6 +777,11 @@ const goPlanetNum = function (num) {
     },
   });
 };
+// 国王星等回忆站:本站回忆未走完时不挂离开按钮(同 B612,避免新玩家误点中断剧情)
+function kingMemoryOpen(world) {
+  const idx = PLANETS.findIndex((p) => 'king' + p.num === world);
+  return idx >= 0 && ctx.store.num('planetsChapter') <= idx;
+}
 const goB612Back = function () {
   worldManager.back();
 };
@@ -994,7 +999,9 @@ onTick(function (dt) {
     if (activeWorld === 'b612') {
       // 小王子的家必须先走完，离别之后才前往 325。边界与物理仍正常更新。
       if (!ctx.store.flag('page1')) {
-        setNav(true, tt({ zh: '返回沙漠', en: 'Back to the desert' }), goMainWorld);
+        // 回忆进行中不挂「返回沙漠」大按钮(2026-10-03 首访实测:它正好压在屏幕中央,
+        // 新玩家被叫去火山时顺手点了它,整段回忆中断)。真要离开走菜单「离开这段回忆」。
+        setNav(false);
         hud.style.display = 'none';
         return;
       }
@@ -1028,7 +1035,7 @@ onTick(function (dt) {
         },
         lock: chapter === 0,
       });
-    } else if (/^king/.test(activeWorld)) {
+    } else if (/^king/.test(activeWorld) && !kingMemoryOpen(activeWorld)) {
       setNav(
         true,
         tt({ zh: '← 返回 B612', en: '← Back to B612' }),

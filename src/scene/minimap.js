@@ -16,8 +16,12 @@ const { OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
 // ===================== 画布与两档尺寸 =====================
 export const mapCanvas = document.getElementById('mc');
 const mapCtx = mapCanvas.getContext('2d');
+// 放大档 2026-10-03 加大(测试反馈「小地图太小」):桌面 320,窄屏按视口收,最小 220
 const SMALL = 150,
-  BIG = 260;
+  BIG =
+    typeof innerWidth === 'number'
+      ? Math.round(Math.min(320, Math.max(220, Math.min(innerWidth - 40, innerHeight - 200))))
+      : 260;
 let mBig = false;
 mapCanvas.width = SMALL;
 mapCanvas.height = SMALL;
@@ -25,14 +29,30 @@ mapCanvas.height = SMALL;
 // 放大按钮(纸片小方章风;必须落在圆形命中区内——border-radius:50% 会把圆外点击裁掉)
 const mBigBtn = document.createElement('button');
 mBigBtn.textContent = '⤢';
-mBigBtn.title = '放大小地图';
+mBigBtn.title = '放大 / 缩小地图 · Bigger / smaller map';
+mBigBtn.setAttribute('aria-label', '放大 / 缩小地图 · Bigger / smaller map');
 mBigBtn.style.cssText =
-  'position:absolute;left:50%;bottom:9px;transform:translateX(-50%);z-index:2;width:22px;height:22px;border-radius:6px;' +
-  'border:1px solid rgba(74,53,38,.5);background:rgba(248,241,223,.88);color:#4e4237;' +
-  "font-size:12px;line-height:1;cursor:pointer;pointer-events:auto;font-family:'Kaiti SC','STKaiti','KaiTi',serif";
+  'position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:2;width:30px;height:30px;border-radius:8px;' +
+  'border:1px solid rgba(74,53,38,.6);background:rgba(248,241,223,.95);color:#4e4237;' +
+  "font-size:16px;line-height:1;cursor:pointer;pointer-events:auto;font-family:'Kaiti SC','STKaiti','KaiTi',serif";
 mBigBtn.addEventListener('click', (e) => {
   e.stopPropagation();
+  toggleBig();
+});
+let bigHintShown = false;
+/** 放大/缩小(2026-10-03:小图上点一下也会放大;放大后点图上任意一点 = 走到那里) */
+export function toggleBig() {
   mBig = !mBig;
+  mBigBtn.textContent = mBig ? '⤡' : '⤢';
+  if (mBig && !bigHintShown) {
+    bigHintShown = true;
+    const zh = (document.body && document.body.dataset.scriptLang) !== 'en';
+    ctx.ui.modeToast?.(
+      zh
+        ? '点地图上任意一处,就能去那里;再点 ⤡ 收起'
+        : 'Tap anywhere on the map to go there; tap ⤡ to shrink it'
+    );
+  }
   const mDiv = document.getElementById('m');
   mDiv.style.transition = 'width .35s ease,height .35s ease';
   const s = mBig ? BIG : SMALL;
@@ -41,7 +61,7 @@ mBigBtn.addEventListener('click', (e) => {
   mDiv.style.width = s + 'px';
   mDiv.style.height = s + 'px';
   ensureBezel();
-});
+}
 document.getElementById('m').appendChild(mBigBtn);
 
 export function isBig() {

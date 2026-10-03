@@ -87,6 +87,10 @@ const SCHEMA = {
   endingAnswer: { key: 'b612EndingAnswer', type: 'str' },
   // 旧玩法开关(2026-10-03 主人令「先放一边」):?legacy=1 写入,默认不存在 = 只玩小王子主线
   legacy: { key: 'b612Legacy', type: 'flag' },
+  // 首次操作小课已上完(2026-10-03 测试反馈:新玩家不知道怎么走/看)
+  controlsLesson: { key: 'b612ControlsLesson', type: 'flag' },
+  // 作品集:玩家在画板上亲手描的四幅画(shared/portfolio-logic.mjs 清洗,{boa,sheep-sick,ram,box})
+  portfolio: { key: 'b612Portfolio', type: 'json' },
 };
 function entry(name) {
   const e = SCHEMA[name];

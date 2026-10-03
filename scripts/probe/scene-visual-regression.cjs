@@ -66,6 +66,7 @@ function startServer() {
     localStorage.setItem('b612Scene2', '1');
     localStorage.setItem('b612Page1', '1');
     localStorage.setItem('b612PlanetChapter', '1');
+    localStorage.setItem('b612ControlsLesson', '1'); // 操作小课已上过(2026-10-03),不进截图
     try {
       localStorage.setItem('kunlunWelcomed', String(Date.now())); // 首点欢迎词(24h 一次)
     } catch (e) {}

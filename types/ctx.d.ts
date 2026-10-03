@@ -204,6 +204,8 @@ export interface UINamespace {
   dialogOpen: () => boolean;
   cancelDialogScope: (scope: string) => void;
   advanceDialog: () => void;
+  portfolio: { open: () => void; count: () => number } | null;
+  chapterMap: { open: () => void } | null;
   storyTarget: (
     target: { world: string; x: number; z: number; en: string; zh: string } | null
   ) => void;

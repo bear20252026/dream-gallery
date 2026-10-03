@@ -8,82 +8,15 @@ import { Z } from '../shared/z-layers.mjs';
 import { SCENE2, tt, whoSpk } from '../shared/story-text.mjs';
 import { replyChoices } from '../shared/dialog-replies.mjs';
 import { TRUTH } from './film-strokes.mjs';
+import { SHEEP_SICK, RAM, BOX } from '../shared/scene2-sketches.mjs';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { DAY_HOURS } from '../shared/dayphase-logic.mjs';
+import { smoothPath, savePortfolioDrawing, ROUND_IDS } from '../shared/portfolio-logic.mjs';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const BOARD_Z = 60; // 盖过世界与 HUD,低于手绘对话框(80)
 
-// 三组新手绘线稿(病羊/公羊/箱子);孩子画风格,少笔数。
-// 2026-09-10 主人定「定稿更生动」:基础轮廓后接一批细节笔(delay 续奏)——
-// 垂耳/闭眼/叹气/羊毛卷/羊角纹/山羊胡/落影/草叶;箱子加第三个气孔+孔里飘出的呼吸+暖光。
-// delay=ms(定稿起笔时刻);无 delay 的基础笔按序 110ms 错峰,像一笔一笔画出来的。
-const SHEEP_SICK = [
-  {
-    d: 'M270,300 C285,255 360,240 420,265 C455,280 455,320 425,335 C360,362 295,350 270,300',
-    t: 900,
-    w: 3.4,
-  },
-  { d: 'M270,300 C240,305 218,325 222,350 C224,362 238,366 248,358', t: 700, w: 3 },
-  { d: 'M232,326 C220,318 210,322 208,332', t: 400, w: 2.2, soft: true },
-  { d: 'M310,352 L306,395', t: 300, w: 2.6 },
-  { d: 'M355,358 L355,398', t: 300, w: 2.6 },
-  { d: 'M400,352 L404,392', t: 300, w: 2.6 },
-  { d: 'M428,330 C446,338 450,352 440,362', t: 400, w: 2.2, soft: true },
-  { d: 'M240,335 a3,3 0 1,0 .1,0', t: 250, fill: true },
-  { d: 'M236,352 C242,356 250,355 254,350', t: 300, w: 1.8, soft: true },
-  { d: 'M216,321 C207,332 207,345 217,354', t: 500, w: 2.2, delay: 1150 },
-  { d: 'M232,331 L250,329', t: 300, w: 2, delay: 1300 },
-  { d: 'M236,333 a1.3,1.3 0 1,0 .1,0', t: 220, fill: true, hl: true, delay: 1440 },
-  { d: 'M298,262 a9,9 0 0,1 17,2', t: 380, w: 1.8, soft: true, delay: 1580 },
-  { d: 'M338,254 a9,9 0 0,1 17,2', t: 380, w: 1.8, soft: true, delay: 1700 },
-  { d: 'M380,254 a9,9 0 0,1 17,3', t: 380, w: 1.8, soft: true, delay: 1820 },
-  { d: 'M258,372 C266,368 273,376 281,371', t: 420, w: 1.6, soft: true, delay: 1950 },
-  { d: 'M212,404 C216,392 222,388 228,390', t: 380, w: 2, delay: 2080 },
-  { d: 'M224,405 C228,395 234,392 240,393', t: 380, w: 2, delay: 2180 },
-  { d: 'M244,402 C310,410 420,410 474,400', t: 600, w: 2, soft: true, delay: 2290 },
-];
-const RAM = [
-  {
-    d: 'M260,300 C270,255 350,240 420,262 C458,275 462,318 430,335 C365,362 285,352 260,300',
-    t: 900,
-    w: 3.4,
-  },
-  { d: 'M430,290 C462,282 482,268 490,248', t: 600, w: 3 },
-  { d: 'M488,252 C470,215 505,198 522,220 C532,234 522,248 508,246', t: 800, w: 3.2 },
-  { d: 'M470,258 C462,232 482,222 494,236', t: 500, w: 2.4, soft: true },
-  { d: 'M305,352 L302,395', t: 300, w: 2.6 },
-  { d: 'M355,358 L355,398', t: 300, w: 2.6 },
-  { d: 'M405,352 L410,392', t: 300, w: 2.6 },
-  { d: 'M336,355 L336,396', t: 300, w: 2.6 },
-  { d: 'M470,285 a3,3 0 1,0 .1,0', t: 250, fill: true },
-  { d: 'M461,272 L483,268', t: 300, w: 2.2, delay: 1150 },
-  { d: 'M468,283 a1.3,1.3 0 1,0 .1,0', t: 220, fill: true, hl: true, delay: 1290 },
-  { d: 'M490,296 C494,306 492,315 486,321', t: 420, w: 2, delay: 1430 },
-  { d: 'M494,238 C504,227 515,226 520,232', t: 500, w: 1.7, soft: true, delay: 1560 },
-  { d: 'M298,266 a9,9 0 0,1 18,3', t: 380, w: 1.8, soft: true, delay: 1690 },
-  { d: 'M334,256 a9,9 0 0,1 18,3', t: 380, w: 1.8, soft: true, delay: 1810 },
-  { d: 'M262,304 C253,310 253,320 262,326', t: 420, w: 2, delay: 1940 },
-  { d: 'M296,398 L288,408', t: 260, w: 2, delay: 2070 },
-  { d: 'M326,400 L318,410', t: 260, w: 2, delay: 2160 },
-  { d: 'M300,402 C360,411 440,411 496,401', t: 600, w: 2, soft: true, delay: 2250 },
-];
-const BOX = [
-  { d: 'M250,270 L470,270 L470,390 L250,390 Z', t: 1100, w: 3.6 },
-  { d: 'M250,270 L300,225 L520,225 L470,270', t: 800, w: 3.2 },
-  { d: 'M470,270 L520,225 L520,345 L470,390', t: 800, w: 3.2 },
-  { d: 'M300,300 a5,5 0 1,0 .1,0', t: 250, fill: true },
-  { d: 'M340,300 a5,5 0 1,0 .1,0', t: 250, fill: true },
-  { d: 'M270,340 C320,332 400,332 450,340', t: 500, w: 1.8, soft: true },
-  { d: 'M270,362 C320,354 400,354 450,362', t: 500, w: 1.8, soft: true },
-  { d: 'M366,328 a118,64 0 1,0 .1,0', t: 900, glow: true, delay: 0 },
-  { d: 'M374,300 a5,5 0 1,0 .1,0', t: 250, fill: true, delay: 1250 },
-  { d: 'M305,290 C300,280 306,272 301,263', t: 500, w: 1.6, soft: true, delay: 1390 },
-  { d: 'M345,290 C341,281 346,273 342,265', t: 500, w: 1.6, soft: true, delay: 1510 },
-  { d: 'M494,386 C498,372 505,367 512,369', t: 420, w: 2, delay: 1640 },
-  { d: 'M506,388 C511,376 518,372 524,374', t: 420, w: 2, delay: 1750 },
-  { d: 'M262,398 C330,406 430,406 486,398', t: 600, w: 2, soft: true, delay: 1870 },
-];
+// 三组线稿(病羊/公羊/箱子)在 shared/scene2-sketches.mjs(作品集也要用同一份)
 
 const ROUNDS = [
   { strokes: TRUTH, line: SCENE2.round1 },
@@ -102,6 +35,9 @@ let svg = null;
 let roundIdx = 0;
 let drawing = false;
 let curStroke = null;
+let curPts = [];
+let roundStrokes = []; // 本轮玩家亲手画的笔迹(定稿时收进作品集)
+const MAX_KEEP_STROKES = 80;
 let submitTimer = null;
 let busy = false;
 
@@ -266,6 +202,7 @@ function round() {
     p.setAttribute('stroke-width', (st.w || 3) * 0.85);
     p.setAttribute('fill', 'none');
     p.setAttribute('stroke-linecap', 'round');
+    p.setAttribute('stroke-linejoin', 'round');
     p.style.opacity = 0.55;
     layerGuide.appendChild(p);
     guidePaths.push(p);
@@ -277,6 +214,7 @@ function playerStrokesClear() {
   if (submitTimer) clearTimeout(submitTimer);
   submitTimer = null;
   curStroke = null;
+  roundStrokes = [];
   layerPlayer.innerHTML = '';
 }
 
@@ -299,12 +237,14 @@ function bindDraw() {
     }
     ptActive = true;
     const p = toSvg(e);
+    curPts = [[p.x, p.y]];
     curStroke = document.createElementNS(SVG_NS, 'path');
-    curStroke.setAttribute('d', 'M' + p.x.toFixed(1) + ',' + p.y.toFixed(1));
+    curStroke.setAttribute('d', smoothPath(curPts));
     curStroke.setAttribute('stroke', '#4e4237');
     curStroke.setAttribute('stroke-width', 2.6);
     curStroke.setAttribute('fill', 'none');
     curStroke.setAttribute('stroke-linecap', 'round');
+    curStroke.setAttribute('stroke-linejoin', 'round');
     curStroke.style.opacity = 0.85;
     layerPlayer.appendChild(curStroke);
     svg.setPointerCapture(e.pointerId);
@@ -312,12 +252,17 @@ function bindDraw() {
   svg.onpointermove = function (e) {
     if (!ptActive || !curStroke) return;
     const p = toSvg(e);
-    const d = curStroke.getAttribute('d');
-    curStroke.setAttribute('d', d + ' L' + p.x.toFixed(1) + ',' + p.y.toFixed(1));
+    const last = curPts[curPts.length - 1];
+    // 小于 1.5 单位的抖动不记点:线更顺,存进作品集也更小
+    if (Math.hypot(p.x - last[0], p.y - last[1]) < 1.5) return;
+    curPts.push([p.x, p.y]);
+    curStroke.setAttribute('d', smoothPath(curPts));
   };
   svg.onpointerup = svg.onpointercancel = function () {
     if (!ptActive) return;
     ptActive = false;
+    if (curStroke && roundStrokes.length < MAX_KEEP_STROKES)
+      roundStrokes.push(curStroke.getAttribute('d'));
     scheduleSubmit();
   };
 }
@@ -336,6 +281,12 @@ async function submit() {
   drawing = false;
   layerPlayer.style.transition = 'opacity 1.1s ease';
   layerPlayer.style.opacity = 0.16; // 玩家涂鸦淡成浅底,一直留在纸上
+  // 作品集(2026-10-03):玩家这一幅的笔迹 + 对应的原著线稿,收进「未完成的画」画册
+  try {
+    savePortfolioDrawing(ctx.store, ROUND_IDS[roundIdx], roundStrokes);
+  } catch (e) {
+    console.debug('[scene2] 作品集保存失败(不影响剧情):', e);
+  }
   const anims = [];
   ROUNDS[roundIdx].strokes.forEach((st, i) => {
     const p = document.createElementNS(SVG_NS, 'path');
@@ -348,6 +299,7 @@ async function submit() {
       p.setAttribute('stroke-width', st.w || 3.1);
       p.setAttribute('fill', 'none');
       p.setAttribute('stroke-linecap', 'round');
+      p.setAttribute('stroke-linejoin', 'round');
     }
     p.style.opacity = 0;
     (st.glow ? layerGuide : layerInk).appendChild(p); // 暖光垫底,墨线在上

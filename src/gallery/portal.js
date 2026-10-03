@@ -6,6 +6,7 @@
 import { ctx } from '../ctx.js';
 import { eventBus } from '../event-bus.js';
 import { Z } from '../shared/z-layers.mjs';
+import { tt } from '../shared/story-text.mjs';
 import {
   GATE_RADIUS,
   GATE_POS,
@@ -17,7 +18,20 @@ import {
 let gateArmed = true; // 见 planet-logic.gateStep:触发即解除,走出半径重新武装(防返回回弹)
 
 const padBtn = document.createElement('button');
-padBtn.textContent = '✦ 进入 B612';
+const padLabel = () => tt({ zh: '✦ 进入 B612', en: '✦ Enter B612' });
+padBtn.textContent = padLabel();
+window.addEventListener('script:lang', () => {
+  padBtn.textContent = padLabel();
+});
+// 按钮亮着时它就是唯一的下一步:罗盘条(「转身 · 15m」)让位,免得两条指令打架
+function showPad(on) {
+  padBtn.style.display = on ? 'block' : 'none';
+  if (on) document.body.dataset.gateReady = '1';
+  else delete document.body.dataset.gateReady;
+}
+const padStyle = document.createElement('style');
+padStyle.textContent = 'body[data-gate-ready] #storyCompass{display:none!important}';
+document.head.appendChild(padStyle);
 padBtn.style.cssText =
   'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:' +
   Z.navBtn +
@@ -26,7 +40,7 @@ padBtn.onclick = function () {
   if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen()) return;
   const wm = ctx.scene.worldManager;
   if (!wm || wm.transitioning) return; // navGuard 语义:切换中不重复触发
-  padBtn.style.display = 'none';
+  showPad(false);
   const sp = spawnFor('b612');
   wm.enter('b612', {
     snapshot: {
@@ -52,7 +66,7 @@ eventBus.on('world:changed', function (e) {
   const pl = ctx.player.pl;
   if (!pl) return;
   if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen()) {
-    padBtn.style.display = 'none';
+    showPad(false);
     return;
   }
   const np = exitGateNudge(pl.p.x, pl.p.z, GATE_RADIUS + 2);
@@ -66,13 +80,13 @@ eventBus.on('world:changed', function (e) {
 
 ctx.onTick(function portalTick() {
   if ((ctx.scene.activeWorld || 'main') !== 'main') {
-    padBtn.style.display = 'none';
+    showPad(false);
     return;
   }
   // 石门未现身:按钮不挂、走近不传(2026-09-27 按剧情出场;营地守卫防现身瞬间误传)
   try {
     if (ctx.kunlun.isStarGateOut && !ctx.kunlun.isStarGateOut()) {
-      padBtn.style.display = 'none';
+      showPad(false);
       gateArmed = false;
       return;
     }
@@ -89,12 +103,14 @@ ctx.onTick(function portalTick() {
     gateArmed = true;
     const dx = pl.p.x - GATE_POS.x,
       dz = pl.p.z - GATE_POS.z;
-    padBtn.style.display = dx * dx + dz * dz < 225 ? 'block' : 'none';
+    // 对白/弹层期间不亮(首访实测:羊箱对白还没收尾,「进入」大按钮已压在台词上方)
+    const busy = !!(ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen());
+    showPad(dx * dx + dz * dz < 225 && !busy);
     return;
   }
   if (step.fire) {
     gateArmed = false; // 触发即解除;从 B612 返回落在圈内不再回弹
-    padBtn.style.display = 'none';
+    showPad(false);
     padBtn.onclick();
   }
 });
