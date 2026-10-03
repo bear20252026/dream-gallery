@@ -8,6 +8,7 @@
 // 回归锚点:书页映射表改动曾只改一处漏另一处(线性映射想当然),此表是唯一权威;
 // 2026-10-03 又发现缺 5/6 两行会让书页从 7 倒退到 1,故补全 + 单测钉死单调不减。
 import { PLANETS } from './planet-logic.mjs';
+import { endingReady, pagesFromEnding, endingBeat, endingNext } from './ending-logic.mjs';
 
 /** 章节封顶(6 = 六章全部点亮) */
 export const CHAPTER_MAX = 6;
@@ -76,7 +77,9 @@ export function readPages(flags) {
   // 章节值只在 B612 三页完成后参与。chapter 0 是存档初值,此刻玩家连第一页都没开始读;
   // 剧本书页一二三 = B612 三场,书页四起才是星球线,所以 page1 之前一律不看章节。
   const chapterPages = f.page1 ? pagesBonusForChapter(f.chapter, true) : 0;
-  return Math.max(1, home, chapterPages);
+  // 结局线(2026-10-03):画册页六~八 + 找井/告别 = 书页六~九。只在 327 完成后参与。
+  const endPages = endingReady(f) ? pagesFromEnding(f.endingStep) : 0;
+  return Math.min(PAGES_TOTAL, Math.max(1, home, chapterPages, endPages));
 }
 
 /**
@@ -100,6 +103,8 @@ export function storyBeat(flags) {
       zh: '书页一 · 夜、羊箱与石门',
     };
   }
+  // 结局线(2026-10-03):327 之后直接接画册页 → 井 → 告别 → 尾声
+  if (endingReady(f)) return endingBeat(f.endingStep);
   const p = PLANETS[ch]; // 已完成 ch 颗 → 当前章是下一颗(325 起)
   if (!p) {
     return { code: 'finale', en: 'Finale — the book is written', zh: '终章 · 这本书，写完了' };
@@ -132,6 +137,7 @@ export function storyNext(flags) {
       zh: '去羊箱边听数数，然后走进亮起的石门',
     };
   }
+  if (endingReady(f)) return endingNext(f.endingStep, f.world);
   const p = PLANETS[ch];
   if (!p) {
     return {

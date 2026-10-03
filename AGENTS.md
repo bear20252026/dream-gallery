@@ -1,5 +1,17 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-03 先做结局 + 开门 + 旧玩法搁置（本地，尚未发布）
+
+- 主人批准:①开头不再勾选协议;②328/329/330 与地球五站先用「临时画册页」接上,结局先做完;③旧玩法先放一边,不删除。
+- **开门**:`gate/entrygate.js` ENTER 始终可点,底部只留三个协议链接。同意改在把内容交给服务器的那一刻请求:`consent-session.askConsent()`(上传面板打开、回声壁发言)。旧的雅号弹窗/初见指引卡依赖会话同意键,因此不再在开场弹出。
+- **旧玩法搁置**:`shared/legacy.mjs` 的 `LEGACY_MODULE_LABELS`(答题门/温柔度/远方山巅/塔楼/永恒厅/飞舟/风铃/壁炉/雪窗/重置视角/放下/终章)默认不进 world-loader 加载链;`?legacy=1` 恢复并记住,`?legacy=0` 关闭。存档键 `legacy` 已登记。启动自检(boot-check)仍全绿。
+- **结局线**:`kunlun/ending-journey.js`(组合根装配)+ 纯逻辑 `shared/ending-logic.mjs` + 台词 `shared/ending-text.mjs`(逐字 Woods,中文照定稿)+ 画册阅读器 `ui/book-pages.js`。存档 `endingStep` 0..4(画册页读完/井/告别/尾声),只前进;`endingAnswer` 记尾声是/否。门槛 = page1 且 chapter≥3(327 完成)。**328–330 建成 3D 后,把 `ENDING_GATE_CHAPTER` 改为 6,并从 `BOOK_PAGES` 删掉对应页。**
+- 书页映射:`readPages` 吸收 endingStep(画册页读完→8 页,告别→9 页);`storyBeat/storyNext` 在 327 后改走结局节拍,不再指向未建成的空岛。planets 罗盘:327 后主世界不再指石门;journey goal 带 `hidden:true` 时罗盘熄灭(找井用)。scene3-night 在 327 后不再立「再次穿门·准备拜访国王」。
+- 找井:井在 `WELL_POS`(48,118),靠水声左右声像 + 屏幕边缘水光导航,静止越久越清楚。剧情机制音走 `avAllowed('story')`(新豁免,`?av=0` 仍可关)。告别后坠机点王子与羊箱隐藏,羊同伴不再出现(羊跟他回家了)。
+- 新 z 层:endingTint 11 / endingAction 72 / bookPages 377 / endingStage 570。ctx.scene 登记 `endingApi`(探针用:state/openBook/act/epilogue/skipTo)。
+- 验收(云端 SwiftShader,源码直跑):结局全程探针桌面 20/20、手机 390×780 20/20,零页面错误;story-progress 40 例、ending-logic 23 例通过。真 vitest/生产构建未在云端跑(npm 被网络策略拦截),发布前必须本机 `npm run test:unit` + `npm run build`。
+- 已知:狐狸 3D 站(scene10-fox)仍无玩家入口(只有 foxApi.open),画册页书页八已含狐狸台词;日后接入时驯养多日仪式必须可跳过,不能挡结局。
+
 ## 2026-10-03 发布范围：首次旅程与小羊同行
 
 - 本次发布包含下述首次旅程第四轮、小羊同行，以及源站/R2缺失的Piper和狐狸模型补齐；后续未建成章节不在交付范围内。以下“本地”段落保留为开发记录。

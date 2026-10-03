@@ -1,11 +1,10 @@
 // entrygate.js — B612 入口闸门(2026-09-05 定稿;2026-09-06 主人定重构)
 // 结构借自 Chartogne-Taillet 入口(标题+一句话+Enter+底部协议小字),皮肤用本作"纸与墨"语言。
 // - **每次进入都显示**(主人 2026-09-06 定:闸门是开场第一屏,不再按 gateEntered 跳过)。
-// - 底部一行:勾选一个「同意」+ 三个协议名字。
+// - 底部一行:三个协议名字(可点开阅读)。2026-10-03 起不再要求勾选才能进入。
 //   **2026-09-23(P1-1)起:三个名字点开的是并列三协议面板**,不是三次整页跳转 ——
 //   见 gate/agreement-swipe.js。三份在同一面板内切换、各自勾选,签毕返回闸门,**全程零 reload**。
-// - 勾选后 ENTER 才可用;点 ENTER 写 3 个会话标记(下游大屏轮播/指引卡只认会话键)。
-//   取代 2026-07-27 的三连读强制签署。
+// - ENTER 始终可用(2026-10-03);同意改在上传/发言那一刻请求(consent-session.askConsent)。
 import { ctx } from '../ctx.js';
 import * as bootState from '../core/boot-state.js';
 import { Z } from '../shared/z-layers.mjs';
@@ -48,16 +47,14 @@ function build(opts) {
     <div class="gScript">a gallery for unfinished drawings</div>
     <div class="gPoem">Here memories are kept — and farewells too.<br>Every unfinished drawing waits for someone.</div>
     <div class="gDed" id="gDed"></div>
-    <button class="gEnter" type="button">E N T E R<span class="gBar"></span></button>
+    <button class="gEnter ready" type="button">E N T E R<span class="gBar"></span></button>
   </div>
   <div class="gLegal">
-    <label class="gAgree">
-      <input type="checkbox" id="gAgreeChk">
-      <span>I have read and agree to the</span>
+    <span class="gAgree">
       <a data-doc="agreement.html" href="javascript:void(0)">Terms of Service</a> ·
       <a data-doc="privacy.html" href="javascript:void(0)">Privacy Policy</a> ·
       <a data-doc="community.html" href="javascript:void(0)">Community Guidelines</a>
-    </label>
+    </span>
     <br>© 2026 B612 · Revised Sep 5, 2026
   </div>
   <style>
@@ -103,19 +100,12 @@ function build(opts) {
   window.addEventListener('script:lang', renderLang);
   if (opts.onGateReady) opts.onGateReady(); // 加载屏就此交接(避免固定延时造成的空白间隙)
 
-  const chk = ov.querySelector('#gAgreeChk');
   const enterBtn = ov.querySelector('.gEnter');
-  // 勾选「同意」后 ENTER 才点亮(2026-09-06 主人定:单勾选 + 三协议可单独展开)
-  chk.addEventListener('change', function () {
-    enterBtn.classList.toggle('ready', chk.checked);
-  });
-
-  // ENTER=同意:写齐标记,揭幕,把开场配乐交给主流程
+  // 2026-10-03 主人批准:开头不再要求勾选协议 —— ENTER 一直可点,点了就开始故事。
+  // 协议只在真正把内容交给服务器时(上传/回声壁发言)才请求同意,见 consent-session.askConsent。
+  // 底部三个链接仍可阅读协议。旧的「勾选后 ENTER 才亮」(2026-09-06)已退役。
   enterBtn.onclick = function () {
-    if (!chk.checked) return;
-    sessionStorage.setItem('agreementConsented', '1');
-    sessionStorage.setItem('privacyConsented', '1');
-    sessionStorage.setItem('communityConsented', '1');
+    if (entered) return;
     ctx.store.mark('gateEntered');
     entered = true;
     ov.style.opacity = '0';
@@ -152,8 +142,7 @@ function build(opts) {
     // 三份签毕:闸门总勾选框自动勾上 + ENTER 点亮,用户直接点 ENTER 进场
     onAllSigned: function () {
       if (entered) return;
-      chk.checked = true;
-      enterBtn.classList.toggle('ready', true);
+      signAllConsents(); // 在面板里读完并逐份勾选 = 本会话已同意(上传/发言时不再问)
     },
   });
   void swipe;

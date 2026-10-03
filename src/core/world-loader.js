@@ -12,6 +12,8 @@
 // 漏载后果是静默的(2026-09-06「石门消失」= 漏载 planets.js),启动自检见 core/boot-check.js;
 // 后台链完成状态挂 window.__deferredWorldReady 供探针/诊断读取。
 
+import { activeModules } from '../shared/legacy.mjs';
+
 /** 核心链:进图前必须就绪(串行,阻塞揭幕) @type {Array<[string, () => Promise<unknown>]>} */
 export const WORLD_MODULES = [
   ['场景', () => import('../scene/scene.js')],
@@ -59,7 +61,8 @@ export const WORLD_MODULES_DEFERRED = [
 ];
 
 async function loadChain(list, tag, fatal) {
-  for (const [label, load] of list) {
+  // 旧玩法(昆仑/永恒展厅/答题/塔楼)默认搁置不加载(2026-10-03),?legacy=1 恢复。见 shared/legacy.mjs
+  for (const [label, load] of activeModules(list)) {
     try {
       window.__worldPhase = tag + ':' + label;
       await load();

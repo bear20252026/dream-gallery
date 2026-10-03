@@ -73,6 +73,7 @@ export function createSceneNamespace(vault) {
     'planeApi',
     // 站五·狐狸(scene10-fox.js)的探针/调试接口,2026-10-03
     'foxApi',
+    'endingApi', // 结局线(找井/告别/尾声)调试与探针入口(2026-10-03)
   ];
 
   const proxy = {};

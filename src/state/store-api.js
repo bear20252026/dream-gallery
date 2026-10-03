@@ -81,6 +81,12 @@ const SCHEMA = {
   journeyTaskCheckpoint: { key: 'b612JourneyTaskCheckpoint', type: 'json' }, // 当前任务内的观察点与时间刻度
   homeMemoryStep: { key: 'b612HomeMemoryStep', type: 'num' }, // 家的四站；完成互动后才保存
   kingMemoryStep: { key: 'b612KingMemoryStep', type: 'num' }, // 国王对白/互动的六段检查点
+  // 结局线(2026-10-03「先做结局」):0 未开始 · 1 画册页读完 · 2 井已找到 · 3 告别完成 · 4 尾声看完
+  endingStep: { key: 'b612EndingStep', type: 'num' },
+  // 尾声里玩家对「羊把花吃了吗」的回答(yes/no),分享卡片用
+  endingAnswer: { key: 'b612EndingAnswer', type: 'str' },
+  // 旧玩法开关(2026-10-03 主人令「先放一边」):?legacy=1 写入,默认不存在 = 只玩小王子主线
+  legacy: { key: 'b612Legacy', type: 'flag' },
 };
 function entry(name) {
   const e = SCHEMA[name];

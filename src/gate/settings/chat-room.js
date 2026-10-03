@@ -1,11 +1,14 @@
 import { Z } from '../../shared/z-layers.mjs';
 // chat-room.js — 聊天室·B612回声壁(全员共壁,最近 100 条,@B612之灵 召唤机器人)
 import { ctx } from '../../ctx.js';
+import { askConsent } from '../consent-session.js';
 
 const chatOv = document.createElement('div');
 chatOv.id = 'chatOv';
 chatOv.style.cssText =
-  'position:fixed;inset:0;z-index:' + Z.modal + ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+  'position:fixed;inset:0;z-index:' +
+  Z.modal +
+  ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
 const chatCard = document.createElement('div');
 chatCard.style.cssText =
   'width:min(520px,92vw);max-height:82vh;display:flex;flex-direction:column;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:16px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)';
@@ -104,9 +107,10 @@ async function sendChat() {
   }
 }
 
-document.getElementById('chatSend').onclick = sendChat;
+// 2026-10-03:发言 = 把内容交给服务器,此刻才请求同意(开头不再强制勾选协议)
+document.getElementById('chatSend').onclick = () => askConsent(sendChat);
 document.getElementById('chatInput').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendChat();
+  if (e.key === 'Enter') askConsent(sendChat);
 });
 // gmChat 由 settings.js 动态创建，需延迟绑定
 setTimeout(function () {

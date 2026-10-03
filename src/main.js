@@ -25,6 +25,7 @@ import { createJourneySystem } from './core/journey-system.js'; // 原著旅途�
 import { createPlaneFlight } from './scene/plane-flight.js'; // 可驾驶 Piper PA-18(2026-10-03)
 import { createSheepCompanion } from './scene/sheep-companion.js';
 import { createFoxScene } from './kunlun/scene10-fox.js'; // 站五·狐狸(2026-10-03)
+import { createEndingJourney } from './kunlun/ending-journey.js'; // 结局线:画册页→找井→告别→六年后(2026-10-03)
 import { createInputSystem } from './core/input.js'; // 统一输入 facade(阶段1·P1-3)
 import { createAudioSystem } from './core/audio-system.js'; // 阶段2 垂直切片:空间音频积木(依赖注入,取代冻结 ctx 写)
 import { createPerfMonitorSystem } from './core/perf-monitor-system.js'; // 阶段3 切片:性能监控积木(单循环驱动,删死 ctx import)
@@ -190,6 +191,8 @@ async function preloadWorld() {
     compositionRoot.register(createSheepCompanion());
     // 站五·狐狸(2026-10-03):剧本第10场,布景用主人提供的 fox-scene.glb(含王子与狐狸)。
     compositionRoot.register(createFoxScene());
+    // 结局线(2026-10-03 主人批准「先做结局」):327 之后接画册页六~八 → 找井 → 告别 → 尾声
+    compositionRoot.register(createEndingJourney());
     compositionRoot.register(createLoopSystem());
     compositionRoot.register(journeyInput);
     compositionRoot.init();

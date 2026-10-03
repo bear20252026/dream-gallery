@@ -1,3 +1,4 @@
+import { hasConsent, askConsent } from './consent-session.js'; // 需要时才请求同意(2026-10-03)
 import { Z } from '../shared/z-layers.mjs';
 // upload.js — 访客上传(照片 + 我的链接) + AI 配文 + 空中悬浮路标
 // 照片:任何人可传、不限张数、≤50MB(视频 ≤700MB);自己只见自己的,后台见全部
@@ -79,7 +80,13 @@ document.getElementById('paneLink').appendChild(myLinkListEl);
 
 let open = false;
 function toggleUpPanel(force) {
-  open = force !== undefined ? force : !open;
+  const want = force !== undefined ? force : !open;
+  // 2026-10-03:协议不再在开头强制勾选;上传是把内容交给服务器的时刻,在这里才请求同意
+  if (want && !hasConsent()) {
+    askConsent(() => toggleUpPanel(true));
+    return;
+  }
+  open = want;
   panel.classList.toggle('show', open);
 }
 document.getElementById('upX').onclick = function () {

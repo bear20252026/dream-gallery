@@ -26,6 +26,7 @@ import {
   kingSpawnPoint,
 } from '../shared/planet-logic.mjs';
 import { clampChapter, advanceChapter, decorateSpiritsState } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死;2026-09-27 加 storyNext 下一步权威)
+import { ENDING_GATE_CHAPTER } from '../shared/ending-logic.mjs'; // 结局线门槛(327 完成)
 import { tt } from '../shared/story-text.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js'; // 剧情浮光指引(2026-09-28)
 const bag = hotBegin('planets');
@@ -613,8 +614,10 @@ function updateStoryGuides() {
     page1Done = !!ctx.store.flag('page1');
   } catch (e) {}
   let target = null;
+  // 结局线(2026-10-03):327 完成后故事回到沙漠(画册页 → 井 → 告别),主世界不再指石门
+  const endingOn = page1Done && chapter >= ENDING_GATE_CHAPTER;
   if (p && chapter < 6) {
-    if (active === 'main' && gateRevealed && page1Done)
+    if (active === 'main' && gateRevealed && page1Done && !endingOn)
       target = {
         world: 'main',
         x: 0.1,
@@ -631,7 +634,7 @@ function updateStoryGuides() {
     }
   }
   const journeyGoal = ctx.ui.journey?.goal();
-  if (journeyGoal && journeyGoal.world === active) target = journeyGoal;
+  if (journeyGoal && journeyGoal.world === active) target = journeyGoal.hidden ? null : journeyGoal;
   try {
     ctx.ui.storyTarget && ctx.ui.storyTarget(target);
   } catch (e) {}
@@ -641,6 +644,7 @@ function updateStoryGuides() {
     p &&
     active === 'main' &&
     chapter < 6 &&
+    !endingOn &&
     gateRevealed &&
     page1Done &&
     (p.x - 0.1) * (p.x - 0.1) + (p.z - 56) * (p.z - 56) > 225

@@ -35,15 +35,21 @@ describe('进程节拍 storyBeat(2026-09-26「情节推进理解困难」单一�
     expect(b.zh).toBe('325 · 国王之星');
     expect(b.en).toBe('325 · The King');
   });
-  it('chapter 递进:1=326 虚荣 … 5=330 地理学家', () => {
+  it('chapter 递进:1=326 虚荣,2=327 酒鬼(328 起暂由画册页接上,见结局线)', () => {
     expect(storyBeat({ scene2: true, page1: true, chapter: 1 }).zh).toBe('326 · 虚荣之星');
-    expect(storyBeat({ scene2: true, page1: true, chapter: 5 }).zh).toBe('330 · 地理学家之星');
+    expect(storyBeat({ scene2: true, page1: true, chapter: 2 }).code).toBe('planet2');
   });
-  it('六章全完成 = 终章', () => {
-    expect(storyBeat({ scene2: true, page1: true, chapter: 6 }).code).toBe('finale');
+  it('327 完成后接结局线(2026-10-03 先做结局):画册页 → 井 → 告别 → 尾声 → 终章', () => {
+    const f = { scene2: true, page1: true, chapter: 3 };
+    expect(storyBeat(f).code).toBe('ending-book');
+    expect(storyBeat({ ...f, endingStep: 1 }).code).toBe('ending-well');
+    expect(storyBeat({ ...f, endingStep: 2 }).code).toBe('ending-farewell');
+    expect(storyBeat({ ...f, endingStep: 3 }).code).toBe('ending-epilogue');
+    expect(storyBeat({ ...f, endingStep: 4 }).code).toBe('finale');
+    expect(storyBeat({ ...f, chapter: 6, endingStep: 4 }).code).toBe('finale');
   });
-  it('脏 chapter 钳制后照常给节拍(99→终章,-5→325)', () => {
-    expect(storyBeat({ scene2: true, page1: true, chapter: 99 }).code).toBe('finale');
+  it('脏 chapter 钳制后照常给节拍(99→结局线,-5→325)', () => {
+    expect(storyBeat({ scene2: true, page1: true, chapter: 99 }).code).toBe('ending-book');
     expect(storyBeat({ scene2: true, page1: true, chapter: -5 }).code).toBe('planet0');
   });
 });
@@ -70,15 +76,16 @@ describe('下一步指引 storyNext(2026-09-27「剧情发展指引不清」单�
     expect(n.code).toBe('next-planet0');
     expect(n.zh).toContain('325');
   });
-  it('没建成的站不许指空岛:说"在路上"(2026-09-27 诚实指引)', () => {
-    // 328/329/330 无路可指;326/327 建成后走指路分支
+  it('327 之后不再指向没建成的空岛,改指结局线(2026-10-03 画册页)', () => {
     for (const ch of [3, 4, 5]) {
       const n = storyNext({ scene2: true, page1: true, chapter: ch });
-      expect(n.code).toBe('next-await');
-      expect(n.zh).toContain('在路上');
+      expect(n.code).toBe('next-book');
+      expect(n.code).not.toBe('next-await');
     }
-    expect(storyNext({ scene2: true, page1: true, chapter: 3 }).zh).toContain('328');
-    expect(storyNext({ scene2: true, page1: true, chapter: 5 }).zh).toContain('330');
+    // 还在星球里:先回沙漠,书在那里翻开
+    expect(storyNext({ scene2: true, page1: true, chapter: 3, world: 'king327' }).code).toBe(
+      'next-book-return'
+    );
   });
   it('建成的站照常指路:chapter=1 去 326,chapter=2 去 327(2026-09-27 第7场)', () => {
     const n1 = storyNext({ scene2: true, page1: true, chapter: 1 });
@@ -88,13 +95,15 @@ describe('下一步指引 storyNext(2026-09-27「剧情发展指引不清」单�
     expect(n2.code).toBe('next-planet2');
     expect(n2.zh).toContain('327');
   });
-  it('六章全完成=终章去展厅', () => {
-    const n = storyNext({ scene2: true, page1: true, chapter: 6 });
-    expect(n.code).toBe('next-finale');
-    expect(n.zh).toContain('永恒展厅');
+  it('结局线逐步指引:井 → 告别 → 星星 → 完', () => {
+    const f = { scene2: true, page1: true, chapter: 3 };
+    expect(storyNext({ ...f, endingStep: 1 }).code).toBe('next-well');
+    expect(storyNext({ ...f, endingStep: 2 }).code).toBe('next-farewell');
+    expect(storyNext({ ...f, endingStep: 3 }).code).toBe('next-epilogue');
+    expect(storyNext({ ...f, endingStep: 4 }).code).toBe('next-done');
   });
-  it('脏 chapter 同 storyBeat 钳制(99→终章,-5→325)', () => {
-    expect(storyNext({ scene2: true, page1: true, chapter: 99 }).code).toBe('next-finale');
+  it('脏 chapter 同 storyBeat 钳制(99→结局线,-5→325)', () => {
+    expect(storyNext({ scene2: true, page1: true, chapter: 99 }).code).toBe('next-book');
     expect(storyNext({ scene2: true, page1: true, chapter: -5 }).code).toBe('next-planet0');
   });
 });
@@ -228,6 +237,16 @@ describe('书页单一真相 readPages(2026-10-03)', () => {
       prev = n;
     }
     expect(prev).toBe(7);
+  });
+  it('结局线把书页推到 8、9(画册页六~八 = 8 页,告别 = 9 页),单调不减', () => {
+    const f = { scene2: true, page1: true, chapter: 3 };
+    expect(readPages({ ...f, endingStep: 0 })).toBe(5);
+    expect(readPages({ ...f, endingStep: 1 })).toBe(8);
+    expect(readPages({ ...f, endingStep: 2 })).toBe(8);
+    expect(readPages({ ...f, endingStep: 3 })).toBe(9);
+    expect(readPages({ ...f, endingStep: 4 })).toBe(PAGES_TOTAL);
+    // 327 没完成时,脏的 endingStep 不让书页跳级
+    expect(readPages({ scene2: true, page1: true, chapter: 2, endingStep: 4 })).toBe(4);
   });
   it('空存档返回 1(不是 0:开场已在读第一页)', () => {
     expect(readPages({})).toBe(1);

@@ -11,6 +11,7 @@ import { replyChoices } from '../shared/dialog-replies.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { DAY_HOURS } from '../shared/dayphase-logic.mjs';
+import { ENDING_GATE_CHAPTER } from '../shared/ending-logic.mjs'; // 结局线门槛(2026-10-03)
 
 let armed = false;
 let boxProp = null;
@@ -190,6 +191,12 @@ function guideGate() {
 // 同一扇石门现在通 B612 —— 信标复立 + toast 直说,进门即撤(portal 传送后由 tick 收走)
 function armB612() {
   if (ctx.scene.activeWorld !== 'main') return;
+  // 327 完成后故事转入结局线(画册页→井→告别),石门不再是「下一步」(2026-10-03)
+  if (ctx.store.num('planetsChapter') >= ENDING_GATE_CHAPTER) {
+    removeB612();
+    ctx.ui.journey?.clearGoal?.(OWNER);
+    return;
+  }
   if (b612Beacon) {
     guideB612();
     return;

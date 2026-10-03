@@ -271,7 +271,7 @@ export function createSheepCompanion() {
       time += Math.min(0.05, dt);
       const active = ctx.scene.activeWorld;
       const drawn = ctx.store.flag('scene2');
-      const shouldShow = sheepVisible(active, drawn);
+      const shouldShow = sheepVisible(active, drawn) && ctx.store.num('endingStep') < 3;
       if (shouldShow && !root) load();
       if (root && active !== world) {
         root.removeFromParent();
@@ -362,7 +362,9 @@ export function createSheepCompanion() {
       uiAcc += dt;
       if (uiAcc < 0.1) return;
       uiAcc = 0;
-      const anchor = visible ? root : active === 'main' && drawn ? box : null;
+      // 告别之后(结局线 endingStep>=3)羊跟王子回家了:「摸摸箱子」从此消失(剧本第 12 场)
+      const homeward = ctx.store.num('endingStep') >= 3;
+      const anchor = visible ? root : active === 'main' && drawn && !homeward ? box : null;
       const p = ctx.player.pl?.p;
       const near =
         anchor && p && Math.hypot(p.x - anchor.position.x, p.z - anchor.position.z) <= 2.6;

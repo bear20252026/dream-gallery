@@ -5,6 +5,7 @@
 export const Z = {
   // —— 世界内浮层(独立世界 Scene 之上的 DOM) ——
   worldFx: 12,      // 小世界对话气泡层(story-dialogs)
+  endingTint: 11,   // 结局线天色/告别金光薄罩(2026-10-03,只盖 3D 画面,不盖 HUD)
   worldHud: 15,     // 世界内小字(昆仑语录/海拔)
 
   // —— 主世界 HUD ——
@@ -16,6 +17,7 @@ export const Z = {
   quizPanel: 401,   // 答题面板(高于常规 HUD)
   navBtn: 60,       // 世界导航/拾取按钮(小世界单列导航)
   questBook: 70,    // 任务册
+  endingAction: 72, // 结局线行动卡(翻开书/唤醒井/走到他身边;低于对话框 80)
   guideCard: 75,    // 初见指引
   menuBtn: 80,      // 「印」菜单按钮
 
@@ -35,6 +37,7 @@ export const Z = {
 
   // —— 剧情与玩法浮层(2026-09-18 收编,原裸值一一对应) ——
   storyVeil: 560,   // scene3-memory 回忆层白光收幕
+  endingStage: 570, // 尾声·六年后 全屏星空(高于回忆白幕,低于开场电影)
   sunsetVeil: 520,  // scene6-king 325 章日落敕令金光(2026-09-27 收编,原内联裸值)
   finaleBase: 393,  // 终章层1(底)
   finaleMid: 394,   // 终章层2
@@ -45,6 +48,7 @@ export const Z = {
   arkHud: 385,      // 飞舟 HUD
   fireplaceUi: 384, // 壁炉交互浮层
   skyProgress: 380, // 天穹进度全屏层
+  bookPages: 377,   // 临时画册页(书页六~八,2026-10-03)
   museumOv: 9000,   // 线下参观模式全屏罩
   skipLink: 9999,   // 无障碍跳转链接(与 kickNotice 同档;CSS 段经注释引用)
 

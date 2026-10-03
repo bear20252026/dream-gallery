@@ -192,6 +192,7 @@ function createGameShellSystem() {
         page1: !!ctx.store.flag('page1'),
         chapter: ctx.store.num('planetsChapter'),
         homeMemoryStep: ctx.store.num('homeMemoryStep'),
+        endingStep: ctx.store.num('endingStep'),
       });
     } catch (e) {
       console.debug('[gameshell-system] 任务册书页映射读取失败(用兜底页数):', e);
@@ -204,11 +205,14 @@ function createGameShellSystem() {
       scene2: !!ctx.store.flag('scene2'),
       page1: !!ctx.store.flag('page1'),
       chapter: ctx.store.num('planetsChapter'),
+      endingStep: ctx.store.num('endingStep'),
     });
     const next = storyNext({
       scene2: !!ctx.store.flag('scene2'),
       page1: !!ctx.store.flag('page1'),
       chapter: ctx.store.num('planetsChapter'),
+      endingStep: ctx.store.num('endingStep'),
+      world: ctx.scene.activeWorld || 'main',
     });
     return { spirits, picks, ark, main, pages, beat, next };
   }
