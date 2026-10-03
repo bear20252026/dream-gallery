@@ -58,7 +58,7 @@ function build(opts) {
     <br>© 2026 B612 · Revised Sep 5, 2026
   </div>
   <style>
-  @import url('https://fonts.googleapis.com/css2?family=Satisfy&display=swap');
+  /* Satisfy 已自托管(main.css @font-face,2026-10-03),不再从 Google Fonts 拉 */
   #b612Gate{position:fixed;inset:0;z-index:${Z.gate};display:flex;align-items:center;justify-content:center;
     font-family:Georgia,'Times New Roman',serif;transition:opacity 1.2s ease;overflow:hidden;
     background:

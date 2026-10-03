@@ -1,5 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-03 剧情字体:中文志莽行书补全 + 英文 Satisfy 自托管(本地,待发布)
+
+- 问题:中文子集只有 318 字(台词用到 1500+ 字),一句话半行书半雅黑;英文剧情继承任务册的楷体,开场 Satisfy 走 Google Fonts(国内常被墙→回退系统 cursive)。
+- 现在:`src/styles/main.css` 一处定义两套「剧情文字」字体(对白/选项/气泡/电影字幕/画册页/尾声),按 `body[data-script-lang]` 自动切换;画册页/尾声的第二语言小字用另一种语言的字体。按钮、任务册仍用楷体(小字可读)。
+- 字体文件在 `src/styles/fonts/`(不在 public/):Vite 打包时加内容哈希,换字表后访客立刻拿到新版,不被一天缓存挡住。
+- **改台词后**:`python scripts/gen/subset-zh-font.py <完整 ZhiMangXing-Regular.ttf>` 重做子集(完整字体在主人电脑 `Downloads/ZMX_extract/`);`src/__tests__/zh-font-coverage.test.js` 会在缺字时让单测失败。完整字体本身缺 稊窣窸茀 四字,允许回退。
+
 ## 2026-10-03 测试反馈修复:火山选择卡死 + 「摸摸小羊」看不懂(本地,待发布)
 
 - **卡死根因**:`ui/overlay.js` 给 touchOnly 层也装了「点外圈关闭」(e.target===el)。任务卡 `#journeyTask` 是 touchOnly,手机上点到卡片空白处 → `display:none`,任务仍在进行 → 火山三选一按钮消失,剧情无法继续。修法:touchOnly 层一律不装外圈关闭(同时修好飞行控件/天穹进度/飞舟 HUD 的同类隐患);任务卡显式 `closeOnOutside:false`;journey update 加自愈(任务进行中卡片被藏 → 重画)。旧版本已用探针复现卡死,新版本同一操作后可选火山并推进到下一站。

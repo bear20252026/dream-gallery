@@ -69,9 +69,11 @@ CC BY 4.0 要求转载/二次分发时保留本署名文件，请一并携带本
 | --- | --- | --- |
 | Sabon / Sabon Next LT | 开屏标题、正文衬线 | 商业字体，**授权由站点运营者自行解决** |
 | Shipley | 开屏副标题斜体 | 商业字体，**授权由站点运营者自行解决** |
+| 志莽行书 Zhi Mang Xing | 中文剧情文字(对白/画册页/尾声/电影字幕) | SIL OFL 1.1，© 2018 The Zhi Mang Xing Project Authors；子集见 `src/styles/fonts/`，许可全文 `ZhiMangXing-OFL.txt` |
+| Satisfy | 英文剧情文字(同上)与开屏手写副标题 | Apache License 2.0，© Sideshow；自托管拉丁子集 `src/styles/fonts/Satisfy-latin.woff2` |
 
-字体文件位于 `public/fonts/`，属用户自行提供的授权副本。若未持有对应授权，请替换为开源替代
-（如 EB Garamond、Cormorant Garamond、Noto Serif SC）并修改 `src/ui/opening-bg.js` 中的 `@font-face` 声明。
+Sabon/Shipley 文件位于 `public/fonts/`，属用户自行提供的授权副本（目前代码未引用）。若未持有对应授权，请替换为开源替代
+（如 EB Garamond、Cormorant Garamond、Noto Serif SC）剧情字体的 `@font-face` 统一在 `src/styles/main.css`。
 
 ## 其他
 

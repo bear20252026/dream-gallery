@@ -3,7 +3,7 @@
 import { Z } from '../shared/z-layers.mjs';
 export const FILM_MARKUP = `
   <style>
-  @import url('https://fonts.googleapis.com/css2?family=Satisfy&display=swap');
+  /* Satisfy 已自托管(main.css @font-face,2026-10-03),不再从 Google Fonts 拉 */
   #b612film{position:fixed;inset:0;z-index:${Z.film};background:#0d0b09;overflow:hidden;
     font-family:'Satisfy',cursive;user-select:none}
   #b612film #fc{position:absolute;inset:0;opacity:0;transition:opacity 1.4s ease}
