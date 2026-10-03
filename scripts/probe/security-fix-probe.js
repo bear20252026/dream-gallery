@@ -1,7 +1,7 @@
 // security-fix-probe.js — OWASP 审计修复项复验(2026-07-28)
 // 断言(2026-08-29 更新):①SVG 上传被拒 + 白名单无 .svg + 存量 SVG 仍有 CSP script-src 'none' 兜底
 //   ②媒体/HTML 的 nosniff 与 XFO ③vid 归属 aid 正确、伪造 UA 拿不到 myUploads 且直读 403
-//   ④token 错误 401/正确 200 ⑤vision 限额 429 ⑥linkClicks 上限逻辑存在
+//   ④token 错误 401/正确 200 ⑤vision 无设备日限且同图复用缓存 ⑥linkClicks 上限逻辑存在
 // 变更说明:原「SVG 仍可上传 + 响应带 CSP」已过时(2026-07-31 起白名单直接移除 svg,姿态更强);
 //   上传归属/越权类断言改用普通图片做载体(该逻辑与文件类型无关)。
 const { spawn } = require('child_process');
@@ -125,7 +125,7 @@ const seedDbFiles = () => {
   const goodQ = await fetch(B + '/api/admin/list?token=audit-t0ken');
   ok(bad.status === 401 && good.status === 200 && goodQ.status === 200, 'token 错误 401 / 正确 200(header+query)');
 
-  // [5] vision 限额:构造 21 张本人照片记录,第 21 次应 429
+  // [5] 设备日限已按主人要求移除：21张本人照片都可分析，同图结果缓存。
   seedDbFiles();
   const gd2 = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
   for (let i = 0; i < 21; i++) gd2.uploads['vq' + i + '.jpg'] = { dk: 'dk-uploader', aid: 'vidAAA', ts: Date.now(), mt: 'x' + i };
@@ -135,14 +135,19 @@ const seedDbFiles = () => {
     cwd: ROOT, env: probeEnv(), stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise(r => s3.stdout.on('data', d => d.toString().includes('服务器已启动') && r()));
-  // 文件要真实存在(vision 读盘);造 21 个小文件,走完 20 次配额后第 21 次 429
+  // 文件要真实存在(vision 读盘)，独立临时访客档案，不使用线上数据。
   for (let i = 0; i < 21; i++) fs.writeFileSync(path.join(ROOT, 'photos', 'vq' + i + '.jpg'), 'x');
   let lastStatus = 0;
+  let everyAllowed = true;
   for (let i = 0; i < 21; i++) {
     const r = await fetch(B + '/api/vision/analyze', { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'RealUser/1.0', 'cookie': 'vid=vidAAA' }, body: JSON.stringify({ file: 'vq' + i + '.jpg' }) });
     lastStatus = r.status;
+    everyAllowed = everyAllowed && r.status === 200;
   }
-  ok(lastStatus === 429, 'vision 第 21 次分析被限额 429(实际 ' + lastStatus + ')');
+  ok(everyAllowed && lastStatus === 200, 'vision 本人照片第21次仍可分析（日限已移除）');
+  const cached = await fetch(B + '/api/vision/analyze', { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'RealUser/1.0', 'cookie': 'vid=vidAAA' }, body: JSON.stringify({ file: 'vq20.jpg' }) });
+  const cachedBody = await cached.json();
+  ok(cached.status === 200 && cachedBody.cached === true && typeof cachedBody.caption === 'string', 'vision 同图重复分析复用缓存');
   for (let i = 0; i < 21; i++) fs.unlinkSync(path.join(ROOT, 'photos', 'vq' + i + '.jpg'));
 
   // [6] linkClicks 上限:源码断言(打 5001 次太慢)

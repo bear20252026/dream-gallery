@@ -32,6 +32,8 @@ export const PLANE_PARAMS = {
   STALL_SPEED: 11.0, // 失速速度 m/s(≈40km/h)
   LIFT_MAX: 1.0, // 升力饱和系数:超过就不再随速度增长
   SINK_DAMP: 1.6, // 垂直速度阻尼(1/s):没有它会永远飘
+  CLIMB_MAX: 8, // 探索手感限幅：短暂抬头不应瞬间蹿到320m天顶。
+  DESCENT_MAX: 14,
   // —— 角速度 ——
   PITCH_RATE: 0.62, // 满舵俯仰角速度 rad/s(约 35°/s,适合慢速轻机)
   ROLL_RATE: 1.15, // 满舵滚转
@@ -43,7 +45,7 @@ export const PLANE_PARAMS = {
   // —— 限幅 ——
   PITCH_LIM: 0.62, // ±35°:再大就要失速
   ROLL_LIM: 1.22, // ±70°
-  YAW_LIM: 0.30, // ±17°(方向舵权限小,符合真机)
+  YAW_LIM: 0.3, // ±17°(方向舵权限小,符合真机)
   // —— 地面 ——
   WHEEL_R: 0.28, // 主轮半径 m
   GROUND_CLEAR: 0.85, // 停机时机身最低点离地(模型的轮高,实测后校准)
@@ -81,7 +83,13 @@ export function stepPlane(s, inp, dt, P = PLANE_PARAMS) {
     onGround: s.onGround,
     vspeed: s.vspeed,
   };
-  const flags = { liftoff: false, touchdown: false, stall: false, crash: false, boundaryHit: false };
+  const flags = {
+    liftoff: false,
+    touchdown: false,
+    stall: false,
+    crash: false,
+    boundaryHit: false,
+  };
 
   const pitchIn = clampN(inp.pitchIn || 0);
   const rollIn = clampN(inp.rollIn || 0);
@@ -90,7 +98,8 @@ export function stepPlane(s, inp, dt, P = PLANE_PARAMS) {
   // ---------- 1. 油门 ----------
   // 地面与空中都能加油门;空中松油门会让速度自然衰减(真实的"能量守恒")
   o.throttle = clamp(o.throttle + (inp.throttleIn || 0) * dt * 0.85, 0, 1);
-  const thrust = (P.THRUST_IDLE + (P.THRUST_MAX - P.THRUST_IDLE) * o.throttle) * (o.onGround ? 1 : 1);
+  const thrust =
+    (P.THRUST_IDLE + (P.THRUST_MAX - P.THRUST_IDLE) * o.throttle) * (o.onGround ? 1 : 1);
 
   // ---------- 2. 升力:只由速度与迎角决定(失速的物理来源) ----------
   const v = Math.max(0, o.speed);
@@ -163,6 +172,7 @@ export function stepPlane(s, inp, dt, P = PLANE_PARAMS) {
   o.vspeed += netUp * dt;
   // 垂直速度带阻尼(没有阻尼会永远飘)
   o.vspeed *= o.onGround ? 0 : 1 - Math.min(0.6, P.SINK_DAMP * dt);
+  o.vspeed = clamp(o.vspeed, -P.DESCENT_MAX, P.CLIMB_MAX);
 
   o.pos.x += dx;
   o.pos.z += dz;
@@ -177,7 +187,7 @@ export function stepPlane(s, inp, dt, P = PLANE_PARAMS) {
     if (o.vspeed < 0) o.vspeed = 0;
     // 摔机判定:高速 + 机头显著下俯 + 触地。三个条件缺一不可:
     //   轻着陆(速度低)允许、垂直落下来(不低头)允许、慢速蹭地允许。
-    if (wasAir && o.speed > 22 && o.pitch < -0.30) {
+    if (wasAir && o.speed > 22 && o.pitch < -0.3) {
       flags.crash = true;
     }
     o.onGround = true;
@@ -225,9 +235,17 @@ export function planePhase(s, P = PLANE_PARAMS) {
   const v = s.speed;
   if (s.crashed) return { phase: 'down', hintZh: '飞机损毁了', hintEn: 'Aircraft wrecked' };
   if (s.onGround && v < 1.5)
-    return { phase: 'parked', hintZh: '停机 · 按住 W 加油门', hintEn: 'Parked · hold W for throttle' };
+    return {
+      phase: 'parked',
+      hintZh: '停机 · 按住 W 加油门',
+      hintEn: 'Parked · hold W for throttle',
+    };
   if (s.onGround && v < P.LIFT_ON)
-    return { phase: 'roll', hintZh: '滑跑中 · 速度够了拉杆抬头', hintEn: 'Rolling · pull back to lift off' };
+    return {
+      phase: 'roll',
+      hintZh: '滑跑中 · 速度够了拉杆抬头',
+      hintEn: 'Rolling · pull back to lift off',
+    };
   if (v < P.STALL_SPEED)
     return { phase: 'stall', hintZh: '失速 · 加油门把速度找回来', hintEn: 'Stalled · add power' };
   if (s.onGround) return { phase: 'roll', hintZh: '滑跑中', hintEn: 'Rolling' };

@@ -52,6 +52,12 @@ describe('参数契约', () => {
 });
 
 describe('积分稳定性', () => {
+  it('高速滑跑后短暂抬头可以起飞，仍看得见沙漠而非瞬间蹿到天顶', () => {
+    const result = run(fresh({ speed: 40, throttle: 1 }), { pitchIn: -1 }, 120);
+    expect(result.flags.some((f) => f.liftoff)).toBe(true);
+    expect(result.state.pos.y).toBeGreaterThan(3);
+    expect(result.state.pos.y).toBeLessThan(30);
+  });
   it('任意极端输入 600 步不出 NaN', () => {
     const cases = [
       { pitchIn: 1, rollIn: 1, yawIn: 1, throttleIn: 1 },

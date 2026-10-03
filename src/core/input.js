@@ -40,6 +40,9 @@ export function createInputSystem(input) {
   function isKeyDown(key) {
     return input.isKeyDown(key);
   }
+  function onKeyPress(key, fn) {
+    return input.onKeyPress(key, fn);
+  }
 
   // 注册每帧动作回调(转交 InputManager,保持既有语义)
   function on(action, fn) {
@@ -70,6 +73,7 @@ export function createInputSystem(input) {
     pointer,
     isDown,
     isKeyDown,
+    onKeyPress,
     on,
     update,
     get impl() {

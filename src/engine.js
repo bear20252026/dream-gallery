@@ -153,6 +153,7 @@ export class InputManager {
     this._mouse = { x: 0, y: 0, dx: 0, dy: 0, down: false };
     this._touch = { active: false, x: 0, y: 0 };
     this._bindings = {};
+    this._keyPressListeners = new Map();
   }
 
   /** 绑定按键到动作 */
@@ -175,6 +176,14 @@ export class InputManager {
   /** 原始键是否按下(供统一输入 facade 读取,不新增监听) */
   isKeyDown(key) {
     return !!this._keys[String(key).toLowerCase()];
+  }
+  /** 单次按下事件：即使按下/松开落在两帧之间，也不会漏掉互动。 */
+  onKeyPress(key, fn) {
+    key = String(key).toLowerCase();
+    if (!this._keyPressListeners.has(key)) this._keyPressListeners.set(key, new Set());
+    const callbacks = this._keyPressListeners.get(key);
+    callbacks.add(fn);
+    return () => callbacks.delete(fn);
   }
 
   /** 指针完整状态(绝对坐标 + 本帧增量 + 是否按下) */
@@ -206,6 +215,7 @@ export class InputManager {
     document.addEventListener('keydown', (e) => {
       if (!e.key) return;
       this._keys[e.key.toLowerCase()] = true;
+      if (!e.repeat) this._keyPressListeners.get(e.key.toLowerCase())?.forEach((fn) => fn(e));
     });
     document.addEventListener('keyup', (e) => {
       if (!e.key) return;

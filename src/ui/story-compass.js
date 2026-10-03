@@ -43,7 +43,12 @@ export function mountStoryCompass(ctx) {
   look.style.cssText =
     'min-height:44px;padding:8px 12px;border:1px solid #b49561;border-radius:20px;background:#58482c;color:#fff0cc;font:inherit;cursor:pointer';
   look.onclick = () => ctx.ui.journey?.lookAtGoal();
-  el.append(arrow, txt, look);
+  const act = document.createElement('button');
+  act.type = 'button';
+  act.dataset.journeyAction = 'activate-goal';
+  act.style.cssText = look.style.cssText;
+  act.onclick = () => ctx.ui.journey?.activateGoal();
+  el.append(arrow, txt, look, act);
   document.body.appendChild(el);
   ctx.overlay.register(el, { touchOnly: true, closeOnOutside: false });
 
@@ -66,7 +71,7 @@ export function mountStoryCompass(ctx) {
       if (el.style.display !== 'none') el.style.display = 'none';
       return;
     }
-    if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen()) {
+    if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen() || ctx.ui.journey?.state()?.preview) {
       el.style.display = 'none';
       return;
     }
@@ -74,6 +79,9 @@ export function mountStoryCompass(ctx) {
       dz = target.z - pl.p.z;
     const d = Math.hypot(dx, dz);
     el.style.display = 'flex';
+    act.style.display = d <= 1.8 && target.onActivate ? 'block' : 'none';
+    act.textContent = tt(target.action || { zh: '开始观察', en: 'Begin observing' });
+    look.style.display = d <= 1.8 && target.onActivate ? 'none' : 'block';
     const quest = document.getElementById('questHud');
     if (quest)
       el.style.top = Math.min(quest.getBoundingClientRect().bottom + 12, innerHeight - 210) + 'px';
@@ -81,9 +89,11 @@ export function mountStoryCompass(ctx) {
     if (d <= 1.8) {
       arrow.style.opacity = '0';
       dist.textContent = tt(
-        ctx.ui.journey?.state()
-          ? { zh: '已到目标 · E 观察', en: 'At the target · E to observe' }
-          : { zh: '已到目标 · 跟随剧情提示', en: 'At the target · follow the story prompt' }
+        target.onActivate
+          ? { zh: '已到目标 · 点按钮或按 E', en: 'At the target · tap or press E' }
+          : ctx.ui.journey?.state()
+            ? { zh: '已到目标 · E 观察', en: 'At the target · E to observe' }
+            : { zh: '已到目标 · 跟随剧情提示', en: 'At the target · follow the story prompt' }
       );
     } else {
       arrow.style.opacity = '1';

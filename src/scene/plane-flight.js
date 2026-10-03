@@ -22,6 +22,9 @@ import { createGLTFLoader } from './gltf-loader.js';
 import { Z } from '../shared/z-layers.mjs';
 import { tt } from '../shared/story-text.mjs';
 import { PLANE_PARAMS as P, stepPlane, planePhase, planeSpeedKmh } from './plane-physics.mjs';
+import { allowPlaneBoard } from '../shared/journey-guidance.mjs';
+import { EYE_HEIGHT } from '../shared/constants.js';
+import { eventBus } from '../core/event-bus.js';
 
 const gs = getGameState();
 const MODEL = '/models/b612/piper-pa18-full.glb'; // 1.74MB 完整机 → 压缩后 0.31MB
@@ -36,7 +39,7 @@ const NEAR_R = 5.5;
 const STYLE = `
 /* 飞行 HUD 用 veilFx(390)之上 —— 原先用 hudBtn(35),会被对话框(questBook 层 70
    与其上的 gameDialog)整块盖住,玩家在飞行中看不到速度/失速告警(2026-10-03 截图自查发现)。 */
-#planeHud{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);z-index:${Z.veilFx};
+#planeHud{position:fixed;left:50%;bottom:140px;transform:translateX(-50%);z-index:${Z.veilFx};
   display:none;min-width:210px;padding:12px 20px;border-radius:12px;
   background:linear-gradient(160deg,rgba(20,22,28,.92),rgba(30,26,22,.92));
   border:1px solid #7d6a4a;color:#f0e2c0;font:13px/1.6 "SF Mono",Consolas,monospace;
@@ -48,22 +51,31 @@ const STYLE = `
 #planeHud .ph-bar i{display:block;height:100%;background:linear-gradient(90deg,#c8a45c,#f0d898)}
 /* 提示条在 HUD **上方**(bottom 更大),两者不能叠在一起 ——
    截图自查过一次:提示条压住了速度数字的上一行,读数被切掉一半。 */
-#planePrompt{position:fixed;left:50%;bottom:210px;transform:translateX(-50%);z-index:${Z.veilFx};
+#planePrompt{position:fixed;left:50%;bottom:310px;transform:translateX(-50%);z-index:${Z.veilFx};
   padding:11px 20px;border-radius:22px;background:rgba(24,22,18,.94);
   border:1px solid #8a7550;color:#ffeec4;font:13.5px/1.5 inherit;cursor:pointer;
   box-shadow:0 6px 22px #0007;min-height:44px;display:none;align-items:center}
 #planePrompt:hover{background:#3a3122}
 body[data-flying] #questHud,body[data-flying] #storyCompass{visibility:hidden}
 /* 飞行中关掉对话框的表现层:玩家在开飞机,不该被剧情对话框挡住仪表与视线 */
-body[data-flying] #gameDialog,body[data-flying] #journeyTask{visibility:hidden}
-@media(max-width:600px){#planeHud{bottom:96px;min-width:170px;padding:9px 14px}
-#planeHud .ph-speed{font-size:23px}#planePrompt{bottom:186px;font-size:12.5px}}
+body[data-flying] #j,body[data-flying] #hp,body[data-flying] #jumpBtnGlide,body[data-flying] #jumpBtnSpace,body[data-flying] #descendBtnSpace,body[data-flying] #homeBtn,body[data-flying] #viewBtn,body[data-flying] #worldNav{visibility:hidden;pointer-events:none}
+#planeControls{position:fixed;inset:auto 12px 18px;z-index:${Z.veilFx};display:none;justify-content:space-between;gap:12px;pointer-events:none}
+#planeControls .pc-group{display:grid;grid-template-columns:repeat(2,48px);gap:7px;pointer-events:auto}
+#planeControls button{min-height:46px;color:#ffeec4;background:#211e19e8;border:1px solid #aa8b55;border-radius:13px;font:13px inherit;touch-action:none;user-select:none}
+#planeControls button[aria-pressed="true"]{background:#886b3d}
+#planeControls .pc-view{grid-column:span 2}
+#planeHud .ph-help{max-width:270px;color:#decda7;font-size:11px;margin-top:6px;line-height:1.6}
+@media(max-width:600px){#planeHud{min-width:170px;padding:9px 14px;max-width:230px}
+#planeHud .ph-speed{font-size:23px}#planePrompt{font-size:12.5px;width:max-content;max-width:calc(100vw - 28px)}}
 `;
 
 const T = {
-  enter: { zh: '走近飞机 · 按 E 登机', en: 'Walk to the plane · press E to board' },
-  exit: { zh: '按 Esc 下机 · F 切视角', en: 'Esc to exit · F for view' },
-  crashed: { zh: '摔机了 · 按 E 重新登机', en: 'Wrecked · press E to board again' },
+  enter: { zh: '自由探索 · 点此或按 E 登机', en: 'Free exploration · tap or press E to board' },
+  exit: { zh: '结束飞行 · 返回停机处', en: 'End flight · return to the parking spot' },
+  crashed: {
+    zh: '飞行结束 · 点此回到停机处再试',
+    en: 'Flight ended · tap to return and try again',
+  },
   flew: { zh: '你已经飞过这片沙海了', en: 'You have flown this desert' },
 };
 
@@ -74,6 +86,9 @@ export function createPlaneFlight({ input }) {
   let hud = null,
     promptEl = null,
     style = null;
+  let controls = null;
+  const held = new Set();
+  const controlApis = [];
   let state = null;
   let driving = false;
   let nearPlane = false;
@@ -88,6 +103,91 @@ export function createPlaneFlight({ input }) {
   let unsubWorld = null;
 
   const groundH = (x, z) => (ctx.media && ctx.media.desert ? ctx.media.desert.getH(x, z) : 0);
+  function canBoard() {
+    const pl = ctx.player.pl;
+    return (
+      !!state &&
+      allowPlaneBoard({
+        world: ctx.scene.activeWorld || 'main',
+        chapter: ctx.store.num('planetsChapter'),
+        dialog: !!ctx.ui.dialogOpen?.(),
+        overlay: !!ctx.overlay.anyOpen(),
+        journeyBusy: !!ctx.ui.journey?.busy(),
+        flightLock: !!ctx.kunlun.flightLock,
+        loaded: !!modelWrap,
+        near: !!pl && Math.hypot(pl.p.x - state.pos.x, pl.p.z - state.pos.z) < NEAR_R,
+      })
+    );
+  }
+  function clearHeld() {
+    held.clear();
+    controls
+      ?.querySelectorAll('[aria-pressed]')
+      .forEach((b) => b.setAttribute('aria-pressed', 'false'));
+  }
+  function changeView() {
+    camMode = (camMode + 1) % 3;
+    camInit = false;
+    if (root) root.visible = camMode !== 1;
+  }
+  function buildControls() {
+    controls = document.createElement('div');
+    controls.id = 'planeControls';
+    const groups = [document.createElement('div'), document.createElement('div')];
+    groups.forEach((g) => {
+      g.className = 'pc-group';
+      controls.appendChild(g);
+    });
+    for (const [group, key, zh, en] of [
+      [0, 'w', '加油门', 'Power +'],
+      [0, 's', '减油门', 'Power −'],
+      [0, 'shift', '刹车', 'Brake'],
+      [0, 'view', '换视角', 'View'],
+      [1, 'arrowleft', '左转', 'Left'],
+      [1, 'arrowright', '右转', 'Right'],
+      [1, 'arrowup', '抬头', 'Climb'],
+      [1, 'arrowdown', '低头', 'Descend'],
+    ]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.planeControl = key;
+      b.dataset.zh = zh;
+      b.dataset.en = en;
+      b.textContent = tt({ zh, en });
+      if (key === 'view') b.onclick = changeView;
+      else {
+        b.setAttribute('aria-pressed', 'false');
+        b.onpointerdown = (e) => {
+          if (!driving || ctx.overlay.anyOpen()) return;
+          e.preventDefault();
+          b.setPointerCapture(e.pointerId);
+          held.add(key);
+          b.setAttribute('aria-pressed', 'true');
+        };
+        const release = () => {
+          held.delete(key);
+          b.setAttribute('aria-pressed', 'false');
+        };
+        b.onpointerup = release;
+        b.onpointercancel = release;
+        b.onlostpointercapture = release;
+      }
+      groups[group].appendChild(b);
+    }
+    document.body.appendChild(controls);
+    controlApis.push(
+      ctx.overlay.register(controls, { touchOnly: true }),
+      ctx.overlay.register(promptEl, { touchOnly: true, closeOnOutside: false })
+    );
+    window.addEventListener('blur', clearHeld);
+    window.addEventListener('script:lang', syncLanguage);
+  }
+  function syncLanguage() {
+    controls
+      ?.querySelectorAll('button')
+      .forEach((b) => (b.textContent = tt({ zh: b.dataset.zh, en: b.dataset.en })));
+    showPrompt(driving ? (crashed ? T.crashed : T.exit) : nearPlane ? T.enter : null);
+  }
 
   function freshState() {
     return {
@@ -205,13 +305,26 @@ export function createPlaneFlight({ input }) {
     if (!hud) return;
     if (!driving) {
       hud.style.display = 'none';
+      if (controls) controls.style.display = 'none';
       return;
     }
     const ph = planePhase({ ...state, crashed });
     hud.style.display = 'block';
+    if (controls) controls.style.display = 'flex';
+    hud.querySelector('.ph-help').textContent = tt({
+      zh: state.onGround
+        ? '先加油门，速度达到 50 km/h 后轻按抬头。'
+        : '松开抬头保持速度；结束飞行可回到停机处。',
+      en: state.onGround
+        ? 'Add power, then gently climb above 50 km/h.'
+        : 'Release climb to keep speed. End flight returns you to the parking spot.',
+    });
     hud.querySelector('.ph-speed').textContent = planeSpeedKmh(state) + ' km/h';
     const el = hud.querySelector('.ph-phase');
-    el.textContent = tt(ph.hint);
+    el.textContent =
+      ph.phase === 'parked'
+        ? tt({ zh: '停机 · 按住「加油门」', en: 'Parked · hold Power +' })
+        : tt({ zh: ph.hintZh, en: ph.hintEn });
     el.classList.toggle('ph-stall', ph.phase === 'stall');
     hud.querySelector('.ph-bar i').style.width = Math.round(state.throttle * 100) + '%';
   }
@@ -228,31 +341,47 @@ export function createPlaneFlight({ input }) {
 
   // ——————————————————————————— 上/下机 ———————————————————————————
   function board() {
+    if (driving || !canBoard()) return false;
     if (crashed) {
       crashed = false;
       state = freshState();
       syncMesh();
     }
     driving = true;
+    clearHeld();
+    ctx.ui.journey?.setPhase('plane-flight', {
+      world: 'main',
+      chapter: { zh: '沙漠 · 自由飞行', en: 'Desert · free flight' },
+      hint: {
+        zh: '结束飞行后，仍可从石门继续旅途。',
+        en: 'Return to the gate after your flight to continue the journey.',
+      },
+    });
     camInit = false;
     gs.set('flightLock', true); // 冻结玩家移动(与飞舟同一条通道)
     document.body.dataset.flying = '1';
     if (root) root.visible = camMode !== 1;
     syncHud();
     showPrompt(T.exit);
+    return true;
   }
 
-  function leave() {
+  function leave(placePlayer = true) {
     if (!driving) return;
     driving = false;
+    clearHeld();
+    ctx.ui.journey?.setPhase('plane-flight', null);
     delete document.body.dataset.flying;
     gs.set('flightLock', false);
     if (root) root.visible = true; // 下机后把玩家放到飞机侧方,而不是机身里
     const pl = ctx.player && ctx.player.pl;
-    if (pl) {
-      pl.p.x = state.pos.x + Math.sin(state.yaw + 1.3) * 5;
-      pl.p.z = state.pos.z + Math.cos(state.yaw + 1.3) * 5;
-      pl.p.y = groundH(pl.p.x, pl.p.z) + 0.2;
+    state = freshState(); // 主动结束探索，回到起点；不把玩家丢在高空或遥远的沙海。
+    crashed = false;
+    syncMesh();
+    if (pl && placePlayer) {
+      pl.p.x = PARK.x + 5.5;
+      pl.p.z = PARK.z - 5.5;
+      pl.p.y = groundH(pl.p.x, pl.p.z) + EYE_HEIGHT;
       pl.vy = 0;
     }
     camInit = false;
@@ -267,12 +396,12 @@ export function createPlaneFlight({ input }) {
   // (2026-10-03 线上探针实锤:拉杆 3s 后 pitch=-0.196,y 纹丝不动)。
   // 正确映射:↓ 压杆低头(+1) · ↑ 拉杆抬头(-1)。
   function readInput() {
-    const kd = (k) => input.isKeyDown(k);
+    const kd = (k) => held.has(k) || input.isKeyDown(k);
     return {
       pitchIn: (kd('arrowdown') ? 1 : 0) - (kd('arrowup') ? 1 : 0),
       rollIn: (kd('arrowright') || kd('d') ? 1 : 0) - (kd('arrowleft') || kd('a') ? 1 : 0),
       yawIn: (kd('e') ? 1 : 0) - (kd('q') ? 1 : 0),
-      throttleIn: (kd('s') ? 1 : 0) - (kd('w') ? 1 : 0),
+      throttleIn: (kd('w') ? 1 : 0) - (kd('s') ? 1 : 0),
       brakeHold: kd('shift'),
       groundHeightAt: groundH,
     };
@@ -295,7 +424,7 @@ export function createPlaneFlight({ input }) {
       hud = document.createElement('div');
       hud.id = 'planeHud';
       hud.innerHTML =
-        '<div class="ph-speed">0 km/h</div><div class="ph-phase"></div><div class="ph-bar"><i style="width:0%"></i></div>';
+        '<div class="ph-speed">0 km/h</div><div class="ph-phase"></div><div class="ph-bar"><i style="width:0%"></i></div><div class="ph-help"></div>';
       document.body.appendChild(hud);
 
       promptEl = document.createElement('button');
@@ -303,6 +432,14 @@ export function createPlaneFlight({ input }) {
       promptEl.type = 'button';
       promptEl.onclick = () => (driving ? leave() : board());
       document.body.appendChild(promptEl);
+      buildControls();
+      unsubWorld = eventBus.on('world:changed', ({ to }) => {
+        if (to !== 'main') {
+          leave(false);
+          nearPlane = false;
+          showPrompt(null);
+        }
+      });
 
       state = freshState();
       buildMesh();
@@ -313,16 +450,19 @@ export function createPlaneFlight({ input }) {
       } catch (e) {}
 
       onKey = (e) => {
-        if (!e || !e.key) return;
+        if (
+          !e ||
+          !e.key ||
+          e.defaultPrevented ||
+          e.repeat ||
+          document.activeElement?.closest('input,textarea,[contenteditable="true"]')
+        )
+          return;
         const k = e.key.toLowerCase();
         if (driving) {
           if (k === 'escape') leave();
-          if (k === 'f') {
-            camMode = (camMode + 1) % 3;
-            camInit = false;
-            if (root) root.visible = camMode !== 1;
-          }
-        } else if (k === 'e' && nearPlane) {
+          if (k === 'f') changeView();
+        } else if (k === 'e' && canBoard()) {
           board();
         }
       };
@@ -331,6 +471,14 @@ export function createPlaneFlight({ input }) {
     update(dt) {
       if (!state) return;
       if (driving) {
+        if ((ctx.scene.activeWorld || 'main') !== 'main') {
+          leave(false);
+          return;
+        }
+        if (ctx.overlay.anyOpen() || ctx.ui.dialogOpen?.()) {
+          clearHeld();
+          return;
+        }
         const r = stepPlane(state, readInput(), Math.min(0.05, dt), P);
         state = r.state;
         if (state.pos.y > maxAltitude) maxAltitude = state.pos.y;
@@ -360,7 +508,7 @@ export function createPlaneFlight({ input }) {
       // 地面:靠近才提示登机
       const pl = ctx.player && ctx.player.pl;
       if (pl) {
-        const near = Math.hypot(pl.p.x - state.pos.x, pl.p.z - state.pos.z) < NEAR_R;
+        const near = canBoard();
         if (near !== nearPlane) {
           nearPlane = near;
           showPrompt(near ? T.enter : null);
@@ -372,6 +520,11 @@ export function createPlaneFlight({ input }) {
       onKey = null;
       unsubWorld?.();
       unsubWorld = null;
+      window.removeEventListener('blur', clearHeld);
+      window.removeEventListener('script:lang', syncLanguage);
+      clearHeld();
+      controlApis.forEach((api) => api.unregister());
+      controls?.remove();
       if (driving) gs.set('flightLock', false);
       delete document.body.dataset.flying;
       style?.remove();
@@ -383,6 +536,7 @@ export function createPlaneFlight({ input }) {
         modelWrap = null;
         shadow = null;
       }
+      ctx.scene.planeApi = null;
     },
   });
 

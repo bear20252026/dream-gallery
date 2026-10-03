@@ -11,6 +11,7 @@ import {
   formatMemoryTime,
   isAlmanacTime,
   nearMemoryPoint,
+  taskCheckpoint,
 } from '../shared/journey-logic.mjs';
 import { guideBearing } from '../shared/journey-guidance.mjs';
 
@@ -25,6 +26,7 @@ const STYLE = `
 .jt-controls button:disabled{opacity:.48;cursor:default}.jt-progress{font:11px/1.5 sans-serif;letter-spacing:2px;color:#aa9878;margin:8px 0}
 .jt-sketch{width:100%;height:85px;margin:6px 0;color:#dbbc79}.jt-clock{display:block;font:38px/1.5 Georgia,serif;letter-spacing:5px;text-align:center;color:#ffe5a8;font-variant-numeric:tabular-nums}
 .jt-sketch svg{width:100%;height:100%}
+.jt-feedback:empty{display:none}.jt-plant-clue{border-left:2px solid #be9959;padding-left:10px;color:#ead7ae}
 .jt-travel{display:none!important}
 .jt-look{background:transparent!important}.jt-progress{order:-1}
 #journeyTransition{position:fixed;inset:0;z-index:${Z.modal};display:none;align-items:center;justify-content:center;padding:20px;background:#0c1021bb;backdrop-filter:blur(5px);box-sizing:border-box;font-family:"KaiTi",serif}
@@ -50,6 +52,10 @@ function sketch(symbol) {
     volcano:
       '<path d="M12 65 35 25 45 33 54 25 80 65M32 25h23M39 19q-7-8 0-13m12 13q-7-8 0-13M72 65l25-38 24 38"/>',
     sprout: '<path d="M65 68V30m0 12Q25 38 30 16q28-4 35 26m0-3q12-30 40-22 3 23-40 26M43 70h45"/>',
+    rosebud:
+      '<path d="M67 70V32m0 21q-24-19-28-3 14 14 28 3m0-12q17-18 25-5-7 14-25 5M67 32q-17-10-10-25 14 0 20 13-1 11-10 12M46 70h42"/>',
+    baobab:
+      '<path d="M60 70 59 38h16l-2 32m-6-31Q37 44 23 25q30-9 44 14m0-1Q89 10 111 22q-3 23-44 16m-1-4Q48 18 51 9q21 1 15 25M42 70h52"/>',
     rose: '<path d="M67 68V35m0 18-17-7m17-2 15-7M67 36q-25-3-23-17 7-15 23-6 17-10 24 5 1 16-24 18m-1-22q-13 0-10 10 11 8 20-2-2-8-10-8"/>',
     sunset: '<path d="M15 55h105M44 55a23 23 0 0 1 46 0M67 18V8M31 28l-8-8m80 8 8-8M25 67h84"/>',
     clock:
@@ -78,7 +84,7 @@ export function createJourneySystem({ input }) {
     objective = null,
     acc = 0;
   let unsubscribe, langListener;
-  const previousKeys = { e: false, j: false };
+  let keySubscriptions = [];
   const make = (tag, cls, content, parent) => {
     const el = document.createElement(tag);
     if (cls) el.className = cls;
@@ -91,6 +97,7 @@ export function createJourneySystem({ input }) {
     const entries = cleanMemories(ctx.store.json('journeyMemories', []));
     if (entries.some((e) => e.id === id)) return;
     ctx.store.setJson('journeyMemories', entries.concat({ id, choice }));
+    eventBus.emit('journey:remembered', { id, world: ctx.scene.activeWorld });
     if (notify) ctx.ui.modeToast && ctx.ui.modeToast(tt(TEXT.saved), 2600);
   }
   function setGoal(owner, value) {
@@ -100,7 +107,34 @@ export function createJourneySystem({ input }) {
     if (objective && objective.owner === owner) objective = null;
   }
   function setPhase(owner, value) {
-    mission = value ? { ...value, owner } : null;
+    if (value) mission = { ...value, owner };
+    else if (mission?.owner === owner) mission = null;
+  }
+  function activateGoal() {
+    if (
+      !objective?.onActivate ||
+      !nearMemoryPoint(
+        objective,
+        ctx.player.pl?.p,
+        ctx.scene.activeWorld,
+        objective.world,
+        ctx.kunlun.flightLock
+      ) ||
+      ctx.overlay.anyOpen() ||
+      ctx.ui.dialogOpen?.()
+    )
+      return false;
+    objective.onActivate();
+    return true;
+  }
+  function saveTask() {
+    if (active)
+      ctx.store.setJson('journeyTaskCheckpoint', {
+        id: active.id,
+        world: active.spec.world,
+        step: active.step,
+        minutes: active.minutes,
+      });
   }
   function lookAtGoal() {
     if (!objective || objective.world !== ctx.scene.activeWorld || ctx.overlay.anyOpen()) return;
@@ -153,6 +187,7 @@ export function createJourneySystem({ input }) {
     delete document.body.dataset.journeyTask;
     clearGoal(current.owner);
     if (result) remember(current.id, current.choice);
+    if (result) ctx.store.setJson('journeyTaskCheckpoint', null);
     current.resolve(result);
   }
   function cancel(owner) {
@@ -193,11 +228,24 @@ export function createJourneySystem({ input }) {
   }
   function observe() {
     if (!active || !near() || ctx.ui.dialogOpen?.() || notebookApi.isOpen()) return;
+    if (active.preview) return;
     const point = targetPoint();
+    active.onObserve?.(point, active.step);
+    eventBus.emit('journey:observed', {
+      id: active.id,
+      world: active.spec.world,
+      step: active.step,
+    });
+    if (active.spec.kind === 'trail') {
+      active.preview = point.detail;
+      renderTask();
+      return;
+    }
     if (active.spec.kind === 'survey') {
       active.visited.push(active.visited.length);
       active.step++;
       active.feedback = point.detail;
+      saveTask();
       updateGoal();
       renderTask();
     } else if (active.spec.kind === 'listen') {
@@ -205,6 +253,7 @@ export function createJourneySystem({ input }) {
       else {
         active.step++;
         active.feedback = point.detail;
+        saveTask();
         updateGoal();
         renderTask();
       }
@@ -212,7 +261,8 @@ export function createJourneySystem({ input }) {
       active.step++;
       if (active.step >= active.spec.points.length) finish({ id: active.id });
       else {
-        active.feedback = null;
+        active.feedback = point.detail;
+        saveTask();
         updateGoal();
         renderTask();
       }
@@ -235,6 +285,28 @@ export function createJourneySystem({ input }) {
       if (data) b.dataset.journeyAction = data;
       return b;
     };
+    if (active.preview) {
+      sketchEl.innerHTML = sketch('sunset');
+      make('p', 'jt-feedback', tt(active.preview), panel);
+      button(
+        { zh: '记下这一幕', en: 'Keep this view' },
+        () => {
+          active.feedback = active.preview;
+          active.preview = null;
+          active.step++;
+          if (active.step === s.points.length) finish({ id: active.id });
+          else {
+            saveTask();
+            updateGoal();
+            renderTask();
+          }
+        },
+        'record-view'
+      );
+      panel.style.display = 'block';
+      panel.classList.remove('jt-travel');
+      return;
+    }
     if (point) {
       const b = button({ zh: '看向目标', en: 'Face the target' }, lookAtGoal, 'look');
       b.className = 'jt-look';
@@ -255,6 +327,7 @@ export function createJourneySystem({ input }) {
       dial.setAttribute('aria-valuetext', formatMemoryTime(active.minutes));
       dial.oninput = () => {
         active.minutes = Number(dial.value);
+        saveTask();
         time.textContent = formatMemoryTime(active.minutes);
         dial.setAttribute('aria-valuetext', time.textContent);
       };
@@ -268,7 +341,20 @@ export function createJourneySystem({ input }) {
         'confirm-time'
       );
     } else if (s.kind === 'sort') {
-      sketchEl.innerHTML = sketch(s.plants[active.step] === 'rose' ? 'rose' : 'sprout');
+      sketchEl.innerHTML = sketch(s.plants[active.step] === 'rose' ? 'rosebud' : 'baobab');
+      make(
+        'p',
+        'jt-hint jt-plant-clue',
+        tt(
+          s.plants[active.step] === 'rose'
+            ? { zh: '细细的茎，顶端有一颗花苞。', en: 'A slender stem carries a flower bud.' }
+            : {
+                zh: '粗壮的嫩茎，叶片向两侧展开，没有花苞。',
+                en: 'A thick young stem spreads its leaves; there is no flower bud.',
+              }
+        ),
+        panel
+      );
       make('div', 'jt-progress', active.step + 1 + ' / 2', panel);
       for (const [value, label] of [
         ['keep', TEXT.keep],
@@ -284,7 +370,10 @@ export function createJourneySystem({ input }) {
             }
             active.step++;
             if (active.step === s.plants.length) finish({ id: active.id });
-            else renderTask();
+            else {
+              saveTask();
+              renderTask();
+            }
           },
           value
         );
@@ -334,7 +423,8 @@ export function createJourneySystem({ input }) {
     panel.classList.toggle('jt-travel', !!point && !near());
   }
   function beginTask(owner, id, options = {}) {
-    if (!TASKS[id] || ctx.scene.activeWorld !== TASKS[id].world) return Promise.resolve(null);
+    if (!Object.hasOwn(TASKS, id) || ctx.scene.activeWorld !== TASKS[id].world)
+      return Promise.resolve(null);
     cancel();
     return new Promise((resolve) => {
       active = {
@@ -347,7 +437,10 @@ export function createJourneySystem({ input }) {
         minutes: 1110,
         choice: null,
         onTarget: options.onTarget,
+        onObserve: options.onObserve,
+        ...taskCheckpoint(id, ctx.store.json('journeyTaskCheckpoint', null)),
       };
+      saveTask();
       document.body.dataset.journeyTask = id;
       updateGoal();
       renderTask();
@@ -408,8 +501,23 @@ export function createJourneySystem({ input }) {
         en: 'Dialogue waits for you. Tap Continue or press E. Choose a reply when options appear.',
       },
       TEXT.rule,
+      {
+        zh: '入梦后，小羊是只有你看得见的想象伙伴。靠近时可以摸摸它；它不会改变回忆中的故事。',
+        en: 'In a memory, the sheep is an imagined companion only you can see. Pet it nearby; it cannot change the past.',
+      },
     ])
       make('p', 'jn-sub', tt(line), book);
+    const sheepCredit = make('p', 'jn-sub', null, book);
+    const modelCredit = make('a', '', 'Sheep · Kinga Kroliczek', sheepCredit);
+    modelCredit.href = 'https://sketchfab.com/3d-models/sheep-fb30303a25dc4badad445217600206e5';
+    modelCredit.target = '_blank';
+    modelCredit.rel = 'noopener noreferrer';
+    sheepCredit.append(' · ');
+    const licenseCredit = make('a', '', 'CC BY 4.0', sheepCredit);
+    licenseCredit.href = 'https://creativecommons.org/licenses/by/4.0/';
+    licenseCredit.target = '_blank';
+    licenseCredit.rel = 'noopener noreferrer';
+    sheepCredit.append(tt({ zh: ' · 游戏添加动作', en: ' · Animated for this game' }));
     notebookApi.open();
     close.focus();
     if (document.pointerLockElement) document.exitPointerLock();
@@ -420,19 +528,28 @@ export function createJourneySystem({ input }) {
     if (document.pointerLockElement) document.exitPointerLock();
     notebook.querySelector('.jn-close')?.focus();
   }
-  function pollKeys() {
-    for (const key of ['e', 'j']) {
-      const down = input.isKeyDown(key);
-      const pressed = down && !previousKeys[key];
-      previousKeys[key] = down;
-      if (!pressed || document.activeElement?.closest('input,textarea,[contenteditable="true"]'))
-        continue;
-      if (key === 'j' && !ctx.overlay.anyOpen() && !ctx.ui.dialogOpen?.()) openNotebook();
-      if (key === 'e' && !ctx.overlay.anyOpen()) {
-        if (ctx.ui.dialogOpen?.()) ctx.ui.advanceDialog?.();
-        else if (active && near()) observe();
-      }
+  function onKeyPress(key, e) {
+    if (
+      e.defaultPrevented ||
+      document.activeElement?.closest('input,textarea,[contenteditable="true"]') ||
+      ctx.overlay.anyOpen()
+    )
+      return;
+    if (key === 'j' && !ctx.ui.dialogOpen?.()) {
+      e.preventDefault();
+      openNotebook();
     }
+    if (key !== 'e') return;
+    if (ctx.ui.dialogOpen?.()) {
+      e.preventDefault();
+      ctx.ui.advanceDialog?.();
+    } else if (active?.preview) {
+      e.preventDefault();
+      panel.querySelector('[data-journey-action="record-view"]')?.click();
+    } else if (active && near()) {
+      e.preventDefault();
+      observe();
+    } else if (activateGoal()) e.preventDefault();
   }
   const api = {
     beginTask,
@@ -445,6 +562,7 @@ export function createJourneySystem({ input }) {
     setPhase,
     transition,
     lookAtGoal,
+    activateGoal,
     phase: () => mission,
     busy: () =>
       !!(
@@ -462,6 +580,7 @@ export function createJourneySystem({ input }) {
             visited: active.visited.slice(),
             minutes: active.minutes,
             feedback: active.feedback,
+            preview: !!active.preview,
           }
         : null,
   };
@@ -495,6 +614,7 @@ export function createJourneySystem({ input }) {
         onClose: () => document.getElementById('gsMenuBtn')?.focus(),
       });
       ctx.ui.journey = api;
+      keySubscriptions = ['e', 'j'].map((key) => input.onKeyPress(key, (e) => onKeyPress(key, e)));
       unsubscribe = eventBus.on('world:changed', ({ to }) => {
         if (active && active.spec.world !== to) cancel(active.owner);
         if (objective && objective.world !== to) objective = null;
@@ -510,7 +630,6 @@ export function createJourneySystem({ input }) {
       window.addEventListener('script:lang', langListener);
     },
     update(dt) {
-      pollKeys();
       acc += dt;
       if (acc < 0.1) return;
       acc = 0;
@@ -528,11 +647,12 @@ export function createJourneySystem({ input }) {
         d.textContent = near()
           ? tt(TEXT.observe) + ' · E'
           : tt(point.label) + ' · ' + Math.round(Math.hypot(p.x - point.x, p.z - point.z)) + ' m';
-      panel.classList.toggle('jt-travel', !!point && !near());
+      panel.classList.toggle('jt-travel', !!point && !near() && !active.preview);
     },
     dispose() {
       cancel();
       unsubscribe?.();
+      keySubscriptions.forEach((unsubscribeKey) => unsubscribeKey());
       window.removeEventListener('script:lang', langListener);
       taskApi.unregister();
       notebookApi.unregister();

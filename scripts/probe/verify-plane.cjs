@@ -14,9 +14,7 @@ const OUT = path.join(__dirname, '..', '..', 'scripts', 'artifacts');
 
 (async () => {
   const b = await launch();
-  const page = await (
-    await b.newContext({ viewport: { width: 1280, height: 800 } })
-  ).newPage();
+  const page = await (await b.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push('PAGEERROR: ' + e.message));
   page.on('console', (m) => {
@@ -33,6 +31,8 @@ const OUT = path.join(__dirname, '..', '..', 'scripts', 'artifacts');
     localStorage.setItem('gender', 'female');
     // 直接落在"已画完羊"的存档,跳过画羊四笔(与本探针无关)
     localStorage.setItem('b612Scene2', '1');
+    localStorage.setItem('b612Page1', '1');
+    localStorage.setItem('b612PlanetChapter', '1'); // 飞行属于完成首次国王章节后的自由探索
   });
 
   const URL = process.env.PROBE_URL || 'http://localhost:5173';
@@ -53,6 +53,16 @@ const OUT = path.join(__dirname, '..', '..', 'scripts', 'artifacts');
     { timeout: WAIT }
   );
   await sleep(2500);
+  await page.waitForFunction(() => window.__ctx.scene.planeApi.debug().modelLoaded, null, {
+    timeout: WAIT,
+  });
+  for (let i = 0; i < 40; i++) {
+    if (!(await page.locator('#gameDialog').isVisible())) break;
+    const choice = page.locator('#gameDialog .gs-choice').first();
+    if (await choice.isVisible()) await choice.click();
+    else await page.locator('#gameDialog').click();
+    await sleep(300);
+  }
 
   const results = [];
   const ok = (name, pass, detail) => {
@@ -116,11 +126,25 @@ const OUT = path.join(__dirname, '..', '..', 'scripts', 'artifacts');
       hasModel: !!window.__ctx.scene.planeApi.debug().modelLoaded,
     };
   });
-  ok('A 真机模型已加载', !!model && model.hasModel, model ? 'modelLoaded=' + model.hasModel : '未找到 piperPA18');
+  ok(
+    'A 真机模型已加载',
+    !!model && model.hasModel,
+    model ? 'modelLoaded=' + model.hasModel : '未找到 piperPA18'
+  );
   if (model) {
     // Piper PA-18 真机:翼展 11.0m / 机长 7.3m。取"最长水平轴"判量级。
     const span = Math.max(model.size.x, model.size.z);
-    ok('B 尺寸接近真机(最长水平轴 6~12m)', span > 6 && span < 12.5, 'span=' + span.toFixed(2) + 'm  (x=' + model.size.x.toFixed(1) + ' z=' + model.size.z.toFixed(1) + ')');
+    ok(
+      'B 尺寸接近真机(最长水平轴 6~12m)',
+      span > 6 && span < 12.5,
+      'span=' +
+        span.toFixed(2) +
+        'm  (x=' +
+        model.size.x.toFixed(1) +
+        ' z=' +
+        model.size.z.toFixed(1) +
+        ')'
+    );
     ok(
       'C 站位在坠机点 (-9,76)',
       Math.abs(model.pos.x - -9) < 1.5 && Math.abs(model.pos.z - 76) < 1.5,
@@ -146,37 +170,49 @@ const OUT = path.join(__dirname, '..', '..', 'scripts', 'artifacts');
       lock: !!window.__ctx.kunlun.flightLock,
     };
   });
-  ok('D 登机成功(flying + HUD + flightLock)', boarded.flying && boarded.hudVisible && boarded.lock, JSON.stringify(boarded));
+  ok(
+    'D 登机成功(flying + HUD + flightLock)',
+    boarded.flying && boarded.hudVisible && boarded.lock,
+    JSON.stringify(boarded)
+  );
   await sleep(1200);
   await page.screenshot({ path: OUT + '/plane-2-cockpit.png' });
 
   // ——— E 物理:加油门 → 加速 ———
   const accel = await page.evaluate(async () => {
     const pf = window.__ctx.scene.planeApi;
-    // 直接推进物理:按住 S(加油门)300 帧
+    // 按住 W 加油门，使用玩家输入推进物理。
     const before = pf.debug().state.speed;
     return { before };
   });
-  await page.keyboard.down('s');
+  await page.keyboard.down('w');
   await sleep(2500);
-  await page.keyboard.up('s');
+  await page.keyboard.up('w');
   const afterAccel = await page.evaluate(() => window.__ctx.scene.planeApi.debug().state.speed);
-  ok('E 加油门加速', afterAccel > accel.before + 2, `${accel.before.toFixed(1)} → ${afterAccel.toFixed(1)} m/s`);
+  ok(
+    'E 加油门加速',
+    afterAccel > accel.before + 2,
+    `${accel.before.toFixed(1)} → ${afterAccel.toFixed(1)} m/s`
+  );
 
   // 拉杆起飞。断言读系统自记的飞行历程(everFlew/maxAltitude),
   // 不靠外部轮询 —— 轮询会漏掉刚离地那几帧,实测过一次假阴性。
   await page.evaluate(() => window.__ctx.scene.planeApi.resetFlight());
   // 滑跑要留足时间:浏览器实测全油门 3.5s 才到 25 m/s(纯物理核 2.6s 到 18.5),
   // 因为沙地有地形起伏与滚动阻力。给 4.5s 再拉杆,确保越过 LIFT_ON=13。
-  await page.keyboard.down('s');
+  await page.keyboard.down('w');
   await sleep(4500);
   const roll = await page.evaluate(() => window.__ctx.scene.planeApi.debug());
-  ok('E 滑跑速度过起飞阈值(>13 m/s)', roll.state.speed > 13, '滑跑末速=' + roll.state.speed.toFixed(1) + ' m/s');
+  ok(
+    'E 滑跑速度过起飞阈值(>13 m/s)',
+    roll.state.speed > 13,
+    '滑跑末速=' + roll.state.speed.toFixed(1) + ' m/s'
+  );
   await page.keyboard.down('ArrowUp'); // 拉杆抬头(ArrowUp = pitchIn -1)
   await sleep(2200);
   await page.keyboard.up('ArrowUp');
   await sleep(1800);
-  await page.keyboard.up('s');
+  await page.keyboard.up('w');
   // ⚠️ 先让飞机再飞一会儿再读:松杆瞬间还在爬升途中,早读会拿到爬升途中的高度
   // (实测读到 2.8m,再等 1.2s 就已是 9.8m —— 数值本身没错,是采样时机不对)。
   await sleep(1400);
@@ -189,7 +225,10 @@ const OUT = path.join(__dirname, '..', '..', 'scripts', 'artifacts');
   await page.screenshot({ path: OUT + '/plane-3-air.png' });
 
   // 三视角
-  for (const [i, name] of [[1, 'cockpit'], [2, 'side']]) {
+  for (const [i, name] of [
+    [1, 'cockpit'],
+    [2, 'side'],
+  ]) {
     await page.evaluate((m) => window.__ctx.scene.planeApi.setCam(m), i);
     await sleep(900);
     await page.screenshot({ path: `${OUT}/plane-4-view-${i}-${name}.png` });
@@ -212,10 +251,7 @@ const OUT = path.join(__dirname, '..', '..', 'scripts', 'artifacts');
   // JSON 路由留下的痕迹)都与本模块无关,不算失败。
   const realErrors = errors.filter(
     (e) =>
-      !/Failed to load resource/.test(e) &&
-      !/MIME type/.test(e) &&
-      !/404/.test(e) &&
-      !/502/.test(e)
+      !/Failed to load resource/.test(e) && !/MIME type/.test(e) && !/404/.test(e) && !/502/.test(e)
   );
   ok('无飞机相关页面异常', realErrors.length === 0, realErrors.slice(0, 3).join(' | ') || '干净');
 

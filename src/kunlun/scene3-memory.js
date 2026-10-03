@@ -12,6 +12,7 @@ import { Z } from '../shared/z-layers.mjs';
 import { ctx } from '../ctx.js';
 import { SCENE3, SCENE4, tt, whoSpk } from '../shared/story-text.mjs';
 import { homeCheckpoint } from '../shared/journey-guidance.mjs';
+import { taskCheckpoint } from '../shared/journey-logic.mjs';
 
 let built = false;
 let arrivalDone = false;
@@ -24,6 +25,7 @@ let interactionBusy = false;
 let visit = 0;
 let memorySun = null;
 let focusedStep = -1;
+let markedVolcanoes = [];
 const OWNER = 'home-memory';
 
 const VOLCANOES = [
@@ -38,6 +40,30 @@ const STEPS = [
   { x: 3.4, z: -2.6, r: 2.2 }, // 1: 面包树苗
   { x: -3.6, z: -0.6, r: 2.2 }, // 2: 小椅子·日落
   { x: 2.46, z: -1.56, r: 2.5 }, // 3: 原模型玫瑰随整场2倍放大
+];
+const STATION_HINTS = [
+  {
+    zh: '两座有烟，一座安静。走近光点，点「听火山的故事」，再找出安静的那座。',
+    en: 'Two smoke; one is quiet. Follow the light, hear their story, then find the quiet one.',
+  },
+  {
+    zh: '小小的芽长大后会很不同。走近幼苗，点「辨认幼苗」，留意花苞与叶片。',
+    en: 'Small sprouts grow very differently. Approach and identify their buds and leaves.',
+  },
+  {
+    zh: '在这颗小星球上，挪动几步就能追上日落。走近椅子，点「追着日落走」。',
+    en: 'A few steps can bring another sunset. Approach the chair and follow the sunset.',
+  },
+  {
+    zh: '她让这颗星球变得不同。走近玫瑰，点「聆听她的告别」，留下你想记住的细节。',
+    en: 'She made this planet special. Approach the rose, hear her farewell and keep a detail.',
+  },
+];
+const STATION_ACTIONS = [
+  { zh: '听火山的故事', en: 'Hear their story' },
+  { zh: '辨认幼苗', en: 'Identify sprouts' },
+  { zh: '追着日落走', en: 'Follow the sunset' },
+  { zh: '聆听她的告别', en: 'Hear her farewell' },
 ];
 
 function world() {
@@ -176,7 +202,14 @@ function build() {
 
 // —— 金色光标 ——
 function placeMarker(x, z, registerGoal = true) {
-  if (registerGoal)
+  if (registerGoal) {
+    ctx.ui.journey?.setPhase(OWNER, {
+      world: 'b612',
+      chapter: { zh: 'B612 · 家的回忆', en: 'B612 · memories of home' },
+      step: curStep + 1,
+      total: 4,
+      hint: STATION_HINTS[curStep],
+    });
     ctx.ui.journey?.setGoal(OWNER, {
       world: 'b612',
       x,
@@ -192,7 +225,13 @@ function placeMarker(x, z, registerGoal = true) {
         ['走近三座火山', '走近面包树苗', '走近看日落的小椅子', '走近玫瑰，听她告别'][
           Math.max(0, curStep)
         ] || '家的回忆',
+      action: STATION_ACTIONS[curStep],
+      onActivate: () => {
+        if (!chainBusy && !interactionBusy && curStep >= 0 && curStep < STEPS.length)
+          doStep(curStep);
+      },
     });
+  }
   if (registerGoal && focusedStep !== curStep) {
     focusedStep = curStep;
     world()?.meta.focusTarget?.(x, z);
@@ -317,6 +356,8 @@ async function arrival() {
     ctx.store.num('homeMemoryStep'),
     ctx.store.json('journeyMemories', [])
   );
+  const resuming =
+    saved > 0 || !!taskCheckpoint(idsForStep(saved), ctx.store.json('journeyTaskCheckpoint', null));
   ctx.ui.journey?.setPhase(OWNER, {
     world: 'b612',
     chapter: { zh: 'B612 · 家的回忆', en: 'B612 · memories of home' },
@@ -327,7 +368,7 @@ async function arrival() {
       en: 'One place at a time. Continue the dialogue, then follow the golden light.',
     },
   });
-  if (!saved) {
+  if (!resuming) {
     const seen = await world()?.meta.showOverview?.();
     if (seen === false || ticket !== visit) return;
   }
@@ -335,20 +376,20 @@ async function arrival() {
     world: 'b612',
     chapter: { zh: '回忆一 · 小王子的家', en: 'Memory I · his home' },
     title: {
-      zh: saved ? '继续家的回忆' : '来到 B612',
-      en: saved ? 'Continue the memory' : 'Arriving on B612',
+      zh: resuming ? '继续家的回忆' : '来到 B612',
+      en: resuming ? 'Continue the memory' : 'Arriving on B612',
     },
     hint: {
       zh: '这是小王子离开以前的家。你是旁观者，过去听不见你。按顺序探索火山、幼苗、日落和玫瑰。',
       en: 'This is his home before he left. The past cannot hear you. Explore the volcanoes, sprouts, sunsets and rose, in order.',
     },
     action: {
-      zh: saved ? '从上次完成的地方继续' : '开始这段回忆',
-      en: saved ? 'Resume the journey' : 'Begin the memory',
+      zh: resuming ? '从上次完成的地方继续' : '开始这段回忆',
+      en: resuming ? 'Resume the journey' : 'Begin the memory',
     },
   });
   if (ready === false || ticket !== visit) return;
-  if (saved) {
+  if (resuming) {
     curStep = saved;
     if (saved < 4) placeMarker(STEPS[saved].x, STEPS[saved].z);
     else checkCompletion();
@@ -407,6 +448,7 @@ async function checkCompletion() {
 
 // —— 各站触发动作 ——
 function doStep(stepIdx) {
+  interactionBusy = true;
   const ticket = visit;
   ctx.ui.journey?.setPhase(OWNER, {
     world: 'b612',
@@ -437,7 +479,12 @@ function doStep(stepIdx) {
   ];
   if (stepIdx >= 0 && stepIdx < seqs.length) {
     if (stepIdx === 2) showDuskVeil(); // 日落站:天幕先烧起来,再数四十四次
-    speakSeq(seqs[stepIdx], 0, function () {
+    const beginObservation = function () {
+      const restored = taskCheckpoint(
+        idsForStep(stepIdx),
+        ctx.store.json('journeyTaskCheckpoint', null)
+      );
+      if (stepIdx === 0 && restored) VOLCANOES.slice(0, restored.step).forEach(markVolcano);
       const next = () => {
         if (ticket !== visit || ctx.scene.activeWorld !== 'b612') return;
         interactionBusy = false;
@@ -445,6 +492,7 @@ function doStep(stepIdx) {
           hideDuskVeil();
           removeMemorySun();
         }
+        clearVolcanoMarks();
         curStep++;
         ctx.store.setNum('homeMemoryStep', curStep);
         if (curStep < STEPS.length) placeMarker(STEPS[curStep].x, STEPS[curStep].z);
@@ -463,14 +511,51 @@ function doStep(stepIdx) {
             if (ticket !== visit) return;
             // 光点随当前观察点移动；玩家改变的是观看位置，不是过去的星球。
             placeMarker(point.x, point.z, false);
+          },
+          onObserve(point, index) {
+            if (ticket !== visit) return;
+            if (stepIdx === 0) markVolcano(point);
             if (stepIdx === 2) showMemorySun(index);
           },
         })
         .then((result) => {
           if (result) next();
         });
-    });
+    };
+    const savedTask = ctx.store.json('journeyTaskCheckpoint', null);
+    if (savedTask?.id === idsForStep(stepIdx) && savedTask.world === 'b612') beginObservation();
+    else speakSeq(seqs[stepIdx], 0, beginObservation);
   }
+}
+function idsForStep(step) {
+  return ['volcano', 'baobab', 'sunset', 'rose'][step];
+}
+function markVolcano(point) {
+  const w = world();
+  if (!w) return;
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.7, 0.8, 24),
+    new THREE.MeshBasicMaterial({
+      color: 0xe8c27a,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.8,
+      depthWrite: false,
+    })
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.set(point.x, w.ground(point.x, point.z) + 0.06, point.z);
+  ring.name = 'homeVolcanoObserved';
+  w.scene.add(ring);
+  markedVolcanoes.push(ring);
+}
+function clearVolcanoMarks() {
+  for (const ring of markedVolcanoes) {
+    ring.parent?.remove(ring);
+    ring.geometry.dispose();
+    ring.material.dispose();
+  }
+  markedVolcanoes = [];
 }
 
 function showMemorySun(index) {
@@ -478,14 +563,27 @@ function showMemorySun(index) {
   if (!sc) return;
   if (!memorySun) {
     memorySun = new THREE.Mesh(
-      new THREE.SphereGeometry(1.15, 20, 12),
-      new THREE.MeshBasicMaterial({ color: 0xf7bd79, transparent: true, opacity: 0.85, fog: false })
+      new THREE.SphereGeometry(0.65, 20, 12),
+      new THREE.MeshBasicMaterial({ color: 0xf7bd79, fog: false })
     );
     memorySun.name = 'homeMemorySun';
     sc.add(memorySun);
   }
-  memorySun.position.set(-12 + index * 1.5, 3.5 - index * 0.8, -5 + index * 4);
+  const pl = ctx.player.pl;
+  memorySun.position.set(-12 + index * 1.5, pl.p.y + 0.15 - index * 0.2, -5 + index * 4);
   memorySun.material.color.set([0xf7bd79, 0xed955b, 0xda6b55][index] || 0xda6b55);
+  pl.y = Math.atan2(-(memorySun.position.x - pl.p.x), -(memorySun.position.z - pl.p.z));
+  pl.pi = Math.max(
+    -0.65,
+    Math.min(
+      0.4,
+      Math.atan2(
+        memorySun.position.y - pl.p.y,
+        Math.hypot(memorySun.position.x - pl.p.x, memorySun.position.z - pl.p.z)
+      )
+    )
+  );
+  if (ctx.player.viewMode === 1 && ctx.player.orbit) ctx.player.orbit.yaw = pl.y;
 }
 function removeMemorySun() {
   if (!memorySun) return;
@@ -506,11 +604,14 @@ ctx.events.on('world:changed', ({ from, to }) => {
   hideMarker();
   hideDuskVeil();
   removeMemorySun();
-  if (curStep < 0) {
+  clearVolcanoMarks();
+  if (!ctx.store.flag('page1')) {
+    curStep = -1;
+    exitStarted = false;
+    focusedStep = -1;
     arrivalDone = false;
     scene3MemoryTickStart = 0;
   }
-  if (curStep >= 4 && !ctx.store.flag('page1')) exitStarted = false;
 });
 
 let scene3MemoryTickStart = 0;
@@ -535,8 +636,6 @@ ctx.onTick(function scene3MemoryTick(dt) {
     build();
     return;
   }
-  const pl = ctx.player.pl;
-
   // 到达演出(1.2s 延迟)
   if (curStep < 0) {
     if (!scene3MemoryTickStart) scene3MemoryTickStart = performance.now();
@@ -551,16 +650,6 @@ ctx.onTick(function scene3MemoryTick(dt) {
   if (curStep >= 4) {
     checkCompletion();
     return;
-  }
-
-  // 顺序引导:检测当前目标站
-  if (curStep >= 0 && curStep < STEPS.length) {
-    const step = STEPS[curStep];
-    const dx = pl.p.x - step.x;
-    const dz = pl.p.z - step.z;
-    if (dx * dx + dz * dz < step.r * step.r) {
-      doStep(curStep);
-    }
   }
 
   // 金色光标呼吸

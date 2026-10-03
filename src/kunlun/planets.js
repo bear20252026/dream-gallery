@@ -301,6 +301,7 @@ function buildIsland(cfg, idx) {
 
   const planetWorld = worldManager.registerWorld('king' + cfg.num, {
     scene: new THREE.Scene(),
+    ground: () => topY,
     meta: { title: cfg.name },
   });
   planetWorld.scene.background = new THREE.Color(0x05050f);

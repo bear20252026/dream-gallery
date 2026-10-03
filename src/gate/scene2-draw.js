@@ -110,8 +110,10 @@ let busy = false;
 if (new URLSearchParams(location.search).has('storyreset')) {
   ctx.store.unmark('scene2');
   ctx.store.unmark('page1');
+  ctx.store.unmark('page2');
   ctx.store.setNum('planetsChapter', 0); // 章节同步归零:325 剧情可重走
   ctx.store.setJson('journeyMemories', []);
+  ctx.store.setJson('journeyTaskCheckpoint', null);
   ctx.store.setNum('homeMemoryStep', 0);
   ctx.store.setNum('kingMemoryStep', 0);
 }

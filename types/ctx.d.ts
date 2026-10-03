@@ -204,18 +204,73 @@ export interface UINamespace {
   dialogOpen: () => boolean;
   cancelDialogScope: (scope: string) => void;
   advanceDialog: () => void;
-  storyTarget: (target: { world: string; x: number; z: number; en: string; zh: string } | null) => void;
+  storyTarget: (
+    target: { world: string; x: number; z: number; en: string; zh: string } | null
+  ) => void;
   journey: {
-    beginTask: (owner: string, id: string, options?: { onTarget?: (point: { x: number; z: number }, index: number) => void }) => Promise<unknown>;
-    setGoal: (owner: string, goal: { world: string; x: number; z: number; en: string; zh: string } | null) => void;
+    beginTask: (
+      owner: string,
+      id: string,
+      options?: {
+        onTarget?: (point: { x: number; z: number }, index: number) => void;
+        onObserve?: (point: { x: number; z: number }, index: number) => void;
+      }
+    ) => Promise<unknown>;
+    setGoal: (
+      owner: string,
+      goal: {
+        world: string;
+        x: number;
+        z: number;
+        en: string;
+        zh: string;
+        action?: { zh: string; en: string };
+        onActivate?: () => void;
+      } | null
+    ) => void;
     clearGoal: (owner: string) => void;
-    setPhase: (owner: string, phase: { world: string; chapter: { zh: string; en: string }; step?: number; total?: number; hint?: { zh: string; en: string }; lock?: boolean }) => void;
-    phase: () => { world: string; chapter: { zh: string; en: string }; step?: number; total?: number; hint?: { zh: string; en: string }; lock?: boolean } | null;
-    transition: (owner: string, value: { world: string; chapter: { zh: string; en: string }; title: { zh: string; en: string }; hint: { zh: string; en: string }; action: { zh: string; en: string } }) => Promise<boolean>;
+    setPhase: (
+      owner: string,
+      phase: {
+        world: string;
+        chapter: { zh: string; en: string };
+        step?: number;
+        total?: number;
+        hint?: { zh: string; en: string };
+        lock?: boolean;
+      } | null
+    ) => void;
+    phase: () => {
+      world: string;
+      chapter: { zh: string; en: string };
+      step?: number;
+      total?: number;
+      hint?: { zh: string; en: string };
+      lock?: boolean;
+    } | null;
+    transition: (
+      owner: string,
+      value: {
+        world: string;
+        chapter: { zh: string; en: string };
+        title: { zh: string; en: string };
+        hint: { zh: string; en: string };
+        action: { zh: string; en: string };
+      }
+    ) => Promise<boolean>;
     lookAtGoal: () => void;
+    activateGoal: () => boolean;
     busy: () => boolean;
     goal: () => { world: string; x: number; z: number; en: string; zh: string } | null;
-    state: () => { id: string; world: string; step: number; visited: number[]; minutes: number; feedback?: { zh: string; en: string } } | null;
+    state: () => {
+      id: string;
+      world: string;
+      step: number;
+      visited: number[];
+      minutes: number;
+      feedback?: { zh: string; en: string };
+      preview?: boolean;
+    } | null;
     remember: (id: string, choice?: number | null, notify?: boolean) => void;
     cancel: (owner?: string) => void;
     openNotebook: () => void;

@@ -238,7 +238,9 @@ function createGameShellSystem() {
       ? tt(currentPhase.chapter) +
         (currentPhase.total ? ' · ' + currentPhase.step + '/' + currentPhase.total : '')
       : tt(JOURNEY_TEXT.action);
-    questEl.querySelector('.q-current').textContent = current;
+    questEl.querySelector('.q-current').textContent = ctx.ui.dialogOpen?.()
+      ? tt({ zh: '聆听这一段 · 点「继续」', en: 'Listen · tap Continue' })
+      : current;
     questEl.querySelector('.q-guidance').textContent = task?.feedback
       ? tt(task.feedback)
       : currentPhase?.hint

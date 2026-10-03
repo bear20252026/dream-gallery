@@ -5,9 +5,26 @@ import {
   memoryWalkPosition as kingWalkPosition,
   homeCheckpoint,
   kingCheckpoint,
+  allowPlaneBoard,
 } from '../shared/journey-guidance.mjs';
 
 describe('一次只推进当前主线', () => {
+  it('飞机不能抢走首次主线、对白、弹层或其他世界的输入', () => {
+    const ready = { world: 'main', chapter: 1, near: true, loaded: true };
+    expect(allowPlaneBoard(ready)).toBe(true);
+    for (const blocked of [
+      { chapter: 0 },
+      { world: 'b612' },
+      { dialog: true },
+      { overlay: true },
+      { journeyBusy: true },
+      { flightLock: true },
+      { near: false },
+      { loaded: false },
+    ]) {
+      expect(allowPlaneBoard({ ...ready, ...blocked })).toBe(false);
+    }
+  });
   it('背景提示不能抢掉锁定的主线，包含主动求助对白', () => {
     expect(allowJourneyDialog({ lock: true }, { lock: false }, 'b612')).toBe(false);
     expect(allowJourneyDialog({ lock: true }, { userInitiated: true }, 'b612')).toBe(false);

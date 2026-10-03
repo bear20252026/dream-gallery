@@ -5,9 +5,32 @@ import {
   nearMemoryPoint,
   isAlmanacTime,
   formatMemoryTime,
+  taskCheckpoint,
 } from '../shared/journey-logic.mjs';
 
 describe('原著旅途交互边界', () => {
+  it('退出再进入仍保留已观察的火山，全部观察后仍须亲自圈选答案', () => {
+    expect(taskCheckpoint('volcano', { id: 'volcano', world: 'b612', step: 2 })).toMatchObject({
+      step: 2,
+      visited: [0, 1],
+    });
+    expect(taskCheckpoint('volcano', { id: 'volcano', world: 'b612', step: 99 })).toMatchObject({
+      step: 3,
+      visited: [0, 1, 2],
+    });
+    expect(taskCheckpoint('volcano', { id: 'rat', world: 'king325', step: 1 })).toBeNull();
+    expect(taskCheckpoint('rat', { id: 'rat', world: 'main', step: 1 })).toBeNull();
+    expect(taskCheckpoint('unknown', {})).toBeNull();
+  });
+  it('未完成的最后一次日落不能因存档直接获得奖励，历书刻度可恢复', () => {
+    expect(taskCheckpoint('sunset', { id: 'sunset', world: 'b612', step: 3 }).step).toBe(2);
+    expect(
+      taskCheckpoint('almanac', { id: 'almanac', world: 'king325', minutes: 1180 }).minutes
+    ).toBe(1180);
+    expect(
+      taskCheckpoint('almanac', { id: 'almanac', world: 'king325', minutes: 'bad' }).minutes
+    ).toBe(1110);
+  });
   it('B612 的家的回忆和国王观察不能跨世界完成', () => {
     const point = { x: 3, z: 4 },
       player = { x: 3, z: 4 };

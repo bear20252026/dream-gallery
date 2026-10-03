@@ -8,30 +8,69 @@ export function allowJourneyDialog(current, incoming, world, busy = false) {
 
 export function guideBearing(player, point) {
   if (!player || !point) return null;
-  const dx = point.x - player.p.x, dz = point.z - player.p.z;
+  const dx = point.x - player.p.x,
+    dz = point.z - player.p.z;
   let angle = Math.atan2(-dx, -dz) - (player.y || 0);
   angle = Math.atan2(Math.sin(angle), Math.cos(angle));
   const distance = Math.hypot(dx, dz);
-  const direction = distance <= 1.8 ? 'arrived' : Math.abs(angle) > 2.35 ? 'behind' :
-    Math.abs(angle) < .3 ? 'forward' : angle > 0 ? 'left' : 'right';
+  const direction =
+    distance <= 1.8
+      ? 'arrived'
+      : Math.abs(angle) > 2.35
+        ? 'behind'
+        : Math.abs(angle) < 0.3
+          ? 'forward'
+          : angle > 0
+            ? 'left'
+            : 'right';
   return { angle, distance, direction };
 }
 
 // 国王舞台的平面行走；B612的高度只由原模型地表决定。
 export function memoryWalkPosition(point) {
   const radius = 12;
-  const r = Math.hypot(point.x, point.z), scale = r > radius ? radius / r : 1;
-  return { x: point.x * scale, y: 13 * .42 + 1.6, z: point.z * scale };
+  const r = Math.hypot(point.x, point.z),
+    scale = r > radius ? radius / r : 1;
+  return { x: point.x * scale, y: 13 * 0.42 + 1.6, z: point.z * scale };
 }
 
 export function homeCheckpoint(value, memories = []) {
-  const ids = new Set(Array.isArray(memories) ? memories.filter(Boolean).map(e => e.id) : []);
+  const ids = new Set(Array.isArray(memories) ? memories.filter(Boolean).map((e) => e.id) : []);
   let completed = 0;
-  for (const id of ['volcano', 'baobab', 'sunset', 'rose']) { if (!ids.has(id)) break; completed++; }
+  for (const id of ['volcano', 'baobab', 'sunset', 'rose']) {
+    if (!ids.has(id)) break;
+    completed++;
+  }
   return Math.max(completed, Math.min(4, Math.max(0, Math.floor(Number(value) || 0))));
 }
 
 export function kingCheckpoint(value, memories = []) {
-  const ids = new Set(Array.isArray(memories) ? memories.filter(Boolean).map(e => e.id) : []);
-  return Math.max(ids.has('rat') ? 4 : ids.has('almanac') ? 2 : 0, Math.min(5, Math.max(0, Math.floor(Number(value) || 0))));
+  const ids = new Set(Array.isArray(memories) ? memories.filter(Boolean).map((e) => e.id) : []);
+  return Math.max(
+    ids.has('rat') ? 4 : ids.has('almanac') ? 2 : 0,
+    Math.min(5, Math.max(0, Math.floor(Number(value) || 0)))
+  );
+}
+
+// 飞行是首次拜访国王之后的自由探索，不能接管对白、画纸或其他飞行。
+export function allowPlaneBoard({
+  world,
+  chapter,
+  dialog,
+  overlay,
+  journeyBusy,
+  flightLock,
+  near,
+  loaded,
+}) {
+  return (
+    world === 'main' &&
+    chapter >= 1 &&
+    near &&
+    loaded &&
+    !dialog &&
+    !overlay &&
+    !journeyBusy &&
+    !flightLock
+  );
 }

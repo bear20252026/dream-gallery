@@ -144,7 +144,10 @@ function buildBox() {
 // —— 石门夜光(呼吸脉动) ——
 function armGateGlow() {
   if (ctx.scene.activeWorld !== 'main') return;
-  if (gateGlow) return;
+  if (gateGlow) {
+    guideGate();
+    return;
+  }
   gateGlow = new THREE.PointLight(0xffd9a0, 0.4, 14);
   gateGlow.position.set(GATE_X, ground(GATE_X, GATE_Z) + 2.2, GATE_Z);
   ctx.scene.s.add(gateGlow);
@@ -167,6 +170,9 @@ function armGateGlow() {
     arrowGate = spawnFloatArrow(ctx.scene.s, GATE_X, gateBeacon.position.y + 1.7 + 0.9, GATE_Z, {
       name: 'guideArrowGate',
     });
+  guideGate();
+}
+function guideGate() {
   phase({
     zh: '羊箱的声音让石门亮起。走向门光，进入小王子的家的回忆。',
     en: 'The counting has lit the stone gate. Follow its light into memories of his home.',
@@ -184,7 +190,10 @@ function armGateGlow() {
 // 同一扇石门现在通 B612 —— 信标复立 + toast 直说,进门即撤(portal 传送后由 tick 收走)
 function armB612() {
   if (ctx.scene.activeWorld !== 'main') return;
-  if (b612Beacon) return;
+  if (b612Beacon) {
+    guideB612();
+    return;
+  }
   // 石门现身(2026-09-27 按剧情出场):同一扇门现在通 B612,先现身再指
   try {
     ctx.kunlun.revealStarGate && ctx.kunlun.revealStarGate();
@@ -196,6 +205,9 @@ function armB612() {
     arrowB612 = spawnFloatArrow(ctx.scene.s, GATE_X, b612Beacon.position.y + 1.7 + 0.9, GATE_Z, {
       name: 'guideArrowB612',
     });
+  guideB612();
+}
+function guideB612() {
   phase({
     zh: '家的回忆已经结束。这次穿过同一扇门，在 B612 选择前往国王星，继续小王子的旅途。',
     en: 'Memories of home are complete. Cross the same gate, then choose the King on B612 to continue his journey.',
@@ -252,6 +264,10 @@ let wd = null;
 // 画板未收束就转夜,计数对话会打断羊初声(时序竞态,2026-09-07 修复)
 ctx.events.on('story:scene2done', armNight);
 ctx.events.on('world:changed', ({ from, to }) => {
+  if (to === 'main' && from !== 'main' && armed) {
+    if (ctx.store.flag('page1') && page1Shown) armB612();
+    else if (!ctx.store.flag('page1') && countingShown) armGateGlow();
+  }
   if (from !== 'main' || to === 'main') return;
   visit++;
   clearTimeout(wd);
