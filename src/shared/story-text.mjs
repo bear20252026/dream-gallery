@@ -11,10 +11,25 @@ export function setScriptLang(l) {
 export function scriptLang() {
   return _lang;
 }
+// 已显示文本 → 原双语条目(2026-10-03 测试反馈:「切到中文,按钮变了台词没变」)。
+// 场景代码打开对话时传的是 tt() 之后的字符串,对话框不知道原条目;记下来,
+// 切换语言时对话框/排队中的台词就能就地换成另一种语言(retranslate)。
+const _shown = new Map();
 // 取当前语言文本(单语显示,不堆叠)
 export function tt(entry) {
   if (!entry) return '';
-  return entry[_lang] ?? entry.en ?? entry.zh ?? String(entry);
+  const s = entry[_lang] ?? entry.en ?? entry.zh ?? String(entry);
+  if (typeof entry === 'object' && typeof s === 'string' && s) {
+    if (_shown.size > 20000) _shown.clear(); // 封顶(正常游玩远到不了)
+    _shown.set(s, entry);
+  }
+  return s;
+}
+/** 把一段已经显示过的文本换成当前语言;不是来自 tt() 的文本原样返回 */
+export function retranslate(text) {
+  if (typeof text !== 'string') return text;
+  const entry = _shown.get(text);
+  return entry ? tt(entry) : text;
 }
 
 // 开场电影字幕(2026-09-07 对稿《中文文学译本》S1;英文照 Woods 译)

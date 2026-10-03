@@ -2,6 +2,11 @@
 // 守三条:①tt 双语切换语义;②whoSpk 说话人视觉类型映射;③数据完整性(全表双语、who 带 spk)。
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
+  tt as _tt,
+  setScriptLang as _setLang,
+  retranslate as _retranslate,
+} from '../shared/story-text.mjs';
+import {
   setScriptLang,
   scriptLang,
   tt,
@@ -193,5 +198,24 @@ describe('狐狸站台词 SCENE_FOX 逐字核对(原著 Ch.21 / 剧本定稿第1
     // king=en-GB-RyanNeural,fox=en-US-RogerNeural —— 不同音色,且二者永不同屏
     expect(SCENE_FOX.who.fox.spk).not.toBe('en-GB-RyanNeural');
     expect(SCENE_FOX.who.fox.spk).toBe('en-US-RogerNeural');
+  });
+});
+
+// 2026-10-03 测试反馈:切到中文时按钮变了、正在显示的台词没变。
+// 对话框靠 retranslate 把已显示的 tt() 文本就地换成另一种语言。
+describe('切换语言时已显示的台词能换成另一种语言', () => {
+  it('tt() 显示过的英文,切到中文后 retranslate 得到中文;再切回得到英文', () => {
+    _setLang('en');
+    const entry = { en: 'Draw me a sheep!', zh: '给我画一只羊！' };
+    const shown = _tt(entry);
+    expect(shown).toBe('Draw me a sheep!');
+    _setLang('zh');
+    expect(_retranslate(shown)).toBe('给我画一只羊！');
+    _setLang('en');
+    expect(_retranslate('给我画一只羊！')).toBe('Draw me a sheep!');
+  });
+  it('不是来自 tt() 的文本原样返回', () => {
+    expect(_retranslate('B612')).toBe('B612');
+    expect(_retranslate(undefined)).toBe(undefined);
   });
 });

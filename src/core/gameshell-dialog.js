@@ -13,7 +13,7 @@ import {
   onVoiceEnd,
 } from './dialog-voice.mjs';
 import { dwellFor } from '../shared/typing-rhythm.mjs';
-import { tt, GLOBAL } from '../shared/story-text.mjs';
+import { tt, GLOBAL, retranslate } from '../shared/story-text.mjs';
 import { allowJourneyDialog } from '../shared/journey-guidance.mjs';
 
 export function createDialogSystem({ getWorld = () => 'main', isStoryBusy = () => false } = {}) {
@@ -26,6 +26,27 @@ export function createDialogSystem({ getWorld = () => 'main', isStoryBusy = () =
   function attach(element) {
     dialogEl = element;
     installMuteBtn(element); // 台词朗读开关(会话级,sessionStorage)
+    window.addEventListener('script:lang', onLangChange);
+  }
+  // 切换语言(2026-10-03 测试反馈):此前只有按钮/任务册跟着换,正在显示的台词和排队中的台词
+  // 仍是旧语言 —— 场景代码开对话时已把文本 tt() 成字符串。现在就地换成另一种语言并重新显示
+  // (重新打字 + 用新语言朗读);来自 tt() 以外的硬编码文本保持原样。
+  function relang(o) {
+    if (!o) return;
+    if (Array.isArray(o.lines)) o.lines = o.lines.map(retranslate);
+    else if (typeof o.lines === 'string') o.lines = retranslate(o.lines);
+    o.speaker = retranslate(o.speaker);
+    if (o.choices) o.choices = o.choices.map((c) => ({ ...c, label: retranslate(c.label) }));
+  }
+  function onLangChange() {
+    lockQueue.forEach(relang);
+    if (!dlg || !dialogEl) return;
+    const before = dlg.lines.join('\n') + '|' + dlg.speaker;
+    relang(dlg);
+    if (dlg.lines.join('\n') + '|' + dlg.speaker === before) return;
+    clearTimeout(dlg.typeTimer);
+    clearTimeout(dlg.hideTimer);
+    renderDialog();
   }
   function el(id) {
     return document.getElementById(id);

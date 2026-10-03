@@ -278,8 +278,11 @@ function buildDom() {
   stageEl.id = 'endStage';
   document.body.appendChild(stageEl);
 }
+let actionLabel = null; // 当前行动卡的双语条目(切换语言时就地换字)
+let stageEntry = null; // 尾声当前字幕的双语条目
 function showAction(label, fn) {
   actionFn = fn;
+  actionLabel = label;
   const b = actionEl.querySelector('button');
   const t = tt(label);
   if (b.textContent !== t) b.textContent = t;
@@ -898,6 +901,7 @@ function stageCaption(entry, opts = {}) {
   return new Promise((resolve) => {
     const cap = stageEl.querySelector('.cap');
     const other = (e) => (tt(e) === e.en ? e.zh : e.en);
+    stageEntry = entry;
     cap.innerHTML = `${opts.kick ? `<div class="kick">${esc(tt(opts.kick))}</div>` : ''}${
       opts.sketch ? `<div class="sk">${sketchSvg(opts.sketch)}</div>` : ''
     }<div class="txt">${esc(tt(entry))}</div><div class="txt2">${esc(other(entry) || '')}</div><div class="btns"></div>`;
@@ -1140,6 +1144,21 @@ export function createEndingJourney() {
         ? ctx.scene.worldManager.getWorld('main').scene
         : ctx.scene.s;
       buildDom();
+      // 切换语言:行动卡与尾声字幕就地换成另一种语言(2026-10-03 测试反馈)
+      const onLang = () => {
+        if (actionFn && actionLabel) actionEl.querySelector('button').textContent = tt(actionLabel);
+        const cap = stageEl && stageEl.querySelector('.cap');
+        if (cap && stageEntry && cap.querySelector('.txt')) {
+          cap.querySelector('.txt').textContent = tt(stageEntry);
+          const o = tt(stageEntry) === stageEntry.en ? stageEntry.zh : stageEntry.en;
+          if (cap.querySelector('.txt2')) cap.querySelector('.txt2').textContent = o || '';
+        }
+        const hint = stageEl && stageEl.querySelector('.hint');
+        if (hint && hint.textContent)
+          hint.textContent = tt({ en: 'tap to continue', zh: '点击继续' });
+      };
+      window.addEventListener('script:lang', onLang);
+      unsub.push(() => window.removeEventListener('script:lang', onLang));
       step = readStep();
       if (step >= ENDING.DONE) mode = 'done';
       // E = 当前行动(捕获阶段先拿到,避免同一下 E 又去登机/开别的面板)
