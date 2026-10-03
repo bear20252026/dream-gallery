@@ -1,6 +1,7 @@
 // music-canvas.js — 2D 音乐演奏器(棕色地板表面,触碰发声,五声音阶)
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
+import { tt } from '../../shared/story-text.mjs';
 // 惰性读取:scene.js 已在 main.js 第 6 行执行完毕,vault 已填充;
 // 不做顶层解构,在函数体内读 ctx.scene.*,防御打包器重排。
 
@@ -229,7 +230,10 @@ function onMusicClick(cx, cy, isStart) {
     mxTouches.set(cx + '_' + cy, id);
     if (!onMusicClick.greeted) {
       onMusicClick.greeted = true;
-      ctx.ui.modeToast && ctx.ui.modeToast('B612 会唱歌。你听到了吗？');
+      ctx.ui.modeToast &&
+        ctx.ui.modeToast(
+          tt({ en: 'B612 can sing. Can you hear it?', zh: 'B612 会唱歌。你听到了吗？' })
+        );
     }
     return id;
   } else {

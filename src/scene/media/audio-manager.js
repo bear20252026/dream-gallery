@@ -3,6 +3,9 @@ import { ctx } from '../../ctx.js';
 import { onMediaChanged } from '../../media-push.js'; // 服务端主动推送:后台增删音乐即刷新(2026-08-29)
 import { avAllowed } from '../../core/av-switch.js'; // 全站音视频总闸(2026-09-26):默认全静,?av=1 恢复
 import { ttsUrl, warmBlob } from '../../core/dialog-voice.mjs'; // 台词音频缓存键三级路径(2026-09-28)
+import { i18nText } from '../../ui/i18n-dom.js'; // 界面文字中英切换(2026-10-03 英文为默认)
+import { legacyOn } from '../../shared/legacy.mjs'; // 旧随机背景乐只在 legacy 下绑定
+const MUSIC_ON = { en: 'Music playing', zh: '音乐播放中' };
 // 惰性读取 aB:scene.js 在 main.js 第 6 行已执行,vault['aB'] 已填充;
 // 不做顶层解构,直接在事件回调里读 ctx.scene.aB,防御打包器重排。
 
@@ -10,7 +13,10 @@ import { ttsUrl, warmBlob } from '../../core/dialog-voice.mjs'; // 台词音频�
 const skyNote = document.createElement('div');
 skyNote.id = 'skyNote';
 skyNote.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui) // 多世界切割:主世界专属语录,切世界由 scene-manager 统一隐藏
-skyNote.textContent = 'B612 在这里等你。你来了，星星就亮了。';
+i18nText(skyNote, {
+  en: 'B612 is waiting for you. You came, and the stars lit up.',
+  zh: 'B612 在这里等你。你来了，星星就亮了。',
+});
 skyNote.style.cssText =
   'position:fixed;right:12px;bottom:12px;z-index:15;color:rgba(255,200,220,0.35);font-size:10px;letter-spacing:2px;pointer-events:none;font-family:inherit';
 document.body.appendChild(skyNote);
@@ -141,7 +147,10 @@ function ensureMusic() {
     else if (d) refreshMusicList(); // 增删 photos/videos 不影响音乐,但保底刷新一次无妨
   });
 }
+// 2026-10-03:右下「音乐」钮由 ui/story-music.js 接管(按章节的剧情配乐 + 开/关);
+// 旧的随机轮播只在 ?legacy=1 时绑定。
 setTimeout(function () {
+  if (!legacyOn()) return;
   ctx.scene.aB.addEventListener('click', () => {
     if (!avAllowed()) return; // 总闸关闭:音乐按钮不动声
     ensureMusic();
@@ -150,7 +159,7 @@ setTimeout(function () {
       mA.play()
         .then(() => {
           mOn = true;
-          _aB.textContent = '音乐播放中';
+          i18nText(_aB, MUSIC_ON);
           _aB.classList.add('p');
         })
         .catch((e) => {
@@ -163,11 +172,11 @@ setTimeout(function () {
     } else {
       if (mA.paused) {
         mA.play();
-        _aB.textContent = '音乐播放中';
+        i18nText(_aB, MUSIC_ON);
         _aB.classList.add('p');
       } else {
         mA.pause();
-        _aB.textContent = '音乐已暂停';
+        i18nText(_aB, { en: 'Music paused', zh: '音乐已暂停' });
         _aB.classList.remove('p');
       }
     }

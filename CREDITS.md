@@ -14,6 +14,19 @@
 | 本地文件 | `models/hall/wedding-arch.glb`（约 8.4 MB） |
 | 处理 | 原始 3ds Max 源文件经 Blender 转换为 GLB，贴图降采样至 1024，去 ortho 相机/灯光；游戏内按 36/27.6 等比缩放并三段实例化沿 z 覆盖全馆 |
 
+## 背景音乐(2026-10-03)
+
+主人提供五首曲目作为剧情配乐,版权事宜由主人自行负责(主人原话:「版权问题我自己处理」)。
+文件在 `public/music/story/`(响度统一到 -18 LUFS、112 kbps MP3),编排见 `src/shared/story-music-logic.mjs`。
+
+| 曲目 | 作者 / 出处 | 用在哪里 |
+| --- | --- | --- |
+| Turnaround | Hans Zimmer & Camille ·《The Little Prince (Original Motion Picture Soundtrack)》 | 闸门、开场电影、坠机与画羊、羊箱之夜 |
+| Our Corner of the Universe | K.S. Rhoads | B612 · 他的家 |
+| Equation | Hans Zimmer & Camille ·《The Little Prince (Original Motion Picture Soundtrack)》 | 国王 / 虚荣 / 酒鬼的星球 |
+| Salvation (Remix) | Gabrielle Aplin & HEYHEY | 回到沙漠自由走、开飞机 |
+| Somewhere Only We Know | Keane | 画册页、告别、六年后(找井那段静音) |
+
 依 CC BY 4.0 要求，此处署名：
 
 > **modern luxury wedding arch house building design** 模型版权归 **zigurat architecture studio** 所有，

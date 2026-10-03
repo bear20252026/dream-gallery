@@ -1,13 +1,19 @@
 // painting-zoom.js — 画框飞入放大/缩回复位交互(2026-09-20 自 paintings.js 拆分,审计「大文件拆分」)
 // 内聚状态:oFog(进入放大时的原雾密度)由本模块私有。
 import { ctx } from '../ctx.js';
+import { tt } from '../shared/story-text.mjs';
 
 let oFog = null;
 // 依赖注入(父模块 paintings.js 装配期调用 initPaintingZoom 传入;2026-09-20 拆分)
 let s, cam, lerp, THREE, captionAllowed, showAI, hideAI;
 export function initPaintingZoom(d) {
-  s = d.s; cam = d.cam; lerp = d.lerp; THREE = d.THREE;
-  captionAllowed = d.captionAllowed; showAI = d.showAI; hideAI = d.hideAI;
+  s = d.s;
+  cam = d.cam;
+  lerp = d.lerp;
+  THREE = d.THREE;
+  captionAllowed = d.captionAllowed;
+  showAI = d.showAI;
+  hideAI = d.hideAI;
 }
 
 // 画框飞入放大
@@ -98,7 +104,8 @@ export function zoomOut(cg, instant) {
     if (Date.now() - d.gazeT0 >= 3000) {
       const n = ctx.store.num('gaze') + 1;
       ctx.store.setNum('gaze', n);
-      ctx.ui.modeToast && ctx.ui.modeToast('这一眼，B612记住了。');
+      ctx.ui.modeToast &&
+        ctx.ui.modeToast(tt({ en: 'B612 will remember this look.', zh: '这一眼，B612记住了。' }));
     }
     d.gazeT0 = null;
   }

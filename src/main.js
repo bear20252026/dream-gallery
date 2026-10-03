@@ -43,7 +43,8 @@ import { GLOBAL, tt } from './shared/story-text.mjs'; // 剧本台词/全局文�
 import { applySavedLang, makeLangToggle } from './ui/lang-toggle.js'; // 剧情语言切换(en/zh,单位置切换
 import { showWorldLoadError } from './ui/world-err.js'; // 世界启动失败兜底 UI(2026-09-18 外迁)
 import { showGuideCard } from './gate/guide-card.js'; // 初见指引卡(2026-09-18 外迁)
-import { startAgreementMusic, stopAgreementMusic } from './ui/agreement-music.js'; // 协议配乐(2026-09-18 外迁)
+import { stopAgreementMusic } from './ui/agreement-music.js'; // 协议配乐(2026-09-18 外迁;2026-10-03 起由剧情音乐取代,只保留停止)
+import { startStoryMusic, createStoryMusic } from './ui/story-music.js'; // 剧情背景音乐(2026-10-03 主人提供五首)
 import { paperReveal } from './ui/reveal.js'; // 纸色揭幕(2026-09-18 外迁)
 import { startBigscreenWhenReady } from './ui/bigscreen-boot.js'; // 大屏轮播延迟启动(零重依赖,2026-09-18 外迁)
 import { setupAgreementSwipe, spawnAgreementPages } from './gate/agreement-swipe.js'; // 三协议并列铺开(P1-1,只读不写)
@@ -61,7 +62,9 @@ setLoop(loopManager); // 注入唯一主循环 facade(新积木经 deps.loop 获
 
 // 早按存档载入剧情语言(双语可切换)
 const _sl = applySavedLang();
+import { bindStaticDom } from './ui/i18n-dom.js'; // 界面固定文字中英切换(2026-10-03)
 document.body.dataset.scriptLang = _sl;
+bindStaticDom(); // 界面固定文字跟随语言(英文为默认,2026-10-03)
 // 主世界常驻语言切换钮:同一位置只显示当前语言标签(EN/中文)
 {
   const tb = makeLangToggle({ placement: 'top:22px;right:132px', z: Z.menuBtn });
@@ -192,6 +195,7 @@ async function preloadWorld() {
     compositionRoot.register(createControlsLesson());
     compositionRoot.register(createPortfolio());
     compositionRoot.register(createChapterMap());
+    compositionRoot.register(createStoryMusic());
     // 可驾驶 Piper PA-18(2026-10-03):坠机点旁的真飞机。物理核 src/scene/plane-physics.mjs(26 项单测),
     // 本系统只管 3D 姿态/输入/相机/HUD。玩家冻结走 gs.flightLock 既有通道(与飞舟同一条)。
     compositionRoot.register(createPlaneFlight({ input: journeyInput }));
@@ -315,7 +319,7 @@ import('./gate/entrygate.js')
     m.setupEntryGate({
       onGateReady: function () {},
       onEnter: function () {
-        startAgreementMusic();
+        startStoryMusic(); // ENTER 手势里起播开场曲 Turnaround
         bootState.markGatePassed();
         preloadWorld().catch(function () {}); // 电影期间后台预加载世界模块(只加载不渲染);失败由 startWorld 的 await 统一上报
       },

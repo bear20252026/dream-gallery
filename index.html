@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta
@@ -47,7 +47,7 @@
       })();
     </script>
   </head>
-  <body>
+  <body data-script-lang="en">
     <!-- 无障碍:跳过链接(P3-4) -->
     <a href="#c" class="skip-link" aria-label="跳过导航，直接进入画廊">跳到画廊</a>
     <!-- 内嵌面板:白板/音乐等分支页面,关闭即返回画廊 -->
@@ -228,7 +228,10 @@
           beacon(msg, url, line);
           console.error('ERR:', msg, err);
           // 2026-08-31 审计 H4:错误细节只走 beacon 上报;页面仅通用文案且用 textContent 防 DOM XSS
-          document.getElementById('l').textContent = '加载出错,请刷新重试;问题已自动上报';
+          document.getElementById('l').textContent =
+            localStorage.getItem('scriptLang') === 'zh'
+              ? '加载出错,请刷新重试;问题已自动上报'
+              : 'Something went wrong while loading. Please refresh — the problem has been reported.';
         };
         window.addEventListener('unhandledrejection', function (e) {
           beacon(
@@ -237,7 +240,10 @@
             0
           );
           console.error('PROMISE ERR:', e.reason);
-          document.getElementById('l').textContent = '加载出错,请刷新重试;问题已自动上报';
+          document.getElementById('l').textContent =
+            localStorage.getItem('scriptLang') === 'zh'
+              ? '加载出错,请刷新重试;问题已自动上报'
+              : 'Something went wrong while loading. Please refresh — the problem has been reported.';
         });
       })();
     </script>

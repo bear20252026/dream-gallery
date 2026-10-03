@@ -119,7 +119,7 @@ export function createDialogSystem({ getWorld = () => 'main', isStoryBusy = () =
           // 白屏静默像坏了 —— 亮「加载中」提示,首次出声即熄(玩家知道在等什么)
           const hintEl = dialogEl.querySelector('.gs-hint');
           if (hintEl && !isVoiceStarted()) {
-            hintEl.textContent = '(♪ 语音加载中…)';
+            hintEl.textContent = tt({ en: '(♪ voice loading…)', zh: '(♪ 语音加载中…)' });
             hintEl.style.display = 'block';
             onVoiceStart(() => {
               if (dlg !== current) return;
@@ -141,7 +141,10 @@ export function createDialogSystem({ getWorld = () => 'main', isStoryBusy = () =
             // 静音状态下提醒一次:防止主人误点过静音钮而不自知(2026-09-26 主人报台词无声)
             const hintEl = dialogEl.querySelector('.gs-hint');
             if (hintEl) {
-              hintEl.textContent = '(台词朗读已静音 — 点右上角 🔇 可恢复)';
+              hintEl.textContent = tt({
+                en: '(Voice is muted — tap 🔇 at the top right to turn it on)',
+                zh: '(台词朗读已静音 — 点右上角 🔇 可恢复)',
+              });
               hintEl.style.display = 'block';
             }
           }

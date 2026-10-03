@@ -91,6 +91,8 @@ const SCHEMA = {
   controlsLesson: { key: 'b612ControlsLesson', type: 'flag' },
   // 作品集:玩家在画板上亲手描的四幅画(shared/portfolio-logic.mjs 清洗,{boa,sheep-sick,ram,box})
   portfolio: { key: 'b612Portfolio', type: 'json' },
+  // 玩家关掉了剧情背景音乐(右下「音乐」钮;ui/story-music.js)
+  musicOff: { key: 'b612MusicOff', type: 'flag' },
 };
 function entry(name) {
   const e = SCHEMA[name];

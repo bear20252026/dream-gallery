@@ -206,6 +206,11 @@ export interface UINamespace {
   advanceDialog: () => void;
   portfolio: { open: () => void; count: () => number } | null;
   chapterMap: { open: () => void } | null;
+  storyMusic: {
+    now: () => string | null;
+    cue: () => string | null;
+    debug: () => { paused: boolean; volume: number; t: number } | null;
+  } | null;
   storyTarget: (
     target: { world: string; x: number; z: number; en: string; zh: string } | null
   ) => void;

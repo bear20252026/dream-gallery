@@ -28,6 +28,7 @@ import {
 import { clampChapter, advanceChapter, decorateSpiritsState } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死;2026-09-27 加 storyNext 下一步权威)
 import { ENDING_GATE_CHAPTER } from '../shared/ending-logic.mjs'; // 结局线门槛(327 完成)
 import { tt } from '../shared/story-text.mjs';
+import { legacyOn } from '../shared/legacy.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js'; // 剧情浮光指引(2026-09-28)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
@@ -381,7 +382,9 @@ gargMain.loop = true;
 let gargStarted = false;
 ctx.scene.worldChanged &&
   ctx.scene.worldChanged(function (d) {
-    if (d && d.to === 'b612') {
+    // 2026-10-03:B612 的配乐改由 ui/story-music.js 按章节编排(Our Corner of the Universe),
+    // GARGANTUA 不再自动播放(两层音乐会叠在一起)。保留下面的代码,legacy 模式下仍可用。
+    if (d && d.to === 'b612' && legacyOn()) {
       if (!gargStarted) {
         gargStarted = true;
         if (avAllowed()) {
@@ -733,13 +736,20 @@ document.body.appendChild(worldNav);
 function navGuard(fn) {
   return function () {
     if (worldManager.transitioning) {
-      if (ctx.ui.modeToast) ctx.ui.modeToast('世界切换中，请稍候…');
+      if (ctx.ui.modeToast)
+        ctx.ui.modeToast(tt({ en: 'Travelling — one moment…', zh: '世界切换中，请稍候…' }));
       return;
     }
     const r = fn();
     if (r && typeof r.then === 'function')
       r.then(function (ok) {
-        if (ok === false && ctx.ui.modeToast) ctx.ui.modeToast('现在无法切换世界，稍后再试');
+        if (ok === false && ctx.ui.modeToast)
+          ctx.ui.modeToast(
+            tt({
+              en: 'Can’t travel right now — try again in a moment',
+              zh: '现在无法切换世界，稍后再试',
+            })
+          );
       });
   };
 }

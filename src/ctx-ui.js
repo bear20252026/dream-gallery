@@ -29,6 +29,7 @@ export function createUINamespace(vault) {
     // 2026-10-03:作品集(ui/portfolio.js)与章节地图(ui/chapter-map.js)的打开入口
     'portfolio',
     'chapterMap',
+    'storyMusic',
   ];
   const proxy = {};
 

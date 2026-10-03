@@ -13,6 +13,8 @@ import { defineSystem } from './system.js';
 import { createDialogSystem } from './gameshell-dialog.js'; // 对话框状态机(B5 外迁)
 import { readPages, storyBeat, storyNext, PAGES_TOTAL } from '../shared/story-progress.mjs'; // 书页映射+进程节拍单一权威(2026-09-24 抽出;2026-09-26 加 storyBeat;2026-09-27 加 storyNext;2026-10-03 改用 readPages 单一真相 + PAGES_TOTAL 作分母)
 import { JOURNEY_TEXT, TASKS } from '../shared/journey-logic.mjs';
+import { legacyOn } from '../shared/legacy.mjs';
+import { i18nAttr } from '../ui/i18n-dom.js'; // 界面文字中英切换(2026-10-03 英文为默认)
 
 // ---------- 手绘样式(一次性注入,羊皮纸 + 抖边 + 楷体笔触) ----------
 const STYLE = `
@@ -206,8 +208,9 @@ function createGameShellSystem() {
     }
     let main;
     if (spirits < 6) main = tt(GLOBAL.questMain);
-    else if (picks < 1) main = '在永恒展厅挂上你的画';
-    else main = 'B612 已亮，慢慢逛';
+    else if (picks < 1)
+      main = tt({ en: 'Hang your drawing in the eternal hall', zh: '在永恒展厅挂上你的画' });
+    else main = tt({ en: 'B612 is lit — wander slowly', zh: 'B612 已亮，慢慢逛' });
     const beat = storyBeat({
       scene2: !!ctx.store.flag('scene2'),
       page1: !!ctx.store.flag('page1'),
@@ -270,7 +273,8 @@ function createGameShellSystem() {
       [tt({ zh: '下一步', en: 'Next' }), current, 1],
       [tt({ zh: '书页', en: 'Pages' }), p.pages + ' / ' + PAGES_TOTAL, 0],
       [tt({ zh: '星屑', en: 'Stardust' }), p.spirits + ' / 6', 0],
-      [tt({ zh: '展厅挂画', en: 'Gallery' }), p.picks + ' / 20', 0],
+      // 展厅挂画属于搁置的旧玩法(2026-10-03):只在 ?legacy=1 时显示
+      ...(legacyOn() ? [[tt({ zh: '展厅挂画', en: 'Gallery' }), p.picks + ' / 20', 0]] : []),
     ];
     questEl.querySelector('.q-rows').innerHTML = rows
       .map(
@@ -376,8 +380,8 @@ function createGameShellSystem() {
         <div class="gs-name">B612</div>
         <div class="gs-text"></div>
         <div class="gs-choices"></div>
-        <div class="gs-hint">▷ 点击继续</div>
-        <button type="button" class="gs-next">继续 →</button>`;
+        <div class="gs-hint">▷ Tap to continue</div>
+        <button type="button" class="gs-next">Continue →</button>`;
       dialogEl.addEventListener('click', dialogApi.advance);
       dialogEl.querySelector('.gs-next').onclick = (e) => {
         e.stopPropagation();
@@ -389,15 +393,20 @@ function createGameShellSystem() {
       questEl = document.createElement('div');
       questEl.id = 'questHud';
       questEl.innerHTML = `
-        <button id="questFold" type="button" aria-label="收起/展开任务册" title="收起/展开">－</button>
-        <div class="q-title">任 务 册</div>
-        <div class="q-main">◈ 收集六颗星屑</div>
+        <button id="questFold" type="button" aria-label="Fold / unfold the story card" title="Fold / unfold">－</button>
+        <div class="q-title">Story</div>
+        <div class="q-main"></div>
         <div class="q-current"></div>
         <div class="q-guidance"></div>
         <div class="q-rows"></div>`;
       document.body.appendChild(questEl);
       // 收纳(2026-09-20 UI 清理):折叠成小签,偏好入 store
       const qFoldBtn = questEl.querySelector('#questFold');
+      i18nAttr(qFoldBtn, 'aria-label', {
+        en: 'Fold / unfold the story card',
+        zh: '收起/展开任务册',
+      });
+      i18nAttr(qFoldBtn, 'title', { en: 'Fold / unfold', zh: '收起/展开' });
       const applyFold = function (folded) {
         questEl.classList.toggle('folded', !!folded);
         qFoldBtn.textContent = folded ? '＋' : '－';
@@ -424,11 +433,11 @@ function createGameShellSystem() {
 
       menuBtn = document.createElement('button');
       menuBtn.type = 'button';
-      menuBtn.setAttribute('aria-label', '菜单 / Menu');
       menuBtn.id = 'gsMenuBtn';
       menuBtn.innerHTML =
-        '<span class="mb-icon" aria-hidden="true">☰</span><span class="mb-label">菜单</span>';
-      menuBtn.title = '菜单 / Menu';
+        '<span class="mb-icon" aria-hidden="true">☰</span><span class="mb-label">Menu</span>';
+      i18nAttr(menuBtn, 'title', { en: 'Menu', zh: '菜单' });
+      i18nAttr(menuBtn, 'aria-label', { en: 'Menu', zh: '菜单' });
       menuBtn.onclick = () => {
         menuApi ? menuApi.open() : null;
       };

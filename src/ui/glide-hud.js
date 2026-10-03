@@ -2,6 +2,7 @@
 // 纯表现层:DOM 创建与样式;物理状态经回调回传 player.js,能量经 update(pl) 每帧刷新。
 // 2026-09-06 主人定:新增 ▼ 下降按钮——小世界太空模式此前只有 ▲ 能升不能降(手机无法下来);
 // ▼ 默认隐藏,进入非主世界由 scene-manager 显示,回主世界隐藏(主世界没有"下降"概念)。
+import { i18nAttr } from './i18n-dom.js'; // 界面文字中英切换(2026-10-03)
 
 export function createGlideHUD({ onJumpPress, onJumpRelease, onDescendPress, onDescendRelease }) {
   // ---- 滑翔能量 HUD(顶部中央五格,原版样式:细条+回充脉冲) ----
@@ -21,7 +22,8 @@ export function createGlideHUD({ onJumpPress, onJumpRelease, onDescendPress, onD
   const jumpBtn = document.createElement('button');
   jumpBtn.id = 'jumpBtnGlide';
   jumpBtn.textContent = '▲';
-  jumpBtn.title = '跳跃(按住滑翔)';
+  i18nAttr(jumpBtn, 'title', { en: 'Jump (hold to glide)', zh: '跳跃(按住滑翔)' });
+  i18nAttr(jumpBtn, 'aria-label', { en: 'Jump (hold to glide)', zh: '跳跃(按住滑翔)' });
   jumpBtn.style.cssText =
     'position:fixed;bottom:30px;right:20px;z-index:35;width:110px;height:110px;border-radius:50%;border:1px solid rgba(255,220,150,0.4);background:rgba(40,25,10,0.55);color:#ffe4b5;font-size:34px;cursor:pointer;font-family:inherit';
   jumpBtn.addEventListener('touchstart', (e) => {
@@ -58,10 +60,11 @@ export function createGlideHUD({ onJumpPress, onJumpRelease, onDescendPress, onD
   // ---- 下降按钮(太空模式专属;与 ▲ 同款对称,默认隐藏) ----
   const descendBtn = document.createElement('button');
   descendBtn.id = 'descendBtnSpace';
-descendBtn.dataset.worldUi = 'space'; // 自声明:只太空世界显示
-descendBtn.dataset.worldUiDisplay = 'block'; // 默认 display:none,显示时恢复 block
+  descendBtn.dataset.worldUi = 'space'; // 自声明:只太空世界显示
+  descendBtn.dataset.worldUiDisplay = 'block'; // 默认 display:none,显示时恢复 block
   descendBtn.textContent = '▼';
-  descendBtn.title = '下降(按住)';
+  i18nAttr(descendBtn, 'title', { en: 'Go down (hold)', zh: '下降(按住)' });
+  i18nAttr(descendBtn, 'aria-label', { en: 'Go down (hold)', zh: '下降(按住)' });
   descendBtn.style.cssText =
     'position:fixed;bottom:30px;right:140px;display:none;z-index:35;width:110px;height:110px;border-radius:50%;border:1px solid rgba(150,200,255,0.4);background:rgba(10,25,40,0.55);color:#cfe8ff;font-size:34px;cursor:pointer;font-family:inherit';
   descendBtn.addEventListener('touchstart', (e) => {

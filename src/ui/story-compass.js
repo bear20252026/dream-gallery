@@ -148,7 +148,7 @@ export function mountStoryCompass(ctx) {
     }
   });
 
-  const zh = () => (document.body && document.body.dataset.scriptLang) !== 'en';
+  const zh = () => (document.body && document.body.dataset.scriptLang) === 'zh';
   let acc = 0;
   let lastKey = '';
   ctx.onTick((dt) => {

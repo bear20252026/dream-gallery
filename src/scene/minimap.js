@@ -8,6 +8,7 @@
 // 交互:放大按钮 + 阻止地图事件冒泡。点图传送在 scene/player.js(经 bMap/bUnmap 反算,圆形命中)。
 import { ctx } from '../ctx.js';
 import { Z } from '../shared/z-layers.mjs';
+import { scriptLang } from '../shared/story-text.mjs';
 
 const { OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
 // ⚠️ 不要在模块顶层捕获 ctx.player.pl —— 本模块经 import 提升,求值早于
@@ -29,8 +30,8 @@ mapCanvas.height = SMALL;
 // 放大按钮(纸片小方章风;必须落在圆形命中区内——border-radius:50% 会把圆外点击裁掉)
 const mBigBtn = document.createElement('button');
 mBigBtn.textContent = '⤢';
-mBigBtn.title = '放大 / 缩小地图 · Bigger / smaller map';
-mBigBtn.setAttribute('aria-label', '放大 / 缩小地图 · Bigger / smaller map');
+mBigBtn.title = 'Bigger / smaller map · 放大 / 缩小地图';
+mBigBtn.setAttribute('aria-label', 'Bigger / smaller map · 放大 / 缩小地图');
 mBigBtn.style.cssText =
   'position:absolute;left:50%;bottom:8px;transform:translateX(-50%);z-index:2;width:30px;height:30px;border-radius:8px;' +
   'border:1px solid rgba(74,53,38,.6);background:rgba(248,241,223,.95);color:#4e4237;' +
@@ -46,7 +47,7 @@ export function toggleBig() {
   mBigBtn.textContent = mBig ? '⤡' : '⤢';
   if (mBig && !bigHintShown) {
     bigHintShown = true;
-    const zh = (document.body && document.body.dataset.scriptLang) !== 'en';
+    const zh = scriptLang() === 'zh';
     ctx.ui.modeToast?.(
       zh
         ? '点地图上任意一处,就能去那里;再点 ⤡ 收起'
@@ -418,7 +419,7 @@ function ensureBezel() {
     c.fillStyle = 'rgba(74,53,38,.7)';
     c.font = "12px 'Kaiti SC','STKaiti','KaiTi',serif";
     c.textAlign = 'center';
-    c.fillText('北', r, r - 32);
+    c.fillText(scriptLang() === 'zh' ? '北' : 'N', r, r - 32);
     // 比例尺(R=150m 视野):60m 线段
     const k = s / 300,
       len = 60 * k;

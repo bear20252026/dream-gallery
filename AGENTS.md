@@ -1,5 +1,20 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-03 剧情背景音乐(五首,本地,待发布)
+
+- 主人提供五首并要求放进公开仓库当游戏配乐,版权由主人自行处理(见 `CREDITS.md`)。原文件在主人 `Downloads/`;发布版在 `public/music/story/*.mp3`(ffmpeg loudnorm -18 LUFS,112k MP3——MP3 各浏览器都能放,开源版 Chromium 不支持 AAC)。Vite 把 public/ 拷进 dist 根,线上地址 `/music/story/<名>.mp3`。
+- 编排(纯逻辑 `shared/story-music-logic.mjs` + 单测):闸门/开场电影/坠机/画羊/羊箱之夜 = Turnaround;B612 = Our Corner of the Universe;国王/虚荣/酒鬼 = Equation;家走完后的沙漠与开飞机 = Salvation (Remix);结局画册页/告别/尾声 = Somewhere Only We Know;**找井那段静音**(玩法靠听水声)。
+- 播放 `ui/story-music.js`:模块级单例,开机就挂手势监听(组合根要到 ENTER 后才装配),main.js 在 ENTER 回调里 `startStoryMusic()`;100ms 定时器选曲、2.5s 交叉淡入淡出、对白时压到 40%。右下 `#ab` 钮改为「♪ Music on/off」(存档 `musicOff`)。`av-switch` 新增 `music` 豁免(默认开,`?av=0` 仍全静)。
+- 退役(legacy 下仍在):闸门协议配乐 00001.m4a、`#ab` 的随机背景乐轮播、进 B612 的 GARGANTUA。探针钩子 `__ctx.ui.storyMusic.{now,cue,debug}`。
+
+## 2026-10-03 英文为默认,中文为可切换备选(本地,待发布)
+
+- 主人定:**英文是默认**,中文只是可选切换。剧情语言本来默认 en;这次把界面上残留的中文固定文字也接上语言切换。
+- 新增 `ui/i18n-dom.js`:`i18nText(el,{en,zh})` / `i18nAttr(el,name,{en,zh})` 绑定一次,`script:lang` 时自动换;`bindStaticDom()` 在 main.js 开机绑定 index.html 静态节点(跳过链接、内嵌面板、音乐钮、AI 配文标签、画布/小地图 aria),并同步 `<html lang>`。index.html 默认 `lang="en"`、`<body data-script-lang="en">`,开机出错文案按存档语言(默认英文)。
+- 已改为双语:音乐钮状态、右下氛围小字、B612 唱歌提示、地名/海拔 HUD(Salt flat / Dunes / Gobi… · Elev.)、人称钮(View)、⌂ 回出生点、跳跃/下降钮、视角切换提示、台词静音钮与「语音加载中/已静音」提示、世界切换提示、凝视提示、世界加载失败页、任务卡折叠钮/菜单钮、小地图北标(N)。罗盘 `story-compass` 的中文判定改为「=== 'zh'」才算中文。
+- 「远方高地罗盘」(左上,点开旧设置面板)属于搁置的旧玩法:默认隐藏(`?legacy=1` 恢复)。任务卡里「展厅挂画 x/20」行同样只在 legacy 时显示。
+- 仍是中文的:搁置的旧玩法模块(飞舟/展厅/答题等)、旧设置/上传面板内部、画廊建筑里的 3D 招牌与印章字、协议子页。以后加界面文字一律走 tt / i18nText,不要再写单语中文。
+
 ## 2026-10-03 第二批测试建议:好上手的移动 + 菜单 + 章节地图/存档码 + WebGL 失效页 + 作品集 + 线稿重画(本地,待发布)
 
 - **移动太难**:罗盘条新增「▶ 自动走过去 / Walk there」(`ui/story-compass.js`):角色自己转向当前目标、推虚拟摇杆 `jD` 走过去(主世界与太空世界共用这个输入源);按移动键/摸摇杆/开对白/弹层/到达(≤1.5m)即停,3 秒没靠近就停并提示绕路。不传送、不跳过行走。操作小课第三步文案同步提到它。

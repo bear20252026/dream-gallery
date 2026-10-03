@@ -6,6 +6,8 @@ import { getGameState } from '../core/game-state.js'; // 阶段4:viewMode 运行
 const gs = getGameState();
 const { cam, rnd, bounds, jT, jB, onC3D, zoomOut, OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
 import { mapCanvas, bUnmap, isBig, toggleBig, drawMap } from './minimap.js';
+import { tt } from '../shared/story-text.mjs';
+import { i18nText, i18nAttr } from '../ui/i18n-dom.js'; // 界面文字中英切换(2026-10-03)
 
 // ===================== 移动状态机(2026-08-01) =====================
 import { StateMachine } from '../player/StateMachine.js';
@@ -239,7 +241,11 @@ function toggleView() {
   if (ctx.scene.avatar) ctx.scene.avatar.visible = ctx.player.viewMode === 1;
   window.quizToast &&
     window.quizToast(
-      ctx.player.viewMode === 1 ? '已切换:第三人称视角' : '已切换:第一人称视角',
+      tt(
+        ctx.player.viewMode === 1
+          ? { en: 'Third-person view', zh: '已切换:第三人称视角' }
+          : { en: 'First-person view', zh: '已切换:第一人称视角' }
+      ),
       true
     );
 }
@@ -249,7 +255,8 @@ document.addEventListener('keydown', (e) => {
 // 视角切换独立按钮(手机/电脑通用)
 const viewBtn = document.createElement('button');
 viewBtn.id = 'viewBtn';
-viewBtn.textContent = '人称';
+i18nText(viewBtn, { en: 'View', zh: '人称' });
+i18nAttr(viewBtn, 'title', { en: 'Switch first / third person (V)', zh: '切换第一/第三人称(V)' });
 viewBtn.style.cssText =
   'position:fixed;bottom:148px;right:20px;z-index:35;width:56px;height:32px;border-radius:16px;border:1px solid rgba(255,150,180,0.4);background:rgba(20,10,18,0.5);color:rgba(255,182,200,0.75);font-size:12px;cursor:pointer;font-family:inherit';
 viewBtn.addEventListener('click', (e) => {
@@ -580,7 +587,8 @@ import { stepVertical } from './player-physics.js'; // 垂直运动纯物理核(
 
 mapCanvas.addEventListener('pointerdown', (e) => {
   if (ctx.kunlun.flightLock) {
-    window.quizToast && window.quizToast('飞舟巡礼中，坐稳了');
+    window.quizToast &&
+      window.quizToast(tt({ en: 'Hold on — the ark is flying', zh: '飞舟巡礼中，坐稳了' }));
     return;
   } // ark.js:飞行中禁传送
   const r = mapCanvas.getBoundingClientRect();
@@ -609,7 +617,13 @@ mapCanvas.addEventListener('pointerdown', (e) => {
   }
   // 空中永恒展厅(eternal.js):只能从金门进出,小地图不可直接传入
   if (ctx.kunlun.eternalKeepOut && ctx.kunlun.eternalKeepOut(wx, wz)) {
-    window.quizToast && window.quizToast('万镜画廊只能从金门进入');
+    window.quizToast &&
+      window.quizToast(
+        tt({
+          en: 'The mirror gallery opens only through the golden gate',
+          zh: '万镜画廊只能从金门进入',
+        })
+      );
     return;
   }
   for (let i = 0; i < bounds.length; i++) {
@@ -631,13 +645,15 @@ const homeBtn = document.createElement('button');
 homeBtn.id = 'homeBtn';
 homeBtn.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui) // 多世界切割(2026-09-06 主人定:小世界不需要回家键,scene-manager 统一隐藏)
 homeBtn.textContent = '⌂';
-homeBtn.title = '回归出生点';
+i18nAttr(homeBtn, 'title', { en: 'Back to the start', zh: '回归出生点' });
+i18nAttr(homeBtn, 'aria-label', { en: 'Back to the start', zh: '回归出生点' });
 homeBtn.style.cssText =
   'position:fixed;bottom:190px;right:88px;z-index:35;width:44px;height:56px;border-radius:22px;border:1px solid rgba(255,220,150,0.45);background:rgba(35,22,10,0.55);color:#ffe4b5;font-size:20px;cursor:pointer;font-family:inherit';
 homeBtn.addEventListener('click', (e) => {
   e.stopPropagation();
   if (ctx.kunlun.flightLock) {
-    window.quizToast && window.quizToast('飞舟巡礼中，坐稳了');
+    window.quizToast &&
+      window.quizToast(tt({ en: 'Hold on — the ark is flying', zh: '飞舟巡礼中，坐稳了' }));
     return;
   } // ark.js:飞行中禁回家
   fadeTeleport(() => {
@@ -652,7 +668,7 @@ homeBtn.addEventListener('click', (e) => {
     cam.rotation.y = pl.y;
     cam.rotation.x = pl.pi;
   });
-  window.quizToast && window.quizToast('已回到出生点', true);
+  window.quizToast && window.quizToast(tt({ en: 'Back at the start', zh: '已回到出生点' }), true);
 });
 document.body.appendChild(homeBtn);
 
@@ -662,6 +678,8 @@ ctx.kunlun.fadeTeleport = fadeTeleport;
 // B612灵鉴:行走氛围——「山记得你的每一步。」(已进展厅后,每 4 分钟至多浮现一次)
 setInterval(() => {
   if (ctx.player.quizPassed && ctx.ui.modeToast) {
-    ctx.ui.modeToast('山记得你的每一步。');
+    ctx.ui.modeToast(
+      tt({ en: 'The mountain remembers every step you take.', zh: '山记得你的每一步。' })
+    );
   }
 }, 240000);

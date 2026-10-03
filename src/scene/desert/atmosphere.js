@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
 import { getH, KX, KZ } from './terrain.js';
+import { tt } from '../../shared/story-text.mjs';
+import { legacyOn } from '../../shared/legacy.mjs';
 const { s } = ctx;
 
 // ===================== 飞鸟 =====================
@@ -88,7 +90,12 @@ s.add(dust);
 // ===================== 远方高地罗盘 =====================
 const compass = document.createElement('div');
 compass.id = 'kunlunCompass';
-compass.title = '远方高地罗盘(点击打开设置)';
+// 远方高地(昆仑)罗盘属于搁置的旧玩法:默认不显示(?legacy=1 恢复)
+if (!legacyOn()) compass.style.visibility = 'hidden';
+compass.title = tt({
+  en: 'Highland compass (click for settings)',
+  zh: '远方高地罗盘(点击打开设置)',
+});
 compass.style.cssText =
   'position:fixed;top:16px;left:16px;width:64px;height:64px;z-index:10;pointer-events:auto;cursor:pointer';
 compass.innerHTML =
@@ -96,7 +103,9 @@ compass.innerHTML =
   '<div style="position:absolute;left:6px;top:6px;right:6px;bottom:6px;border-radius:50%;border:1px solid rgba(160,120,60,0.25)"></div>' +
   '<div class="cp-needle" style="position:absolute;left:50%;top:50%;width:3px;height:22px;margin-left:-1.5px;margin-top:-22px;background:linear-gradient(to bottom,rgba(230,200,130,0.95) 0%,rgba(180,140,70,0.85) 55%,rgba(160,60,40,0.9) 100%);border-radius:40% 40% 50% 50%;transform-origin:50% 22px;box-shadow:0 0 8px rgba(200,160,90,0.25)"></div>' +
   '<div style="position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:radial-gradient(circle at 35% 35%,rgba(220,190,130,0.9),rgba(140,100,50,0.9))"></div>' +
-  '<div style="position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);color:rgba(200,170,120,0.5);font-size:9px;letter-spacing:3px;white-space:nowrap">远方高地</div>';
+  '<div style="position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);color:rgba(200,170,120,0.5);font-size:9px;letter-spacing:3px;white-space:nowrap">' +
+  tt({ en: 'Highland', zh: '远方高地' }) +
+  '</div>';
 document.body.appendChild(compass);
 const cpNeedle = compass.querySelector('.cp-needle');
 
@@ -308,8 +317,7 @@ document.body.appendChild(timeHud);
 const terrainHud = document.createElement('div');
 terrainHud.id = 'desertTerrainHud';
 terrainHud.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
-terrainHud.innerHTML =
-  '<div class="tn" id="dtName">戈壁</div><div class="te" id="dtElev">海拔 0m</div>';
+terrainHud.innerHTML = '<div class="tn" id="dtName"></div><div class="te" id="dtElev"></div>';
 document.body.appendChild(terrainHud);
 const cross = document.createElement('div');
 cross.id = 'desertCross';
@@ -326,17 +334,21 @@ const dtText = timeHud.querySelector('#dtText'),
 const dtName = terrainHud.querySelector('#dtName'),
   dtElev = terrainHud.querySelector('#dtElev');
 
+// 地名中英(2026-10-03 英文为默认)
+const TERRAIN = [
+  [-1, { en: 'Salt flat', zh: '盐沼' }],
+  [0.5, { en: 'Damp sand', zh: '湿沙' }],
+  [3, { en: 'Dunes', zh: '沙丘' }],
+  [7, { en: 'Gobi', zh: '戈壁' }],
+  [12, { en: 'Yardangs', zh: '雅丹' }],
+  [20, { en: 'Rock cliffs', zh: '岩崖' }],
+  [35, { en: 'Scree slope', zh: '碎石坡' }],
+  [60, { en: 'Highland rock', zh: '远方高地岩' }],
+  [90, { en: 'Snow line', zh: '雪线' }],
+];
 function terrainType(h) {
-  if (h < -1) return '盐沼';
-  if (h < 0.5) return '湿沙';
-  if (h < 3) return '沙丘';
-  if (h < 7) return '戈壁';
-  if (h < 12) return '雅丹';
-  if (h < 20) return '岩崖';
-  if (h < 35) return '碎石坡';
-  if (h < 60) return '远方高地岩';
-  if (h < 90) return '雪线';
-  return '远方高地巅';
+  for (const [max, name] of TERRAIN) if (h < max) return tt(name);
+  return tt({ en: 'Highland summit', zh: '远方高地巅' });
 }
 
 // ===================== 大气更新函数 =====================
@@ -516,7 +528,7 @@ function updateHud(time) {
           : 'rgba(100,80,150,0.8)';
     if (ctx.player.pl) {
       const ev = Math.round(ctx.player.pl.p.y - 1.6);
-      dtElev.textContent = '海拔 ' + ev + 'm';
+      dtElev.textContent = tt({ en: 'Elev. ', zh: '海拔 ' }) + ev + 'm';
       dtName.textContent = terrainType(ev);
     }
   }

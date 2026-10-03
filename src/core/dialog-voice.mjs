@@ -40,6 +40,7 @@ const SPK_VOICES_EN = {
 const OFF_KEY = 'dialogVoiceOff';
 const MAX_SPEAK_LEN = 220; // 与 lib/tts.js MAX_LEN 对齐,超长服务端还会再截
 import { avAllowed } from './av-switch.js'; // 全站音视频总闸(2026-09-26):总闸关闭等同静音
+import { tt } from '../shared/story-text.mjs'; // 静音钮文字中英(2026-10-03)
 
 /** 说话人 → 声线(按文本语言分轨;未知说话人走默认女声) */
 export function voiceFor(spk, text) {
@@ -381,14 +382,20 @@ export function installMuteBtn(dialogEl) {
   const b = document.createElement('button');
   b.className = 'gs-voice';
   b.type = 'button';
-  b.setAttribute('aria-label', '台词朗读开关');
+  b.setAttribute('aria-label', tt({ en: 'Voice on / off', zh: '台词朗读开关' }));
   b.style.cssText =
     'position:absolute;right:10px;top:6px;border:none;background:none;cursor:pointer;' +
     'font-size:13px;opacity:.55;padding:2px 4px;line-height:1;font-family:inherit';
   const sync = () => {
     b.textContent = isVoiceOff() ? '🔇' : '🔈';
-    b.title = isVoiceOff() ? '开启台词朗读' : '关闭台词朗读';
+    b.title = tt(
+      isVoiceOff()
+        ? { en: 'Turn the voice on', zh: '开启台词朗读' }
+        : { en: 'Turn the voice off', zh: '关闭台词朗读' }
+    );
+    b.setAttribute('aria-label', tt({ en: 'Voice on / off', zh: '台词朗读开关' }));
   };
+  if (typeof window !== 'undefined') window.addEventListener('script:lang', () => sync());
   b.onclick = (e) => {
     e.stopPropagation(); // 别触发对话框推进
     toggleVoiceOff();

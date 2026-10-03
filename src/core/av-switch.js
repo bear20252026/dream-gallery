@@ -13,6 +13,15 @@ function avAllowed(scope) {
   if (scope === 'dialogue') return true; // 对白豁免:人物说话不算干扰源
   // 剧情机制音豁免(2026-10-03 结局线):找井「只能靠听」、尾声「会笑的小铃铛」是玩法本身,
   // 音量极低、只在结局线里响;?av=0 仍可显式关掉。
+  // 剧情背景音乐(2026-10-03 主人提供五首、要求作为游戏配乐):默认开,玩家可用右下「音乐」钮关,
+  // ?av=0 仍全部静音
+  if (scope === 'music') {
+    try {
+      return new URLSearchParams(location.search).get('av') !== '0';
+    } catch (e) {
+      return true;
+    }
+  }
   if (scope === 'story') {
     try {
       return new URLSearchParams(location.search).get('av') !== '0';
