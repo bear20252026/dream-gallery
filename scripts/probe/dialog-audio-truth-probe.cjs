@@ -31,7 +31,7 @@ const { launch } = require('./browser.js');
     });
     await page.goto(URL + '/?noopening&noprologue', { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForSelector('#b612Gate', { timeout: 90000 });
-    await page.check('#b612Gate #gAgreeChk');
+    if (await page.locator('#b612Gate #gAgreeChk').count()) if (await page.locator('#b612Gate #gAgreeChk').count()) await page.check('#b612Gate #gAgreeChk'); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
     await page.click('#b612Gate .gEnter'); // 真实手势
     await page.waitForFunction(() => window.__ctx && window.__ctx.player && window.__ctx.player.pl, { timeout: 90000 });
     await page.waitForFunction(() => window.__bootCheck && window.__bootCheck.ok === true, null, { timeout: 120000 });

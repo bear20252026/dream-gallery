@@ -91,7 +91,7 @@ async function run() {
   });
   await page.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#b612Gate');
-  await page.locator('#gAgreeChk').check();
+  if (await page.locator('#gAgreeChk').count()) if (await page.locator('#gAgreeChk').count()) await page.locator('#gAgreeChk').check(); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
   await click('#b612Gate .gEnter');
   await page.waitForSelector('#b612film #cBoa');
   await click('#b612film #cBoa');
@@ -124,7 +124,7 @@ async function run() {
       !window.__ctx.ui.dialogOpen()
   );
   assert(
-    (await page.locator('#sheepCompanion button').textContent()) === '摸摸羊箱',
+    (await page.locator('#sheepCompanion button').textContent()) === '摸摸羊箱(可选)',
     '现实提供摸摸羊箱'
   );
   await click('#sheepCompanion button');
@@ -233,7 +233,7 @@ async function run() {
   await click('.jn-close');
   await click('button[aria-label="切换语言 / toggle language"]');
   await wait(
-    () => document.querySelector('#sheepCompanion button').textContent === 'Pet your sheep'
+    () => document.querySelector('#sheepCompanion button').textContent === 'Pet the sheep (just for fun)'
   );
   assert(true, '同伴按钮支持中英文');
   await page.evaluate(async () => {

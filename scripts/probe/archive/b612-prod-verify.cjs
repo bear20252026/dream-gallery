@@ -33,7 +33,7 @@ const { launch } = require('./browser.js');
   console.log('✓ 生产:用户协议可读(日期 2026-09-05 ' + (dateOk ? '已确认' : '未检出') + '),‹返回 回闸门');
 
   // ENTER → 电影(2026-09-06 起需先勾选同意框,勾选后 ENTER 才点亮)
-  await page.click('#b612Gate #gAgreeChk');
+  if (await page.locator('#b612Gate #gAgreeChk').count()) if (await page.locator('#b612Gate #gAgreeChk').count()) await page.click('#b612Gate #gAgreeChk');
   await page.click('#b612Gate .gEnter');
   await page.waitForFunction(() => !document.getElementById('b612Gate'), null, { timeout: 15000 });
   await page.waitForSelector('#b612film', { timeout: 20000 });

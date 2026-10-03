@@ -72,7 +72,7 @@ let _browser = null; // 失败兜底关浏览器(防孤儿进程),成功路径�
   console.log('…等闸门');
   await page.waitForSelector('#b612Gate', { timeout: 150000 });
   await page.evaluate(() => {
-    const c = document.getElementById('gAgreeChk');
+    const c = document.getElementById('gAgreeChk') || document.createElement('input'); // 2026-10-03 起闸门无勾选框
     c.checked = true;
     c.dispatchEvent(new Event('change', { bubbles: true }));
   });

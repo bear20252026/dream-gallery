@@ -29,7 +29,7 @@ function startServer(port) {
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text().slice(0, 120)); });
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
-  await page.check('#b612Gate #gAgreeChk');
+  if (await page.locator('#b612Gate #gAgreeChk').count()) if (await page.locator('#b612Gate #gAgreeChk').count()) await page.check('#b612Gate #gAgreeChk'); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
   await page.click('#b612Gate .gEnter');
   await page.waitForSelector('#b612film', { timeout: 20000 });
   await page.waitForTimeout(1500);

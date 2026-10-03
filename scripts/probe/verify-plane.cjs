@@ -41,7 +41,7 @@ const OUT = path.join(__dirname, '..', '..', 'scripts', 'artifacts');
   // 线上要下 3D 模型,必须显式把 timeout 传进每一次等待。
   await page.goto(URL + '/', { waitUntil: 'domcontentloaded', timeout: WAIT });
   await page.waitForSelector('#b612Gate', { timeout: WAIT });
-  await page.locator('#gAgreeChk').check();
+  if (await page.locator('#gAgreeChk').count()) if (await page.locator('#gAgreeChk').count()) await page.locator('#gAgreeChk').check(); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
   await page.locator('#b612Gate .gEnter').click();
   await page.waitForSelector('#b612film #cBoa', { state: 'visible', timeout: WAIT });
   await page.locator('#b612film #cBoa').click();

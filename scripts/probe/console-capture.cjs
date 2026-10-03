@@ -24,7 +24,7 @@ const { launch } = require('./browser.js');
   await page.goto(URL + '/?noopening&noprologue', { waitUntil: 'domcontentloaded' });
   try {
     await page.waitForSelector('#b612Gate', { timeout: 60000 });
-    await page.check('#b612Gate #gAgreeChk');
+    if (await page.locator('#b612Gate #gAgreeChk').count()) if (await page.locator('#b612Gate #gAgreeChk').count()) await page.check('#b612Gate #gAgreeChk'); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
     await page.click('#b612Gate .gEnter');
   } catch (e) {
     logs.push('[probe] 闸门阶段异常: ' + e.message.slice(0, 200));

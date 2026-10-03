@@ -67,7 +67,7 @@ const { BASE_URL, launch } = require('./browser');
     throw e;
   }
   await page.evaluate(() => {
-    const c = document.getElementById('gAgreeChk');
+    const c = document.getElementById('gAgreeChk') || document.createElement('input'); // 2026-10-03 起闸门无勾选框
     c.checked = true;
     c.dispatchEvent(new Event('change', { bubbles: true }));
   });

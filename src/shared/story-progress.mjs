@@ -68,7 +68,7 @@ export function pagesFromHomeStep(homeMemoryStep) {
  * 书页数单一真相(2026-10-03)。任务册「书页 x / 9」与「进程」行必须同源,
  * 否则会出现「进程:书页五 进行中」与「书页:1 / 9」自相矛盾(2026-10-03 修)。
  * 三段进度取最大:开场弧线(B612 三页) / 星球章节 / 已完成 B612 站数。
- * @param {{scene2?:boolean,page1?:boolean,chapter?:number,homeMemoryStep?:number}} flags
+ * @param {{scene2?:boolean,page1?:boolean,chapter?:number,homeMemoryStep?:number,endingStep?:number}} flags
  * @returns {number} 0..PAGES_TOTAL
  */
 export function readPages(flags) {
@@ -87,7 +87,7 @@ export function readPages(flags) {
  * 按存档标志算「现在讲到哪」,任务册「进程」行展示 —— 开场弧线(坠机→画羊→夜与石门)
  * 此前在羊皮卷上不可见(书页数字不讲人名),玩家不知道故事进行到哪一章。
  * chapter 语义 = 已完成星数(scene6-king 完成时 setChapter(1))→ 当前章 = 下一颗未完成的星。
- * @param {{scene2?:boolean, page1?:boolean, chapter?:number}} flags 存档标志
+ * @param {{scene2?:boolean, page1?:boolean, chapter?:number, endingStep?:number, world?:string}} flags 存档标志
  * @returns {{code:string, en:string, zh:string}} 调用方 tt() 取当前语言
  */
 export function storyBeat(flags) {
@@ -117,7 +117,7 @@ export function storyBeat(flags) {
  * 与 storyBeat 同输入,回答「接下来做什么+去哪+怎么去」—— 任务册「下一步」行、
  * B612 首进 toast、探针断言的唯一权威。改文案只许动这里(双语同行)。
  * chapter 语义同 storyBeat(已完成星数 → 当前章=下一颗)。
- * @param {{scene2?:boolean, page1?:boolean, chapter?:number}} flags 存档标志
+ * @param {{scene2?:boolean, page1?:boolean, chapter?:number, endingStep?:number, world?:string}} flags 存档标志
  * @returns {{code:string, en:string, zh:string}}
  */
 export function storyNext(flags) {

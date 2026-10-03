@@ -80,7 +80,7 @@ function startServer() {
   await page.goto(ORIGIN + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
   await page.evaluate(() => {
-    const c = document.getElementById('gAgreeChk');
+    const c = document.getElementById('gAgreeChk') || document.createElement('input'); // 2026-10-03 起闸门无勾选框
     c.checked = true;
     c.dispatchEvent(new Event('change', { bubbles: true }));
   });
@@ -311,7 +311,7 @@ function startServer() {
   await page2.goto(ORIGIN + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page2.waitForSelector('#b612Gate', { timeout: 90000 });
   await page2.evaluate(() => {
-    const c = document.getElementById('gAgreeChk');
+    const c = document.getElementById('gAgreeChk') || document.createElement('input'); // 2026-10-03 起闸门无勾选框
     c.checked = true;
     c.dispatchEvent(new Event('change', { bubbles: true }));
   });

@@ -38,7 +38,7 @@ function startServer(port) {
   //  本探针入场序列一直停在点击重试——补勾选步,入场流程与其余 b612 探针对齐)
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
-  await page.check('#b612Gate #gAgreeChk');
+  if (await page.locator('#b612Gate #gAgreeChk').count()) if (await page.locator('#b612Gate #gAgreeChk').count()) await page.check('#b612Gate #gAgreeChk'); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
   await page.click('#b612Gate .gEnter');
   await page.waitForFunction(() => !document.getElementById('b612Gate'), null, { timeout: 15000 });
   await page.waitForSelector('#b612film', { timeout: 20000 });

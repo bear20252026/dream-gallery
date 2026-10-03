@@ -13,7 +13,7 @@ const { launch } = require('./browser.js');
   await page.goto(URL + '/?noopening&noprologue', { waitUntil: 'domcontentloaded' });
   // 闸门必须勾选+ENTER(无人点击则 60s 也不放行——gate 超时只管"闸门加载失败")
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
-  await page.check('#b612Gate #gAgreeChk');
+  if (await page.locator('#b612Gate #gAgreeChk').count()) if (await page.locator('#b612Gate #gAgreeChk').count()) await page.check('#b612Gate #gAgreeChk'); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
   await page.click('#b612Gate .gEnter');
   await page.waitForFunction(() => window.__ctx && window.__ctx.player && window.__ctx.player.pl, { timeout: 90000 });
   await page.waitForTimeout(2000);

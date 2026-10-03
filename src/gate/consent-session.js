@@ -56,8 +56,8 @@ export function askConsent(onYes) {
     `<button type="button" data-c="yes" style="font:inherit;padding:9px 18px;border-radius:18px;border:none;background:#7a5a36;color:#fff3da;cursor:pointer;min-height:44px">${zh ? '同意并继续' : 'Agree and continue'}</button>` +
     '</div></div>';
   document.body.appendChild(ov);
-  ov.querySelector('[data-c="no"]').onclick = () => ov.remove();
-  ov.querySelector('[data-c="yes"]').onclick = () => {
+  /** @type {HTMLButtonElement} */ (ov.querySelector('[data-c="no"]')).onclick = () => ov.remove();
+  /** @type {HTMLButtonElement} */ (ov.querySelector('[data-c="yes"]')).onclick = () => {
     signAllConsents();
     ov.remove();
     onYes && onYes();

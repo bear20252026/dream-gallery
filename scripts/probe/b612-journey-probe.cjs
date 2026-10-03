@@ -299,7 +299,7 @@ async function run() {
     });
   await p.goto(ORIGIN + '/', { waitUntil: 'domcontentloaded', timeout: PROBE_WAIT });
   await p.waitForSelector('#b612Gate');
-  await p.locator('#gAgreeChk').check();
+  if (await p.locator('#gAgreeChk').count()) if (await p.locator('#gAgreeChk').count()) await p.locator('#gAgreeChk').check(); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
   await p.locator('#b612Gate .gEnter').click();
   await p.waitForSelector('#b612film #cBoa', { state: 'visible', timeout: 60000 });
   await p.locator('#b612film #cBoa').click();
@@ -828,7 +828,7 @@ async function run() {
   assert((await p.locator('.jn-title').textContent()) === 'Travel notebook', '手札支持英文切换');
   await p.reload({ waitUntil: 'domcontentloaded' });
   await p.waitForSelector('#b612Gate');
-  await p.locator('#gAgreeChk').check();
+  if (await p.locator('#gAgreeChk').count()) if (await p.locator('#gAgreeChk').count()) await p.locator('#gAgreeChk').check(); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
   await p.locator('#b612Gate .gEnter').click();
   await p.waitForSelector('#b612film #fSkip', { state: 'visible' });
   await p.locator('#b612film #fSkip').click();

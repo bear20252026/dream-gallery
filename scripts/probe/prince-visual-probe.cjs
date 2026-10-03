@@ -11,7 +11,7 @@ const { launch } = require('./browser.js');
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
   console.log('闸门出现 @', Date.now() - t0, 'ms');
   await page.waitForTimeout(1200);
-  await page.check('#b612Gate #gAgreeChk');
+  if (await page.locator('#b612Gate #gAgreeChk').count()) if (await page.locator('#b612Gate #gAgreeChk').count()) await page.check('#b612Gate #gAgreeChk'); // 2026-10-03 起可无勾选框 // 2026-10-03 起可无勾选框
   await page.click('#b612Gate .gEnter');
   await page.waitForSelector('#b612film', { timeout: 30000 });
   await page.waitForSelector('#cHat', { timeout: 30000 });

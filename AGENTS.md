@@ -1,5 +1,11 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-03 测试反馈修复:火山选择卡死 + 「摸摸小羊」看不懂(本地,待发布)
+
+- **卡死根因**:`ui/overlay.js` 给 touchOnly 层也装了「点外圈关闭」(e.target===el)。任务卡 `#journeyTask` 是 touchOnly,手机上点到卡片空白处 → `display:none`,任务仍在进行 → 火山三选一按钮消失,剧情无法继续。修法:touchOnly 层一律不装外圈关闭(同时修好飞行控件/天穹进度/飞舟 HUD 的同类隐患);任务卡显式 `closeOnOutside:false`;journey update 加自愈(任务进行中卡片被藏 → 重画)。旧版本已用探针复现卡死,新版本同一操作后可选火山并推进到下一站。
+- **摸摸小羊**:文案改为「摸摸小羊(可选) / Pet the sheep (just for fun)」,说明写明只是好玩、不影响故事;任务卡打开时不显示,避免与任务按钮混淆。`sheep-companion-probe.cjs` 断言文案同步更新。
+- **发布模板**:`scripts/release.sh` + 根目录 `release.bat`(通用版)。每次发布前把 commit 信息写进 `.tmp/release-msg.txt`;脚本按 对齐 GitHub → vitest → build → 暂存(只收代码目录,拦截疑似密钥)→ commit/push → deploy.sh 顺序执行,任一步失败即停,日志 `.tmp/release.log`。
+
 ## 2026-10-03 先做结局 + 开门 + 旧玩法搁置（本地，尚未发布）
 
 - 主人批准:①开头不再勾选协议;②328/329/330 与地球五站先用「临时画册页」接上,结局先做完;③旧玩法先放一边,不删除。

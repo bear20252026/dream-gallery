@@ -594,7 +594,7 @@ export function createJourneySystem({ input }) {
       panel = make('section', '', null, document.body);
       panel.id = 'journeyTask';
       panel.setAttribute('aria-label', tt(TEXT.action));
-      taskApi = ctx.overlay.register(panel, { touchOnly: true });
+      taskApi = ctx.overlay.register(panel, { touchOnly: true, closeOnOutside: false });
       transitionEl = make('div', '', null, document.body);
       transitionEl.id = 'journeyTransition';
       transitionEl.setAttribute('role', 'dialog');
@@ -638,6 +638,8 @@ export function createJourneySystem({ input }) {
         cancel(active.owner);
         return;
       }
+      // 自愈:任务进行中卡片不应消失。若被任何外部原因藏起(曾因点外圈关闭导致火山选择卡死),重新画出来。
+      if (panel.style.display === 'none' && !ctx.ui.dialogOpen?.()) renderTask();
       const b = panel.querySelector('[data-journey-action="observe"]');
       if (b) b.disabled = !near() || !!ctx.ui.dialogOpen?.() || notebookApi.isOpen();
       const d = panel.querySelector('.jt-distance');

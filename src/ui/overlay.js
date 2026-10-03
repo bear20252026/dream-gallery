@@ -7,26 +7,32 @@
 //   栈空时放行给后注册的消费者(ark 飞行 / player 画作放大 / settings 面板)。
 // 生命周期:ctx.ui.overlay 服务在模块顶层注入(保证 Esc 监听最先注册,不被延迟到 System.init 破坏优先级);
 //   关闭/销毁出口(closeAll/destroy)由 core/ui-system.js 在组合根 dispose 时调用,实现 ui 域生命周期收口。
-import {ctx} from '../ctx.js';
+import { ctx } from '../ctx.js';
 
-const layers=new Map(); // el -> cfg
-const stack=[];         // 打开顺序栈:后开先关
+const layers = new Map(); // el -> cfg
+const stack = []; // 打开顺序栈:后开先关
 
-function isOpenEl(el){const d=el.style.display;return d==='flex'||d==='block';}
-function removeFromStack(el){const i=stack.indexOf(el);if(i>=0)stack.splice(i,1);}
+function isOpenEl(el) {
+  const d = el.style.display;
+  return d === 'flex' || d === 'block';
+}
+function removeFromStack(el) {
+  const i = stack.indexOf(el);
+  if (i >= 0) stack.splice(i, 1);
+}
 
-function closeLayer(cfg,reason){
-  if(cfg.canClose&&!cfg.canClose(reason))return false; // 调用方可按原因拦截(如答题中禁点外圈)
+function closeLayer(cfg, reason) {
+  if (cfg.canClose && !cfg.canClose(reason)) return false; // 调用方可按原因拦截(如答题中禁点外圈)
   removeFromStack(cfg.el);
-  cfg.el.style.display='none';
-  if(cfg.onClose)cfg.onClose(reason);
+  cfg.el.style.display = 'none';
+  if (cfg.onClose) cfg.onClose(reason);
   return true;
 }
-function openLayer(cfg){
-  if(stack.includes(cfg.el))return;
-  cfg.el.style.display=cfg.display;
+function openLayer(cfg) {
+  if (stack.includes(cfg.el)) return;
+  cfg.el.style.display = cfg.display;
   stack.push(cfg.el);
-  if(cfg.onOpen)cfg.onOpen();
+  if (cfg.onOpen) cfg.onOpen();
 }
 
 // register(el, opts) → {open, close, isOpen, unregister}
@@ -38,59 +44,87 @@ function openLayer(cfg){
 //   canClose(reason)    返回 false 拦截关闭;reason: 'esc'|'outside'|'x'|'api'
 //   onOpen()/onClose(reason)  副作用钩子(如聊天室开关轮询定时器)
 //   touchOnly=false     true=只进触摸白名单,不管开关节奏(飞舟 HUD/序章/一次性弹窗用)
-function register(el,opts){
-  opts=opts||{};
-  const cfg={
+function register(el, opts) {
+  opts = opts || {};
+  const cfg = {
     el,
-    display:opts.display||'flex',
-    escapable:opts.escapable!==false,
-    closeOnOutside:opts.closeOnOutside!==false,
-    touchOnly:!!opts.touchOnly,
-    canClose:opts.canClose||null,
-    onOpen:opts.onOpen||null,
-    onClose:opts.onClose||null,
-    x:opts.x||null,
+    display: opts.display || 'flex',
+    escapable: opts.escapable !== false,
+    closeOnOutside: opts.closeOnOutside !== false,
+    touchOnly: !!opts.touchOnly,
+    canClose: opts.canClose || null,
+    onOpen: opts.onOpen || null,
+    onClose: opts.onClose || null,
+    x: opts.x || null,
   };
-  el.dataset.overlay='1'; // 触摸白名单统一识别标记
-  if(cfg.closeOnOutside)el.addEventListener('click',e=>{if(e.target===el&&isOpenEl(el))closeLayer(cfg,'outside');});
-  if(cfg.x)el.addEventListener('click',e=>{if(isOpenEl(el)&&e.target.closest&&e.target.closest(cfg.x)){e.stopPropagation();closeLayer(cfg,'x');}});
-  layers.set(el,cfg);
+  el.dataset.overlay = '1'; // 触摸白名单统一识别标记
+  // 2026-10-03 测试反馈修复:touchOnly 层(任务卡/飞行控件/HUD)不归本模块管开关,绝不能被「点外圈」关掉。
+  // 此前点到任务卡空白处(e.target===el)会把卡片 display:none,而任务仍在进行 → 火山选择按钮消失,剧情卡死。
+  if (cfg.closeOnOutside && !cfg.touchOnly)
+    el.addEventListener('click', (e) => {
+      if (e.target === el && isOpenEl(el)) closeLayer(cfg, 'outside');
+    });
+  if (cfg.x)
+    el.addEventListener('click', (e) => {
+      if (isOpenEl(el) && e.target.closest && e.target.closest(cfg.x)) {
+        e.stopPropagation();
+        closeLayer(cfg, 'x');
+      }
+    });
+  layers.set(el, cfg);
   return {
-    open(){if(!cfg.touchOnly)openLayer(cfg);},
-    close(){if(!cfg.touchOnly)closeLayer(cfg,'api');},
-    isOpen(){return !cfg.touchOnly&&isOpenEl(el);},
-    unregister(){removeFromStack(el);layers.delete(el);delete el.dataset.overlay;},
+    open() {
+      if (!cfg.touchOnly) openLayer(cfg);
+    },
+    close() {
+      if (!cfg.touchOnly) closeLayer(cfg, 'api');
+    },
+    isOpen() {
+      return !cfg.touchOnly && isOpenEl(el);
+    },
+    unregister() {
+      removeFromStack(el);
+      layers.delete(el);
+      delete el.dataset.overlay;
+    },
   };
 }
 
 // Esc 统一栈(本模块最先 import,监听器最先触发;关到即止,下层弹层不吃同一个 Esc)
 // onEsc 命名以便 UiSystem.dispose 能精确移除该全局监听(收口生命周期,避免泄漏)
-function onEsc(e){
-  if(e.key!=='Escape')return;
-  for(let i=stack.length-1;i>=0;i--){
-    const cfg=layers.get(stack[i]);
-    if(cfg&&cfg.escapable&&closeLayer(cfg,'esc')){e.stopImmediatePropagation();return;}
+function onEsc(e) {
+  if (e.key !== 'Escape') return;
+  for (let i = stack.length - 1; i >= 0; i--) {
+    const cfg = layers.get(stack[i]);
+    if (cfg && cfg.escapable && closeLayer(cfg, 'esc')) {
+      e.stopImmediatePropagation();
+      return;
+    }
   }
 }
-document.addEventListener('keydown',onEsc);
+document.addEventListener('keydown', onEsc);
 
 // 关闭全部已开弹层(保留 Esc 监听,供后续复用)——UiSystem.dispose 调用
-function closeAll(){
-  for(let i=stack.length-1;i>=0;i--)closeLayer(layers.get(stack[i]),'api');
-  stack.length=0;
+function closeAll() {
+  for (let i = stack.length - 1; i >= 0; i--) closeLayer(layers.get(stack[i]), 'api');
+  stack.length = 0;
 }
 // 彻底销毁:关闭全部 + 移除全局 Esc 监听 + 清空注册表(应用卸载/HMR 收口用)
-function destroyOverlay(){
+function destroyOverlay() {
   closeAll();
   layers.clear();
-  document.removeEventListener('keydown',onEsc);
+  document.removeEventListener('keydown', onEsc);
 }
 
-ctx.ui.overlay={
+ctx.ui.overlay = {
   register,
-  anyOpen(){return stack.length>0;},
-  isUiTouch(t){return !!(t&&t.closest&&t.closest('[data-overlay]'));},
+  anyOpen() {
+    return stack.length > 0;
+  },
+  isUiTouch(t) {
+    return !!(t && t.closest && t.closest('[data-overlay]'));
+  },
   closeAll,
-  destroy:destroyOverlay,
+  destroy: destroyOverlay,
 };
 export { destroyOverlay, closeAll };

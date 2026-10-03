@@ -66,7 +66,7 @@ function startServer(port) {
   // 走真实开场路径(2026-09-06):闸门勾选→ENTER→电影→skip;电影落定后 3D 世界才启动
   await page.waitForSelector('#b612Gate', { timeout: 60000 });
   await page.evaluate(() => {
-    const c = document.getElementById('gAgreeChk');
+    const c = document.getElementById('gAgreeChk') || document.createElement('input'); // 2026-10-03 起闸门无勾选框
     c.checked = true;
     c.dispatchEvent(new Event('change', { bubbles: true }));
   });

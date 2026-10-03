@@ -34,7 +34,7 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   // kunlun 簇模块(spiritsGot/eternalHandlers)不加载 → [4][5] 断言假失败)。
   // 入场与其余 b612 探针对齐:勾选 → ENTER → 等 __bootCheck.ok(全模块装配完成)。
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
-  await page.check('#b612Gate #gAgreeChk');
+  if (await page.locator('#b612Gate #gAgreeChk').count()) await page.check('#b612Gate #gAgreeChk'); // 2026-10-03 起可无勾选框
   await page.click('#b612Gate .gEnter');
   await page.waitForFunction(() => window.__ctx && window.__ctx.ui && window.__ctx.kunlun && window.__ctx.player, null, { timeout: 90000 });
   await page.waitForFunction(() => window.__bootCheck && window.__bootCheck.ok === true, null, { timeout: 120000 }).catch(() => {

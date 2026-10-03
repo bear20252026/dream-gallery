@@ -12,10 +12,17 @@ import { createGLTFLoader } from './gltf-loader.js';
 import { prepareSheep } from './sheep-model.js';
 
 const WORDS = {
-  pat: { zh: '摸摸小羊', en: 'Pet your sheep' },
-  box: { zh: '摸摸羊箱', en: 'Pat the sheep box' },
-  dream: { zh: '回忆伙伴 · 只有你能看见', en: 'A memory companion · only you can see it' },
-  boxHint: { zh: '箱子里传来轻轻的回应', en: 'A little answer from inside the box' },
+  // 2026-10-03 测试反馈:「摸摸小羊」玩家看不懂是做什么的 → 写明是可选的小互动,不影响故事
+  pat: { zh: '摸摸小羊(可选)', en: 'Pet the sheep (just for fun)' },
+  box: { zh: '摸摸羊箱(可选)', en: 'Pat the sheep box (just for fun)' },
+  dream: {
+    zh: '你画的羊在回忆里陪着你。摸摸它只是好玩,不影响故事。',
+    en: 'The sheep you drew keeps you company here. Petting it is just for fun; the story goes on either way.',
+  },
+  boxHint: {
+    zh: '你画的羊睡在箱子里。拍拍箱子,它会轻轻回应。',
+    en: 'The sheep you drew sleeps in this box. Pat it and it answers softly.',
+  },
   answer: { zh: '咩……它轻轻歪了歪头', en: 'Baa… it tilts its head' },
   credit: {
     zh: '小羊模型：Kinga Kroliczek · CC BY 4.0；游戏添加动作',
@@ -368,7 +375,9 @@ export function createSheepCompanion() {
       const p = ctx.player.pl?.p;
       const near =
         anchor && p && Math.hypot(p.x - anchor.position.x, p.z - anchor.position.z) <= 2.6;
-      panel.style.display = near && !stop ? 'block' : 'none';
+      // 任务卡(如火山三选一)打开时不显示,避免玩家把两个按钮混在一起
+      const taskOpen = !!document.body.dataset.journeyTask;
+      panel.style.display = near && !stop && !taskOpen ? 'block' : 'none';
       button.disabled = time - lastPat < 2.5;
       language();
     },

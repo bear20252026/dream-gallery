@@ -634,7 +634,9 @@ function updateStoryGuides() {
     }
   }
   const journeyGoal = ctx.ui.journey?.goal();
-  if (journeyGoal && journeyGoal.world === active) target = journeyGoal.hidden ? null : journeyGoal;
+  // hidden:true = 结局线找井时罗盘熄灭(只能靠听)
+  if (journeyGoal && journeyGoal.world === active)
+    target = /** @type {any} */ (journeyGoal).hidden ? null : journeyGoal;
   try {
     ctx.ui.storyTarget && ctx.ui.storyTarget(target);
   } catch (e) {}
