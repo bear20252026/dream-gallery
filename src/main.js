@@ -24,6 +24,7 @@ import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外
 import { createControlsLesson } from './ui/controls-lesson.js'; // 首次操作小课 +「?」(2026-10-03 测试反馈)
 import { createPortfolio } from './ui/portfolio.js'; // 作品集「未完成的画」(2026-10-03)
 import { createChapterMap } from './ui/chapter-map.js'; // 章节地图 + 存档码(2026-10-03)
+import { createStarMap } from './ui/star-map.js'; // 星图:点星飞过去(2026-10-04)
 import { createVoyage } from './ui/voyage.js'; // 旅途卡:一夜接一夜(2026-10-04)
 import { createJourneySystem } from './core/journey-system.js'; // 原著旅途交互与观察手札，组合根统一装配
 import { createPlaneFlight } from './scene/plane-flight.js'; // 可驾驶 Piper PA-18(2026-10-03)
@@ -200,6 +201,7 @@ async function preloadWorld() {
     compositionRoot.register(createPortfolio());
     compositionRoot.register(createChapterMap());
     compositionRoot.register(createVoyage());
+    compositionRoot.register(createStarMap());
     compositionRoot.register(createStoryMusic());
     // 可驾驶 Piper PA-18(2026-10-03):坠机点旁的真飞机。物理核 src/scene/plane-physics.mjs(26 项单测),
     // 本系统只管 3D 姿态/输入/相机/HUD。玩家冻结走 gs.flightLock 既有通道(与飞舟同一条)。

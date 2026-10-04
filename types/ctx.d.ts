@@ -206,6 +206,7 @@ export interface UINamespace {
   advanceDialog: () => void;
   portfolio: { open: () => void; count: () => number } | null;
   chapterMap: { open: () => void } | null;
+  starMap: { open: () => void; close: () => void; isOpen: () => boolean } | null;
   voyage: {
     offer: (delayMs?: number, stop?: string) => void;
     open: (stop?: string) => boolean;

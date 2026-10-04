@@ -88,6 +88,9 @@ async function go(stop, row) {
   row.replaceChildren();
   el('div', 'vy-travel', tt(VOYAGE.ui.travelling), row);
   const world = worldOf(stop);
+  justArrived = world; // 先记上:到达那一帧各场景就会问 arrived()
+  // 书页卡与星流交叉淡化(2026-10-04):星流在卡片底下拉起,卡片随即淡出,露出飞行中的星空
+  setTimeout(() => close(900), 280);
   let ok = false;
   for (let i = 0; i < 8 && !ok; i++) {
     if (i) await new Promise((r) => setTimeout(r, 500));
@@ -99,13 +102,11 @@ async function go(stop, row) {
   }
   busy = false;
   if (!ok) {
-    close(400);
+    justArrived = null;
     ctx.ui.modeToast?.(tt(STUCK), 5000);
     return;
   }
-  justArrived = world;
   if (stop === 'earth') ctx.events?.emit?.('story:earthday');
-  setTimeout(() => close(), 900);
 }
 /** 立刻翻出下一站的卡(没有下一站就什么也不做) */
 function open(stopArg) {

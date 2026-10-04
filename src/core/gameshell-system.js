@@ -162,6 +162,8 @@ body[data-dialog-open] #questHud.folded .q-current{font-size:13px}
   box-shadow:inset 0 0 0 1px rgba(74,53,38,.3);transition:all .18s ease;
 }
 .gs-menu-card .m-btn:hover{background:#caa15f;color:#fff5e0;transform:scale(1.02);}
+.gs-menu-card .m-btn.m-star{background:linear-gradient(135deg,#1d2a48,#0c1222);color:#f4e8c8;border-color:#2b2218}
+.gs-menu-card .m-btn.m-star:hover{background:linear-gradient(135deg,#2a3a62,#121a30);color:#ffe9b0}
 `;
 
 function createGameShellSystem() {
@@ -289,6 +291,7 @@ function createGameShellSystem() {
     if (!menuEl) return;
     const n = ctx.ui.portfolio?.count() || 0;
     const labels = {
+      stars: { zh: '✦ 星 图', en: '✦ Star map' },
       map: { zh: '章 节 地 图', en: 'Chapter map' },
       portfolio: { zh: '作 品 集 · ' + n + '/4', en: 'Portfolio · ' + n + '/4' },
       help: { zh: '操 作 指 引', en: 'How to play' },
@@ -319,6 +322,7 @@ function createGameShellSystem() {
       <div class="gs-menu-card">
         <div class="m-title">B 6 1 2</div>
         <div class="m-sub">a gallery for unfinished drawings</div>
+        <button class="m-btn m-star" data-act="stars">✦ 星 图</button>
         <button class="m-btn" data-act="map">章 节 地 图</button>
         <button class="m-btn" data-act="portfolio">作 品 集</button>
         <button class="m-btn" data-act="help">操 作 指 引</button>
@@ -335,6 +339,10 @@ function createGameShellSystem() {
     menuEl.querySelector('[data-act="notebook"]').onclick = () => {
       menuApi.close();
       ctx.ui.journey?.openNotebook();
+    };
+    /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="stars"]')).onclick = () => {
+      menuApi.close();
+      ctx.ui.starMap?.open();
     };
     /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="map"]')).onclick = () => {
       menuApi.close();

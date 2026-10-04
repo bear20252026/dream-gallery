@@ -242,6 +242,8 @@ npm run test:scene                # 场景截图回归 4 检查点(主世界/B61
 - **328/329/330**:`kunlun/late-planets.js` 一个文件三颗星,流程 chainA → 小玩法(`#planetGame`,Z.planetGame 73)→ chainB → 星屑 → `setChapter(4/5/6)`。台词在 `shared/story-text-late.mjs`。
 - **地球之日**:`kunlun/earth-day.js`,七站(蛇/花/回声/玫瑰园/狐狸/再看玫瑰/秘密),进度 `earthStep`,走完写 `earthDay`;狐狸用 `foxApi.open({earth:true,onRite})` 压缩版 + `foxApi.secret()`。
 - **结局门槛** `ENDING_GATE_CHAPTER = 6`;老存档(chapter≥3 且 endingStep>0)按 `LEGACY_GATE_CHAPTER` 照旧走完。ending-journey 第 0 步不再翻临时画册页,等 `earthDay` 后直接找井。
+- **星图**(`ui/star-map.js`,菜单「✦ 星图」,Z.starMap 573):八颗星手绘 SVG,点亮着的星直接飞过去;解锁同章节地图。
+- **世界切换不再黑屏**:`core/scene-manager.js` 走 `shared/warp-fx.js` 星流过场(`runWarp`);多跳旅行 `ui/world-travel.js` 用 `holdWarp/releaseWarp` 托住一段、`lockWarpLabel` 锁定终点名。目的地名/色在 `shared/warp-labels.mjs`。
 - 改台词后重跑 `scripts/gen/subset-zh-font.py`(缺 brotli 时可用 node zlib 做 shim)。
 
 ## 环境

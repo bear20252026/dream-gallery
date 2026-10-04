@@ -32,6 +32,8 @@ export function createUINamespace(vault) {
     'storyMusic',
     // 2026-10-04:旅途卡(ui/voyage.js),每段回忆结束后接下一站
     'voyage',
+    // 2026-10-04:星图(ui/star-map.js)
+    'starMap',
   ];
   const proxy = {};
 

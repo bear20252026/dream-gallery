@@ -4,7 +4,15 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { eventBus } from '../event-bus.js';
-import { darkTeleport } from '../shared/teleport-fx.js';
+// 2026-10-04 主人反馈「跳转不要黑屏」:世界切换改走星流过场(shared/warp-fx.js),目的地名在中心浮现
+import { runWarp } from '../shared/warp-fx.js';
+import { warpDest } from '../shared/warp-labels.mjs';
+import { tt } from '../shared/story-text.mjs';
+
+function warpOpts(id) {
+  const d = warpDest(id);
+  return d ? { label: tt(d.label), color: d.color } : {};
+}
 
 let manager = null;
 
@@ -207,15 +215,12 @@ export class SceneManager {
     };
     try {
       let commitError = null;
-      await new Promise((resolve) =>
-        darkTeleport(() => {
-          commit()
-            .then(resolve)
-            .catch((e) => {
-              commitError = e;
-              resolve(undefined);
-            });
-        })
+      await runWarp(
+        () =>
+          commit().catch((e) => {
+            commitError = e;
+          }),
+        warpOpts(id)
       );
       this.transitioning = false;
       if (commitError) {
@@ -270,11 +275,7 @@ export class SceneManager {
       this.restore(snapshot);
       eventBus.emit('world:changed', { from: source.id, to: target.id });
     };
-    await new Promise((resolve) =>
-      darkTeleport(() => {
-        commit().then(resolve).catch(resolve);
-      })
-    );
+    await runWarp(() => commit().catch(() => {}), warpOpts(id));
     this.transitioning = false;
     return true;
   }
