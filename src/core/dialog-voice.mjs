@@ -209,13 +209,41 @@ async function sha256hex(s) {
 // 解法:闸门死时间里 fetch(CORS 全放行)拉成 blob → objectURL 内存常驻,
 // 播放期零网络、零缓存博弈;拥塞窗口付一次钱(后台 idle),之后永远秒开。
 const blobUrls = new Map(); // <20hex键> -> blob: URL
+const AUDIO_CACHE = 'tts-audio-v1'; // Cache Storage bucket for line audio (bump the suffix to drop old files)
+async function cacheMatch(url) {
+  try {
+    if (typeof caches === 'undefined') return null;
+    const c = await caches.open(AUDIO_CACHE);
+    return (await c.match(url)) || null;
+  } catch (e) {
+    return null;
+  }
+}
+function cachePut(url, response) {
+  try {
+    if (typeof caches === 'undefined') return;
+    caches
+      .open(AUDIO_CACHE)
+      .then((c) => c.put(url, response))
+      .catch(() => {});
+  } catch (e) {
+    /* storage full or blocked: the in-memory blob still works */
+  }
+}
 /** 按 20hex 键拉取并驻留内存;失败返回 false(播放期自然走流式路径) */
 export async function warmBlobByKey(key) {
   if (!/^[0-9a-f]{20}$/.test(String(key || ''))) return false;
   if (blobUrls.has(key)) return true;
+  const url = R2_BASE + '/tts-audio/' + key + '.mp3';
   try {
-    const r = await fetch(R2_BASE + '/tts-audio/' + key + '.mp3', { mode: 'cors' });
-    if (!r.ok) return false;
+    // 2026-10-04: Cache Storage keeps the line on the player's device between visits, so a returning
+    // player loads nothing from the network and every line opens at once. Any cache failure falls back to the network.
+    let r = await cacheMatch(url);
+    if (!r) {
+      r = await fetch(url, { mode: 'cors' });
+      if (!r.ok) return false;
+      cachePut(url, r.clone());
+    }
     const blob = await r.blob();
     if (!blob.size) return false;
     blobUrls.set(key, URL.createObjectURL(blob));
