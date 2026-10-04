@@ -90,8 +90,6 @@ s.add(dust);
 // ===================== 远方高地罗盘 =====================
 const compass = document.createElement('div');
 compass.id = 'kunlunCompass';
-// 远方高地(昆仑)罗盘属于搁置的旧玩法:默认不显示(?legacy=1 恢复)
-if (!legacyOn()) compass.style.visibility = 'hidden';
 compass.title = tt({
   en: 'Highland compass (click for settings)',
   zh: '远方高地罗盘(点击打开设置)',
@@ -106,6 +104,9 @@ compass.innerHTML =
   '<div style="position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);color:rgba(200,170,120,0.5);font-size:9px;letter-spacing:3px;white-space:nowrap">' +
   tt({ en: 'Highland', zh: '远方高地' }) +
   '</div>';
+// 远方高地(昆仑)罗盘属于搁置的旧玩法:默认不显示(?legacy=1 恢复)。
+// 必须写在 cssText 之后(cssText 会整体覆盖样式)
+if (!legacyOn()) compass.style.display = 'none';
 document.body.appendChild(compass);
 const cpNeedle = compass.querySelector('.cp-needle');
 

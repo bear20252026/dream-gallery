@@ -93,6 +93,9 @@ const SCHEMA = {
   portfolio: { key: 'b612Portfolio', type: 'json' },
   // 玩家关掉了剧情背景音乐(右下「音乐」钮;ui/story-music.js)
   musicOff: { key: 'b612MusicOff', type: 'flag' },
+  // 2026-10-04 剧本补全:地球的一天(第 10 场)走到第几站;earthDay = 地球一天走完(之后才去找井)
+  earthStep: { key: 'b612EarthStep', type: 'num' },
+  earthDay: { key: 'b612EarthDay', type: 'flag' },
 };
 function entry(name) {
   const e = SCHEMA[name];

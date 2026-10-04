@@ -66,7 +66,7 @@ export const PLANETS = [
   },
   {
     key: 'snow',
-    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
+    built: true, // 2026-10-04 剧本第 8~9 场建成(kunlun/late-planets.js)
     num: '328',
     name: '商人之星',
     color: '#c8a86a',
@@ -79,7 +79,7 @@ export const PLANETS = [
   },
   {
     key: 'dawn',
-    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
+    built: true, // 2026-10-04 剧本第 8~9 场建成(kunlun/late-planets.js)
     num: '329',
     name: '点灯人之星',
     color: '#a8c8e0',
@@ -92,7 +92,7 @@ export const PLANETS = [
   },
   {
     key: 'dusk',
-    built: false, // 未建成:空岛,有去无回,指引必须说"在路上"
+    built: true, // 2026-10-04 剧本第 8~9 场建成(kunlun/late-planets.js)
     num: '330',
     name: '地理学家之星',
     color: '#d0b090',

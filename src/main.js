@@ -24,10 +24,12 @@ import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外
 import { createControlsLesson } from './ui/controls-lesson.js'; // 首次操作小课 +「?」(2026-10-03 测试反馈)
 import { createPortfolio } from './ui/portfolio.js'; // 作品集「未完成的画」(2026-10-03)
 import { createChapterMap } from './ui/chapter-map.js'; // 章节地图 + 存档码(2026-10-03)
+import { createVoyage } from './ui/voyage.js'; // 旅途卡:一夜接一夜(2026-10-04)
 import { createJourneySystem } from './core/journey-system.js'; // 原著旅途交互与观察手札，组合根统一装配
 import { createPlaneFlight } from './scene/plane-flight.js'; // 可驾驶 Piper PA-18(2026-10-03)
 import { createSheepCompanion } from './scene/sheep-companion.js';
 import { createFoxScene } from './kunlun/scene10-fox.js'; // 站五·狐狸(2026-10-03)
+import { createEarthDay } from './kunlun/earth-day.js'; // 第 10 场 · 地球之日(2026-10-04)
 import { createEndingJourney } from './kunlun/ending-journey.js'; // 结局线:画册页→找井→告别→六年后(2026-10-03)
 import { createInputSystem } from './core/input.js'; // 统一输入 facade(阶段1·P1-3)
 import { createAudioSystem } from './core/audio-system.js'; // 阶段2 垂直切片:空间音频积木(依赖注入,取代冻结 ctx 写)
@@ -63,8 +65,10 @@ setLoop(loopManager); // 注入唯一主循环 facade(新积木经 deps.loop 获
 // 早按存档载入剧情语言(双语可切换)
 const _sl = applySavedLang();
 import { bindStaticDom } from './ui/i18n-dom.js'; // 界面固定文字中英切换(2026-10-03)
+import { mountHudLayout } from './ui/hud-layout.js'; // 屏幕布局统一收口(2026-10-03)
 document.body.dataset.scriptLang = _sl;
 bindStaticDom(); // 界面固定文字跟随语言(英文为默认,2026-10-03)
+mountHudLayout(); // 屏幕按钮统一排位,手机不再互相压住(2026-10-03)
 // 主世界常驻语言切换钮:同一位置只显示当前语言标签(EN/中文)
 {
   const tb = makeLangToggle({ placement: 'top:22px;right:132px', z: Z.menuBtn });
@@ -195,6 +199,7 @@ async function preloadWorld() {
     compositionRoot.register(createControlsLesson());
     compositionRoot.register(createPortfolio());
     compositionRoot.register(createChapterMap());
+    compositionRoot.register(createVoyage());
     compositionRoot.register(createStoryMusic());
     // 可驾驶 Piper PA-18(2026-10-03):坠机点旁的真飞机。物理核 src/scene/plane-physics.mjs(26 项单测),
     // 本系统只管 3D 姿态/输入/相机/HUD。玩家冻结走 gs.flightLock 既有通道(与飞舟同一条)。
@@ -202,6 +207,7 @@ async function preloadWorld() {
     compositionRoot.register(createSheepCompanion());
     // 站五·狐狸(2026-10-03):剧本第10场,布景用主人提供的 fox-scene.glb(含王子与狐狸)。
     compositionRoot.register(createFoxScene());
+    compositionRoot.register(createEarthDay());
     // 结局线(2026-10-03 主人批准「先做结局」):327 之后接画册页六~八 → 找井 → 告别 → 尾声
     compositionRoot.register(createEndingJourney());
     compositionRoot.register(createLoopSystem());

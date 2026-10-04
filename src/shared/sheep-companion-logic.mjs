@@ -1,5 +1,5 @@
 // 同伴只生活在已经建成的回忆世界；现实中的羊仍留在箱里。
-const MEMORIES = new Set(['b612', 'king325', 'king326', 'king327']);
+const MEMORIES = new Set(['b612', 'king325', 'king326', 'king327', 'king328', 'king329', 'king330']);
 export function sheepVisible(world, drawn) {
   return !!drawn && MEMORIES.has(world);
 }

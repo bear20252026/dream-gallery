@@ -54,6 +54,7 @@ export const WORLD_MODULES_DEFERRED = [
   ['第6场国王', () => import('../kunlun/scene6-king.js')],
   ['第7场虚荣', () => import('../kunlun/scene7-vanity.js')],
   ['第7场酒鬼', () => import('../kunlun/scene7-tippler.js')],
+  ['第8-9场商人/点灯人/地理学家', () => import('../kunlun/late-planets.js')],
   ['回忆层', () => import('../kunlun/scene3-memory.js')],
   ['重置视角', () => import('../kunlun/resetview.js')],
   ['放下', () => import('../kunlun/letgo.js')],

@@ -339,12 +339,15 @@ ctx.onTick(function scene7Tick() {
           } catch (e) {}
           armDoorBeacon(); // 指引三件套:回程光柱立起,进门即撤
         }, 1600);
-        // 「怎么回去」再晚一拍:与前两条 toast 错峰,不互顶
-        setTimeout(function () {
-          try {
-            ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.gotoDoor), 6000);
-          } catch (e) {}
-        }, 4800);
+        // 下一站(2026-10-04 衔接整改):不再让玩家自己找门回 B612、再找按钮——
+        // toast 亮完翻出旅途卡「下一夜」,点继续直达下一颗星;没有旅途卡时退回老指引
+        if (ctx.ui.voyage) ctx.ui.voyage.offer(3600);
+        else
+          setTimeout(function () {
+            try {
+              ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.gotoDoor), 6000);
+            } catch (e) {}
+          }, 4800);
       });
     return;
   }

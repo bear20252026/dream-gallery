@@ -4,7 +4,8 @@
 //   B612 · 他的家(火山/面包树/日落/玫瑰)→ Our Corner of the Universe(K.S. Rhoads,「我们的小角落」)
 //   拜访大人们的星球(国王/虚荣/酒鬼) → Equation(Hans Zimmer & Camille,大人世界的「算式」,安静不压台词)
 //   回到沙漠自由走走 · 开飞机          → Salvation (HEYHEY Remix)(Gabrielle Aplin,有速度感)
-//   结局:画册页 · 告别 · 六年后       → Somewhere Only We Know(Keane)
+//   地球之日(蛇/花/回声/玫瑰/狐狸)     → Turnaround(回到开头那首:他刚来地球,一切都新)
+//   结局:告别 · 六年后                → Somewhere Only We Know(Keane)
 //   找井那一段静音:那一段的玩法就是「靠听水声」找井,音乐会盖住线索。
 // 零依赖纯函数,单测钉死;播放/淡入淡出/闪避在 ui/story-music.js。
 
@@ -22,7 +23,7 @@ const WELL_FOUND = 2;
 
 /**
  * @param {{world?:string, scene2?:boolean, page1?:boolean, chapter?:number,
- *          endingReady?:boolean, endingStep?:number, flying?:boolean, epilogue?:boolean, opening?:boolean}} s
+ *          endingReady?:boolean, endingStep?:number, earthDay?:boolean, flying?:boolean, epilogue?:boolean, opening?:boolean}} s
  * @returns {string|null} CUES 的键;null = 此刻不放音乐
  */
 export function pickCue(s) {
@@ -38,6 +39,7 @@ export function pickCue(s) {
   if (f.endingReady) {
     const step = Number(f.endingStep) || 0;
     if (step === BOOK_READ) return null; // 找井:只留水声
+    if (step === 0 && !f.earthDay) return 'turnaround'; // 地球之日:他刚来地球,好奇又孤单(2026-10-04)
     if (step >= WELL_FOUND || step === 0) return 'somewhere';
   }
   return 'salvation';

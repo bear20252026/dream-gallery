@@ -7,7 +7,7 @@ import { ENDING, endingReady } from './ending-logic.mjs';
 
 /**
  * 章节表。world = 「去这一章」时要进的世界(main 表示沙漠)。
- * done(f) 用存档标志判定是否完成。f = {scene2,page1,chapter,endingStep}
+ * done(f) 用存档标志判定是否完成。f = {scene2,page1,chapter,endingStep,earthDay}
  */
 export function chapterList() {
   const list = [
@@ -35,13 +35,23 @@ export function chapterList() {
       done: (f) => (Number(f.chapter) || 0) > i,
     })
   );
+  // 书页八 · 地球之日(2026-10-04):六颗星之后,先在沙漠里走一天,再去找井
+  const earthDone = (f) => !!f.earthDay || (Number(f.endingStep) || 0) > 0;
+  list.push({
+    id: 'earth',
+    world: 'main',
+    title: { zh: '书页八 · 地球之日', en: 'Page VIII · a day on Earth' },
+    note: { zh: '蛇、花、回声、玫瑰园、狐狸', en: 'The snake, a flower, an echo, the roses, the fox' },
+    done: earthDone,
+    ready: (f) => endingReady(f),
+  });
   list.push({
     id: 'ending',
     world: 'main',
     title: { zh: '井 · 告别 · 六年后', en: 'The well · farewell · six years later' },
     note: { zh: '回到沙漠', en: 'Back in the desert' },
     done: (f) => (Number(f.endingStep) || 0) >= ENDING.DONE,
-    ready: (f) => endingReady(f),
+    ready: (f) => endingReady(f) && earthDone(f),
   });
   return list;
 }
@@ -83,6 +93,8 @@ export const SAVE_FIELDS = {
   endingAnswer: 'str',
   journeyMemories: 'json',
   portfolio: 'json',
+  earthStep: 'num',
+  earthDay: 'flag',
 };
 const PREFIX = 'B612-1-';
 

@@ -1,5 +1,18 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-03 屏幕布局收口:手机不再挤成一团(本地,待发布)
+
+- 新增 `ui/hud-layout.js`(main.js 开机 `mountHudLayout()`):一张样式表统一排位,用 id + !important 覆盖各模块写死的位置。**以后新增屏幕按钮,先来这里排位,不要再各自写 top/right。**
+- 所有尺寸:小地图下移到菜单钮下方(top 70),时刻/地名挪到小地图下面(原来时刻压在任务卡下沿);AI 配文框空着时不显示;滑翔能量格只在跳起/滑翔/回充时出现。
+- 手机(≤600px):隐藏 B612 标题、底部氛围小字、时刻/地名、AI 配文框;「?」、语言钮、音乐钮收进菜单(菜单新增「怎么走动 / Language / Music」三项,`.m-phone` 只在手机显示,点了转点原钮)。小地图 112px。底部:左摇杆,右跳跃(84px),上面依次「View」「⌂」;中间大按钮(石门 `#gateBtn`、世界导航)抬到 150~160px,不压摇杆/跳跃,文字不换行。操作小课卡挪到大按钮上方。对白进行时摇杆/跳跃/视角/⌂/大按钮/罗盘/小课全部让位。小羊按钮手机上去掉说明小字。
+- 旧昆仑罗盘修正:之前的 `visibility:hidden` 被后面的 cssText 覆盖,左上仍显示「Highland」;现改为 cssText 之后 `display:none`。
+- 验收(云端 390×780 手机 + 1024×640 桌面截图):沙漠对白、对白后、菜单、B612 导航各状态无重叠。
+
+## 2026-10-03 版本号随发布自动更新(本地,待发布)
+
+- 闸门底行原来是手写的「Revised Sep 5, 2026」,永远不变。现在 `vite.config.js` 构建时从 git 读出 `{n: 提交总数, hash: 短哈希, date: 提交日期}`,经 `define` 注入 `__B612_BUILD__`;`shared/build-info.mjs` 拼成「Updated Oct 3, 2026 · v1.<提交总数>」(中文「更新于 2026-10-03 · v1.N」),悬停显示 `build <hash>`。每发布一次提交数 +1,版本号自动 +1。
+- release.sh 先 commit 再跑 deploy.sh(其第 1 步重新构建),所以线上戳就是这次发布的提交。源码直跑(本地 server.js、单测)没有 define,显示「dev build」。eslint globals 与 `types/ctx.d.ts` 已声明该常量。
+
 ## 2026-10-03 剧情背景音乐(五首,本地,待发布)
 
 - 主人提供五首并要求放进公开仓库当游戏配乐,版权由主人自行处理(见 `CREDITS.md`)。原文件在主人 `Downloads/`;发布版在 `public/music/story/*.mp3`(ffmpeg loudnorm -18 LUFS,112k MP3——MP3 各浏览器都能放,开源版 Chromium 不支持 AAC)。Vite 把 public/ 拷进 dist 根,线上地址 `/music/story/<名>.mp3`。
@@ -223,6 +236,13 @@ npm run test:scene                # 场景截图回归 4 检查点(主世界/B61
 - **灯光与编译的关系**(实测):点光源 59盏→单程序编译≈822ms,24盏≈208ms,13盏≈103ms。电脑端限额 ≈30 盏既为编译速度也为弱 GPU 视频带宽余量。
 - **媒体加载规则(2026-07-24 主人定)**:①答题通过(`ctx.quizPassed`)前,室内图片(`loadTexCapped` 统一拦截挂起)与室内挂画视频(`preload='none'`)一律不加载,带宽全留给室外大屏;通过后图片统一放行、永久保留(地板照片同此),挂画视频按距离调度(近 18m 播/远 22m 停)。②室外大屏(media.js)始终按序轮播;**唯一闸口(2026-07-27):三连读会话标记未齐时 1 号原地循环不推进,签完才从 1 号完整轮播**;**普通模式全线下架大屏 2 号(只播 1/3/4/5),特殊模式完整五个**——清单 `VID_ALL` 在 startVidSeq 按 `ctx.siteMode` 现取,模式切换下一轮循环生效(2026-07-26 主人定)。③同页多路视频同时起播会拖垮弱网/解码,新增挂画视频必须走 `vE` 调度,禁止裸 `autoplay+play()`。
 - **诊断工具**:`scripts/probe/perf-probe.js`(rAF 帧率/长任务/视频丢帧/解码能力,`SETTLE_S=秒 node perf-probe.js <url> [采样秒]`)、`perf-profile.js`(CDP CPU Profiler 热点)、`daynight-probe.js`(昼夜相位×卡顿关联)、`light-compile-bench.js`(灯光数 vs 编译耗时,均在 `scripts/probe/`)。页面里 `window.__vidEl/__v45El/__rnd/__ctx` 是探针钩子。`scripts/test/verify-all.js` 是大版本全链路验收(门禁→模式→邀请函→特殊访问→彩蛋,改 UA 可当新访客)。
+
+## 剧本补全:旅途卡 + 328~330 + 地球之日(2026-10-04)
+- **衔接**:每段回忆结束(家的回忆/每颗星拾起星屑)→ `ctx.ui.voyage.offer()` 翻出夜色书页卡(`ui/voyage.js`,Z.voyage 565),点「继续」直达下一站(`ui/world-travel.js` 的 `travel()`,章节地图共用)。下一站算法 `shared/voyage-logic.mjs nextStop()`。「再待一会儿」后星球底部导航主按钮 = 「继续旅途 →」。经旅途卡到达的场景用 `voyage.arrived(world)` 跳过自己的开场过渡卡。
+- **328/329/330**:`kunlun/late-planets.js` 一个文件三颗星,流程 chainA → 小玩法(`#planetGame`,Z.planetGame 73)→ chainB → 星屑 → `setChapter(4/5/6)`。台词在 `shared/story-text-late.mjs`。
+- **地球之日**:`kunlun/earth-day.js`,七站(蛇/花/回声/玫瑰园/狐狸/再看玫瑰/秘密),进度 `earthStep`,走完写 `earthDay`;狐狸用 `foxApi.open({earth:true,onRite})` 压缩版 + `foxApi.secret()`。
+- **结局门槛** `ENDING_GATE_CHAPTER = 6`;老存档(chapter≥3 且 endingStep>0)按 `LEGACY_GATE_CHAPTER` 照旧走完。ending-journey 第 0 步不再翻临时画册页,等 `earthDay` 后直接找井。
+- 改台词后重跑 `scripts/gen/subset-zh-font.py`(缺 brotli 时可用 node zlib 做 shim)。
 
 ## 环境
 

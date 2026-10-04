@@ -8,7 +8,12 @@
 import { ctx } from '../ctx.js';
 import * as bootState from '../core/boot-state.js';
 import { Z } from '../shared/z-layers.mjs';
-import { GLOBAL, tt } from '../shared/story-text.mjs';
+import { GLOBAL, tt, scriptLang } from '../shared/story-text.mjs';
+import { buildInfo, versionLine } from '../shared/build-info.mjs'; // 版本戳随发布自动更新(2026-10-03)
+const verTitle = () => {
+  const b = buildInfo();
+  return b ? 'build ' + b.hash : 'dev';
+};
 import { makeLangToggle } from '../ui/lang-toggle.js';
 import { spawnAgreementPages } from './agreement-swipe.js';
 
@@ -32,6 +37,8 @@ function build(opts) {
   const renderLang = () => {
     const d = ov.querySelector('#gDed');
     if (d) d.textContent = tt(GLOBAL.gateDedication);
+    const v = ov.querySelector('.gVer');
+    if (v) v.textContent = versionLine(buildInfo(), scriptLang());
   };
   ov.innerHTML = `
   <svg class="gOrn" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
@@ -55,7 +62,7 @@ function build(opts) {
       <a data-doc="privacy.html" href="javascript:void(0)">Privacy Policy</a> ·
       <a data-doc="community.html" href="javascript:void(0)">Community Guidelines</a>
     </span>
-    <br>© 2026 B612 · Revised Sep 5, 2026
+    <br>© 2026 B612 · <span class="gVer" title="${verTitle()}">${versionLine(buildInfo(), scriptLang())}</span>
   </div>
   <style>
   /* Satisfy 已自托管(main.css @font-face,2026-10-03),不再从 Google Fonts 拉 */
@@ -90,6 +97,18 @@ function build(opts) {
   @media (max-width:640px){
     #b612Gate .gLegal{bottom:14px;padding:0 12px}
     #b612Gate .gAgree{flex-wrap:wrap;justify-content:center;row-gap:4px}
+  }
+  /* 横屏手机(矮屏,2026-10-04 实测 844×390:ENTER 压在条款链接上点不到)——收紧排版,条款贴底单行 */
+  @media (max-height:520px){
+    #b612Gate .gEyebrow{margin-bottom:4px}
+    #b612Gate .gTitle{font-size:clamp(40px,14vh,72px)}
+    #b612Gate .gScript{font-size:18px;margin-top:2px}
+    #b612Gate .gPoem{margin:2.5vh 0;font-size:14px;line-height:1.7}
+    #b612Gate .gDed{margin-top:4px;font-size:12px;line-height:1.5}
+    #b612Gate .gBar{height:12px;margin-top:4px}
+    #b612Gate .gInner{margin-bottom:44px}
+    #b612Gate .gLegal{bottom:6px;font-size:11px;line-height:1.6}
+    #b612Gate .gLegal br{display:none}
   }
   </style>`;
   document.body.appendChild(ov);

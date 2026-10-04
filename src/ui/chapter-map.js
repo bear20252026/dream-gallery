@@ -7,7 +7,7 @@ import { ctx } from '../ctx.js';
 import { defineSystem } from '../core/system.js';
 import { tt } from '../shared/story-text.mjs';
 import { Z } from '../shared/z-layers.mjs';
-import { spawnFor, kingSpawnPoint } from '../shared/planet-logic.mjs';
+import { travel } from './world-travel.js';
 import {
   chapterStates,
   canTravel,
@@ -89,35 +89,8 @@ function flags() {
     page1: !!ctx.store.flag('page1'),
     chapter: ctx.store.num('planetsChapter'),
     endingStep: ctx.store.num('endingStep'),
+    earthDay: !!ctx.store.flag('earthDay'),
   };
-}
-
-/** 去某一章:按需先回沙漠/进 B612,再进星球(与石门/导航按钮同一套世界切换) */
-async function travel(world) {
-  const wm = ctx.scene.worldManager;
-  if (!wm || wm.transitioning || ctx.kunlun.flightLock) return false;
-  const cur = ctx.scene.activeWorld || 'main';
-  if (world === cur) return true;
-  if (cur !== 'main' && !(world.startsWith('king') && cur === 'b612'))
-    await ctx.scene.toMainWorld?.();
-  if (world === 'main') return true;
-  if ((ctx.scene.activeWorld || 'main') === 'main') {
-    await wm.enter('b612', { snapshot: { camera: null, player: spawnFor('b612') } });
-  }
-  if (world === 'b612') return true;
-  const sp = kingSpawnPoint();
-  return wm.enter(world, {
-    snapshot: {
-      camera: null,
-      player: {
-        position: { x: sp.x, y: sp.y, z: sp.z },
-        yaw: sp.yaw,
-        pitch: 0,
-        vy: 0,
-        onGround: true,
-      },
-    },
-  });
 }
 
 export function createChapterMap() {

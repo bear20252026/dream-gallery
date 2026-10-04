@@ -50,6 +50,7 @@ const STYLE = `
   border-radius:20px;padding:9px 14px;min-height:44px}
 #foxPanel button:hover{background:#8a6d3c}
 #foxPanel button:disabled{opacity:.45;cursor:default}
+body[data-dialog-open] #foxPanel{visibility:hidden}
 @media(max-width:600px){#foxPanel{right:70px;bottom:122px;width:calc(100vw - 88px);padding:14px 15px}
 #foxPanel .fx-title{font-size:16px}}
 `;
@@ -67,6 +68,9 @@ let hour = HOURS;
 let honest = true; // 是否承诺"明天同一时辰再来"
 let foxNode = null;
 let princeNode = null;
+// 地球之日(2026-10-04 剧本定稿「压缩版」):同一个傍晚坐三次,不按真实日期卡;
+// 仪式完成只说秘密的第一句(「回去再看一眼玫瑰」),秘密本身等玩家从玫瑰园回来再说(secret())。
+let earth = null; // { onRite } | null
 
 function groundH(x, z) {
   return ctx.media && ctx.media.desert ? ctx.media.desert.getH(x, z) : 0;
@@ -175,11 +179,12 @@ function render() {
     seats.appendChild(d);
   }
   const rite = readRite();
-  mk(
-    'p',
-    'fx-hour',
-    `${tt({ zh: '仪式', en: 'Rite' })} ${rite.days || 0} / 3 · ${tt({ zh: '约定时辰', en: 'Hour' })} ${rite.hour}:00`
-  );
+  if (!earth)
+    mk(
+      'p',
+      'fx-hour',
+      `${tt({ zh: '仪式', en: 'Rite' })} ${rite.days || 0} / 3 · ${tt({ zh: '约定时辰', en: 'Hour' })} ${rite.hour}:00`
+    );
 
   const btns = mk('div', 'fx-btns');
   if (current < 3) {
@@ -192,6 +197,7 @@ function render() {
     btns.appendChild(b);
     // 诚实开关:承诺明天同一时辰 / 今天就办完
     const h = document.createElement('button');
+    if (earth) h.style.display = 'none';
     h.type = 'button';
     h.textContent = inHour() ? tt(FOX_UI.arrived) : `${rite.hour}:00 ${tt(FOX_UI.approach)}`;
     h.dataset.foxAction = 'hour';
@@ -267,16 +273,38 @@ function sitDown() {
   // 走到这里 = 玩家履行了承诺。狐狸的反应按原著:越近越安静。
   const rite = readRite();
   const today = dayKey();
-  if (rite.lastDay === today) {
+  if (!earth && rite.lastDay === today) {
     // 同一天不重复计数(原著:你最好在同一个时辰来)
     ctx.ui.modeToast?.(tt(FOX_UI.arrived), 2200);
     return;
   }
-  writeRite({ days: (rite.days || 0) + 1, lastDay: today, hour, honest });
-  current = Math.min(3, (rite.days || 0) + 1);
+  writeRite({ days: Math.min(3, (rite.days || 0) + 1), lastDay: today, hour, honest });
+  current = earth ? Math.min(3, current + 1) : Math.min(3, (rite.days || 0) + 1);
   placeSeat();
   render();
+  if (current < 3) {
+    const ns = SEATS[current];
+    ctx.ui.journey?.setGoal?.(OWNER, {
+      world: 'main',
+      x: SITE.x + ns.x,
+      z: SITE.z + ns.z,
+      label: tt(ns.label),
+      ...ns.label,
+    });
+  }
   eventBus.emit('fox:rite', { days: current });
+  if (earth) {
+    // 压缩版:每坐近一次,狐狸只说新的一段;三次坐完 → 「回去再看一眼玫瑰」
+    const opts = earth;
+    speak([SCENE_FOX.rite[current - 1]], () => {
+      if (current < 3) return;
+      speak([SCENE_FOX.secret[0]], () => {
+        close(true);
+        opts.onRite && opts.onRite();
+      });
+    });
+    return;
+  }
   speak(SCENE_FOX.rite.slice(0, current + 1), () => {
     if (current >= 3) {
       // 仪式完成 → 狐狸交出秘密(全书题眼)
@@ -288,14 +316,16 @@ function sitDown() {
   });
 }
 
-function open() {
+function open(opts) {
   if (active) return;
   active = true;
+  earth = opts && opts.earth ? opts : null;
   const rite = readRite();
-  current = Math.min(3, rite.days || 0);
+  current = earth ? 0 : Math.min(3, rite.days || 0);
   hour = rite.hour || HOURS;
   build();
   placeSeat();
+  if (seatMesh) seatMesh.visible = true;
   render();
   ctx.ui.journey?.setPhase?.(OWNER, {
     world: 'main',
@@ -310,8 +340,21 @@ function open() {
     x: SITE.x + SEATS[Math.min(current, 2)].x,
     z: SITE.z + SEATS[Math.min(current, 2)].z,
     label: tt(SEATS[Math.min(current, 2)].label),
+    ...SEATS[Math.min(current, 2)].label,
   });
   speak(SCENE_FOX.greet.concat(SCENE_FOX.meaning), () => {});
+}
+
+/** 地球之日:从玫瑰园回来道别,狐狸送出秘密(全书题眼) */
+function secret(onDone) {
+  if (active) return;
+  active = true;
+  build();
+  speak(SCENE_FOX.secret.slice(1), () => {
+    active = false;
+    ctx.ui.journey?.remember?.('foxSecret', null);
+    onDone && onDone();
+  });
 }
 
 function close(done) {
@@ -360,6 +403,13 @@ export function createFoxScene() {
       ctx.scene.foxApi = {
         open,
         sit: sitDown,
+        secret,
+        site: () => ({ ...SITE }),
+        seat: () => {
+          const s = SEATS[Math.min(current, 2)];
+          return { x: SITE.x + s.x, z: SITE.z + s.z };
+        },
+        isActive: () => active,
         debug: () => ({ active, current, hour, loaded: !!foxNode, pos: SITE }),
       };
     },

@@ -66,6 +66,7 @@ export function buildChapterProps(idx, box, cyl, topY) {
       new THREE.MeshBasicMaterial({ color: 0xffe9b0 })
     );
     head.position.set(0, 3.6, 0);
+    head.name = 'lampHead'; // late-planets.js 点灯小游戏接管亮灭(userData.manual)
     props.add(post, head);
     props.userData.lampHead = head; // 主循环交替亮灭
   } else {

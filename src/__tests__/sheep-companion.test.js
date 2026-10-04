@@ -10,8 +10,8 @@ describe('sheep memory companion', () => {
   it('keeps the sheep inside the box in reality and before the drawing', () => {
     expect(sheepVisible('main', true)).toBe(false);
     expect(sheepVisible('b612', false)).toBe(false);
-    expect(sheepVisible('king328', true)).toBe(false);
-    for (const world of ['b612', 'king325', 'king326', 'king327'])
+    expect(sheepVisible('earth', true)).toBe(false);
+    for (const world of ['b612', 'king325', 'king326', 'king327', 'king328', 'king329', 'king330'])
       expect(sheepVisible(world, true)).toBe(true);
   });
   it('walks smoothly and waits close by without overshooting', () => {

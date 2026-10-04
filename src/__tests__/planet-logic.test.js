@@ -45,8 +45,8 @@ describe('章节数据完整性(与 spirits SPIRITS 同序同键的前提)', () 
       expect(p.pos).toHaveLength(3);
     }
   });
-  it('建成旗 built:325+326+327 可玩,其余是空岛(2026-09-27 诚实指引)', () => {
-    expect(PLANETS.map((p) => !!p.built)).toEqual([true, true, true, false, false, false]);
+  it('建成旗 built:六颗星全部可玩(2026-10-04 第 8~9 场建成)', () => {
+    expect(PLANETS.map((p) => !!p.built)).toEqual([true, true, true, true, true, true]);
   });
 });
 

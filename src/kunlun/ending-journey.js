@@ -112,7 +112,6 @@ let mode = 'idle'; // idle | book | well | wake | muzzle | farewell-wait | farew
 let mainScene = null;
 let styleEl, actionEl, listenEl, tintEl, veilEl, sketchEl, stageEl;
 let actionFn = null;
-let hintedBook = false;
 let unsub = [];
 // 找井
 let startDist = 0;
@@ -1119,12 +1118,12 @@ function tick(dt) {
       if (busy()) return;
       if (step === ENDING.NONE) {
         if (!endingReady(flags())) return;
-        if (!actionFn) showAction(ENDING_UI.bookOpen, openTheBook);
-        if (!hintedBook) {
-          hintedBook = true;
-          toast(ENDING_UI.bookHint, 6500);
-          setPhase({ en: 'Pages VI–VIII', zh: '书页六~八' }, ENDING_UI.bookHint);
-        }
+        // 2026-10-04:书页六~八不再是临时画册页——328~330 已是 3D 星球,书页八是沙漠里的「地球之日」
+        // (earth-day.js)。地球之日走完(earthDay)才接「今夜,去找井」。画册页仍可由 endingApi.openBook 翻看。
+        if (!ctx.store.flag('earthDay')) return;
+        setStep(ENDING.BOOK);
+        setTimeout(() => startWell(false), 2400);
+        mode = 'wait';
       } else if (step === ENDING.BOOK) startWell(true);
       else if (step === ENDING.WELL) startFarewell();
       else if (step === ENDING.FAREWELL) {

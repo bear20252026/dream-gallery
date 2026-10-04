@@ -51,6 +51,7 @@ function state() {
     page1: !!ctx.store?.flag('page1'),
     chapter: ctx.store?.num('planetsChapter') || 0,
     endingStep: ctx.store?.num('endingStep') || 0,
+    earthDay: !!ctx.store?.flag('earthDay'),
     flying: !!document.body.dataset.flying,
     epilogue: !!document.querySelector('#endStage.show'),
     opening: !!(document.getElementById('b612Gate') || document.getElementById('b612film')),

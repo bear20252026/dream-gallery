@@ -18,6 +18,7 @@ import {
 let gateArmed = true; // 见 planet-logic.gateStep:触发即解除,走出半径重新武装(防返回回弹)
 
 const padBtn = document.createElement('button');
+padBtn.id = 'gateBtn'; // 布局样式(ui/hud-layout.js)按 id 定位
 const padLabel = () => tt({ zh: '✦ 进入 B612', en: '✦ Enter B612' });
 padBtn.textContent = padLabel();
 window.addEventListener('script:lang', () => {

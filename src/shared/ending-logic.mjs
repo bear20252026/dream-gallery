@@ -11,8 +11,11 @@
 export const ENDING = Object.freeze({ NONE: 0, BOOK: 1, WELL: 2, FAREWELL: 3, DONE: 4 });
 export const ENDING_MAX = 4;
 
-/** 酒鬼章(327)完成 = chapter>=3。B612 三页(page1)也必须已读。 */
-export const ENDING_GATE_CHAPTER = 3;
+/** 六颗星全部走完 = chapter>=6(2026-10-04 第 8~9 场建成后从 3 改到 6)。B612 三页(page1)也必须已读。
+ *  之后先在沙漠里走「地球之日」(earth-day.js,存 earthDay),走完才去找井。 */
+export const ENDING_GATE_CHAPTER = 6;
+/** 旧门槛(327 完成);只用于识别「已在旧版里开始结局线」的存档 */
+export const LEGACY_GATE_CHAPTER = 3;
 
 export function clampEnding(n) {
   n = Math.floor(Number(n) || 0);
@@ -28,7 +31,10 @@ export function advanceEnding(current, next) {
 /** 是否该进入结局线(画册页从这里开始) */
 export function endingReady(flags) {
   const f = flags || {};
-  return !!f.page1 && (Number(f.chapter) || 0) >= ENDING_GATE_CHAPTER;
+  const ch = Number(f.chapter) || 0;
+  // 老存档(2026-10-04 之前在 327 后已翻开过临时画册页、结局线已起步)照旧走完结局,不被拉回 328
+  const legacy = ch >= LEGACY_GATE_CHAPTER && (Number(f.endingStep) || 0) > 0;
+  return !!f.page1 && (ch >= ENDING_GATE_CHAPTER || legacy);
 }
 
 /**
@@ -44,7 +50,7 @@ export function pagesFromEnding(step) {
 export function endingBeat(step) {
   switch (clampEnding(step)) {
     case 0:
-      return { code: 'ending-book', en: 'Pages VI–VIII — the book continues', zh: '书页六~八 · 这本书还没写完' };
+      return { code: 'ending-earth', en: 'Page VIII — a day on Earth', zh: '书页八 · 地球之日' };
     case 1:
       return { code: 'ending-well', en: 'Page IX — looking for a well', zh: '书页九 · 找一口井' };
     case 2:
@@ -62,11 +68,11 @@ export function endingNext(step, world) {
   switch (clampEnding(step)) {
     case 0:
       return inMain
-        ? { code: 'next-book', en: 'Open the book — tap the card at the bottom of the screen', zh: '翻开书——点屏幕下方的卡片' }
+        ? { code: 'next-earth', en: 'Follow the arrow to the places he first walked on Earth', zh: '跟着箭头,去他刚来地球时走过的地方' }
         : {
-            code: 'next-book-return',
-            en: 'Go back to the desert through the stone ring; the book will open there',
-            zh: '从石环回到沙漠，书会在那里翻开',
+            code: 'next-earth-return',
+            en: 'Tap “Travel on” — the Earth is the next page',
+            zh: '点「继续旅途」——下一页是地球',
           };
     case 1:
       return { code: 'next-well', en: 'No compass tonight. Stand still, listen, walk toward the water', zh: '今夜没有罗盘。站定，听，朝水声走' };

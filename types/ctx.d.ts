@@ -206,6 +206,13 @@ export interface UINamespace {
   advanceDialog: () => void;
   portfolio: { open: () => void; count: () => number } | null;
   chapterMap: { open: () => void } | null;
+  voyage: {
+    offer: (delayMs?: number, stop?: string) => void;
+    open: (stop?: string) => boolean;
+    next: () => string | null;
+    isOpen: () => boolean;
+    arrived: (world: string) => boolean;
+  } | null;
   storyMusic: {
     now: () => string | null;
     cue: () => string | null;
@@ -325,6 +332,8 @@ export type EventBus = import('../src/event-bus.js').EventBus;
 // ===================== Window 探针钩子(运行时挂载,均为诊断用途) =====================
 
 declare global {
+  /** 构建时由 vite.config.js define 注入的版本戳(源码直跑时不存在) */
+  const __B612_BUILD__: { n: number; hash: string; date: string } | undefined;
   // eslint-disable-next-line @typescript-eslint/no-empty-interface
   interface Window {
     [key: string]: any;

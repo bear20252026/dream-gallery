@@ -197,6 +197,9 @@ function armB612() {
     ctx.ui.journey?.clearGoal?.(OWNER);
     return;
   }
+  // 旅途卡(2026-10-04 衔接整改):王子说完「你也看见了吗」,翻出「第四夜 · 国王」直接启程;
+  // 选「再待一会儿」时,下面的石门光柱照旧指路(同一扇门通 B612)
+  ctx.ui.voyage?.offer(1200);
   if (b612Beacon) {
     guideB612();
     return;

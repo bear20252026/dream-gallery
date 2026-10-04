@@ -295,6 +295,11 @@ function createGameShellSystem() {
       quest: { zh: '任 务 册', en: 'Story progress' },
       notebook: { zh: '旅 途 手 札', en: 'Travel notebook' },
       leave: { zh: '离 开 这 段 回 忆', en: 'Leave this memory' },
+      controls: { zh: '怎 么 走 动', en: 'How to move' },
+      lang: { zh: '语言 · English', en: 'Language · 中文' },
+      music: ctx.store.flag('musicOff')
+        ? { zh: '音乐 · 已关', en: 'Music · off' }
+        : { zh: '音乐 · 开', en: 'Music · on' },
       close: { zh: '继 续 游 历', en: 'Continue journey' },
     };
     for (const [act, label] of Object.entries(labels))
@@ -320,6 +325,9 @@ function createGameShellSystem() {
         <button class="m-btn" data-act="quest">任 务 册</button>
         <button class="m-btn" data-act="notebook">旅 途 手 札</button>
         <button class="m-btn" data-act="leave">离 开 这 段 回 忆</button>
+        <button class="m-btn m-phone" data-act="controls">怎 么 走 动</button>
+        <button class="m-btn m-phone" data-act="lang">Language · 中文</button>
+        <button class="m-btn m-phone" data-act="music">Music · on</button>
         <button class="m-btn" data-act="close">继 续 游 历</button>
       </div>`;
     document.body.appendChild(menuEl);
@@ -350,6 +358,18 @@ function createGameShellSystem() {
       // 进度按段保存(homeMemoryStep 等),回来从当前段继续
       if ((ctx.scene.activeWorld || 'main') !== 'main') ctx.scene.toMainWorld?.();
     };
+    // 手机上收进菜单的三个小钮(屏幕上的原钮在手机上隐藏,见 ui/hud-layout.js);直接转点原钮,行为一致
+    const relay = (act, id, close) => {
+      /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="' + act + '"]')).onclick =
+        () => {
+          if (close) menuApi.close();
+          document.getElementById(id)?.click();
+          refreshMenu();
+        };
+    };
+    relay('controls', 'ctlHelpBtn', true);
+    relay('lang', 'hudLang', false);
+    relay('music', 'ab', false);
     menuEl.querySelector('[data-act="close"]').onclick = () => menuApi.close();
     menuApi = ctx.overlay.register(menuEl, {
       display: 'flex',

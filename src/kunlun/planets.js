@@ -998,7 +998,7 @@ onTick(function (dt) {
     islands.forEach(function (isl, i) {
       isl.mote.rotation.y += 0.01;
       if (!isl.mote.visible) return;
-      if (i === 4) {
+      if (i === 4 && !isl.props.userData.lampHead.userData.manual) {
         const on = Math.floor((performance.now() * 0.001) / 1.2) % 2 === 0;
         isl.props.userData.lampHead.material.color.set(on ? 0xffe9b0 : 0x555044);
       }
@@ -1022,7 +1022,7 @@ onTick(function (dt) {
         return p.built;
       }).pop();
       const goTarget = nextBuilt || lastBuilt;
-      const goLabel = nextBuilt
+      let goLabel = nextBuilt
         ? tt({ zh: '前往 ', en: 'Visit ' }) +
           nextBuilt.num +
           ' ' +
@@ -1032,9 +1032,16 @@ onTick(function (dt) {
           lastBuilt.num +
           ' ' +
           tt({ zh: lastBuilt.name, en: lastBuilt.en });
-      const goFn = function () {
+      let goFn = function () {
         goPlanetNum(goTarget.num);
       };
+      // 星球都走完、地球那一天还没过(2026-10-04):下一步是「第八天 · 地球」旅途卡
+      if (ctx.ui.voyage && ctx.ui.voyage.next() === 'earth') {
+        goLabel = tt({ zh: '下一页 · 地球 →', en: 'Next page · the Earth →' });
+        goFn = function () {
+          ctx.ui.voyage.open('earth');
+        };
+      }
       setNav(true, tt({ zh: '返回沙漠', en: 'Back to the desert' }), goMainWorld, goLabel, goFn);
       ctx.ui.journey?.setPhase('travel-hub', {
         world: 'b612',
@@ -1045,6 +1052,23 @@ onTick(function (dt) {
         },
         lock: chapter === 0,
       });
+    } else if (
+      /^king/.test(activeWorld) &&
+      !kingMemoryOpen(activeWorld) &&
+      ctx.ui.voyage &&
+      ctx.ui.voyage.next() &&
+      !ctx.ui.voyage.isOpen()
+    ) {
+      // 这颗星已走完、旅途还没到头(2026-10-04 衔接整改):主按钮 = 「下一夜 →」翻旅途卡直达下一站
+      setNav(
+        true,
+        tt({ zh: '继续旅途 →', en: 'Travel on →' }),
+        function () {
+          ctx.ui.voyage.open();
+        },
+        tt({ zh: '← 返回 B612', en: '← Back to B612' }),
+        goB612Back
+      );
     } else if (/^king/.test(activeWorld) && !kingMemoryOpen(activeWorld)) {
       setNav(
         true,

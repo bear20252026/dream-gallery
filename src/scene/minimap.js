@@ -18,7 +18,9 @@ const { OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
 export const mapCanvas = document.getElementById('mc');
 const mapCtx = mapCanvas.getContext('2d');
 // 放大档 2026-10-03 加大(测试反馈「小地图太小」):桌面 320,窄屏按视口收,最小 220
-const SMALL = 150,
+// 手机上小图缩到 112(2026-10-03 测试反馈「手机顶部挤成一团」)
+const PHONE = typeof innerWidth === 'number' && innerWidth <= 600;
+const SMALL = PHONE ? 112 : 150,
   BIG =
     typeof innerWidth === 'number'
       ? Math.round(Math.min(320, Math.max(220, Math.min(innerWidth - 40, innerHeight - 200))))
@@ -26,6 +28,13 @@ const SMALL = 150,
 let mBig = false;
 mapCanvas.width = SMALL;
 mapCanvas.height = SMALL;
+{
+  const mDiv0 = document.getElementById('m');
+  if (mDiv0) {
+    mDiv0.style.width = SMALL + 'px';
+    mDiv0.style.height = SMALL + 'px';
+  }
+}
 
 // 放大按钮(纸片小方章风;必须落在圆形命中区内——border-radius:50% 会把圆外点击裁掉)
 const mBigBtn = document.createElement('button');

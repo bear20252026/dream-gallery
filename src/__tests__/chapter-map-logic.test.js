@@ -31,7 +31,18 @@ function fakeStore(init = {}) {
 
 describe('chapter map', () => {
   it('按原著顺序:坠机 → 家 → 已建成的星球 → 结局', () => {
-    expect(ids()).toEqual(['crash', 'home', 'king325', 'king326', 'king327', 'ending']);
+    expect(ids()).toEqual([
+      'crash',
+      'home',
+      'king325',
+      'king326',
+      'king327',
+      'king328',
+      'king329',
+      'king330',
+      'earth',
+      'ending',
+    ]);
   });
   it('新存档:只有第一章是当前,其余锁住', () => {
     expect(states({})).toEqual({
@@ -40,6 +51,10 @@ describe('chapter map', () => {
       king325: 'locked',
       king326: 'locked',
       king327: 'locked',
+      king328: 'locked',
+      king329: 'locked',
+      king330: 'locked',
+      earth: 'locked',
       ending: 'locked',
     });
   });
@@ -50,9 +65,12 @@ describe('chapter map', () => {
     expect(s.king325).toBe('current');
     expect(s.king326).toBe('locked');
   });
-  it('327 完成后结局是当前;结局走完全部完成', () => {
-    const f = { scene2: true, page1: true, chapter: 3 };
-    expect(states(f).ending).toBe('current');
+  it('六颗星走完 → 地球之日是当前;地球走完 → 结局是当前;结局走完全部完成', () => {
+    expect(states({ scene2: true, page1: true, chapter: 3 }).king328).toBe('current');
+    const f = { scene2: true, page1: true, chapter: 6 };
+    expect(states(f).earth).toBe('current');
+    expect(states(f).ending).toBe('locked');
+    expect(states({ ...f, earthDay: true }).ending).toBe('current');
     expect(states({ ...f, endingStep: 4 }).ending).toBe('done');
   });
   it('只能去已完成或当前的章节', () => {

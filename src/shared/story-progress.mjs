@@ -68,7 +68,7 @@ export function pagesFromHomeStep(homeMemoryStep) {
  * 书页数单一真相(2026-10-03)。任务册「书页 x / 9」与「进程」行必须同源,
  * 否则会出现「进程:书页五 进行中」与「书页:1 / 9」自相矛盾(2026-10-03 修)。
  * 三段进度取最大:开场弧线(B612 三页) / 星球章节 / 已完成 B612 站数。
- * @param {{scene2?:boolean,page1?:boolean,chapter?:number,homeMemoryStep?:number,endingStep?:number}} flags
+ * @param {{scene2?:boolean,page1?:boolean,chapter?:number,homeMemoryStep?:number,endingStep?:number,earthDay?:boolean}} flags
  * @returns {number} 0..PAGES_TOTAL
  */
 export function readPages(flags) {
@@ -78,7 +78,8 @@ export function readPages(flags) {
   // 剧本书页一二三 = B612 三场,书页四起才是星球线,所以 page1 之前一律不看章节。
   const chapterPages = f.page1 ? pagesBonusForChapter(f.chapter, true) : 0;
   // 结局线(2026-10-03):画册页六~八 + 找井/告别 = 书页六~九。只在 327 完成后参与。
-  const endPages = endingReady(f) ? pagesFromEnding(f.endingStep) : 0;
+  // 2026-10-04:地球之日走完 = 书页八完成(8 页)
+  const endPages = endingReady(f) ? Math.max(pagesFromEnding(f.endingStep), f.earthDay ? 8 : 0) : 0;
   return Math.min(PAGES_TOTAL, Math.max(1, home, chapterPages, endPages));
 }
 
@@ -164,8 +165,8 @@ export function storyNext(flags) {
   }
   return {
     code: 'next-planet' + ch,
-    en: 'Next: ' + p.num + ' ' + p.en + ' — tap the button below, pick up the stardust',
-    zh: '下一步：去 ' + p.num + ' ' + p.name + '——点屏幕下方按钮进星球，拾起星屑',
+    en: 'Next: ' + p.num + ' ' + p.en + ' — tap “Travel on” at the bottom, listen, then pick up the stardust',
+    zh: '下一步：去 ' + p.num + ' ' + p.name + '——点屏幕下方「继续旅途」，听完对话，拾起星屑',
   };
 }
 

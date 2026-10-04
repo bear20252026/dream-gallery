@@ -412,8 +412,8 @@ async function checkCompletion() {
     chapter: { zh: '家的回忆 · 已完成', en: 'Memories of home · complete' },
     title: { zh: '把她的告别留在手札里', en: 'Keep her farewell' },
     hint: {
-      zh: '你已走完火山、幼苗、日落和玫瑰。现在回到沙漠听小王子说话，再穿过石门，继续前往国王的星球。',
-      en: 'You have seen the volcanoes, sprouts, sunsets and rose. Return to the desert, hear him speak, then cross the gate again to visit the King.',
+      zh: '你已走完火山、幼苗、日落和玫瑰。回到沙漠听他说完，他的旅途就从下一页开始。',
+      en: 'You have seen the volcanoes, sprouts, sunsets and rose. Return to the desert and hear him out — his journey begins on the next page.',
     },
     action: { zh: '回到沙漠', en: 'Return to the desert' },
   });

@@ -24,10 +24,10 @@ describe('结局线进度', () => {
     expect(clampEnding(-3)).toBe(0);
     expect(clampEnding('x')).toBe(0);
   });
-  it('327 完成且书页一已读才开始', () => {
-    expect(endingReady({ page1: true, chapter: 3 })).toBe(true);
-    expect(endingReady({ page1: true, chapter: 2 })).toBe(false);
-    expect(endingReady({ page1: false, chapter: 3 })).toBe(false);
+  it('六颗星都走完且书页一已读才开始', () => {
+    expect(endingReady({ page1: true, chapter: 6 })).toBe(true);
+    expect(endingReady({ page1: true, chapter: 3 })).toBe(false);
+    expect(endingReady({ page1: false, chapter: 6 })).toBe(false);
     expect(endingReady()).toBe(false);
   });
   it('书页换算单调不减,告别后满 9 页', () => {
@@ -52,8 +52,8 @@ describe('结局线进度', () => {
     expect(endingBeat(ENDING.DONE).code).toBe('finale');
   });
   it('还在星球里时,先指回沙漠', () => {
-    expect(endingNext(0, 'b612').code).toBe('next-book-return');
-    expect(endingNext(0, 'main').code).toBe('next-book');
+    expect(endingNext(0, 'b612').code).toBe('next-earth-return');
+    expect(endingNext(0, 'main').code).toBe('next-earth');
   });
 });
 

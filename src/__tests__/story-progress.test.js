@@ -39,9 +39,13 @@ describe('进程节拍 storyBeat(2026-09-26「情节推进理解困难」单一�
     expect(storyBeat({ scene2: true, page1: true, chapter: 1 }).zh).toBe('326 · 虚荣之星');
     expect(storyBeat({ scene2: true, page1: true, chapter: 2 }).code).toBe('planet2');
   });
-  it('327 完成后接结局线(2026-10-03 先做结局):画册页 → 井 → 告别 → 尾声 → 终章', () => {
-    const f = { scene2: true, page1: true, chapter: 3 };
-    expect(storyBeat(f).code).toBe('ending-book');
+  it('330 完成后接结局线(2026-10-04):地球之日 → 井 → 告别 → 尾声 → 终章', () => {
+    const f = { scene2: true, page1: true, chapter: 6 };
+    expect(storyBeat(f).code).toBe('ending-earth');
+    // 327 完成只到 328(2026-10-04 起六颗星都建成)
+    expect(storyBeat({ ...f, chapter: 3 }).code).toBe('planet3');
+    // 老存档:旧版已在 327 后起步结局线 → 照旧走完
+    expect(storyBeat({ ...f, chapter: 3, endingStep: 1 }).code).toBe('ending-well');
     expect(storyBeat({ ...f, endingStep: 1 }).code).toBe('ending-well');
     expect(storyBeat({ ...f, endingStep: 2 }).code).toBe('ending-farewell');
     expect(storyBeat({ ...f, endingStep: 3 }).code).toBe('ending-epilogue');
@@ -49,7 +53,7 @@ describe('进程节拍 storyBeat(2026-09-26「情节推进理解困难」单一�
     expect(storyBeat({ ...f, chapter: 6, endingStep: 4 }).code).toBe('finale');
   });
   it('脏 chapter 钳制后照常给节拍(99→结局线,-5→325)', () => {
-    expect(storyBeat({ scene2: true, page1: true, chapter: 99 }).code).toBe('ending-book');
+    expect(storyBeat({ scene2: true, page1: true, chapter: 99 }).code).toBe('ending-earth');
     expect(storyBeat({ scene2: true, page1: true, chapter: -5 }).code).toBe('planet0');
   });
 });
@@ -76,15 +80,15 @@ describe('下一步指引 storyNext(2026-09-27「剧情发展指引不清」单�
     expect(n.code).toBe('next-planet0');
     expect(n.zh).toContain('325');
   });
-  it('327 之后不再指向没建成的空岛,改指结局线(2026-10-03 画册页)', () => {
+  it('六颗星都建成:327 之后照常指向 328/329/330,330 之后指地球之日(2026-10-04)', () => {
     for (const ch of [3, 4, 5]) {
       const n = storyNext({ scene2: true, page1: true, chapter: ch });
-      expect(n.code).toBe('next-book');
+      expect(n.code).toBe('next-planet' + ch);
       expect(n.code).not.toBe('next-await');
     }
-    // 还在星球里:先回沙漠,书在那里翻开
-    expect(storyNext({ scene2: true, page1: true, chapter: 3, world: 'king327' }).code).toBe(
-      'next-book-return'
+    expect(storyNext({ scene2: true, page1: true, chapter: 6 }).code).toBe('next-earth');
+    expect(storyNext({ scene2: true, page1: true, chapter: 6, world: 'king330' }).code).toBe(
+      'next-earth-return'
     );
   });
   it('建成的站照常指路:chapter=1 去 326,chapter=2 去 327(2026-09-27 第7场)', () => {
@@ -96,14 +100,14 @@ describe('下一步指引 storyNext(2026-09-27「剧情发展指引不清」单�
     expect(n2.zh).toContain('327');
   });
   it('结局线逐步指引:井 → 告别 → 星星 → 完', () => {
-    const f = { scene2: true, page1: true, chapter: 3 };
+    const f = { scene2: true, page1: true, chapter: 6 };
     expect(storyNext({ ...f, endingStep: 1 }).code).toBe('next-well');
     expect(storyNext({ ...f, endingStep: 2 }).code).toBe('next-farewell');
     expect(storyNext({ ...f, endingStep: 3 }).code).toBe('next-epilogue');
     expect(storyNext({ ...f, endingStep: 4 }).code).toBe('next-done');
   });
   it('脏 chapter 同 storyBeat 钳制(99→结局线,-5→325)', () => {
-    expect(storyNext({ scene2: true, page1: true, chapter: 99 }).code).toBe('next-book');
+    expect(storyNext({ scene2: true, page1: true, chapter: 99 }).code).toBe('next-earth');
     expect(storyNext({ scene2: true, page1: true, chapter: -5 }).code).toBe('next-planet0');
   });
 });
@@ -238,9 +242,10 @@ describe('书页单一真相 readPages(2026-10-03)', () => {
     }
     expect(prev).toBe(7);
   });
-  it('结局线把书页推到 8、9(画册页六~八 = 8 页,告别 = 9 页),单调不减', () => {
-    const f = { scene2: true, page1: true, chapter: 3 };
-    expect(readPages({ ...f, endingStep: 0 })).toBe(5);
+  it('结局线把书页推到 8、9(地球之日 = 8 页,告别 = 9 页),单调不减', () => {
+    const f = { scene2: true, page1: true, chapter: 6 };
+    expect(readPages({ ...f, endingStep: 0 })).toBe(7);
+    expect(readPages({ ...f, endingStep: 0, earthDay: true })).toBe(8);
     expect(readPages({ ...f, endingStep: 1 })).toBe(8);
     expect(readPages({ ...f, endingStep: 2 })).toBe(8);
     expect(readPages({ ...f, endingStep: 3 })).toBe(9);

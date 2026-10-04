@@ -7,8 +7,9 @@ import { i18nAttr } from './i18n-dom.js'; // 界面文字中英切换(2026-10-03
 export function createGlideHUD({ onJumpPress, onJumpRelease, onDescendPress, onDescendRelease }) {
   // ---- 滑翔能量 HUD(顶部中央五格,原版样式:细条+回充脉冲) ----
   const glideHud = document.createElement('div');
+  glideHud.id = 'glideHud';
   glideHud.style.cssText =
-    'position:fixed;top:70px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:35;pointer-events:none';
+    'position:fixed;top:70px;left:50%;transform:translateX(-50%);display:flex;gap:6px;z-index:35;pointer-events:none;transition:opacity .4s';
   const glidePips = [];
   for (let i = 0; i < 5; i++) {
     const pip = document.createElement('div');
@@ -106,6 +107,8 @@ export function createGlideHUD({ onJumpPress, onJumpRelease, onDescendPress, onD
         pip.classList.toggle('recharge', pl.onGround && i >= n);
       });
       jumpBtn.classList.toggle('gliding', pl.gliding);
+      // 能量满且站在地上时不显示(2026-10-03 减少顶部拥挤;跳起/滑翔/回充时才出现)
+      glideHud.style.opacity = !pl.onGround || n < 5 ? '1' : '0';
     },
   };
 }

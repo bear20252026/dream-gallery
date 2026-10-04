@@ -31,9 +31,10 @@ describe('story music cues', () => {
     expect(pickCue({ scene2: true, page1: true, chapter: 1 })).toBe('salvation');
     expect(pickCue({ world: 'main', flying: true })).toBe('salvation');
   });
-  it('结局:画册页与告别放 Somewhere Only We Know,找井静音,尾声也是它', () => {
-    const f = { scene2: true, page1: true, chapter: 3, endingReady: true };
-    expect(pickCue({ ...f, endingStep: 0 })).toBe('somewhere');
+  it('结局:地球之日回到 Turnaround;之后告别放 Somewhere Only We Know,找井静音,尾声也是它', () => {
+    const f = { scene2: true, page1: true, chapter: 6, endingReady: true };
+    expect(pickCue({ ...f, endingStep: 0 })).toBe('turnaround');
+    expect(pickCue({ ...f, endingStep: 0, earthDay: true })).toBe('somewhere');
     expect(pickCue({ ...f, endingStep: 1 })).toBeNull();
     expect(pickCue({ ...f, endingStep: 2 })).toBe('somewhere');
     expect(pickCue({ ...f, endingStep: 4 })).toBe('somewhere');

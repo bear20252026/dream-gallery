@@ -6,6 +6,19 @@ import { resolve } from 'path';
 import { createHtmlPlugin } from 'vite-plugin-html';
 import fs from 'fs';
 import { minify as terserMinify } from 'terser';
+import { execSync } from 'child_process';
+
+// 版本戳(2026-10-03 主人要「版本号自动更新」):每次构建从 git 读出
+//   版本号 v1.<提交总数>(每发布一次 +1)、短哈希、提交日期;闸门底行「Updated … · v1.N」显示。
+// release.sh 先提交再由 deploy.sh 构建,所以线上显示的就是这次发布的那个提交。
+function buildStamp() {
+  const git = (cmd) => execSync('git ' + cmd, { cwd: __dirname, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+  try {
+    return { n: Number(git('rev-list --count HEAD')), hash: git('rev-parse --short HEAD'), date: git('log -1 --format=%cs') };
+  } catch (e) {
+    return { n: 0, hash: '', date: new Date().toISOString().slice(0, 10) };
+  }
+}
 
 // 构建钩子:压缩 public/sw.js,产物覆盖到 dist/sw.js(源文件不变,部署用压缩版)
 const minifySw = () => ({
@@ -65,6 +78,7 @@ const corePreloadInject = () => ({
 
 export default defineConfig({
   root: '.',
+  define: { __B612_BUILD__: JSON.stringify(buildStamp()) },
   // 路径别名:@/ → src/(模块内可用,如 import {ctx} from '@/ctx.js')
   resolve: { alias: {
     '@': resolve(__dirname, 'src'),
