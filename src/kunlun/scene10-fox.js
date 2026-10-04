@@ -16,6 +16,16 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { eventBus } from '../core/event-bus.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
+import {
+  groundShift,
+  lowestGround,
+  STAGE,
+  STAGE_SINK,
+  STANDING,
+  CLOUDS,
+  CLOUD_LIFT,
+  SEAT_LANTERN,
+} from '../shared/fox-ground-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
 import { tt, SCENE_FOX, FOX_UI } from '../shared/story-text.mjs';
 
@@ -102,6 +112,43 @@ function inHour() {
   return new Date().getHours() === hour;
 }
 
+// —— Grounding (2026-10-04): the diorama's own origin left it hovering above the sand ——
+/** Move `o` by `dy` metres in world space (its parents may be scaled or rotated). */
+function liftWorld(o, dy) {
+  if (!dy) return;
+  const wp = o.getWorldPosition(new THREE.Vector3());
+  wp.y += dy;
+  o.parent.worldToLocal(wp);
+  o.position.copy(wp);
+  o.updateMatrixWorld(true);
+}
+function groundDiorama(m) {
+  root.updateMatrixWorld(true);
+  const box = (o) => new THREE.Box3().setFromObject(o);
+  // 1) the rocky stage sinks to just under the lowest sand in its footprint (moves the whole model with it)
+  const stage = m.getObjectByName(STAGE);
+  if (stage) {
+    const b = box(stage);
+    const low = lowestGround(groundH, { minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z });
+    liftWorld(m, groundShift(b.min.y, low, -STAGE_SINK));
+  }
+  // 2) the fox, the prince, the grass and the wheat stand on the sand under each of them
+  for (const name of STANDING) {
+    const o = m.getObjectByName(name);
+    if (!o) continue;
+    const b = box(o);
+    const c = b.getCenter(new THREE.Vector3());
+    liftWorld(o, groundShift(b.min.y, groundH(c.x, c.z)));
+  }
+  // 3) the cloud strip comes down to a low mist bank instead of hanging 4 m up
+  const clouds = m.getObjectByName(CLOUDS);
+  if (clouds) {
+    const b = box(clouds);
+    const c = b.getCenter(new THREE.Vector3());
+    liftWorld(clouds, groundShift(b.min.y, groundH(c.x, c.z), CLOUD_LIFT));
+  }
+}
+
 // —— 3D ——
 function build() {
   if (built) return;
@@ -130,6 +177,7 @@ function build() {
         m.position.y -= new THREE.Box3().setFromObject(m).min.y;
       }
       root.add(m);
+      groundDiorama(m);
       // 找狐狸与王子节点(用于"狐狸在/不在"的表现)
       foxNode = m.getObjectByName('Zorro_5') || null;
       princeNode = m.getObjectByName('Principito_4') || null;
@@ -152,8 +200,10 @@ function build() {
 function placeSeat() {
   if (!seatMesh) return;
   const s = SEATS[Math.min(current, SEATS.length - 1)];
-  seatMesh.position.set(s.x, 1.1, s.z);
-  if (light) light.position.set(s.x, 1.6, s.z);
+  // a low lantern on the sand, not an orb hanging in the air
+  const y = groundH(SITE.x + s.x, SITE.z + s.z) - root.position.y + SEAT_LANTERN;
+  seatMesh.position.set(s.x, y, s.z);
+  if (light) light.position.set(s.x, y + 0.5, s.z);
 }
 
 // —— 面板 ——

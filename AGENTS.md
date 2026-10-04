@@ -1,5 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-04 The fox diorama now rests on the sand (pushed to the work branch, not yet released)
+
+- Bug: in the Earth-day fox scene (`kunlun/scene10-fox.js`, at `SITE` = (-46, 34) in the main world) the Sketchfab diorama kept its own origin, so the rocky stage ("the map") hovered ~0.7 m above the sand, the fox, prince, grass and wheat ~1.1 m up, a strip of cloud ~3.7 m up, and the glowing seat marker hung in the air at 1.1 m.
+- Fix: `groundDiorama()` runs once after the model loads. The stage (`Escenario_0`) sinks to 0.12 m under the lowest sand in its footprint (moving the whole model, trees included); the fox, prince, grass and wheat (`Zorro_5`, `Principito_4`, `Pasto_8`, `Trigo_9`) each rest on the sand under them; the cloud strip (`Nubes_2`) is lowered to 0.3 m above the sand; the seat marker is a low lantern 0.35 m above the sand. Arithmetic and the part names live in `shared/fox-ground-logic.mjs` (unit-tested).
+- The cloud strip now lies on the sand as a pale low-poly slab. If that looks odd in play, hide it (`clouds.visible = false` in `groundDiorama`) instead.
+- Acceptance: `PW_BROWSER=chromium node scripts/probe/fox-ground-probe.cjs` (8 checks: every part's gap to the terrain under it). Before the fix the same measurements were 0.7-3.7 m.
+
 ## 2026-10-04 Witness cards for 325 / 326 / 327 (pushed to the work branch, not yet released)
 
 - Owner decision: **the player stays a ghost in the memories** (finalized script rule one). The King, the Vain Man and the Tippler never see or answer the player, and no finalized line changes. Instead a small private paper card appears after the dialogue (`ui/witness-card.js`, `ctx.ui.witness.ask(id, {target})`, rules and text in `shared/witness-logic.mjs`, unit-tested):
