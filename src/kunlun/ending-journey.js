@@ -23,6 +23,7 @@ import { tt } from '../shared/story-text.mjs';
 import { avAllowed } from '../core/av-switch.js';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { openBook, sketchSvg } from '../ui/book-pages.js';
+import { epilogueKeepsake, keepsakeIds } from '../shared/portfolio-logic.mjs';
 import {
   BOOK_PAGES,
   SCENE_WELL,
@@ -95,6 +96,11 @@ const STYLE = `
 #endStage .sk{width:min(240px,50vw);margin:0 auto 14px;opacity:.9}
 #endStage .sk svg{width:100%;height:auto;fill:none;stroke:#e8d9b6;stroke-width:2.2;stroke-linecap:round}
 #endStage .sk svg .faint{stroke:#8f8572}
+#endStage .own{width:min(260px,56vw,40dvh);margin:0 auto 14px;padding:8px;background:#f1e7cc;border-radius:3px 14px;transform:rotate(-1.2deg);box-shadow:0 10px 30px #0008}
+#endStage .own-note{font-size:13px;line-height:1.5;color:#cdbfa6;text-align:center;margin:0 auto 12px;max-width:min(360px,80vw)}
+#endStage .pf-strip{display:flex;justify-content:center;gap:10px;margin:0 auto 14px;flex-wrap:wrap}
+#endStage .pf-strip button{width:min(84px,20vw);padding:4px;background:#f1e7cc;border:0;border-radius:3px 10px;cursor:pointer;transform:rotate(-1deg)}
+#endStage .pf-strip button:nth-child(even){transform:rotate(1.2deg)}
 #endStage .btns{margin-top:28px;display:flex;justify-content:center;gap:12px;flex-wrap:wrap;opacity:0;transition:opacity 1s ease}
 #endStage .btns.on{opacity:1}
 #endStage button{font:inherit;font-size:16px;cursor:pointer;color:#f6e6c4;background:rgba(255,236,190,.08);
@@ -903,7 +909,19 @@ function stageCaption(entry, opts = {}) {
     stageEntry = entry;
     cap.innerHTML = `${opts.kick ? `<div class="kick">${esc(tt(opts.kick))}</div>` : ''}${
       opts.sketch ? `<div class="sk">${sketchSvg(opts.sketch)}</div>` : ''
+    }${opts.own ? '<div class="own"></div>' : ''}${
+      opts.own ? `<div class="own-note">${esc(tt(opts.own.note))}</div>` : ''
     }<div class="txt">${esc(tt(entry))}</div><div class="txt2">${esc(other(entry) || '')}</div><div class="btns"></div>`;
+    if (opts.own) {
+      // The player's own drawing; if it cannot be drawn, drop the frame and its note rather than show an empty one.
+      const frame = cap.querySelector('.own');
+      const thumb = ctx.ui.portfolio?.thumb?.(opts.own.id);
+      if (thumb) frame.appendChild(thumb);
+      else {
+        frame.remove();
+        cap.querySelector('.own-note')?.remove();
+      }
+    }
     requestAnimationFrame(() => {
       cap.querySelector('.txt').classList.add('on');
       setTimeout(() => cap.querySelector('.txt2').classList.add('on'), 700);
@@ -977,7 +995,9 @@ async function playEpilogue() {
   await stageCaption(E.captions[1]);
   bellsOff();
   await stageCaption(E.captions[2], { sketch: 'muzzle' });
+  const keepsake = epilogueKeepsake(ctx.store.json('portfolio', {}));
   const ans = await stageCaption(E.question, {
+    own: keepsake,
     choices: [
       { label: ENDING_UI.answerNo, value: 'no' },
       { label: ENDING_UI.answerYes, value: 'yes' },
@@ -1012,6 +1032,25 @@ async function playEpilogue() {
       })
     )}</div>`;
   sky.laugh(8000);
+  // Keepsakes: small copies of the drawings the player actually made, each opening the portfolio.
+  const kept = keepsakeIds(ctx.store.json('portfolio', {}));
+  if (kept.length) {
+    const strip = document.createElement('div');
+    strip.className = 'pf-strip';
+    for (const id of kept) {
+      const thumb = ctx.ui.portfolio?.thumb?.(id);
+      if (!thumb) continue;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.appendChild(thumb);
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        ctx.ui.portfolio?.open();
+      };
+      strip.appendChild(b);
+    }
+    if (strip.childElementCount) cap.querySelector('.btns').before(strip);
+  }
   /** @type {HTMLElement} */ (cap.querySelector('[data-e="portfolio"]')).onclick = (ev) => {
     ev.stopPropagation();
     ctx.ui.portfolio?.open();

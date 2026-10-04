@@ -204,7 +204,7 @@ export interface UINamespace {
   dialogOpen: () => boolean;
   cancelDialogScope: (scope: string) => void;
   advanceDialog: () => void;
-  portfolio: { open: () => void; count: () => number } | null;
+  portfolio: { open: () => void; count: () => number; thumb: (id: string) => SVGSVGElement | null } | null;
   chapterMap: { open: () => void } | null;
   starMap: { open: () => void; close: () => void; isOpen: () => boolean } | null;
   voyage: {

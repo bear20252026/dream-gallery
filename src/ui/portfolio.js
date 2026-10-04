@@ -178,6 +178,14 @@ export function createPortfolio() {
       /** @type {HTMLElement|null} */ (root.querySelector('.pf-close'))?.focus();
     },
     count: () => portfolioCount(ctx.store.json('portfolio', {})),
+    /** Small framed copy of one of the player's drawings for other screens (the ending), or null if not drawn. */
+    thumb(id) {
+      const entry = cleanPortfolio(ctx.store.json('portfolio', {}))[id];
+      if (!entry || !entry.strokes.length) return null;
+      const svg = drawingSvg(id, entry);
+      svg.setAttribute('style', 'width:100%;height:auto;display:block;background:#fbf5e4;border-radius:3px');
+      return svg;
+    },
   };
   const onLang = () => {
     if (api?.isOpen()) render();

@@ -1,5 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-04 The ending brings back the player's own drawings (pushed to the work branch, not yet released)
+
+- The epilogue question ("Has the sheep eaten the flower?") now shows the player's own box drawing in a paper frame, with an interface note ("The box you drew for him. The sheep he asked for was inside."). The final screen shows a strip of small copies of every drawing the player actually made; each opens the portfolio. If the player never drew the box, nothing is shown (no empty frame).
+- Pure logic `keepsakeIds` / `epilogueKeepsake` in `shared/portfolio-logic.mjs` (unit-tested). `ctx.ui.portfolio.thumb(id)` returns a small SVG copy or null. The finalized epilogue lines are untouched; the note is interface text.
+- Not done on purpose: a "laughing stars" line conditional on a drawing. The player draws only the boa, sick sheep, ram and box (the muzzle at the well is a canned sketch), so there is no star drawing to key it on.
+- Acceptance: `PW_BROWSER=chromium node scripts/probe/ending-portfolio-probe.cjs` (runs a local server; with and without a saved portfolio). Cloud note: `npm ci` is blocked, but `node node_modules/vitest/vitest.mjs run` works after a partial install, and `vendor/` must be generated with `node scripts/gen/sync-vendor.js` (git-ignored) before a browser probe can load the page. Model files are not in git, so some 3D models 404 locally; the epilogue screens do not need them.
+
 ## 2026-10-03 屏幕布局收口:手机不再挤成一团(本地,待发布)
 
 - 新增 `ui/hud-layout.js`(main.js 开机 `mountHudLayout()`):一张样式表统一排位,用 id + !important 覆盖各模块写死的位置。**以后新增屏幕按钮,先来这里排位,不要再各自写 top/right。**

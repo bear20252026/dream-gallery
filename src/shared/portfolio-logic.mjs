@@ -65,3 +65,26 @@ export function savePortfolioDrawing(store, id, strokes) {
 export function portfolioCount(raw) {
   return Object.keys(cleanPortfolio(raw)).length;
 }
+
+/** Ids of the drawings the player actually made, in story order (a round saved with no strokes does not count). */
+export function keepsakeIds(raw) {
+  const book = cleanPortfolio(raw);
+  return ROUND_IDS.filter((id) => book[id] && book[id].strokes.length > 0);
+}
+
+/**
+ * The drawing the epilogue brings back when it asks "has the sheep eaten the flower?".
+ * It is the player's own box, because the sheep the prince asked for was inside it.
+ * The note is interface text beside the drawing, never a line of the finalized script.
+ * Returns null when the player never drew the box, so nothing is shown instead of a blank frame.
+ */
+export function epilogueKeepsake(raw) {
+  if (!keepsakeIds(raw).includes('box')) return null;
+  return {
+    id: 'box',
+    note: {
+      en: 'The box you drew for him. The sheep he asked for was inside.',
+      zh: '你给他画的那只箱子。他要的羊,就在里面。',
+    },
+  };
+}

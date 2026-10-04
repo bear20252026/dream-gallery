@@ -7,6 +7,8 @@ import {
   cleanPortfolio,
   addDrawing,
   portfolioCount,
+  keepsakeIds,
+  epilogueKeepsake,
   MAX_STROKES,
   MAX_D_CHARS,
 } from '../shared/portfolio-logic.mjs';
@@ -65,5 +67,22 @@ describe('portfolio', () => {
     const b = addDrawing({}, 'boa', [], 1);
     expect(b.boa.strokes).toEqual([]);
     expect(portfolioCount(b)).toBe(1);
+  });
+  it('keepsakeIds: only drawings with strokes, in story order', () => {
+    expect(keepsakeIds(null)).toEqual([]);
+    const raw = {
+      box: { strokes: ['M0,0 L1,1'], at: 1 },
+      boa: { strokes: ['M0,0 L2,2'], at: 2 },
+      ram: { strokes: [], at: 3 },
+    };
+    expect(keepsakeIds(raw)).toEqual(['boa', 'box']);
+  });
+  it('epilogueKeepsake: shows the box only if the player drew it', () => {
+    expect(epilogueKeepsake({})).toBeNull();
+    expect(epilogueKeepsake({ box: { strokes: [], at: 1 } })).toBeNull();
+    const k = epilogueKeepsake({ box: { strokes: ['M0,0 L1,1'], at: 1 } });
+    expect(k.id).toBe('box');
+    expect(k.note.en).toBeTruthy();
+    expect(k.note.zh).toBeTruthy();
   });
 });
