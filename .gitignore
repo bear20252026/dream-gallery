@@ -56,3 +56,6 @@ dev/
 .mimosa/
 # 照片缩略图(gen-thumbs 可重建,服务器自跑)
 photos/thumbs/
+
+# 发布脚本暂存区(release/ship 的消息与日志,tgz/log 已被上面规则覆盖,这里兜底整目录)
+.tmp/
