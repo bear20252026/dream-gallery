@@ -23,12 +23,8 @@ const cdnEnabled = () => !IS_LOCAL && !window.__modelCdnDown;
 // GLTF 内部子资源(scene.bin/贴图)会以 CDN 绝对地址解析,天然走 CDN,无需在此处理。
 // 新入库、还没镜像到 R2 的模型:直接走源站(否则 CDN 404 会把整局都切回源站,别的大模型变慢)。
 // 镜像后(服务器上跑 node scripts/r2-upload-models-rest.cjs hall/b612-world/xxx.glb)从这里删掉即可。
-const NOT_ON_CDN_YET = new Set([
-  'models/hall/b612-world/garden-rose.glb',
-  'models/hall/b612-world/hero-rose.glb',
-  'models/hall/b612-world/rose-dome.glb',
-  'models/hall/b612-world/street-lamp.glb',
-]);
+// 2026-10-04:玫瑰/路灯四件真模型已镜像 R2(200 验证),摘出清单;当前清单为空。
+const NOT_ON_CDN_YET = new Set([]);
 function rewrite(url) {
   if (!cdnEnabled()) return url;
   const stripped = url.replace(/^https?:\/\/[^/]+/, '');
