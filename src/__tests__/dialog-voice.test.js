@@ -2,8 +2,8 @@
 // 2026-09-26 主人报「还是没有声音」→ 根因:闸门默认英文(scriptLang=en)而旧决策表
 // 「无汉字不读」把英文台词全拦 → 全程无声。修订:①英文行照读;②音色切 MiMo 官方
 // 预置(中文 苏打/茉莉,英文 Milo/Dean/Mia),按文本语言分轨(voiceFor 带 text)。
-import { describe, it, expect } from 'vitest';
-import { voiceFor, hasCJK, speakDecision, prefetchLine, ttsUrl } from '../core/dialog-voice.mjs';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { voiceFor, hasCJK, speakDecision, prefetchLine, ttsUrl, warmBlobByKey } from '../core/dialog-voice.mjs';
 import crypto from 'node:crypto';
 
 describe('voiceFor 说话人分声线(按文本语言分轨)', () => {
@@ -117,5 +117,59 @@ describe('ttsUrl 台词音频 URL(2026-09-26 起走 R2 镜像,前后端键契约
     expect(await ttsUrl(long, '苏打')).toBe(
       'https://cdn.cloudbear.cloud/tts-audio/' + expectKey + '.mp3'
     );
+  });
+});
+
+describe('warmBlobByKey: line audio is kept on the device between visits (2026-10-04)', () => {
+  const realFetch = globalThis.fetch;
+  const realCaches = globalThis.caches;
+  const realCreate = URL.createObjectURL;
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    globalThis.caches = realCaches;
+    URL.createObjectURL = realCreate;
+  });
+  const fakeCaches = (store) => ({
+    open: async () => ({
+      match: async (u) => store.get(u) || undefined,
+      put: async (u, r) => void store.set(u, r),
+    }),
+  });
+  const audio = (n = 4) => new Response(new Blob([new Uint8Array(n)]), { status: 200 });
+
+  it('a line already in Cache Storage loads with no network request', async () => {
+    const key = 'a'.repeat(20);
+    const store = new Map([['https://cdn.cloudbear.cloud/tts-audio/' + key + '.mp3', audio()]]);
+    globalThis.caches = fakeCaches(store);
+    globalThis.fetch = vi.fn(async () => {
+      throw new Error('network must not be used');
+    });
+    URL.createObjectURL = () => 'blob:test-hit';
+    expect(await warmBlobByKey(key)).toBe(true);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('a new line is fetched once and then stored for the next visit', async () => {
+    const key = 'b'.repeat(20);
+    const store = new Map();
+    globalThis.caches = fakeCaches(store);
+    globalThis.fetch = vi.fn(async () => audio());
+    URL.createObjectURL = () => 'blob:test-miss';
+    expect(await warmBlobByKey(key)).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(store.has('https://cdn.cloudbear.cloud/tts-audio/' + key + '.mp3')).toBe(true);
+  });
+
+  it('works when Cache Storage is missing or broken, and a 404 is not cached', async () => {
+    const key = 'c'.repeat(20);
+    globalThis.caches = { open: async () => { throw new Error('blocked'); } };
+    globalThis.fetch = vi.fn(async () => new Response('nope', { status: 404 }));
+    expect(await warmBlobByKey(key)).toBe(false);
+    globalThis.fetch = vi.fn(async () => audio());
+    URL.createObjectURL = () => 'blob:test-ok';
+    expect(await warmBlobByKey('d'.repeat(20))).toBe(true);
+    delete globalThis.caches;
+    expect(await warmBlobByKey('e'.repeat(20))).toBe(true);
   });
 });
