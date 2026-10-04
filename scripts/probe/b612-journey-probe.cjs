@@ -272,6 +272,10 @@ async function run() {
       : { viewport: { width: 1280, height: 800 } }
   );
   const p = await context.newPage();
+  // Witness cards (325/326/327) are optional; these probes test the main chain, so skip them like a player would.
+  await p.addInitScript(() => {
+    setInterval(() => document.querySelector('#witnessCard .wc-skip')?.click(), 500);
+  });
   context.setDefaultTimeout(PROBE_WAIT);
   lastPage = p;
   const errors = [];

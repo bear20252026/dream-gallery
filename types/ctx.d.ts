@@ -205,6 +205,7 @@ export interface UINamespace {
   cancelDialogScope: (scope: string) => void;
   advanceDialog: () => void;
   portfolio: { open: () => void; count: () => number; thumb: (id: string) => SVGSVGElement | null } | null;
+  witness: { ask: (id: string, opts?: { target?: number }) => Promise<{ skipped: boolean; value?: string; taps?: number }>; cancel: () => void } | null;
   chapterMap: { open: () => void } | null;
   starMap: { open: () => void; close: () => void; isOpen: () => boolean } | null;
   voyage: {

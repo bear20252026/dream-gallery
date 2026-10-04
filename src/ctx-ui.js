@@ -29,6 +29,7 @@ export function createUINamespace(vault) {
     // 2026-10-03:作品集(ui/portfolio.js)与章节地图(ui/chapter-map.js)的打开入口
     'portfolio',
     'chapterMap',
+    'witness', // witness cards for 325/326/327 (ui/witness-card.js)
     'storyMusic',
     // 2026-10-04:旅途卡(ui/voyage.js),每段回忆结束后接下一站
     'voyage',

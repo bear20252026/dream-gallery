@@ -43,6 +43,16 @@ const CSS = `
   body[data-dialog-open] #ctlLesson{visibility:hidden!important;pointer-events:none!important}
   .gs-menu-card .m-btn{margin:7px 0!important;padding:9px 0!important;font-size:15px!important}
 }
+/* While a witness card (325/326/327) is open, the movement controls, compass and lesson card step aside, at every size. */
+body[data-witness] #j,
+body[data-witness] #jumpBtnGlide,
+body[data-witness] #descendBtnSpace,
+body[data-witness] #viewBtn,
+body[data-witness] #homeBtn,
+body[data-witness] #gateBtn,
+body[data-witness] #worldNav,
+body[data-witness] #storyCompass,
+body[data-witness] #ctlLesson{visibility:hidden!important;pointer-events:none!important}
 /* 菜单里「操作说明 / 语言 / 音乐」三项只在手机上出现(电脑上这三个钮本来就在屏幕上) */
 @media (min-width:601px){ .gs-menu-card .m-phone{display:none!important} }
 `;

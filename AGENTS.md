@@ -1,5 +1,16 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-04 Witness cards for 325 / 326 / 327 (pushed to the work branch, not yet released)
+
+- Owner decision: **the player stays a ghost in the memories** (finalized script rule one). The King, the Vain Man and the Tippler never see or answer the player, and no finalized line changes. Instead a small private paper card appears after the dialogue (`ui/witness-card.js`, `ctx.ui.witness.ask(id, {target})`, rules and text in `shared/witness-logic.mjs`, unit-tested):
+  - 325 King: "If the King had given you an order" — obey / ask for a reason / refuse (shown at the last step, before the stardust pickup).
+  - 326 Vain Man: "Clap along" — 12 taps fill the five minutes (replaces the plain 4 s wait after the clap toast).
+  - 327 Tippler: "Count the bottles" — one tap per bottle at his feet (3), after the silence.
+- Every card can be skipped; a world change cancels an open card; the card hides under any dialogue (`body[data-dialog-open]`) and the movement controls, compass and lesson card step aside while it is open (`body[data-witness]`, rule in `ui/hud-layout.js`). Answers are only recorded (store key `witness` = `b612Witness`): `{king325:{value}, vain326:{taps}, tippler327:{taps}}`. **Nothing branches on them yet**; the ending/rose/fox could read them later.
+- Probes that wait for the stardust pickup in 325/326/327 now auto-skip the cards (an interval clicking `#witnessCard .wc-skip`): b612-journey, b612-king325-guidance, b612-scene6, b612-327-guidance, b612-327-voice.
+- Acceptance: `PW_BROWSER=chromium node scripts/probe/witness-probe.cjs` (26 checks: card UI on its own, then the real 326, 327 and 325 scenes entered with `worldManager.enter()` — no stone gate needed). Cloud note: the older king325/327 guidance probes cannot run in the cloud sandbox (the stone-gate teleport needs model files that are not in git); they fail the same way without these changes.
+- Caveat: the new Chinese card strings are not in the Chinese story-font subset's coverage test; if a character is missing it falls back to a system font. Re-run `scripts/gen/subset-zh-font.py` when you next touch the font.
+
 ## 2026-10-04 The ending brings back the player's own drawings (pushed to the work branch, not yet released)
 
 - The epilogue question ("Has the sheep eaten the flower?") now shows the player's own box drawing in a paper frame, with an interface note ("The box you drew for him. The sheep he asked for was inside."). The final screen shows a strip of small copies of every drawing the player actually made; each opens the portfolio. If the player never drew the box, nothing is shown (no empty frame).

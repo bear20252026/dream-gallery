@@ -39,6 +39,10 @@ function start() {
   };
   const b = await launch();
   const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+  // Witness cards (325/326/327) are optional; these probes test the main chain, so skip them like a player would.
+  await p.addInitScript(() => {
+    setInterval(() => document.querySelector('#witnessCard .wc-skip')?.click(), 500);
+  });
   const errs = [];
   p.on('pageerror', (e) => { if (!/dynamically imported module/.test(e.message)) errs.push(e.message); });
   await p.addInitScript(() => {

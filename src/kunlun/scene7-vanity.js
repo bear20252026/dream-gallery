@@ -245,7 +245,9 @@ ctx.onTick(function scene7VanityTick() {
         try {
           ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE7_VANITY.clapToast), 4500);
         } catch (e) {}
-        setTimeout(function () {
+        // The montage lasts 4 s on its own; with the witness card the player may clap along, or skip.
+        const afterClap = function () {
+          if (ctx.scene.activeWorld !== 'king326') return;
           window.__scene7a.stage = 'chainB';
           speakSeq(SCENE7_VANITY.chainB, 0, function () {
             window.__scene7a.stage = 'pickup';
@@ -256,7 +258,10 @@ ctx.onTick(function scene7VanityTick() {
               ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE7_VANITY.pickupToast), 6000);
             } catch (e) {}
           });
-        }, 4000);
+        };
+        if (ctx.ui.witness) {
+          ctx.ui.witness.ask('vain326').then(afterClap, afterClap);
+        } else setTimeout(afterClap, 4000);
       });
     }, 1400);
   }, 1200);

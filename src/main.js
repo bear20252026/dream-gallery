@@ -23,6 +23,7 @@ import { createToastSystem } from './core/toast-system.js'; // 示范积木:事�
 import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外壳:手绘对话框+任务栏+系统菜单(2026-08-29)
 import { createControlsLesson } from './ui/controls-lesson.js'; // 首次操作小课 +「?」(2026-10-03 测试反馈)
 import { createPortfolio } from './ui/portfolio.js'; // 作品集「未完成的画」(2026-10-03)
+import { createWitnessCard } from './ui/witness-card.js'; // witness cards for 325/326/327 (2026-10-04)
 import { createChapterMap } from './ui/chapter-map.js'; // 章节地图 + 存档码(2026-10-03)
 import { createStarMap } from './ui/star-map.js'; // 星图:点星飞过去(2026-10-04)
 import { createVoyage } from './ui/voyage.js'; // 旅途卡:一夜接一夜(2026-10-04)
@@ -199,6 +200,7 @@ async function preloadWorld() {
     compositionRoot.register(createJourneySystem({ input: journeyInput }));
     compositionRoot.register(createControlsLesson());
     compositionRoot.register(createPortfolio());
+    compositionRoot.register(createWitnessCard());
     compositionRoot.register(createChapterMap());
     compositionRoot.register(createVoyage());
     compositionRoot.register(createStarMap());

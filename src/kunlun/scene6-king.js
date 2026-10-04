@@ -303,10 +303,13 @@ function runKingStep(step) {
     chapter: { zh: '325 · 国王的回忆', en: '325 · memory of the King' },
     step: step + 1,
     total: 6,
-    hint: {
-      zh: '按「继续」读完当前对白，再完成这一段观察。',
-      en: 'Continue the current dialogue, then complete this observation.',
-    },
+    hint:
+      step >= 5
+        ? { zh: '在心里答一句，或者跳过，然后去拾起星屑。', en: 'Answer in your head, or skip, then go and pick up the stardust.' }
+        : {
+            zh: '按「继续」读完当前对白，再完成这一段观察。',
+            en: 'Continue the current dialogue, then complete this observation.',
+          },
   });
   const next = () => {
     if (ticket !== visit || ctx.scene.activeWorld !== 'king325') return;
@@ -328,17 +331,24 @@ function runKingStep(step) {
     window.__scene6.stage = 'departure';
     speakSeq(SCENE5.chain2.slice(2), 0, next);
   } else {
-    window.__scene6.stage = 'pickup';
-    pickupArmed = true;
-    armMoteBeacon();
-    const m = motePos();
-    ctx.ui.journey?.setGoal(OWNER, {
-      world: 'king325',
-      x: m.x,
-      z: m.z,
-      zh: '拾起国王之星的星屑',
-      en: 'Pick up the King’s stardust',
-    });
+    // Private witness card: the player answers in their own head; the King never reacts (ghost rule).
+    window.__scene6.stage = 'witness';
+    const armPickup = () => {
+      if (ticket !== visit || ctx.scene.activeWorld !== 'king325') return;
+      window.__scene6.stage = 'pickup';
+      pickupArmed = true;
+      armMoteBeacon();
+      const m = motePos();
+      ctx.ui.journey?.setGoal(OWNER, {
+        world: 'king325',
+        x: m.x,
+        z: m.z,
+        zh: '拾起国王之星的星屑',
+        en: 'Pick up the King’s stardust',
+      });
+    };
+    if (ctx.ui.witness) ctx.ui.witness.ask('king325').then(armPickup, armPickup);
+    else armPickup();
   }
 }
 

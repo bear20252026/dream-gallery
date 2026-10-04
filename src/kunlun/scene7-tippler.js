@@ -368,7 +368,8 @@ ctx.onTick(function scene7Tick() {
       speakSeq(SCENE7_TIPPLER.chain, 0, function () {
         // 沉默演出(定稿:沉默。酒鬼把自己关了进去)——2.2s 停顿,不上锁不阻塞
         window.__scene7b.stage = 'silence';
-        setTimeout(function () {
+        const armPickup = function () {
+          if (ctx.scene.activeWorld !== 'king327') return;
           window.__scene7b.stage = 'pickup';
           pickupArmed = true;
           // 行动指引三件套:台词只讲戏,「去哪」由 toast 直说 + 光柱信标指——拾取即撤
@@ -376,6 +377,12 @@ ctx.onTick(function scene7Tick() {
           try {
             ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE7_TIPPLER.pickupToast), 6000);
           } catch (e) {}
+        };
+        setTimeout(function () {
+          // Witness card: count the three bottles at his feet (optional, skippable; he never reacts).
+          window.__scene7b.stage = 'witness';
+          if (ctx.ui.witness) ctx.ui.witness.ask('tippler327', { target: 3 }).then(armPickup, armPickup);
+          else armPickup();
         }, 2200);
       });
     }, 1400);

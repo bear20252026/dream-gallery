@@ -52,6 +52,10 @@ function startServer() {
 
   const b = await launch();
   const page = await b.newPage({ viewport: { width: 1280, height: 800 } });
+  // Witness cards (325/326/327) are optional; these probes test the main chain, so skip them like a player would.
+  await page.addInitScript(() => {
+    setInterval(() => document.querySelector('#witnessCard .wc-skip')?.click(), 500);
+  });
   const errs = [];
   page.on('pageerror', (e) => errs.push(String(e).slice(0, 200)));
   await page.addInitScript(() => {

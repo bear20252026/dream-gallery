@@ -91,6 +91,8 @@ const SCHEMA = {
   controlsLesson: { key: 'b612ControlsLesson', type: 'flag' },
   // 作品集:玩家在画板上亲手描的四幅画(shared/portfolio-logic.mjs 清洗,{boa,sheep-sick,ram,box})
   portfolio: { key: 'b612Portfolio', type: 'json' },
+  // Witness-card answers for 325/326/327 (shared/witness-logic.mjs): {king325:{value}, vain326:{taps}, tippler327:{taps}}
+  witness: { key: 'b612Witness', type: 'json' },
   // 玩家关掉了剧情背景音乐(右下「音乐」钮;ui/story-music.js)
   musicOff: { key: 'b612MusicOff', type: 'flag' },
   // 2026-10-04 剧本补全:地球的一天(第 10 场)走到第几站;earthDay = 地球一天走完(之后才去找井)

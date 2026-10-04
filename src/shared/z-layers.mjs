@@ -19,6 +19,7 @@ export const Z = {
   questBook: 70,    // 任务册
   endingAction: 72, // 结局线行动卡(翻开书/唤醒井/走到他身边;低于对话框 80)
   planetGame: 73,  // 328~330 星球小玩法面板(2026-10-04;低于对话框,对白时自动让位)
+  witness: 73,     // 325/326/327 witness card (2026-10-04; below the dialogue box, so it steps aside during dialogue)
   guideCard: 75,    // 初见指引
   menuBtn: 80,      // 「印」菜单按钮
 
