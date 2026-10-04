@@ -45,7 +45,7 @@ jobs:
       - name: Backend atomic-write regression (no media assets needed)
         run: node scripts/test/test-store.js
 
-      - name: Backend API regression (127 assertions: data validation / security boundaries / quiz gate / approval gate)
+      - name: Backend API regression (127 assertions - data validation / security boundaries / quiz gate / approval gate)
         run: node scripts/test/test.js
 
       - name: Type-health trend (checkJs tiers, non-blocking)
@@ -101,7 +101,7 @@ jobs:
       - name: Smoke gate (canvas / ctx / light budget / page errors)
         run: BASE_URL=http://127.0.0.1:3311 PW_BROWSER=chromium node scripts/probe/smoke-gate.js
 
-      - name: Scene screenshot regression (four checkpoints: main world / B612 / King's planet / return; semantic assertions are a hard gate, pixel differences only warn)
+      - name: Scene screenshot regression (four checkpoints - main world / B612 / King's planet / return; semantic assertions are a hard gate, pixel differences only warn)
         env:
           VR_UPDATE: ${{ github.event_name == 'workflow_dispatch' && inputs.update_vr_baseline && '1' || '' }}
         run: BASE_URL=http://127.0.0.1:3311 PW_BROWSER=chromium node scripts/probe/scene-visual-regression.cjs
