@@ -3,9 +3,10 @@
 ## 2026-10-04 The fox diorama now rests on the sand (pushed to the work branch, not yet released)
 
 - Bug: in the Earth-day fox scene (`kunlun/scene10-fox.js`, at `SITE` = (-46, 34) in the main world) the Sketchfab diorama kept its own origin, so the rocky stage ("the map") hovered ~0.7 m above the sand, the fox, prince, grass and wheat ~1.1 m up, a strip of cloud ~3.7 m up, and the glowing seat marker hung in the air at 1.1 m.
-- Fix: `groundDiorama()` runs once after the model loads. The stage (`Escenario_0`) sinks to 0.12 m under the lowest sand in its footprint (moving the whole model, trees included); the fox, prince, grass and wheat (`Zorro_5`, `Principito_4`, `Pasto_8`, `Trigo_9`) each rest on the sand under them; the cloud strip (`Nubes_2`) is lowered to 0.3 m above the sand; the seat marker is a low lantern 0.35 m above the sand. Arithmetic and the part names live in `shared/fox-ground-logic.mjs` (unit-tested).
-- The cloud strip now lies on the sand as a pale low-poly slab. If that looks odd in play, hide it (`clouds.visible = false` in `groundDiorama`) instead.
-- Acceptance: `PW_BROWSER=chromium node scripts/probe/fox-ground-probe.cjs` (8 checks: every part's gap to the terrain under it). Before the fix the same measurements were 0.7-3.7 m.
+- Fix: `groundDiorama()` runs once after the model loads. The stage (`Escenario_0`) sinks to 0.12 m under the lowest sand in its footprint (moving the whole model, trees included); the fox, prince, grass and wheat (`Zorro_5`, `Principito_4`, `Pasto_8`, `Trigo_9`) each rest on the sand under them; the seat marker is a low lantern 0.35 m above the sand.
+- Look ("make it normal and beautiful", same day): the diorama's painted backdrop looked wrong in an open desert, so these parts are hidden (`HIDDEN_PARTS` in `shared/fox-ground-logic.mjs`): the grey stone wedge `Object_4`, the spiky sheets `Object_6`, the flat slabs `Object_5/7/8` and the cloud strip `Nubes_2`. The leafy trees (`Object_9` trunks, `Hojas_3` leaves), the fox, the prince, the grass and the wheat stay. A soft green-to-gold meadow disc (`foxMeadow`, built from `meadowDisc()`, vertex heights follow the dunes, 4 cm above the sand, alpha fades to nothing at the rim) sits under the fox and the prince.
+- Arithmetic, part names and the meadow geometry live in `shared/fox-ground-logic.mjs` (unit-tested). To restore a hidden part, remove its name from `HIDDEN_PARTS`.
+- Acceptance: `PW_BROWSER=chromium node scripts/probe/fox-ground-probe.cjs` (10 checks: each part's gap to the terrain, hidden/kept parts, meadow never below the sand, seat marker height). Before the fix the same measurements were 0.7-3.7 m off the ground.
 
 ## 2026-10-04 Witness cards for 325 / 326 / 327 (pushed to the work branch, not yet released)
 

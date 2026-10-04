@@ -22,9 +22,11 @@ import {
   STAGE,
   STAGE_SINK,
   STANDING,
-  CLOUDS,
-  CLOUD_LIFT,
+  HIDDEN_PARTS,
   SEAT_LANTERN,
+  meadowDisc,
+  MEADOW_RADIUS,
+  MEADOW_LIFT,
 } from '../shared/fox-ground-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
 import { tt, SCENE_FOX, FOX_UI } from '../shared/story-text.mjs';
@@ -140,13 +142,52 @@ function groundDiorama(m) {
     const c = b.getCenter(new THREE.Vector3());
     liftWorld(o, groundShift(b.min.y, groundH(c.x, c.z)));
   }
-  // 3) the cloud strip comes down to a low mist bank instead of hanging 4 m up
-  const clouds = m.getObjectByName(CLOUDS);
-  if (clouds) {
-    const b = box(clouds);
-    const c = b.getCenter(new THREE.Vector3());
-    liftWorld(clouds, groundShift(b.min.y, groundH(c.x, c.z), CLOUD_LIFT));
+  // 3) the painted backdrop pieces that look wrong in an open desert are hidden (see fox-ground-logic)
+  for (const name of HIDDEN_PARTS) {
+    const o = m.getObjectByName(name);
+    if (o) o.visible = false;
   }
+  // 4) a soft meadow under the fox and the prince, following the dunes
+  const fox = m.getObjectByName('Zorro_5');
+  if (fox) {
+    const c = box(fox).getCenter(new THREE.Vector3());
+    addMeadow(c.x, c.z);
+  }
+}
+
+function addMeadow(cx, cz) {
+  const { verts, index } = meadowDisc(MEADOW_RADIUS);
+  const pos = new Float32Array(verts.length * 3);
+  const col = new Float32Array(verts.length * 4);
+  const inner = new THREE.Color(0xa9c466); // fresh green at the heart
+  const outer = new THREE.Color(0xd2c27a); // dry gold toward the rim
+  const c = new THREE.Color();
+  verts.forEach((v, i) => {
+    const wx = cx + v.x,
+      wz = cz + v.z;
+    // a little deterministic variation so the patch is not a flat colour
+    const wobble = 0.5 + 0.5 * Math.sin(v.x * 2.3 + v.z * 1.7) * Math.cos(v.z * 1.9 - v.x * 0.8);
+    c.copy(inner).lerp(outer, Math.min(1, v.t * 0.9 + wobble * 0.15));
+    pos.set([wx - root.position.x, groundH(wx, wz) - root.position.y + MEADOW_LIFT, wz - root.position.z], i * 3);
+    col.set([c.r, c.g, c.b, v.a * 0.92], i * 4);
+  });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  g.setIndex(index);
+  g.computeVertexNormals();
+  const mat = new THREE.MeshLambertMaterial({
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+  });
+  const mesh = new THREE.Mesh(g, mat);
+  mesh.name = 'foxMeadow';
+  mesh.renderOrder = 1;
+  root.add(mesh);
 }
 
 // —— 3D ——

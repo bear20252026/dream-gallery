@@ -30,6 +30,41 @@ export function lowestGround(heightAt, box, n = 4) {
 export const STAGE = 'Escenario_0'; // the rocky stage: sunk just under the lowest sand in its footprint
 export const STAGE_SINK = 0.12; // m below that lowest sand, so no gap shows on the low side
 export const STANDING = ['Zorro_5', 'Principito_4', 'Pasto_8', 'Trigo_9']; // fox, prince, grass, wheat: feet on the sand under them
-export const CLOUDS = 'Nubes_2'; // lowered to a low mist bank
-export const CLOUD_LIFT = 0.3; // m of mist above the sand
+// Backdrop pieces of the original diorama that look wrong in an open desert: the grey stone wedge and spiky
+// sheets (Object_4, Object_6), the flat slabs that only peek out of the sand (Object_5, 7, 8) and the cloud strip.
+// The leafy trees (Object_9 trunks, Hojas_3 leaves), the fox, the prince, the grass and the wheat stay.
+export const HIDDEN_PARTS = ['Nubes_2', 'Object_4', 'Object_5', 'Object_6', 'Object_7', 'Object_8'];
 export const SEAT_LANTERN = 0.35; // m above the sand for the glowing seat marker
+
+/**
+ * A round meadow patch as a flat disc of rings: positions are offsets from the centre (x, z) with an alpha
+ * that is solid in the middle and fades to zero at the rim, so it blends into the sand. The scene sets each
+ * vertex height from the terrain, so the patch follows the dunes.
+ * Returns { verts: [{x, z, a, t}], index: number[] } where t is 0 at the centre and 1 at the rim.
+ */
+export function meadowDisc(radius = 5.5, rings = 7, segments = 28, solid = 0.55) {
+  const verts = [{ x: 0, z: 0, a: 1, t: 0 }];
+  for (let r = 1; r <= rings; r++) {
+    const t = r / rings;
+    const a = t <= solid ? 1 : Math.max(0, 1 - (t - solid) / (1 - solid));
+    for (let k = 0; k < segments; k++) {
+      const ang = (k / segments) * Math.PI * 2;
+      verts.push({ x: Math.cos(ang) * radius * t, z: Math.sin(ang) * radius * t, a, t });
+    }
+  }
+  const index = [];
+  const ring = (r, k) => 1 + (r - 1) * segments + (k % segments);
+  for (let k = 0; k < segments; k++) index.push(0, ring(1, k + 1), ring(1, k));
+  for (let r = 1; r < rings; r++) {
+    for (let k = 0; k < segments; k++) {
+      const a = ring(r, k),
+        b = ring(r, k + 1),
+        c = ring(r + 1, k),
+        d = ring(r + 1, k + 1);
+      index.push(a, b, d, a, d, c);
+    }
+  }
+  return { verts, index };
+}
+export const MEADOW_RADIUS = 5.5;
+export const MEADOW_LIFT = 0.04; // m above the sand, so the patch never sinks into it

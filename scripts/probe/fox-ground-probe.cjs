@@ -1,4 +1,4 @@
-// fox-ground-probe.cjs — the fox diorama (scene 10) rests on the sand, nothing hovers (2026-10-04).
+// fox-ground-probe.cjs — the fox diorama (scene 10) rests on the sand, nothing hovers, and it looks natural (2026-10-04).
 // Run: PW_BROWSER=chromium node scripts/probe/fox-ground-probe.cjs   (starts its own local server)
 // Measures each part of the diorama in world space against the terrain height under it.
 const path = require('path'),
@@ -67,6 +67,27 @@ const check = (name, ok, extra) => {
         const c = bx.getCenter(new THREE.Vector3());
         out[n] = { minY: bx.min.y, ground: gh(c.x, c.z) };
       }
+      out.hidden = {};
+      for (const n of ['Nubes_2', 'Object_4', 'Object_5', 'Object_6', 'Object_7', 'Object_8']) {
+        const o = root.getObjectByName(n);
+        out.hidden[n] = o ? o.visible : 'missing';
+      }
+      out.keep = {};
+      for (const n of ['Hojas_3', 'Object_9', 'Zorro_5', 'Principito_4', 'Pasto_8', 'Trigo_9']) {
+        const o = root.getObjectByName(n);
+        out.keep[n] = o ? o.visible : 'missing';
+      }
+      const meadow = root.getObjectByName('foxMeadow');
+      if (meadow) {
+        const pos = meadow.geometry.attributes.position;
+        let worst = Infinity;
+        for (let i = 0; i < pos.count; i++) {
+          const v = new THREE.Vector3().fromBufferAttribute(pos, i);
+          meadow.localToWorld(v);
+          worst = Math.min(worst, v.y - gh(v.x, v.z));
+        }
+        out.meadow = { verts: pos.count, lowestAboveSand: worst };
+      }
       const seat = window.__ctx.scene.foxApi.seat();
       const orb = root.children.find((o) => o.isMesh && o.geometry?.type === 'SphereGeometry');
       if (orb) {
@@ -80,9 +101,18 @@ const check = (name, ok, extra) => {
       check(`${n} rests on the sand`, Math.abs(g) < 0.05, 'gap=' + g.toFixed(2));
     }
     const stage = parts.Escenario_0.minY - parts.Escenario_0.ground;
-    check('stage (rocky "map") is not hovering', stage <= 0.05, 'gap=' + stage.toFixed(2));
-    const cloud = parts.Nubes_2.minY - parts.Nubes_2.ground;
-    check('clouds are down near the sand, not up in the air', cloud < 0.6, 'gap=' + cloud.toFixed(2));
+    check('stage is not hovering', stage <= 0.05, 'gap=' + stage.toFixed(2));
+    check(
+      'grey rock, spiky sheets, flat slabs and the cloud strip are hidden',
+      Object.values(parts.hidden).every((v) => v === false),
+      JSON.stringify(parts.hidden)
+    );
+    check('trees, fox, prince, grass and wheat stay visible', Object.values(parts.keep).every((v) => v === true), JSON.stringify(parts.keep));
+    check(
+      'meadow patch follows the sand (never below it)',
+      !!parts.meadow && parts.meadow.verts > 100 && parts.meadow.lowestAboveSand > 0.01,
+      JSON.stringify(parts.meadow)
+    );
     const leaves = parts.Hojas_3.minY - parts.Hojas_3.ground;
     check('trees are not hovering', leaves <= 0.1, 'gap=' + leaves.toFixed(2));
     if (parts.seatOrb) {
