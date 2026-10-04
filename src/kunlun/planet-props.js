@@ -91,3 +91,14 @@ export function buildChapterProps(idx, box, cyl, topY) {
   }
   return props;
 }
+
+/**
+ * 点灯人路灯亮/灭(2026-10-04 换真模型后统一入口)。
+ * 程序化灯头仍保留为「状态载体」(名 lampHead,点灯小游戏用 userData.manual 接管);
+ * 真路灯载入后在 userData.setLit 挂上实际的发光材质与光晕。
+ */
+export function setLampLit(head, on) {
+  if (!head) return;
+  if (head.userData.setLit) head.userData.setLit(on);
+  else head.material.color.set(on ? 0xffe9b0 : 0x555044);
+}

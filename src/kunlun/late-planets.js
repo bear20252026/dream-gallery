@@ -13,6 +13,7 @@ import { tt, whoSpk } from '../shared/story-text.mjs';
 import { SCENE8_BUSINESS, SCENE8_LAMP, SCENE9_GEO } from '../shared/story-text-late.mjs';
 import { PLANETS } from '../shared/planet-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
+import { setLampLit } from './planet-props.js';
 
 const STAGES = {
   king328: { idx: 3, text: SCENE8_BUSINESS, game: businessGame, figure: 'businessman' },
@@ -368,7 +369,7 @@ function lampGame(world, done) {
         dots.appendChild(k);
       } else dots.append('○');
     }
-    if (head) head.material.color.set(lit ? 0xffe9b0 : 0x555044);
+    setLampLit(head, lit);
   };
   const greet = g.good.en.split(' / '),
     greetZh = g.good.zh.split('/');

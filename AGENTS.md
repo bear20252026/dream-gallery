@@ -244,6 +244,7 @@ npm run test:scene                # 场景截图回归 4 检查点(主世界/B61
 - **结局门槛** `ENDING_GATE_CHAPTER = 6`;老存档(chapter≥3 且 endingStep>0)按 `LEGACY_GATE_CHAPTER` 照旧走完。ending-journey 第 0 步不再翻临时画册页,等 `earthDay` 后直接找井。
 - **星图**(`ui/star-map.js`,菜单「✦ 星图」,Z.starMap 573):八颗星手绘 SVG,点亮着的星直接飞过去;解锁同章节地图。
 - **世界切换不再黑屏**:`core/scene-manager.js` 走 `shared/warp-fx.js` 星流过场(`runWarp`);多跳旅行 `ui/world-travel.js` 用 `holdWarp/releaseWarp` 托住一段、`lockWarpLabel` 锁定终点名。目的地名/色在 `shared/warp-labels.mjs`。
+- **真模型(2026-10-04 主人提供)**:`scripts/optimize/build-rose-lamp-assets.cjs` 产出 street-lamp(329 路灯,亮灭经 `planet-props.js setLampLit`)、garden-rose(玫瑰园内圈实例化,外圈仍是低模远景)、hero-rose + rose-dome(只取玻璃罩;原底座有铭牌字样)。高精度玫瑰用 `simplifySloppy` 减面(常规 simplify 被 UV 接缝锁死)。新模型未镜像到 R2 前列在 `scene/gltf-loader.js NOT_ON_CDN_YET`,直接走源站。
 - 改台词后重跑 `scripts/gen/subset-zh-font.py`(缺 brotli 时可用 node zlib 做 shim)。
 
 ## 环境

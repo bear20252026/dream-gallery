@@ -21,10 +21,19 @@ const cdnEnabled = () => !IS_LOCAL && !window.__modelCdnDown;
 
 // URL 重写:models/ 相对路径(或同源绝对路径)→ CDN;外部 URL / 其余资源原样。
 // GLTF 内部子资源(scene.bin/贴图)会以 CDN 绝对地址解析,天然走 CDN,无需在此处理。
+// 新入库、还没镜像到 R2 的模型:直接走源站(否则 CDN 404 会把整局都切回源站,别的大模型变慢)。
+// 镜像后(服务器上跑 node scripts/r2-upload-models-rest.cjs hall/b612-world/xxx.glb)从这里删掉即可。
+const NOT_ON_CDN_YET = new Set([
+  'models/hall/b612-world/garden-rose.glb',
+  'models/hall/b612-world/hero-rose.glb',
+  'models/hall/b612-world/rose-dome.glb',
+  'models/hall/b612-world/street-lamp.glb',
+]);
 function rewrite(url) {
   if (!cdnEnabled()) return url;
   const stripped = url.replace(/^https?:\/\/[^/]+/, '');
   if (!/^\/?models\//.test(stripped)) return url;
+  if (NOT_ON_CDN_YET.has(stripped.replace(/^\/+/, ''))) return url;
   if (/^https?:\/\//.test(url)) return url; // 已是绝对地址(别的域/已是 CDN)
   return MODEL_CDN + '/' + stripped.replace(/^\/+/, '');
 }

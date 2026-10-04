@@ -2,7 +2,7 @@
 // 330 地理学家说「去地球吧」→ 旅途卡「第八天 · 地球」把玩家带回沙漠 → 在沙漠里走一遍他刚到地球的那一天:
 //   ① 蛇(坠机点旁,金色的一环)  ② 三瓣小花  ③ 山与回声(西北沙丘顶)
 //   ④ 玫瑰园(五千朵一模一样)   ⑤ 狐狸 · 苹果树下(坐近三次,压缩成同一个傍晚)
-//   ⑥ 回到玫瑰园(园中只有一只空的玻璃罩——他的那朵不在这里)  ⑦ 回到狐狸身边 · 那个秘密
+//   ⑥ 回到玫瑰园(园心现出玻璃罩里的「他的那朵」——千百朵里只有她不一样)  ⑦ 回到狐狸身边 · 那个秘密
 // 走完 → 存档 earthDay → ending-journey 接上「今夜,去找井」。
 // 每站同一套指引:光柱 + 悬浮箭 + 罗盘目标(可「走过去」);走到 4m 内开讲。进度存 earthStep,断点续上。
 import * as THREE from 'three';
@@ -11,6 +11,7 @@ import { tt, whoSpk } from '../shared/story-text.mjs';
 import { SCENE10, EARTH_UI } from '../shared/story-text-late.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
 import { shiftDayTo } from '../scene/time-shift.js';
+import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { earthDue, EARTH_STOPS, EARTH_DONE } from '../shared/earth-day-logic.mjs';
 
 const OWNER = 'earth-day';
@@ -141,8 +142,8 @@ function build() {
   }
   // ④ 玫瑰园:几百朵一模一样(实例化,两次绘制)
   {
-    const N = 420;
-    const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 8, 6), mat(0xd04a5a), N);
+    const N = 360;
+    const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.13, 8, 6), mat(0xb31b2e), N);
     const stems = new THREE.InstancedMesh(
       new THREE.CylinderGeometry(0.015, 0.02, 0.55, 5),
       mat(0x4f6f3a),
@@ -152,7 +153,7 @@ function build() {
     let seed = 7;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     for (let i = 0; i < N; i++) {
-      const r = 1.6 + Math.sqrt(rnd()) * 8.5; // 园心留一圈空地放玻璃罩
+      const r = 4.9 + Math.sqrt(rnd()) * 5; // 外圈远景:低模花头(内圈是真玫瑰)
       const a = rnd() * Math.PI * 2;
       const x = ROSES.x + Math.cos(a) * r,
         z = ROSES.z + Math.sin(a) * r;
@@ -167,22 +168,108 @@ function build() {
     heads.name = 'earthRoses';
     sc.add(heads, stems);
     props.roses = heads;
-    // 园心的玻璃罩(第二次来才出现;里面是空的)
-    globe = new THREE.Mesh(
-      new THREE.SphereGeometry(0.55, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.62),
-      new THREE.MeshBasicMaterial({
-        color: 0xdff2ff,
-        transparent: true,
-        opacity: 0.28,
-        depthWrite: false,
-        side: THREE.DoubleSide,
-      })
-    );
-    globe.position.set(ROSES.x, gh(ROSES.x, ROSES.z) + 0.05, ROSES.z);
-    globe.scale.y = 1.25;
-    globe.visible = false;
-    sc.add(globe);
+    props.rosesLow = [heads, stems];
+    // 2026-10-04 主人提供真玫瑰模型:内圈换成实例化的真玫瑰,外圈留低模花头当远景(手机也扛得住)
+    loadRealRoses(sc);
   }
+}
+
+// —— 真模型:玫瑰园(garden-rose 4 千面 × 实例化)+ 园心玻璃罩里的「他的那朵」(rose-dome + hero-rose) ——
+const MODEL_DIR = '/models/hall/b612-world/';
+function lowQuality() {
+  try {
+    return !!ctx.store.json('lowQuality', false) || window.innerWidth < 700;
+  } catch (e) {
+    return false;
+  }
+}
+/** 把一个 glTF 场景里的每个网格烘成「根坐标系」几何,供 InstancedMesh 复用 */
+function bakeParts(root) {
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
+  const parts = [];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    const geo = o.geometry.clone();
+    geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    parts.push({ geo, mat: o.material });
+  });
+  return parts;
+}
+function loadRealRoses(sc) {
+  const loader = createGLTFLoader();
+  loader.load(
+    MODEL_DIR + 'garden-rose.glb',
+    (g) => {
+      const parts = bakeParts(g.scene);
+      const box = new THREE.Box3().setFromObject(g.scene);
+      const unit = 0.66 / Math.max(0.01, box.max.y - box.min.y); // 一朵约 0.66m 高
+      const N = lowQuality() ? 120 : 190;
+      const meshes = parts.map(({ geo, mat }) => {
+        const im = new THREE.InstancedMesh(geo, mat, N);
+        im.frustumCulled = false;
+        im.name = 'earthRoseReal';
+        return im;
+      });
+      const m = new THREE.Matrix4(),
+        q = new THREE.Quaternion(),
+        e = new THREE.Euler(),
+        v = new THREE.Vector3(),
+        sv = new THREE.Vector3();
+      let seed = 11;
+      const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+      for (let i = 0; i < N; i++) {
+        const r = 1.5 + Math.sqrt(rnd()) * 3.7; // 内圈真玫瑰(园心留一圈空地给玻璃罩)
+        const a = rnd() * Math.PI * 2;
+        const x = ROSES.x + Math.cos(a) * r,
+          z = ROSES.z + Math.sin(a) * r;
+        const k = unit * (0.85 + rnd() * 0.3);
+        e.set((rnd() - 0.5) * 0.18, rnd() * Math.PI * 2, (rnd() - 0.5) * 0.18);
+        m.compose(v.set(x, gh(x, z) - box.min.y * k, z), q.setFromEuler(e), sv.set(k, k, k));
+        meshes.forEach((im) => im.setMatrixAt(i, m));
+      }
+      meshes.forEach((im) => {
+        im.instanceMatrix.needsUpdate = true;
+        sc.add(im);
+      });
+      props.roses = meshes[0];
+    },
+    undefined,
+    (err) => console.warn('[earth-day] 玫瑰模型未载入,保留低模:', err && err.message)
+  );
+  // 园心:玻璃罩 + 罩里的那一朵(第二次来才现身)
+  const hero = new THREE.Group();
+  hero.name = 'earthHeroRose';
+  hero.position.set(ROSES.x, gh(ROSES.x, ROSES.z), ROSES.z);
+  hero.visible = false;
+  sc.add(hero);
+  globe = hero;
+  loader.load(MODEL_DIR + 'rose-dome.glb', (g) => {
+    const d = g.scene;
+    const b = new THREE.Box3().setFromObject(d);
+    const k = 1.0 / Math.max(0.01, b.max.y - b.min.y); // 罩高约 1m
+    d.scale.setScalar(k);
+    const c = b.getCenter(new THREE.Vector3());
+    d.position.set(-c.x * k, -b.min.y * k, -c.z * k);
+    d.traverse((o) => {
+      if (o.isMesh) {
+        o.material = o.material.clone();
+        o.material.depthWrite = false;
+        o.material.opacity = Math.min(o.material.opacity, 0.3);
+        o.renderOrder = 2; // 透明罩最后画,里面的玫瑰看得见
+      }
+    });
+    hero.add(d);
+  });
+  loader.load(MODEL_DIR + 'hero-rose.glb', (g) => {
+    const r = g.scene;
+    const b = new THREE.Box3().setFromObject(r);
+    const k = 0.74 / Math.max(0.01, b.max.y - b.min.y);
+    r.scale.setScalar(k);
+    const c = b.getCenter(new THREE.Vector3());
+    r.position.set(-c.x * k, -b.min.y * k + 0.02, -c.z * k);
+    hero.add(r);
+  });
 }
 
 // —— 指引:光柱 + 悬浮箭 + 罗盘目标 ——

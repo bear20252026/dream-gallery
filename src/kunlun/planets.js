@@ -6,7 +6,7 @@
 // 回程门回画廊,星门换色指向下一章;groundOverride 链式注册(多浮空岛地面)。
 // 门槛解除: spirits questActive 在 planetsMode 下恒真(天穹100%前置退役)。
 import * as THREE from 'three';
-import { buildChapterProps } from './planet-props.js';
+import { buildChapterProps, setLampLit } from './planet-props.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { createModelSurface } from '../scene/model-surface.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
@@ -369,6 +369,66 @@ loadWorldAsset('models/hall/b612-world/king-scene.glb', worldManager.getWorld('k
   y: 0,
   z: -15,
 });
+// 329 点灯人:维多利亚路灯真模型(主人提供,2026-10-04)取代程序化灯柱+灯球。
+// 程序化灯头留作「状态载体」(隐藏,名 lampHead),亮灭经 setLampLit → 这里挂上的 setLit 改真灯的发光材质与光晕。
+{
+  const isl = islands[4];
+  loadWorldAsset('models/hall/b612-world/street-lamp.glb', worldManager.getWorld('king329'), {
+    name: 'streetLamp',
+    maxSize: 4.4,
+    x: 1.3,
+    y: isl.topY,
+    z: -2.6, // 稍往后、偏右:出生点(z=4)抬头就能把整盏灯和灯头收进画面;灯臂侧向伸出,看得见轮廓
+    onLoad: function (model) {
+      model.updateMatrixWorld(true);
+      isl.props.children.forEach(function (c) {
+        c.visible = false;
+      });
+      let lightMat = null;
+      let lightMesh = null;
+      model.traverse(function (o) {
+        if (o.isMesh && o.material && /light/i.test(o.material.name)) {
+          o.material = o.material.clone();
+          lightMat = o.material;
+          lightMesh = o;
+        }
+      });
+      // 光晕:一张加法混合的柔光贴(零 PointLight 铁律,手机 GPU 友好)
+      const cv = document.createElement('canvas');
+      cv.width = cv.height = 64;
+      const g2 = cv.getContext('2d');
+      const grd = g2.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grd.addColorStop(0, 'rgba(255,233,176,1)');
+      grd.addColorStop(0.35, 'rgba(255,214,138,.45)');
+      grd.addColorStop(1, 'rgba(255,214,138,0)');
+      g2.fillStyle = grd;
+      g2.fillRect(0, 0, 64, 64);
+      const glow = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: new THREE.CanvasTexture(cv),
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          transparent: true,
+        })
+      );
+      glow.scale.set(2.6, 2.6, 1);
+      glow.name = 'streetLampGlow';
+      if (lightMesh) {
+        const p = new THREE.Box3().setFromObject(lightMesh).getCenter(new THREE.Vector3());
+        glow.position.copy(p);
+      } else glow.position.set(0, isl.topY + 3.6, 0);
+      worldManager.getWorld('king329').scene.add(glow);
+      const head = isl.props.userData.lampHead;
+      head.userData.setLit = function (on) {
+        glow.visible = on;
+        if (!lightMat) return;
+        lightMat.color.set(on ? 0xfff3d0 : 0x6a665c);
+        if (lightMat.emissive) lightMat.emissive.set(on ? 0xffc870 : 0x000000);
+        if ('emissiveIntensity' in lightMat) lightMat.emissiveIntensity = on ? 1.6 : 0;
+      };
+    },
+  });
+}
 // B612 由 storybook GLB 原样呈现(小王子+绵羊+玫瑰+火山+星空全在模型内)
 // 终幕配乐:进入 B612 播放 GARGANTUA intro + main
 // 2026-09-25 加速:音频走 R2 CDN 边缘(1.4MB main 原走同源抢开机带宽);localhost 走源码目录
@@ -862,7 +922,7 @@ onTick(function (dt) {
     isl.mote.position.y = isl.topY + 1.15 + Math.sin(t * 1.6 + i) * 0.18;
     if (i === 4) {
       const on = Math.floor(t / 1.2) % 2 === 0;
-      isl.props.userData.lampHead.material.color.set(on ? 0xffe9b0 : 0x555044);
+      if (!isl.props.userData.lampHead.userData.manual) setLampLit(isl.props.userData.lampHead, on);
     }
   });
   if (!ctx.player.pl) return;
@@ -1000,7 +1060,7 @@ onTick(function (dt) {
       if (!isl.mote.visible) return;
       if (i === 4 && !isl.props.userData.lampHead.userData.manual) {
         const on = Math.floor((performance.now() * 0.001) / 1.2) % 2 === 0;
-        isl.props.userData.lampHead.material.color.set(on ? 0xffe9b0 : 0x555044);
+        setLampLit(isl.props.userData.lampHead, on);
       }
     });
     // 上下文导航(太空中常驻):B612=回主世界/去星球;星球=回 B612/回主世界

@@ -33,7 +33,8 @@ for d in src lib scripts types public; do [ -d "$d" ] && git add "$d"; done
 STAGED=$(git diff --cached --name-only)
 [ -n "$STAGED" ] || { echo "❌ 没有可提交的改动,停止"; exit 1; }
 echo "$STAGED"
-if echo "$STAGED" | grep -Eiq '(^|/)\.env|\.pem$|\.key$|\.p12$|\.pfx$|\.ppk$|私钥|secret'; then
+# 白名单:防泄露单测本身(文件名里带 secret 字样,2026-10-04 误拦)
+if echo "$STAGED" | grep -v '^src/__tests__/no-secrets\.test\.js$' | grep -Eiq '(^|/)\.env|\.pem$|\.key$|\.p12$|\.pfx$|\.ppk$|私钥|secret'; then
   echo "❌ 暂存区里有疑似密钥文件,停止(公开仓!)"; git reset -q; exit 1
 fi
 
