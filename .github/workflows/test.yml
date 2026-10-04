@@ -1,17 +1,17 @@
-# 自动化测试门禁：把"全绿才部署"从人治变自动化
-# 触发：推送到 main / 任意 PR
-# 步骤：lint → typecheck → 单元测试 → 构建 → 后端回归 → 浏览器冒烟(含灯光预算门禁)
+# Automated test gate: turns "deploy only when everything is green" from a human rule into automation
+# Triggers: pushes to main / any PR
+# Steps: lint -> typecheck -> unit tests -> build -> backend regression -> browser smoke test (including the light-budget gate)
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
-  # 手动重建 VR 截图基线(画面有意改动后跑一次;产物需人工取回提交)
+  # Manually rebuild the VR screenshot baselines (run once after an intentional visual change; the output must be fetched and committed by hand)
   workflow_dispatch:
     inputs:
       update_vr_baseline:
-        description: '重建 VR 截图基线(勾选=只重建不比对,产物上传为 vr-baselines)'
+        description: 'Rebuild the VR screenshot baselines (checked = rebuild only, no comparison; output is uploaded as vr-baselines)'
         type: boolean
         default: false
 
@@ -21,92 +21,92 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: 配置 Node 22
+      - name: Set up Node 22
         uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
 
-      - name: 安装依赖
+      - name: Install dependencies
         run: npm ci
 
-      - name: ESLint 代码规范检查
+      - name: ESLint code-style check
         run: npm run lint
 
-      - name: TypeScript 类型检查
+      - name: TypeScript type check
         run: npm run typecheck
 
-      - name: Vitest 单元测试
+      - name: Vitest unit tests
         run: npm run test:unit
 
-      - name: 前端构建(质量门禁)
+      - name: Frontend build (quality gate)
         run: npm run build
 
-      - name: 后端原子写回归(无需媒体资源)
+      - name: Backend atomic-write regression (no media assets needed)
         run: node scripts/test/test-store.js
 
-      - name: 后端 API 回归(127 条断言:数据校验/安全边界/答题门/审批门)
+      - name: Backend API regression (127 assertions: data validation / security boundaries / quiz gate / approval gate)
         run: node scripts/test/test.js
 
-      - name: 类型健康趋势(checkJs 分级,不阻断)
+      - name: Type-health trend (checkJs tiers, non-blocking)
         run: |
           COUNT=$(npx tsc -p tsconfig.checkjs.json 2>&1 | grep -c "error TS" || true)
-          # 基线 420(2026-10-02 实测 417):旧基线 87 早已失真,告警天天亮=无告警。
-          # 重设到"当前实测值 + 3 条余量",只拦**新增**类型债;历史债按主题另行清理。
-          echo "checkJs 错误数: ${COUNT} (基线 420,超过说明新增了类型债)"
+          # Baseline 420 (measured 417 on 2026-10-02): the old baseline of 87 had long been meaningless, and a warning that is always on is no warning.
+          # Reset to "current measured value + 3 spare" so only **new** type debt is caught; historical debt is cleaned up by topic separately.
+          echo "checkJs errors: ${COUNT} (baseline 420; more means new type debt was added)"
           if [ "${COUNT:-0}" -gt 420 ]; then
-            echo "::warning::checkJs 错误数 ${COUNT} 超过基线 420(2026-10-02 重设),请勿继续积累类型债"
+            echo "::warning::checkJs errors ${COUNT} exceed the baseline of 420 (reset 2026-10-02); please do not keep accumulating type debt"
           fi
 
-      - name: Bundle 大小检查(阻断)
+      - name: Bundle size check (blocking)
         run: |
           MAIN_SIZE=$(wc -c < dist/assets/main-*.js 2>/dev/null || echo 0)
           THREE_SIZE=$(wc -c < dist/assets/three-*.js 2>/dev/null || echo 0)
           echo "main.js: ${MAIN_SIZE} bytes"
           echo "three.js: ${THREE_SIZE} bytes"
-          # main 超过 512KB 阻断(2026-08-30 起为硬门禁,防体积劣化静默累积)
+          # main over 512KB blocks the build (a hard gate since 2026-08-30, so size regressions cannot accumulate silently)
           if [ "$MAIN_SIZE" -gt 512000 ]; then
-            echo "::error::main.js ${MAIN_SIZE} bytes 超过 512KB 上限"
+            echo "::error::main.js ${MAIN_SIZE} bytes exceeds the 512KB limit"
             exit 1
           fi
 
-  # 浏览器冒烟:起本地服务,无头浏览器跑健康门禁(canvas/ctx/灯光预算/页面异常)
+  # Browser smoke test: start the local server and run the health gate in a headless browser (canvas / ctx / light budget / page errors)
   smoke:
     runs-on: ubuntu-latest
     needs: build-and-test
     steps:
       - uses: actions/checkout@v5
 
-      - name: 配置 Node 22
+      - name: Set up Node 22
         uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: npm
 
-      - name: 安装依赖
+      - name: Install dependencies
         run: npm ci
 
-      - name: 前端构建
+      - name: Frontend build
         run: npm run build
 
-      - name: 安装 Chromium(playwright-core 注册表)
+      - name: Install Chromium (playwright-core registry)
         run: npx playwright-core@1.61.1 install --with-deps chromium
 
-      - name: 启动本地服务
+      - name: Start local server
         run: |
           SMOKE=1 PORT=3311 node server.js &
           sleep 4
-          curl -s -o /dev/null -w "本地服务: %{http_code}\n" http://127.0.0.1:3311/
+          curl -s -o /dev/null -w "local server: %{http_code}\n" http://127.0.0.1:3311/
 
-      - name: 冒烟门禁(canvas/ctx/灯光预算/页面异常)
+      - name: Smoke gate (canvas / ctx / light budget / page errors)
         run: BASE_URL=http://127.0.0.1:3311 PW_BROWSER=chromium node scripts/probe/smoke-gate.js
 
-      - name: 场景截图回归(四检查点:主世界/B612/国王星球/返回;语义断言硬门禁,像素差异仅警告)
+      - name: Scene screenshot regression (four checkpoints: main world / B612 / King's planet / return; semantic assertions are a hard gate, pixel differences only warn)
         env:
           VR_UPDATE: ${{ github.event_name == 'workflow_dispatch' && inputs.update_vr_baseline && '1' || '' }}
         run: BASE_URL=http://127.0.0.1:3311 PW_BROWSER=chromium node scripts/probe/scene-visual-regression.cjs
 
-      - name: 上传新基线(仅手动重建)
+      - name: Upload new baselines (manual rebuild only)
         if: github.event_name == 'workflow_dispatch' && inputs.update_vr_baseline
         uses: actions/upload-artifact@v4
         with:

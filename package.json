@@ -1,8 +1,12 @@
 {
   "name": "dream-gallery-backend",
   "version": "1.0.0",
-  "description": "梦幻画廊静态托管 + 文件 API 后端",
+  "description": "Dream Gallery (B612): static hosting and file API backend for a Little Prince 3D game",
   "main": "server.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bear20252026/dream-gallery.git"
+  },
   "scripts": {
     "start": "node server.js",
     "check": "npm run deps && npm run build && node scripts/test/test.js",

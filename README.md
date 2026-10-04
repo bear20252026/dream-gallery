@@ -1,77 +1,96 @@
-# 梦幻画廊(Dream Gallery)
+# Dream Gallery (梦幻画廊) — B612
 
-> 昆仑灵鉴 · 万镜画廊 —— Three.js 3D 交互画廊 + Node 零依赖单文件后端。
-> 女娲补天神话包装:答题门禁攒灵蕴 → 天穹愈合 → 六合灵蕴收集 → 飞舟自由飞 → 空中永恒展厅。
+> A Three.js 3D interactive game built on *The Little Prince*, with a single-file Node backend.
+> Originally a "Kunlun mirror gallery"; the main line is now a playable retelling of the book:
+> crash in the desert → draw a sheep → the home on B612 → six planets → a day on Earth → the well → the ending.
 
-## 这是什么
+**English is the default language** for the game and the primary working language for this project
+(docs, code comments, commit messages, tests). Chinese is an optional player-facing language behind the
+EN / 中文 toggle; the story data stays bilingual.
 
-一个自托管的 3D 交互画廊网站。访客在沙海昆仑之间行走、滑翔、收集六枚灵蕴,
-把自己的照片挂上墙;主人通过后台审批、策展、看数据。
+## What this is
 
-- **3D 场景**:建筑展厅 + 西域沙海无限地形 + 昆仑雪峰(实心山铁律)
-- **玩法**:互动序章(残镜四幕)→ 心象共鸣答题(60 分门禁)→ 天穹里程碑 →
-  六灵蕴收集(乱序拾取/光柱指引/HUD 箭头)→ 飞舟六航路首飞+手动自由飞 → 永恒展厅(晨光留影/放下与召回)
-- **子系统**:白板共创、音乐演奏器、聊天室(昆仑之灵 AI 回帖)、TTS 语音、AI 看图配文、访客上传/链接
-- **双模式展示区**:普通模式(图库空框策展)/ 特殊模式(全展示),媒体文件级门禁
+A self-hosted 3D interactive site. Players walk and glide across a desert, meet the Little Prince, and
+follow the story from the crash site to B612, through six planets and a day on Earth, to the ending.
+The owner manages visitors, approvals and content through an admin panel.
 
-## 技术栈
+- **3D world**: a gallery hall, endless western-desert terrain, the Kunlun snow peak (solid-mountain rule),
+  small-planet worlds (B612, the King, the Vain Man, the Tippler, the Businessman, the Lamplighter, the Geographer)
+- **Story**: opening film → crash → draw the sheep → home on B612 (four memory stations) → planets 325–330 →
+  Earth day → find the well → farewell → epilogue. Chapter map, star map, save codes and a portfolio of the
+  player's unfinished drawings.
+- **Systems**: story music (five tracks, per chapter), voiced dialogue (TTS), sheep companion,
+  gallery uploads, whiteboard, chat room, AI captions
+- **Legacy gameplay** (quiz gate, ark flight, eternal hall, …) is shelved by default; `?legacy=1` restores it.
 
-- **前端**:原生 ES Modules + Three.js 0.160(开发态原生 ESM 直跑,生产 Vite 8 打包)
-- **后端**:Node 路由 + `lib/` 模块(`server.js` 入口 / `lib/routes.js` 声明式路由);持久层 **SQLite 主库 + JSON 镜像**(`gate_data.db`/`gate_data.json`,`USE_SQLITE=0` 可回退)
-- **基建**:Cloudflare CDN/R2(媒体)+ 阿里云源站(pm2 `gallery`)+ GitHub(代码异地备份,⚠️ 该仓为 PUBLIC)
-- **展示区**:2026-09-06 起仅普通模式(演示/本人上传可见);特殊模式已删除
+## Tech stack
 
-## 目录结构
+- **Frontend**: native ES Modules + Three.js 0.160 (native ESM in development, bundled by Vite 8 for production)
+- **Backend**: Node router + `lib/` modules (`server.js` entry, declarative route table in `lib/routes.js`);
+  persistence is **SQLite primary + JSON mirror** (`gate_data.db` / `gate_data.json`; `USE_SQLITE=0` rolls back)
+- **Infrastructure**: Cloudflare CDN/R2 (media and models) + Alibaba Cloud origin (pm2 process `gallery`) +
+  GitHub (off-site code backup — ⚠️ this repository is PUBLIC)
+
+## Layout
 
 ```
-server.js          # 后端入口(仅 require + 路由 + listen)
-lib/               # 后端模块:config/util/store/gate/admin/quiz/files/siteconfig/vision/track/docs/chat/abuse/tts/aichannels(AI通道登记处,被 chat/quiz/tts/vision 复用)
-src/               # 前端 ES 模块(main.js 按序 import)
-  ctx.js           # 共享总线:登记册 + 7 命名空间(ui/kunlun/player/scene/media/gallery/mode)
-  ui/overlay.js    # 弹层注册处(冷核心)
-  state/store.js   # 存档登记处(localStorage 唯一入口,冷核心)
-  shared/          # mediarules.mjs 媒体可见性决策表(前后端同一份)
+server.js          # backend entry (require + routing + listen only)
+lib/               # backend modules: config/util/store/gate/admin/quiz/files/siteconfig/vision/track/docs/chat/abuse/tts/aichannels (single source for AI channels)
+src/               # frontend ES modules (main.js imports in order)
+  ctx.js           # shared bus: registry + 7 namespaces (ui/kunlun/player/scene/media/gallery/mode)
+  core/            # composition root, game state, game loop, world loader, scene manager
+  ui/overlay.js    # overlay registry (cold core)
+  state/store.js   # save-data registry (the only localStorage entry point, cold core)
+  shared/          # pure logic + bilingual story text; mediarules.mjs is shared by frontend and backend
   scene/ gallery/ gate/ kunlun/ styles/
-scripts/           # test/(两套测试) probe/(实机探针) gen/(构建/生成器)
-tools/             # backup-gallery.sh(云端备份) r2-upload.js(R2 上传)
-questions/         # 题库(公网 404,含答案)
-docs               # AGENTS.md(工程档案) ADMIN_GUIDE.md(后台手册) RFC-架构深化.md KUNLUN_PLAN.md
+scripts/           # test/ (backend + mobile suites)  probe/ (real-browser probes)  gen/ (build/generators)
+tools/             # backup-gallery.sh (cloud backup)  r2-upload.js (R2 upload)
+questions/         # quiz bank (404 on the public site, contains answers)
+docs               # AGENTS.md (engineering handbook)  ADMIN_GUIDE.md (admin manual)  RFC-架构深化.md  KUNLUN_PLAN.md
 ```
 
-## 本地开发
+## Local development
 
 ```bash
-export PATH="/c/Program Files/nodejs:$PATH"   # Windows Git Bash 必做
-npm install                                   # postinstall 自动同步 vendor/
-npm run dev                                   # Vite 开发服务器 :5173(API/媒体代理到 :3000)
-node server.js                                # 或裸跑后端 :3000(原生 ESM 入口)
+export PATH="/c/Program Files/nodejs:$PATH"   # required on Windows Git Bash
+npm install                                   # postinstall syncs vendor/
+npm run dev                                   # Vite dev server :5173 (API/media proxied to :3000) + backend
+node server.js                                # or run the backend alone on :3000 (native ESM entry)
 ```
 
-## 测试(上线前必跑,全绿才部署)
+## Tests (all green before any deploy)
 
 ```bash
-node scripts/test/test-store.js     # 后端存档原子写 4 项
-node scripts/test/test.js           # 后端 API/安全边界/门禁/上传/邀请
-node scripts/test/test-mobile.js    # 手机端渲染 6 项(iPhone 模拟:着色器/JS 异常/空屏)
-npm run test:unit                   # Vitest 单元测试
-# 专项探针见 scripts/probe/(overlay/store/media-rules/security-fix/ark/story/minimap…)
+node scripts/test/test-store.js     # backend atomic-save suite
+node scripts/test/test.js           # backend API / security / gate / upload / invites
+node scripts/test/test-mobile.js    # mobile rendering (iPhone emulation: shader errors, JS exceptions, blank screen)
+npm run test:unit                   # Vitest unit tests
+npm run test:scene                  # scene screenshot regression
+# focused probes live in scripts/probe/ (overlay, store, media-rules, security-fix, story chains, minimap, …)
 ```
 
-## 部署
+## Deploy
 
 ```bash
-npm run build                     # → dist/(index.html + assets/* hash 分包)
-# dist 全量上传 /opt/gallery(先 assets 后 index.html);改 server.js/lib/ 才 pm2 restart gallery
+npm run build                     # → dist/ (index.html + hashed assets/*)
+bash scripts/release.sh           # full release: sync GitHub → unit tests → build → commit/push → deploy.sh
 ```
 
-详细规矩(媒体门禁/灯光限额/视频码率/HMR/弹层/存档/ctx 命名空间/安全基线)见 **AGENTS.md**;
-访客玩法与后台操作见 **ADMIN_GUIDE.md**;神话文案层设计见 **KUNLUN_PLAN.md**。
+Detailed rules (media gating, light budget, video bitrate, HMR, overlays, save data, ctx namespaces,
+security baseline) are in **AGENTS.md**; the visitor rules and admin operations are in **ADMIN_GUIDE.md**.
 
-## 版本与备份
+## Versions and backups
 
-- 本地 git(main)+ GitHub **公开仓** `bear20252026/dream-gallery`(⚠️ PUBLIC,密钥一律不得入库),每次部署前 commit + push
-- 云端 cron:daily 03:17(数据库+照片+音乐+代码,留 14 份)/ weekly 周日 04:23(视频,留 2 份)→ `/opt/backups/`
+- Local git plus the **public** GitHub repo `bear20252026/dream-gallery` (⚠️ PUBLIC — never commit secrets).
+  Commit and push before every deploy.
+- Cloud cron: daily 03:17 (database + photos + music + code, keep 14) and weekly Sunday 04:23
+  (videos, keep 2) → `/opt/backups/`.
+- The start-screen version line ("Updated … · v1.N") is generated at build time from git.
+
+## Credits
+
+Third-party models, music, fonts and code are credited in **CREDITS.md** and **THIRD_PARTY_NOTICES.md**.
 
 ---
 
-*三千年来,第一个带着真意推开这扇门的,是你。*
+*Three thousand years, and the first to push this door open with a true heart is you.*
