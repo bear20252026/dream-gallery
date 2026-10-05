@@ -1,5 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-05 Story thread: one voice from the desert to the hill (draft PR, not yet released)
+
+- bear: the scenes felt loosely joined, and the faraway hill felt like a different game. Layout untouched; only words changed. Finalized book lines inside the memories are unchanged.
+- **Night cards**: each voyage stop now has its own `kicker` (`VOYAGE.<stop>.kicker` in `shared/story-text-late.mjs`, rendered by `ui/voyage.js` as `v.kicker || VOYAGE.ui.kicker`): the pilot's desert days with the water running out (day four … day eight, "I drink the last drop of water"), so the planets read as one countdown.
+- **The hill is the pilot's dream six years later** (book's epilogue). `HILL_TEXT.note`, `hill-src/src/game/story.ts` and the hill i18n (`caption.arrive`, `game.tagline`, laughing-star counters, "The Fox"-style speaker names, default name Pilot/飞行员) were rewritten so every character remembers the journey: the fox smells the sheep in the box, the rose knows the one who drew the sheep, the sheep looks like the one in the box, the tapir ate the sad part of the dream, the guardian keeps its post like the lamplighter. Chinese reuses the game's existing phrasing (仪式 / 用心看 / 眼睛看不见 / 负责).
+- After a release: rebuild was done (`public/hill/` committed); re-cook voices with `node scripts/dev/warm-all-voices.mjs https://cloudbear.cloud` because the 7 new kickers are voiced text.
+
 ## 2026-10-05 全量发布 + 台词音频预煮收尾:v1.390 上线,顺修一处缓存键口径 bug
 
 - **同步**:本地 main 从 e57611c(385) fast-forward 到 ed1810d(390,远端两个 PR:voice 预渲染 + faraway hill);`npm run test:unit` 514 项全过后 `deploy.sh` 部署,`server.js`(/hill 路由)按盲区流程单独 scp + md5 比对 + pm2 restart。线上 `/hill/` 200、`/hill` 301、版本戳 `ed1810d`(v1.390)。

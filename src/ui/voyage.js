@@ -122,7 +122,7 @@ function open(stopArg) {
   document.body.dataset.voyage = stop;
   el('div', 'vy-stars', null, root);
   const card = el('div', 'vy-card', null, root);
-  el('div', 'vy-kicker', tt(VOYAGE.ui.kicker), card);
+  el('div', 'vy-kicker', tt(v.kicker || VOYAGE.ui.kicker), card);
   el('div', 'vy-night', tt(v.night), card);
   el('h2', 'vy-title', tt(v.title), card);
   el('div', 'vy-rule', null, card);

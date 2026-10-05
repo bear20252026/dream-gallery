@@ -385,6 +385,7 @@ export const EARTH_UI = {
 // 每段回忆之间,沙漠里过去了一天。过场卡替玩家走完这段路:不必再回沙漠、再穿石门、再点按钮。
 export const VOYAGE = {
   king325: {
+    kicker: { en: 'Day four in the desert · water for four more days', zh: '沙漠第四天 · 水还够喝四天' },
     night: { en: 'The fourth night', zh: '第四夜' },
     title: { en: 'Page IV · The King', zh: '书页四 · 国王' },
     line: {
@@ -393,6 +394,7 @@ export const VOYAGE = {
     },
   },
   king326: {
+    kicker: { en: 'Day five · a king who ruled a planet with only a rat on it', zh: '第五天 · 一个只管着一只老耗子的国王' },
     night: { en: 'The fifth night', zh: '第五夜' },
     title: { en: 'Page V · The Conceited Man', zh: '书页五 · 爱虚荣的人' },
     line: {
@@ -401,6 +403,7 @@ export const VOYAGE = {
     },
   },
   king327: {
+    kicker: { en: 'The same night · he goes quiet when he talks of the tippler', zh: '同一夜 · 说到酒鬼,他不作声了' },
     night: { en: 'The same night', zh: '同一夜' },
     title: { en: 'Page V · The Tippler', zh: '书页五 · 酒鬼' },
     line: {
@@ -409,6 +412,7 @@ export const VOYAGE = {
     },
   },
   king328: {
+    kicker: { en: 'Day six · two days of water left', zh: '第六天 · 水只剩两天的了' },
     night: { en: 'The sixth night', zh: '第六夜' },
     title: { en: 'Page VI · The Businessman', zh: '书页六 · 商人' },
     line: {
@@ -417,6 +421,7 @@ export const VOYAGE = {
     },
   },
   king329: {
+    kicker: { en: 'The same night · the lamplighter was the only one he could have made his friend', zh: '同一夜 · 点灯人,是他唯一可能交上朋友的人' },
     night: { en: 'The same night', zh: '同一夜' },
     title: { en: 'Page VI · The Lamplighter', zh: '书页六 · 点灯人' },
     line: {
@@ -425,6 +430,7 @@ export const VOYAGE = {
     },
   },
   king330: {
+    kicker: { en: 'Day seven · one day of water left', zh: '第七天 · 水只剩一天的了' },
     night: { en: 'The seventh night', zh: '第七夜' },
     title: { en: 'Page VII · The Geographer', zh: '书页七 · 地理学家' },
     line: {
@@ -433,6 +439,7 @@ export const VOYAGE = {
     },
   },
   earth: {
+    kicker: { en: 'Day eight · I drink the last drop of water', zh: '第八天 · 我喝下了最后一滴水' },
     night: { en: 'The eighth day', zh: '第八天' },
     title: { en: 'Page VIII · The Earth', zh: '书页八 · 地球' },
     line: {
@@ -441,6 +448,7 @@ export const VOYAGE = {
     },
   },
   ui: {
+    // 默认眉题;每站自带 kicker(飞行员的沙漠日子 + 水的倒数)优先
     kicker: {
       en: 'Morning in the desert · the pilot works on his engine',
       zh: '沙漠的早晨 · 飞行员修着发动机',
