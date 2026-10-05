@@ -13,6 +13,8 @@ import {
   walkLinesDue,
   WELL_POS,
   LISTEN_RANGE,
+  hillUrl,
+  HILL_TEXT,
 } from '../shared/ending-logic.mjs';
 import { BOOK_PAGES, SCENE_WELL, SCENE_FAREWELL, SCENE_EPILOGUE } from '../shared/ending-text.mjs';
 
@@ -137,5 +139,19 @@ describe('结局台词(逐字照 Woods 译本)', () => {
     expect(SCENE_EPILOGUE.no.en).toContain('sweetness');
     expect(SCENE_EPILOGUE.yes.en).toContain('tears');
     expect(SCENE_EPILOGUE.dedication.en).toContain('All grownups were once children');
+  });
+});
+
+describe('远方山丘(故事之后)', () => {
+  it('地址带上剧情语言,未知语言回落英文', () => {
+    expect(hillUrl('en')).toBe('/hill/?lang=en');
+    expect(hillUrl('zh')).toBe('/hill/?lang=zh');
+    expect(hillUrl(undefined)).toBe('/hill/?lang=en');
+  });
+  it('按钮与说明都是双语', () => {
+    for (const t of Object.values(HILL_TEXT)) {
+      expect(t.en).toBeTruthy();
+      expect(t.zh).toBeTruthy();
+    }
   });
 });

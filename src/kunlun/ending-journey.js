@@ -19,7 +19,7 @@ import { ctx } from '../ctx.js';
 import { eventBus } from '../core/event-bus.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { Z } from '../shared/z-layers.mjs';
-import { tt } from '../shared/story-text.mjs';
+import { tt, scriptLang } from '../shared/story-text.mjs';
 import { avAllowed } from '../core/av-switch.js';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { openBook, sketchSvg } from '../ui/book-pages.js';
@@ -42,6 +42,8 @@ import {
   walkLinesDue,
   WELL_POS,
   WELL_REACH,
+  HILL_TEXT,
+  hillUrl,
 } from '../shared/ending-logic.mjs';
 
 const OWNER = 'ending-journey';
@@ -106,6 +108,8 @@ const STYLE = `
 #endStage button{font:inherit;font-size:16px;cursor:pointer;color:#f6e6c4;background:rgba(255,236,190,.08);
   border:1px solid rgba(240,214,160,.55);border-radius:24px;padding:10px 24px;min-height:44px}
 #endStage button:hover{background:rgba(255,236,190,.18)}
+#endStage button.hill{color:#2c2014;background:linear-gradient(135deg,#f3d79a,#d7a65a);border-color:#f3d79a;flex-basis:100%;max-width:max-content;margin:0 auto}
+#endStage button.hill:hover{background:linear-gradient(135deg,#f7e2b2,#e0b46c)}
 #endStage .end{font-size:clamp(34px,6vw,64px);letter-spacing:.3em;font-weight:400;margin:6px 0 4px}
 #endStage .hint{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-size:12px;color:#7d7564;letter-spacing:.2em}
 @media (hover:none),(max-width:600px){#endAction kbd{display:none}#endAction{padding:8px}}
@@ -1022,9 +1026,11 @@ async function playEpilogue() {
   const cap = stageEl.querySelector('.cap');
   stageEl.querySelector('.hint').textContent = '';
   cap.innerHTML = `<div class="kick">B612</div><div class="end txt on">${esc(tt(ENDING_UI.theEnd))}</div>
-    <div class="btns on"><button type="button" data-e="again">${esc(tt(ENDING_UI.again))}</button>
+    <div class="btns on"><button type="button" class="hill" data-e="hill">${esc(tt(HILL_TEXT.go))}</button>
+    <button type="button" data-e="again">${esc(tt(ENDING_UI.again))}</button>
     <button type="button" data-e="share">${esc(tt(ENDING_UI.share))}</button>
     <button type="button" data-e="portfolio">${esc(tt({ zh: '翻开我的作品集', en: 'Open my portfolio' }))}</button></div>
+    <div class="txt on pf-note">${esc(tt(HILL_TEXT.note))}</div>
     <div class="txt on pf-note">${esc(
       tt({
         zh: '每一幅未完成的画,都在等一个人。你画给他的画,收在作品集里。',
@@ -1055,6 +1061,10 @@ async function playEpilogue() {
     ev.stopPropagation();
     ctx.ui.portfolio?.open();
   };
+  cap.querySelector('[data-e="hill"]').onclick = (ev) => {
+    ev.stopPropagation();
+    goToHill();
+  };
   cap.querySelector('[data-e="share"]').onclick = (ev) => {
     ev.stopPropagation();
     saveStarCard();
@@ -1070,6 +1080,13 @@ async function playEpilogue() {
       shiftDayTo(22.5, 300); // 回到沙漠的夜里,抬头就是星星
     }, 2000);
   };
+}
+/** 故事之后:淡出,走向远方山丘(独立页面 /hill/,带上剧情语言) */
+function goToHill() {
+  stageEl.classList.remove('in');
+  setTimeout(() => {
+    location.href = hillUrl(scriptLang());
+  }, 1600);
 }
 function saveStarCard() {
   try {

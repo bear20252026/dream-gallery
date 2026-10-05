@@ -1,5 +1,13 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-05 The faraway hill: where the player stays after the story (draft PR, not yet released)
+
+- Owner decision: the whole Faraway scene from `bear20252026/faraway-game` (the cloud-sea hill, the guardian robot with the red ribbon, fox, rose, sheep, box, baobab sprouts, hat stone, plane, **tapir and shoebill kept on purpose**) becomes the place after the ending, like a victory screen. The player can stay there.
+- It is a separate TypeScript sub-project in `hill-src/` (its own three 0.186 + Rapier, tsc and vitest), not merged into our three 0.160 code. `cd hill-src && pnpm install && pnpm build` writes `public/hill/`; Vite copies public/ to dist/, so production serves it at `/hill/` with no change to `deploy.sh`. **The built `public/hill/` is committed**, so a normal release ships it; rebuild only when `hill-src/` changes.
+- Inside Dream Gallery the hill runs alone: `hill-src/manus-auth.js` is an offline stand-in (no Manus sign-in), the room and drawing notes never start (no request leaves the site), and `body[data-solo]` hides the account chip, presence pill and note key. `?lang=en|zh` sets its language from the story.
+- Entry points: the end screen's first button "Walk on to the faraway hill" (`ending-journey.js goToHill()`), plus a button on the finished ending row of the chapter map. Text and URL in `shared/ending-logic.mjs` (`HILL_TEXT`, `hillUrl`, unit-tested). `server.js` redirects `/hill` → `/hill/` (the hill loads `./assets/` relatively) and serves `/hill/` as `hill/index.html`.
+- Acceptance: `PW_BROWSER=chromium node scripts/probe/hill-ending-probe.cjs` (8 checks: final screen, button first, note, URL with the story language, hill title card, no sign-in/online parts, no off-site requests, no page errors). The local server serves the repo root, so the probe answers `/hill/*` from `public/hill/` itself.
+
 ## 2026-10-04 The fox diorama now rests on the sand (pushed to the work branch, not yet released)
 
 - Bug: in the Earth-day fox scene (`kunlun/scene10-fox.js`, at `SITE` = (-46, 34) in the main world) the Sketchfab diorama kept its own origin, so the rocky stage ("the map") hovered ~0.7 m above the sand, the fox, prince, grass and wheat ~1.1 m up, a strip of cloud ~3.7 m up, and the glowing seat marker hung in the air at 1.1 m.

@@ -5,7 +5,8 @@
 // 章节状态/存档码在 shared/chapter-map-logic.mjs(单测钉死)。
 import { ctx } from '../ctx.js';
 import { defineSystem } from '../core/system.js';
-import { tt } from '../shared/story-text.mjs';
+import { tt, scriptLang } from '../shared/story-text.mjs';
+import { HILL_TEXT, hillUrl } from '../shared/ending-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
 import { travel } from './world-travel.js';
 import {
@@ -28,6 +29,7 @@ const TEXT = {
   go: { zh: '从这里继续', en: 'Continue here' },
   revisit: { zh: '回去看看', en: 'Visit again' },
   replayEnd: { zh: '再看一次尾声', en: 'Watch the ending again' },
+  hill: HILL_TEXT.go,
   here: { zh: '你在这里', en: 'You are here' },
   saveTitle: { zh: '存档', en: 'Saves' },
   saveAuto: {
@@ -147,6 +149,15 @@ export function createChapterMap() {
         api.close();
         action();
       };
+      // 书写完以后:章节地图里也能直接去远方山丘(故事之后的落脚处)
+      if (c.id === 'ending' && c.state === 'done') {
+        const h = el('button', '', tt(TEXT.hill), li);
+        h.type = 'button';
+        h.dataset.go = 'hill';
+        h.onclick = () => {
+          location.href = hillUrl(scriptLang());
+        };
+      }
     });
     // —— 存档 ——
     el('h3', '', tt(TEXT.saveTitle), book);
