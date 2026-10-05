@@ -1,5 +1,13 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-05 Releases now update the server code too (draft PR, not yet used)
+
+- Problem: `server.js`, `lib/*.js` and `src/shared/mediarules.mjs` (required by the server) are not in `dist/`, so they were uploaded by hand, and the server copy drifted (`lib/config.js` was missing four MIME lines for weeks).
+- New `scripts/backend-sync.sh`: compares md5 of those files with `/opt/gallery`, lists each differing file with its line counts (`-` lines exist only on the server, so a manual server hotfix shows up before it is overwritten), asks `y/N`, backs up each server file as `*.bak-<time>`, uploads, re-checks md5, then restarts `gallery`. `--dry` only lists; `--yes` skips the question; with no terminal it skips the upload and says so.
+- `deploy.sh` step 5 now runs it before its single restart (`BACKEND_SYNC_NO_RESTART=1`). `--no-backend` skips it. A refusal or failure never stops the rest of the deploy.
+- Not covered on purpose: `gate_data.db` and `.env` (data and secrets stay manual).
+- Tested in the cloud against a fake local server (ssh/scp/pm2 shims): dry run, y, N, no terminal, nothing to do, and the deploy mode. Not yet run against the real server.
+
 ## 2026-10-05 Story thread: one voice from the desert to the hill (PR #3, released 2026-10-05 as v1.392)
 
 - bear: the scenes felt loosely joined, and the faraway hill felt like a different game. Layout untouched; only words changed. Finalized book lines inside the memories are unchanged.
@@ -240,7 +248,7 @@ npm run test:scene                # 场景截图回归 4 检查点(主世界/B61
 
 - **工具链 Vite 8**:`npm run dev` 一键起**前后双进程**(scripts/gen/dev.js:后端 server.js :3000 + Vite :5173,Ctrl+C 同退;CLI 参数如 --port/--host 转发给 Vite;**只起 Vite 不起后端 = 媒体全 404**,2026-07-27 踩过);`npm run build` → `dist/`(**10 个 html 入口**(index/admin/guide/whiteboard/music/agreement/privacy/community/lobby/room,以 `vite.config.js` 的 `rollupOptions.input` 为唯一权威,多页构建,产物仍在 dist 根)+ `sw.js`/`manifest.json`(来自 public/,URL 不变)+ assets/* hash 分包,gzip 后 ~200KB);`npm test` 跑两套测试(`npx vitest run` 单测 245 项 + scripts/test/)。
 - **生产部署**:标准流程 = `node scripts/deploy.sh`(见下「deploy 全套流程」),脚本已把历史血泪固化进步骤。**先传 assets 再传 html**,且 **`dist/` 必须整目录全量上传**(assets 哈希每版都可能变;2026-07-26 血泪:只传 index 包会让旧包 404 被 Cloudflare 边缘缓存,部分用户长时间白屏;万一中招,改 `main.js` 里 `window.__BUILD__` 的值重打出新哈希即可绕开);脚本会上传 `dist/index.html`→`/opt/gallery/index.html`、`dist/assets/*`→`/opt/gallery/assets/`、其余 `dist/*.html`/`sw.js`/`manifest.json`→`/opt/gallery/` 同名,并清理历史 main chunk(只留最新 3 个);仓库根的 `index.html` 是开发入口(引用 `/src/main.js` 原生 ESM(importmap 把 three/hls.js 映射到 /vendor/),test-mobile 直接用它),**生产用的是 dist/index.html(hash 分包)**,两者不要混。
-  ⚠️ **部署盲区(不进 dist,必须单独传)**——共四块,`scripts/deploy.sh` 只覆盖了 dist,其余靠流程:
+  ⚠️ **部署盲区(不进 dist,必须单独传)**——共四块,`scripts/deploy.sh` 覆盖 dist + ①后端(2026-10-05 起经 `scripts/backend-sync.sh`,问 y/N)+ ③models,②④仍靠流程:
     ① **后端文件**:`server.js`、`lib/*.js`、`gate_data.json` 等;
     ② **SQLite**:`gate_data.db`(WAL/SHM 一并);
     ③ **`models/` 目录**(~495M):deploy.sh **第 6 步自动补传**(md5 清单比差集,只传缺的/改过的;⚠️ 不用 rsync——Windows Git Bash 没有 rsync);加 `--no-models` 可跳过;
