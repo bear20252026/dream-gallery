@@ -1,11 +1,11 @@
 # 梦幻画廊 — 项目工程档案
 
-## 2026-10-05 Story thread: one voice from the desert to the hill (draft PR, not yet released)
+## 2026-10-05 Story thread: one voice from the desert to the hill (PR #3, released 2026-10-05 as v1.392)
 
 - bear: the scenes felt loosely joined, and the faraway hill felt like a different game. Layout untouched; only words changed. Finalized book lines inside the memories are unchanged.
 - **Night cards**: each voyage stop now has its own `kicker` (`VOYAGE.<stop>.kicker` in `shared/story-text-late.mjs`, rendered by `ui/voyage.js` as `v.kicker || VOYAGE.ui.kicker`): the pilot's desert days with the water running out (day four … day eight, "I drink the last drop of water"), so the planets read as one countdown.
 - **The hill is the pilot's dream six years later** (book's epilogue). `HILL_TEXT.note`, `hill-src/src/game/story.ts` and the hill i18n (`caption.arrive`, `game.tagline`, laughing-star counters, "The Fox"-style speaker names, default name Pilot/飞行员) were rewritten so every character remembers the journey: the fox smells the sheep in the box, the rose knows the one who drew the sheep, the sheep looks like the one in the box, the tapir ate the sad part of the dream, the guardian keeps its post like the lamplighter. Chinese reuses the game's existing phrasing (仪式 / 用心看 / 眼睛看不见 / 负责).
-- After a release: rebuild was done (`public/hill/` committed); re-cook voices with `node scripts/dev/warm-all-voices.mjs https://cloudbear.cloud` because the 7 new kickers are voiced text.
+- Release: PR #3 merged (bebf11d), `deploy.sh` shipped it, then `warm-all-voices` cooked the 7 new kickers (14 audio files, en+zh); `--check` and an R2 HEAD sweep both came back all-covered (870/870).
 
 ## 2026-10-05 全量发布 + 台词音频预煮收尾:v1.390 上线,顺修一处缓存键口径 bug
 
