@@ -1,12 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
-## 2026-10-05 Releases now update the server code too (draft PR, not yet used)
+## 2026-10-05 Releases now update the server code too (PR #5, released 2026-10-05 as v1.393)
 
 - Problem: `server.js`, `lib/*.js` and `src/shared/mediarules.mjs` (required by the server) are not in `dist/`, so they were uploaded by hand, and the server copy drifted (`lib/config.js` was missing four MIME lines for weeks).
 - New `scripts/backend-sync.sh`: compares md5 of those files with `/opt/gallery`, lists each differing file with its line counts (`-` lines exist only on the server, so a manual server hotfix shows up before it is overwritten), asks `y/N`, backs up each server file as `*.bak-<time>`, uploads, re-checks md5, then restarts `gallery`. `--dry` only lists; `--yes` skips the question; with no terminal it skips the upload and says so.
 - `deploy.sh` step 5 now runs it before its single restart (`BACKEND_SYNC_NO_RESTART=1`). `--no-backend` skips it. A refusal or failure never stops the rest of the deploy.
 - Not covered on purpose: `gate_data.db` and `.env` (data and secrets stay manual).
-- Tested in the cloud against a fake local server (ssh/scp/pm2 shims): dry run, y, N, no terminal, nothing to do, and the deploy mode. Not yet run against the real server.
+- Tested in the cloud against a fake local server (ssh/scp/pm2 shims): dry run, y, N, no terminal, nothing to do, and the deploy mode. **First real run 2026-10-05: `--dry` listed exactly `lib/config.js` (+6/-0, no server-only lines), `--yes` synced it, md5 verified.**
 
 ## 2026-10-05 Story thread: one voice from the desert to the hill (PR #3, released 2026-10-05 as v1.392)
 
@@ -22,7 +22,7 @@
 - **顺带修的 bug(缓存键口径)**:全库 856 条台词里唯一超 220 字符的 328 章国王心算句(247 字符)永远「缺一条」——根因:lib/tts.js 的 handleTts/handleTtsBatch 收到文本**先 trim 再 slice(0,220)** 才算 ttsKey,而客户端 `dialog-voice.mjs` 两处 key 计算与回退 URL、`voice-lines.mjs` 收集器都只 slice 不 trim;该句截断处(第 220 字符)恰是空格 → 客户端 key(220 带尾空格)与服务端落盘 key(219)永远差一拍,`/tts-audio/<客户端key>` 永远 404、warm 脚本永远报缺、回退通道每次多打一轮。修法:客户端统一 **trim→slice→trim**(dialog-voice `normTtsText` 三处 + voice-lines 收集器),服务端不动;其余 855 条 key 不变,该句归位到服务端已煮好的键。回归测试 dialog-voice/voice-lines 各 +1。
 - **运维记录**:①`~/.ssh/gk-deploy.pem`(从交接笔记提取)是本次会话重建的部署密钥,比 /tmp 临时文件耐久,后续手工 ssh 可复用;②服务器 `lib/config.js` 与本地有历史漂移(仅缺 .glb 等 MIME 四行,2026-09-23 的改动从未单独 scp)——本次未动它,盲区文件同步流程照旧须人工 diff;③`src/ui/agreement-music.js` 顶层 `new Audio('.../00001.m4a')` 仍会发起一次注定 ERR_ABORTED 的预加载(配乐已退役,无用户影响),日后顺手清理。
 
-## 2026-10-05 The faraway hill: where the player stays after the story (merged to main, not yet released)
+## 2026-10-05 The faraway hill: where the player stays after the story (released as part of v1.390; "Leave the hill" button added in PR #4, v1.393)
 
 - Owner decision: the whole Faraway scene from `bear20252026/faraway-game` (the cloud-sea hill, the guardian robot with the red ribbon, fox, rose, sheep, box, baobab sprouts, hat stone, plane, **tapir and shoebill kept on purpose**) becomes the place after the ending, like a victory screen. The player can stay there.
 - It is a separate TypeScript sub-project in `hill-src/` (its own three 0.186 + Rapier, tsc and vitest), not merged into our three 0.160 code. `cd hill-src && pnpm install && pnpm build` writes `public/hill/`; Vite copies public/ to dist/, so production serves it at `/hill/` with no change to `deploy.sh`. **The built `public/hill/` is committed**, so a normal release ships it; rebuild only when `hill-src/` changes.
