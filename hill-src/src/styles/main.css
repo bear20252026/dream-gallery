@@ -1716,3 +1716,7 @@ body[data-talking] .presence {
 body[data-solo] :is(.account, .presence, .title-presence, .note-key) {
   display: none !important;
 }
+/* The extra "leave" button makes the title menu taller: on short screens the font credit steps aside. */
+@media (max-height: 760px) {
+  body[data-solo] .title-foot { display: none; }
+}
