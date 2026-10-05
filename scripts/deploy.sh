@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # deploy.sh — 一键部署前端到服务器(含验证)
-# 用法: bash scripts/deploy.sh [--no-models]
-# 功能: build → 上传完整 dist → 解到 /opt/gallery/ 根目录 → 清理旧 chunk → 同步 models → 重启 → 验证
+# 用法: bash scripts/deploy.sh [--no-models] [--no-backend]
+# 功能: build → 上传完整 dist → 解到 /opt/gallery/ 根目录 → 清理旧 chunk → 同步后端(问 y/N)→ 重启 → 同步 models → 验证
 # 注意:server.js 直接服务 /opt/gallery/assets/(不是 dist/assets/),必须解到根目录
 #
 # ⚠️ 模型盲区(2026-09-23 根治):Vite 只复制 public/ 进 dist,models/ **不在 dist 里**;
@@ -15,7 +15,13 @@ ROOT_DIR="$PWD"
 KEY="/tmp/gk.pem"
 HOST="101.133.235.110"
 SYNC_MODELS=1
-[ "$1" = "--no-models" ] && SYNC_MODELS=0
+SYNC_BACKEND=1
+for a in "$@"; do
+  case "$a" in
+    --no-models) SYNC_MODELS=0 ;;
+    --no-backend) SYNC_BACKEND=0 ;;
+  esac
+done
 
 echo "=== 1/7 构建 ==="
 rm -rf dist node_modules/.vite
@@ -51,7 +57,15 @@ ls -t assets/main-*.js | tail -n +4 | xargs -r rm -f
 echo "清理后 main chunk 数: $(ls assets/main-*.js | wc -l)"
 EOF
 
-echo "=== 5/7 重启服务 ==="
+echo "=== 5/7 同步后端文件(server.js / lib)+ 重启服务 ==="
+# 2026-10-05:后端不进 dist,以前靠手工 scp(盲区①)。现在比对 md5,列出差异,问 y/N 后备份+上传+复核。
+# 失败或拒绝都不阻断部署;重启统一在下面做一次。
+if [ "$SYNC_BACKEND" = "1" ]; then
+  KEY="$KEY" HOST="$HOST" BACKEND_SYNC_NO_RESTART=1 bash scripts/backend-sync.sh \
+    || echo "⚠️ 后端同步出错(dist 已上线),请单独运行 bash scripts/backend-sync.sh --dry 查看"
+else
+  echo "(已用 --no-backend 跳过后端同步)"
+fi
 ssh -i "$KEY" -o StrictHostKeyChecking=no "root@$HOST" "pm2 restart gallery --update-env >/dev/null && sleep 2 && pm2 status gallery | grep -E 'gallery.*online'"
 
 echo "=== 6/7 同步 models/(只补服务器缺的) ==="
