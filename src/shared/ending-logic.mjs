@@ -91,8 +91,8 @@ export function endingNext(step, world) {
 export const HILL_TEXT = Object.freeze({
   go: { en: 'Walk on to the faraway hill', zh: '走向远方的山丘' },
   note: {
-    en: 'The story is over. Beyond the stars there is a quiet hill where everyone you met is waiting. Stay as long as you like.',
-    zh: '故事讲完了。星星的另一边有一座安静的山丘,你遇见过的它们都在那里等你。想待多久,就待多久。',
+    en: 'Six years later, the pilot flies again. Above the clouds he comes down on a quiet hill, and everything from the journey is resting there. Stay as long as you like.',
+    zh: '六年以后,飞行员又飞上了天。云海上,他落在一座安静的山丘上,旅途里遇见的一切都在那里歇着。想待多久,就待多久。',
   },
 });
 /** 去山丘的地址:带上剧情语言(en / zh),山丘那边据此选语言 */
