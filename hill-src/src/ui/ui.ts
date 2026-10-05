@@ -398,6 +398,8 @@ export class Ui {
       case 'play': this.setOff(); break
       case 'resume': this.actions.resume(); break
       case 'quit': this.actions.quit(); break
+      // Back to Dream Gallery: the hill is the last stop, never a dead end.
+      case 'leave': location.href = '/'; break
       case 'settings': this.push('settings'); break
       case 'back': this.back(); break
       // ManusAuth.login() must run inside the click itself (popup and redirect rules).
@@ -562,6 +564,7 @@ export class Ui {
     <nav class="menu">
       <button data-nav class="btn btn-primary" data-action="play"><span data-i18n="menu.play"></span></button>
       <button data-nav class="btn" data-action="settings"><span data-i18n="menu.settings"></span></button>
+      <button data-nav class="btn" data-action="leave"><span data-i18n="menu.leave"></span></button>
     </nav>
     <p class="title-presence" hidden><i aria-hidden="true"></i><span></span></p>
   </div>
@@ -596,6 +599,7 @@ export class Ui {
       <button data-nav class="btn btn-primary" data-action="resume"><span data-i18n="menu.continue"></span></button>
       <button data-nav class="btn" data-action="settings"><span data-i18n="menu.settings"></span></button>
       <button data-nav class="btn" data-action="quit"><span data-i18n="menu.quit"></span></button>
+      <button data-nav class="btn" data-action="leave"><span data-i18n="menu.leave"></span></button>
     </nav>
     <div class="account account-inline"></div>
   </div>
