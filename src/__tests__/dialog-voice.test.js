@@ -3,7 +3,14 @@
 // 「无汉字不读」把英文台词全拦 → 全程无声。修订:①英文行照读;②音色切 MiMo 官方
 // 预置(中文 苏打/茉莉,英文 Milo/Dean/Mia),按文本语言分轨(voiceFor 带 text)。
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { voiceFor, hasCJK, speakDecision, prefetchLine, ttsUrl, warmBlobByKey } from '../core/dialog-voice.mjs';
+import {
+  voiceFor,
+  hasCJK,
+  speakDecision,
+  prefetchLine,
+  ttsUrl,
+  warmBlobByKey,
+} from '../core/dialog-voice.mjs';
 import crypto from 'node:crypto';
 
 describe('voiceFor 说话人分声线(按文本语言分轨)', () => {
@@ -118,6 +125,22 @@ describe('ttsUrl 台词音频 URL(2026-09-26 起走 R2 镜像,前后端键契约
       'https://cdn.cloudbear.cloud/tts-audio/' + expectKey + '.mp3'
     );
   });
+  it('超长英文句 220 截断处恰为空格:key 与服务端 trim→slice 口径一致(2026-10-05 实锤,328 章心算句曾永远 404)', async () => {
+    // 247 字符原文,前 220 字符以 "…and " 结尾(行尾空格);服务端 lib/tts.js 先 trim 再 slice,
+    // 客户端必须哈希 trim→slice→trim 后的 219 字符串,否则该行 /tts-audio/<key>.mp3 永远不命中
+    const full =
+      "Three and two make five. Five and seven make twelve. Twelve and three make fifteen. Good morning. Fifteen and seven make twenty-two. Twenty-two and six make twenty-eight. I haven't time to light it again. Twenty-six and five make thirty-one. Phew!";
+    const serverText = full.trim().slice(0, 220).trim();
+    expect(serverText.length).toBe(219); // 行尾空格被去掉,与服务端落盘口径一致
+    const expectKey = crypto
+      .createHash('sha256')
+      .update('tts1|' + 'en-GB-RyanNeural' + '|' + serverText)
+      .digest('hex')
+      .slice(0, 20);
+    expect(await ttsUrl(full, 'en-GB-RyanNeural')).toBe(
+      'https://cdn.cloudbear.cloud/tts-audio/' + expectKey + '.mp3'
+    );
+  });
 });
 
 describe('warmBlobByKey: line audio is kept on the device between visits (2026-10-04)', () => {
@@ -163,7 +186,11 @@ describe('warmBlobByKey: line audio is kept on the device between visits (2026-1
 
   it('works when Cache Storage is missing or broken, and a 404 is not cached', async () => {
     const key = 'c'.repeat(20);
-    globalThis.caches = { open: async () => { throw new Error('blocked'); } };
+    globalThis.caches = {
+      open: async () => {
+        throw new Error('blocked');
+      },
+    };
     globalThis.fetch = vi.fn(async () => new Response('nope', { status: 404 }));
     expect(await warmBlobByKey(key)).toBe(false);
     globalThis.fetch = vi.fn(async () => audio());

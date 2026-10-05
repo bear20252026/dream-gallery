@@ -39,6 +39,12 @@ const SPK_VOICES_EN = {
 };
 const OFF_KEY = 'dialogVoiceOff';
 const MAX_SPEAK_LEN = 220; // 与 lib/tts.js MAX_LEN 对齐,超长服务端还会再截
+// 缓存键口径必须与服务端完全一致:lib/tts.js 收到文本后先 trim 再 slice(0,220),
+// 客户端也必须 trim→slice→trim,否则行尾恰在 220 处截出空格的台词(328 章国王心算句)
+// 客户端哈希的 key 与服务端落盘的 key 永远差一个空格,该行 /tts-audio 永远 404。
+function normTtsText(text) {
+  return String(text).trim().slice(0, MAX_SPEAK_LEN).trim();
+}
 import { avAllowed } from './av-switch.js'; // 全站音视频总闸(2026-09-26):总闸关闭等同静音
 import { tt } from '../shared/story-text.mjs'; // 静音钮文字中英(2026-10-03)
 
@@ -177,7 +183,7 @@ function playFail(audio, url, text, voice, e) {
 function legacyTtsUrl(text, voice) {
   return (
     '/api/tts?text=' +
-    encodeURIComponent(String(text).slice(0, MAX_SPEAK_LEN)) +
+    encodeURIComponent(normTtsText(text)) +
     '&voice=' +
     encodeURIComponent(voice)
   );
@@ -256,7 +262,7 @@ export async function warmBlobByKey(key) {
 export async function warmBlob(text, voice) {
   try {
     if (!(typeof crypto !== 'undefined' && crypto.subtle)) return false;
-    const key = (await sha256hex(KEY_VER + '|' + voice + '|' + String(text).slice(0, MAX_SPEAK_LEN))).slice(0, 20);
+    const key = (await sha256hex(KEY_VER + '|' + voice + '|' + normTtsText(text))).slice(0, 20);
     return await warmBlobByKey(key);
   } catch (e) {
     return false;
@@ -266,7 +272,7 @@ export async function warmBlob(text, voice) {
 export async function ttsUrl(text, voice) {
   try {
     if (typeof crypto !== 'undefined' && crypto.subtle) {
-      const key = (await sha256hex(KEY_VER + '|' + voice + '|' + String(text).slice(0, MAX_SPEAK_LEN))).slice(0, 20);
+      const key = (await sha256hex(KEY_VER + '|' + voice + '|' + normTtsText(text))).slice(0, 20);
       const b = blobUrls.get(key);
       if (b) return b;
       return R2_BASE + '/tts-audio/' + key + '.mp3';

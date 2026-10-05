@@ -21,7 +21,9 @@ export function collectVoiceLines(modules, voiceFor) {
     for (const lang of ['en', 'zh']) {
       const raw = entry[lang];
       if (typeof raw !== 'string' || !raw.trim()) continue;
-      const text = raw.slice(0, MAX_LINE_LEN);
+      // 与 lib/tts.js 的 trim→slice 口径一致(再 trim 掉截断处行尾空格),否则
+      // 超长句(328 章国王心算句)预煮/预热算出的 key 与服务端落盘 key 永远差一个空格
+      const text = raw.trim().slice(0, MAX_LINE_LEN).trim();
       const voice = voiceFor(spk, text);
       const id = voice + '|' + text;
       if (seen.has(id)) continue;

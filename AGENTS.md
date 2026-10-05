@@ -1,5 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-05 全量发布 + 台词音频预煮收尾:v1.390 上线,顺修一处缓存键口径 bug
+
+- **同步**:本地 main 从 e57611c(385) fast-forward 到 ed1810d(390,远端两个 PR:voice 预渲染 + faraway hill);`npm run test:unit` 514 项全过后 `deploy.sh` 部署,`server.js`(/hill 路由)按盲区流程单独 scp + md5 比对 + pm2 restart。线上 `/hill/` 200、`/hill` 301、版本戳 `ed1810d`(v1.390)。
+- **预煮**:`node scripts/dev/warm-all-voices.mjs https://cloudbear.cloud` 把 370 条缺失台词(全部 story-text-late + ending-text)煮齐,新合成由 lib/tts.js 自动镜像 R2。
+- **顺带修的 bug(缓存键口径)**:全库 856 条台词里唯一超 220 字符的 328 章国王心算句(247 字符)永远「缺一条」——根因:lib/tts.js 的 handleTts/handleTtsBatch 收到文本**先 trim 再 slice(0,220)** 才算 ttsKey,而客户端 `dialog-voice.mjs` 两处 key 计算与回退 URL、`voice-lines.mjs` 收集器都只 slice 不 trim;该句截断处(第 220 字符)恰是空格 → 客户端 key(220 带尾空格)与服务端落盘 key(219)永远差一拍,`/tts-audio/<客户端key>` 永远 404、warm 脚本永远报缺、回退通道每次多打一轮。修法:客户端统一 **trim→slice→trim**(dialog-voice `normTtsText` 三处 + voice-lines 收集器),服务端不动;其余 855 条 key 不变,该句归位到服务端已煮好的键。回归测试 dialog-voice/voice-lines 各 +1。
+- **运维记录**:①`~/.ssh/gk-deploy.pem`(从交接笔记提取)是本次会话重建的部署密钥,比 /tmp 临时文件耐久,后续手工 ssh 可复用;②服务器 `lib/config.js` 与本地有历史漂移(仅缺 .glb 等 MIME 四行,2026-09-23 的改动从未单独 scp)——本次未动它,盲区文件同步流程照旧须人工 diff;③`src/ui/agreement-music.js` 顶层 `new Audio('.../00001.m4a')` 仍会发起一次注定 ERR_ABORTED 的预加载(配乐已退役,无用户影响),日后顺手清理。
+
 ## 2026-10-05 The faraway hill: where the player stays after the story (merged to main, not yet released)
 
 - Owner decision: the whole Faraway scene from `bear20252026/faraway-game` (the cloud-sea hill, the guardian robot with the red ribbon, fox, rose, sheep, box, baobab sprouts, hat stone, plane, **tapir and shoebill kept on purpose**) becomes the place after the ending, like a victory screen. The player can stay there.
