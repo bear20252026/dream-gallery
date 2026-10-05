@@ -83,6 +83,15 @@ const handler = (req, res) => {
   let rel = pathname === '/' ? 'index.html' : pathname.replace(/^\/+/, '');
   // 官网落地页子目录回落(2026-08-29):/landing 与 /landing/ → /landing/index.html
   if (rel === 'landing' || rel === 'landing/') rel = 'landing/index.html';
+  // 远方山丘(2026-10-05):故事之后的落脚处,构建在 public/hill/ → dist/hill/。
+  // 山丘用相对路径加载 ./assets/,所以 /hill 先补斜杠跳到 /hill/,/hill/ 再落到 index.html
+  if (rel === 'hill') {
+    const q = req.url.indexOf('?');
+    res.writeHead(301, { Location: '/hill/' + (q < 0 ? '' : req.url.slice(q)) });
+    res.end();
+    return;
+  }
+  if (rel === 'hill/') rel = 'hill/index.html';
   if (!mediaGate(req, res, rel)) return; // 媒体门禁(2026-09-18 下沉 lib/security)
   // 敏感文件黑名单(2026-07-26):.env/gate_data.json/origin 私钥/题库/后端源码等一律 404
   // 注意:/admin 与 /admin-media 走独立 token 通道,不经过这里,不受影响

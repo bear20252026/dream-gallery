@@ -11,3 +11,6 @@ music
 data.js
 gate_data.json
 package-lock.json
+# 远方山丘:独立子项目与其构建产物
+hill-src
+public/hill

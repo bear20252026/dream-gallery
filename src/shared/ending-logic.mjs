@@ -85,6 +85,21 @@ export function endingNext(step, world) {
   }
 }
 
+// ===================== 远方山丘:故事之后的落脚处 =====================
+// 2026-10-05 主人定:把 faraway-game 的整座山丘(狐狸/玫瑰/羊/貘/鲸头鹳/守护者)
+// 放在全剧最后,像通关后的结算地,玩家可以一直留在那里。源码在 hill/,构建进 public/hill/。
+export const HILL_TEXT = Object.freeze({
+  go: { en: 'Walk on to the faraway hill', zh: '走向远方的山丘' },
+  note: {
+    en: 'The story is over. Beyond the stars there is a quiet hill where everyone you met is waiting. Stay as long as you like.',
+    zh: '故事讲完了。星星的另一边有一座安静的山丘,你遇见过的它们都在那里等你。想待多久,就待多久。',
+  },
+});
+/** 去山丘的地址:带上剧情语言(en / zh),山丘那边据此选语言 */
+export function hillUrl(lang) {
+  return `/hill/?lang=${lang === 'zh' ? 'zh' : 'en'}`;
+}
+
 // ===================== 找井:用耳朵导航 =====================
 // 没有箭头。玩家只拿到两样东西:水声有多清楚(距离) + 从哪一侧传来(左右声像)。
 // 静止越久听得越清楚——"要紧的东西,眼睛看不见"的可玩化。
