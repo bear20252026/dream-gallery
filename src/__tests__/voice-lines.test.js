@@ -3,8 +3,6 @@ import { describe, it, expect } from 'vitest';
 import { collectVoiceLines, prioritizeLines, MAX_LINE_LEN } from '../shared/voice-lines.mjs';
 import { voiceFor } from '../core/dialog-voice.mjs';
 import * as STORY from '../shared/story-text.mjs';
-import * as LATE from '../shared/story-text-late.mjs';
-import * as ENDING from '../shared/ending-text.mjs';
 
 const vf = (spk, text) => spk + ':' + (/[一-鿿]/.test(text) ? 'zh' : 'en');
 
@@ -53,15 +51,11 @@ describe('collectVoiceLines', () => {
     expect(got).toBe(raw.trim().slice(0, MAX_LINE_LEN).trim());
     expect(got.endsWith(' ')).toBe(false);
   });
-  it('covers all three real text modules, not only story-text', () => {
-    const lines = collectVoiceLines(
-      { 'story-text': STORY, 'story-text-late': LATE, 'ending-text': ENDING },
-      voiceFor
-    );
-    const by = (s) => lines.filter((l) => l.src === s).length;
-    expect(by('story-text')).toBeGreaterThan(300);
-    expect(by('story-text-late')).toBeGreaterThan(200); // 328-330, Earth day: missed by the old prewarm
-    expect(by('ending-text')).toBeGreaterThan(150); // the ending: missed by the old prewarm
+  it('covers the merged text module whole — every story chapter is voiced', () => {
+    const lines = collectVoiceLines({ 'story-text': STORY }, voiceFor);
+    // 2026-10-05 台词三合一:主线上游 + 328-330/地球日 + 结局都来自同一个模块;
+    // 这条护栏曾经按三模块分账(>300/>200/>150),合并后按单一来源合计
+    expect(lines.length).toBeGreaterThan(650);
     expect(lines.every((l) => l.voice && l.text)).toBe(true);
   });
 });

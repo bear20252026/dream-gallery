@@ -6,11 +6,11 @@
 //   328 陪商人数星星:点天上的星,账上 +1,数到第七颗「锁进抽屉」;
 //   329 陪点灯人点灯:一分钟一天,天黑点灯、天亮熄灯,跟上六次;
 //   330 给地理学家讲 B612:三座火山都记下了,讲到花,他不录——于是有了「朝生暮死」那段。
-// 回忆里的大人用纸剪影立在道具旁(画布绘制,零模型依赖)。台词单一源 shared/story-text-late.mjs。
+// 回忆里的大人用纸剪影立在道具旁(画布绘制,零模型依赖)。台词单一源 shared/story-text.mjs。
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { tt, whoSpk } from '../shared/story-text.mjs';
-import { SCENE8_BUSINESS, SCENE8_LAMP, SCENE9_GEO } from '../shared/story-text-late.mjs';
+import { SCENE8_BUSINESS, SCENE8_LAMP, SCENE9_GEO } from '../shared/story-text.mjs';
 import { PLANETS } from '../shared/planet-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
 import { setLampLit } from './planet-props.js';

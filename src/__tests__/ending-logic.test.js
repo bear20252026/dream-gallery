@@ -16,7 +16,7 @@ import {
   hillUrl,
   HILL_TEXT,
 } from '../shared/ending-logic.mjs';
-import { BOOK_PAGES, SCENE_WELL, SCENE_FAREWELL, SCENE_EPILOGUE } from '../shared/ending-text.mjs';
+import { BOOK_PAGES, SCENE_WELL, SCENE_FAREWELL, SCENE_EPILOGUE } from '../shared/story-text.mjs';
 
 describe('结局线进度', () => {
   it('只前进不回退,钳在 0..4', () => {

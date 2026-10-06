@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { tt, whoSpk } from '../shared/story-text.mjs';
-import { SCENE10, EARTH_UI } from '../shared/story-text-late.mjs';
+import { SCENE10, EARTH_UI } from '../shared/story-text.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';

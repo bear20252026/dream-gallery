@@ -12,7 +12,7 @@
 //   3 → 尾声·六年后(全屏星空,字幕 + 是/否 一问)。
 //   4 → 全书完。可再看星星 / 保存「我的星星」卡片。
 //
-// 规矩:角色台词全部来自 shared/ending-text.mjs(逐字 Woods);本文件只写界面提示。
+// 规矩:角色台词全部来自 shared/story-text.mjs(逐字 Woods);本文件只写界面提示。
 //       串台词照抄 scene10-fox.js 的范式:autoHide 按长度 + 心跳守护 + spent 幂等,不传 world/scope。
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
@@ -31,7 +31,7 @@ import {
   SCENE_EPILOGUE,
   ENDING_UI,
   WHO,
-} from '../shared/ending-text.mjs';
+} from '../shared/story-text.mjs';
 import {
   ENDING,
   clampEnding,

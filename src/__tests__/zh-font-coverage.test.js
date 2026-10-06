@@ -7,10 +7,8 @@ import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import zlib from 'node:zlib';
 import * as STORY from '../shared/story-text.mjs';
-import * as ENDING from '../shared/ending-text.mjs';
 import * as JOURNEY from '../shared/journey-logic.mjs';
 import * as PLANETS from '../shared/planet-logic.mjs';
-import * as LATE from '../shared/story-text-late.mjs';
 
 const FONT = fileURLToPath(new URL('../styles/fonts/ZhiMangXing-sub.woff2', import.meta.url));
 // 完整字体本身就没有的字(只能回退系统字体),不算子集的错
@@ -161,10 +159,8 @@ describe('中文剧情字体子集覆盖全部台词', () => {
   });
   for (const [name, mod] of [
     ['story-text', STORY],
-    ['ending-text', ENDING],
     ['journey-logic', JOURNEY],
     ['planet-logic', PLANETS],
-    ['story-text-late', LATE],
   ]) {
     it(name + ' 的每个汉字都在字体里', () => {
       const missing = new Set();

@@ -22,8 +22,6 @@ const { collectVoiceLines } = await import('../../src/shared/voice-lines.mjs');
 const { voiceFor } = await import('../../src/core/dialog-voice.mjs');
 const modules = {
   'story-text': await import('../../src/shared/story-text.mjs'),
-  'story-text-late': await import('../../src/shared/story-text-late.mjs'),
-  'ending-text': await import('../../src/shared/ending-text.mjs'),
 };
 // Same key as lib/tts.js ttsKey() and dialog-voice.mjs ttsUrl(): sha256('tts1|voice|text') first 20 hex.
 const keyOf = (voice, text) => createHash('sha256').update('tts1|' + voice + '|' + text).digest('hex').slice(0, 20);

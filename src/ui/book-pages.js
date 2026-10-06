@@ -2,10 +2,10 @@
 // 书页六/七/八(328·329·330·地球之日)暂时以可翻的插画书页呈现,把故事接到结局。
 // 呈现:左页铅笔插画(程序化 SVG,逐笔画出),右页台词(当前语言为主,另一语言淡写在下)。
 // 操作:翻页按钮 / → / 空格 / E / 左右滑;← 回上一页。读完最后一页才能「合上书」(onDone)。
-// 规矩:台词来自 shared/ending-text.mjs(逐字照 Woods 译本),本模块只管呈现,不写一句台词。
+// 规矩:台词来自 shared/story-text.mjs(逐字照 Woods 译本),本模块只管呈现,不写一句台词。
 import { tt, scriptLang } from '../shared/story-text.mjs';
 import { Z } from '../shared/z-layers.mjs';
-import { ENDING_UI } from '../shared/ending-text.mjs';
+import { ENDING_UI } from '../shared/story-text.mjs';
 
 // —— 铅笔插画(viewBox 0 0 300 260,线条风格与开场电影的手绘一致) ——
 const SKETCH = {

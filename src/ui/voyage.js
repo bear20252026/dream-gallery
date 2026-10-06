@@ -5,11 +5,11 @@
 // 点「继续」:卡片保持不透明,底下完成世界切换(沙漠→B612→下一颗星,或回沙漠过地球的一天),
 // 到了再淡出——玩家看到的是「翻一页」,不再是黑幕、回 B612、找按钮、再黑幕。
 // 「再待一会儿」:先不走;星球底部导航会留「下一夜 →」,随时接上(planets.js 调 open())。
-// 下一站算法在 shared/voyage-logic.mjs(单测钉死);台词在 shared/story-text-late.mjs VOYAGE。
+// 下一站算法在 shared/voyage-logic.mjs(单测钉死);台词在 shared/story-text.mjs VOYAGE。
 import { ctx } from '../ctx.js';
 import { defineSystem } from '../core/system.js';
 import { tt } from '../shared/story-text.mjs';
-import { VOYAGE } from '../shared/story-text-late.mjs';
+import { VOYAGE } from '../shared/story-text.mjs';
 import { Z } from '../shared/z-layers.mjs';
 import { nextStop, worldOf } from '../shared/voyage-logic.mjs';
 import { travel } from './world-travel.js';

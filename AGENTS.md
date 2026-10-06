@@ -1,5 +1,13 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-06 台词三合一 + 中英对照测试(本地,待发布)
+
+- 主人要求对齐 hill-src 范本(「远方把所有台词放在一个文件里,还有一个测试检查中英文是否对应」):`src/shared/story-text-late.mjs`(460 行)与 `ending-text.mjs`(539 行)整体并入 `story-text.mjs`(现 ~1610 行,26 个数据导出名一字未改),两文件删除;WHO 说话人表上移到说话人区,late/ending 各自的 `const P/S/C` 简写收拢为 WHO 之后的一份共享解构块(P,S,C,B,L,G);late 节内私有的 SNAKE/FLOWER/ECHO/ROSES 保留原地。`tt()/retranslate` 机制与其唯一消费者零改动。
+- 消费方 10 处改 import:late-planets/earth-day/voyage/ending-journey/book-pages/dialog-prewarm/warm-all-voices + 三个测试文件;`dialog-prewarm.js` 与 `warm-all-voices.mjs` 的三键模块表收敛为单键 `'story-text'`(warm 统计的 by-module 维度随之合并,音频内容零变化)。
+- **新增 `src/__tests__/story-text-parity.test.js`**(对齐 hill-src/tests/story.test.ts 的结构性遍历):①凡有 en 必有非空 zh、反之亦然,空串只许成对(如 WHO.caption);②裸字符串台词数组一律违法(旧 DIALOG_LINES.prince 那种纯英文数组就是漏译温床);③who.spk ∈ 声线登记集(说话人 id / edge-tts 原生音色名 / 空串);④音频条目 ≥870 护栏。今后加台词漏译、漏声线,单测直接红。
+- 顺带补齐对照测试逼出的缺口:`DIALOG_LINES.prince` 4 条纯英文 idle 台词(原本无运行时消费方、无中文)补译成 {en,zh},新增 8 条音频键(870→878),已煮齐并镜像 R2(878/878 全 200)。补译首稿「帽子终究只是帽子」的「究」不在字体子集,按预案改「帽子不过是帽子——除非你用心去看。」(究 在完整字体里有,子集待下次重做时自然覆盖)。
+- 验证:vitest **520 项全绿**(516 −2 字体扫描项 +6 对照测试);`npm run build` 通过;本地页面启动零报错。`b612-script-fill-probe` 在本机「等石门现身」超时——**stash 前后 A/B 实证合并前同样卡死**,属本机环境限制(模型 404、全链剧情探针只在云端/线上验证过),与合并无关;发布后跑线上探针验收。
+
 ## 2026-10-05 Releases now update the server code too (PR #5, released 2026-10-05 as v1.393)
 
 - Problem: `server.js`, `lib/*.js` and `src/shared/mediarules.mjs` (required by the server) are not in `dist/`, so they were uploaded by hand, and the server copy drifted (`lib/config.js` was missing four MIME lines for weeks).

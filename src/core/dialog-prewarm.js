@@ -7,21 +7,19 @@
 // ③配合 dialog-voice 的逐行预取,形成三层预热(见 gameshell-dialog)。
 // 全程 fire-and-forget:任何失败静默,不影响页面(与全站错误静默铁律一致)。
 import * as ST from '../shared/story-text.mjs';
-import * as LATE from '../shared/story-text-late.mjs';
-import * as ENDING from '../shared/ending-text.mjs';
 import { collectVoiceLines, prioritizeLines } from '../shared/voice-lines.mjs';
 import { voiceFor, warmBlobByKey } from './dialog-voice.mjs';
 import { avAllowed } from './av-switch.js';
 
 // 2026-10-04: the prewarm used to walk only story-text.mjs, so the lines of 328-330, the Earth day and the
 // ending (52% of all audio files) were never pre-cooked and were synthesized live the first time they were heard.
-// The collector now covers all three text modules, in story order.
+// Since 2026-10-05 the three text modules are merged into one (story-text.mjs), which the collector walks whole.
 const BATCH_SIZE = 20; // 每批条数(≤服务端 MAX_BATCH_ITEMS 60;batch 让位,连续灌不抢实时)
 const BATCH_GAP_MS = 1200; // 批间隔:服务端低优先级队列保证实时台词优先,这里尽量快煮
 let started = false;
 
 function allLines() {
-  return collectVoiceLines({ 'story-text': ST, 'story-text-late': LATE, 'ending-text': ENDING }, voiceFor);
+  return collectVoiceLines({ 'story-text': ST }, voiceFor);
 }
 
 function postBatch(items) {
@@ -60,7 +58,10 @@ export function prewarmDialogs() {
   started = true;
   if (!avAllowed('dialogue')) return; // 对白豁免通道恒真;防御性判断
   try {
-    const ordered = prioritizeLines(allLines(), ST.scriptLang()).map((l) => ({ text: l.text, voice: l.voice }));
+    const ordered = prioritizeLines(allLines(), ST.scriptLang()).map((l) => ({
+      text: l.text,
+      voice: l.voice,
+    }));
     if (!ordered.length) return;
     // 分批发送:批间 1.2s,总 ~23 批;服务端煮缓存的同批响应带回已煮键 → 立刻预热边缘
     let i = 0;
