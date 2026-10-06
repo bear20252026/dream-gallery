@@ -6,7 +6,8 @@
 - 消费方 10 处改 import:late-planets/earth-day/voyage/ending-journey/book-pages/dialog-prewarm/warm-all-voices + 三个测试文件;`dialog-prewarm.js` 与 `warm-all-voices.mjs` 的三键模块表收敛为单键 `'story-text'`(warm 统计的 by-module 维度随之合并,音频内容零变化)。
 - **新增 `src/__tests__/story-text-parity.test.js`**(对齐 hill-src/tests/story.test.ts 的结构性遍历):①凡有 en 必有非空 zh、反之亦然,空串只许成对(如 WHO.caption);②裸字符串台词数组一律违法(旧 DIALOG_LINES.prince 那种纯英文数组就是漏译温床);③who.spk ∈ 声线登记集(说话人 id / edge-tts 原生音色名 / 空串);④音频条目 ≥870 护栏。今后加台词漏译、漏声线,单测直接红。
 - 顺带补齐对照测试逼出的缺口:`DIALOG_LINES.prince` 4 条纯英文 idle 台词(原本无运行时消费方、无中文)补译成 {en,zh},新增 8 条音频键(870→878),已煮齐并镜像 R2(878/878 全 200)。补译首稿「帽子终究只是帽子」的「究」不在字体子集,按预案改「帽子不过是帽子——除非你用心去看。」(究 在完整字体里有,子集待下次重做时自然覆盖)。
-- 验证:vitest **520 项全绿**(516 −2 字体扫描项 +6 对照测试);`npm run build` 通过;本地页面启动零报错。`b612-script-fill-probe` 在本机「等石门现身」超时——**stash 前后 A/B 实证合并前同样卡死**,属本机环境限制(模型 404、全链剧情探针只在云端/线上验证过),与合并无关;发布后跑线上探针验收。
+- 验证:vitest **520 项全绿**(516 −2 字体扫描项 +6 对照测试);`npm run build` 通过;本地页面启动零报错。`b612-script-fill-probe` 在本机「等石门现身」超时——**stash 前后 A/B 实证合并前同样卡死**,属本机环境限制(模型 404、全链剧情探针只在云端/线上验证过),与合并无关。
+- **发布 v1.394(2026-10-06)**:deploy.sh 上线,版本戳 `2bb9d75` 双端核对,首页/`/hill/` 200、0 pageerror,878 条音频服务器+R2 全 200。线上探针深挖(诊断脚本 .tmp/gate-diag2.cjs 端到端实证:**合并代码在线上从老档开机→数数链→石门→入梦 B612 全程零报错**),顺带查明 `b612-script-fill-probe` 自 09-27 石门出场规矩后欠三层预置:①门需 `revealStarGate()` 手动现身;②主线对白 autoHide:0 后要点「继续 →」推进(点选器只会点选项);③对白收束前落进门圈会被 padBtn 对白守卫吃掉 fire 且 disarm。三层已修两层半写入探针(reveal/点继续/去抖 1.5s+出圈重武装),但完整 9 项语料断言仍未走通——**探针需按 post-09-27 演出流程重新设计(待办)**,合并质量由单测+诊断脚本+线上健康度兜底。
 
 ## 2026-10-05 Releases now update the server code too (PR #5, released 2026-10-05 as v1.393)
 

@@ -67,10 +67,15 @@ let _browser = null;
       const iv = setInterval(() => {
         try {
           const d = document.getElementById('gameDialog');
-          const c = d && d.style.display !== 'none' && d.querySelector('.gs-choice');
-          if (c) c.click();
+          if (!d || d.style.display === 'none') return;
+          const c = d.querySelector('.gs-choice');
+          if (c) { c.click(); return; }
+          // 2026-10-06 补第三段预置:主线对白 autoHide:0(2026-10-03 指引整改)后,
+          // 无选项的行靠「继续 →」推进;点一次=补全打字,再点一次=下一行。探针模拟玩家手速。
+          const nxt = d.querySelector('.gs-next');
+          if (nxt && nxt.style.display !== 'none') nxt.click();
         } catch (e) {}
-      }, 1000);
+      }, 700);
       setTimeout(() => clearInterval(iv), 540000);
     })
     .catch(() => {});
@@ -91,17 +96,68 @@ let _browser = null;
     }, 1000);
   });
   // exitBridge 重播收束 → 石门现身 → 摆进门圈 → 入梦
+  // 2026-10-06 预置补丁(与 CI VR 探针 2026-09-30 同款,见 AGENTS.md 探针预置坑①):
+  // 石门出场规矩(2026-09-27 主人令)后,门由剧情点(羊箱计数点亮)现身;本探针老档直进、
+  // 不走近羊箱重播计数,门永远不亮 —— 预置里手动现身,再等可见(探针不验「门何时亮」)
   console.log('…等石门现身');
+  await page.evaluate(() => {
+    try {
+      window.__ctx.kunlun.revealStarGate && window.__ctx.kunlun.revealStarGate();
+    } catch (e) {}
+  });
   await page.waitForFunction(() => window.__starGate && window.__starGate.visible(), null, {
     timeout: 120000,
   });
+  // 2026-10-06 第二段补丁(探针预置坑②的另一半):老档夜流程的数数对话是「轮到你开口」
+  // 链(无语音时按纯文本节奏逐字播出,一行约 40s),且主线对白 autoHide:0 靠「继续 →」推进
+  // (点选器已补)。等待「对白连续闭合 ≥1.5s」(去抖,防锁链两段之间的瞬时缝隙误判),
+  // 然后落进门圈;portal fire 自动传送。若 15s 仍未入梦:出圈↔进圈交替重武装再试。
+  await page.waitForFunction(
+    () => {
+      const w = window.__calm || 0;
+      const closed =
+        !(window.__ctx.ui.dialogOpen && window.__ctx.ui.dialogOpen()) &&
+        !(window.__ctx.overlay && window.__ctx.overlay.anyOpen());
+      window.__calm = closed ? w + 1 : 0;
+      return window.__calm > 5;
+    },
+    null,
+    { timeout: 420000, polling: 300 }
+  );
+  await page.waitForTimeout(800);
   await page.evaluate(() => {
     const pl = window.__ctx && window.__ctx.player && window.__ctx.player.pl;
     if (pl) {
       pl.p.x = 0.1;
-      pl.p.z = 56.0;
+      pl.p.z = 56;
     }
   });
+  for (let i = 0; i < 8; i++) {
+    await page.waitForTimeout(5000);
+    const st = await page.evaluate(() => ({
+      world: window.__ctx.scene.activeWorld || '',
+      blocked: !!(window.__ctx.ui.dialogOpen?.() || window.__ctx.overlay.anyOpen()),
+    }));
+    if (st.world === 'b612') break;
+    await page.evaluate(() => {
+      const ctx = window.__ctx;
+      if ((ctx.scene.activeWorld || '') !== 'main') return;
+      const d = document.getElementById('gameDialog');
+      const open = d && d.style.display !== 'none';
+      const pl = ctx.player.pl;
+      if (open) {
+        const c = d.querySelector('.gs-choice');
+        if (c) c.click();
+        else {
+          const n = d.querySelector('.gs-next');
+          if (n && n.style.display !== 'none') n.click();
+        }
+        pl.p.z = 70; // 对白开着:退到圈外
+      } else {
+        pl.p.z = pl.p.z > 60 ? 56 : 70; // 收束:进圈;仍未入梦:出圈重武装再进
+      }
+    });
+  }
   console.log('…等入梦 B612');
   await page.waitForFunction(() => (window.__ctx.scene.activeWorld || '') === 'b612', null, {
     timeout: 120000,
