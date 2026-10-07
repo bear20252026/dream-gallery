@@ -2,7 +2,7 @@
 # release.sh — reusable release template (since 2026-10-03; generalized from release-ending.sh)
 # Usage: run `bash scripts/release.sh` in Git Bash.
 # Prerequisite: write this release's commit message to .tmp/release-msg.txt (first line is the title). Without it nothing is released.
-# Order follows the standard flow in AGENTS.md: sync with GitHub -> unit tests -> build -> commit + push -> deploy.sh -> online verification.
+# Order follows the standard flow in AGENTS.md: sync with GitHub -> backend + unit tests -> build -> commit + push -> deploy.sh -> online verification.
 # Any failing step stops immediately, so a half-finished build is never pushed or deployed. All output goes to .tmp/release.log.
 #
 # Only code directories are committed (src/ lib/ scripts/ types/ public/ and already-tracked root files).
@@ -21,8 +21,9 @@ git fetch origin
 [ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || { echo "❌ Not on the main branch; stopping"; exit 1; }
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "❌ Local main differs from GitHub; stopping (resolve this first)"; exit 1; }
 
-echo "=== 2/6 Unit tests ==="
-npx vitest run
+echo "=== 2/6 Backend tests + unit tests ==="
+npm test       # test-store.js (atomic saves) + test.js (backend 125) + test-mobile.js (mobile rendering) — the AGENTS.md pre-release suite
+npx vitest run # frontend unit tests
 
 echo "=== 3/6 Production build (trial) ==="
 npm run build 2>&1 | tail -5

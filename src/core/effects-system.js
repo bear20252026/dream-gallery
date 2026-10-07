@@ -17,25 +17,74 @@ export function createEffectsSystem(deps = {}) {
   // ===================== 3D 烟花(四棱锥表面) =====================
   const fwParticles = []; // {x,y,z,vx,vy,vz,life,maxLife,size,cr,cg,cb,gen,hasSplit}
   const fwColors = [
-    '#ff0040', '#ff3366', '#ff5500', '#ff7700', '#ffaa00', '#ffcc00', '#ffee00',
-    '#aaff00', '#66ff00', '#00ff44', '#00ff88', '#00ffcc', '#00ffff',
-    '#0088ff', '#0044ff', '#1100ff', '#4400ff', '#7700ff', '#aa00ff',
-    '#ff00ff', '#ff00cc', '#ff0099', '#ff0066', '#ff3399', '#ff66cc',
-    '#ffffff', '#fff8dc', '#ffd700', '#c0c0c0', '#ff69b4', '#00fa9a',
-    '#39ff14', '#ff00ff', '#00ffff', '#ff1493', '#7fff00', '#ff4500',
+    '#ff0040',
+    '#ff3366',
+    '#ff5500',
+    '#ff7700',
+    '#ffaa00',
+    '#ffcc00',
+    '#ffee00',
+    '#aaff00',
+    '#66ff00',
+    '#00ff44',
+    '#00ff88',
+    '#00ffcc',
+    '#00ffff',
+    '#0088ff',
+    '#0044ff',
+    '#1100ff',
+    '#4400ff',
+    '#7700ff',
+    '#aa00ff',
+    '#ff00ff',
+    '#ff00cc',
+    '#ff0099',
+    '#ff0066',
+    '#ff3399',
+    '#ff66cc',
+    '#ffffff',
+    '#fff8dc',
+    '#ffd700',
+    '#c0c0c0',
+    '#ff69b4',
+    '#00fa9a',
+    '#39ff14',
+    '#ff00ff',
+    '#00ffff',
+    '#ff1493',
+    '#7fff00',
+    '#ff4500',
   ];
   let fwFrame = 0;
   let fwGeo, fwPosArr, fwColArr, fwSizeArr, fwPoints;
 
   function randomPyramidPoint() {
     const face = Math.floor(Math.random() * 4);
-    const u = Math.random(), v = Math.random() * (1 - u);
-    const w2 = bW / 2, d2 = bD / 2, h = pyrHeight, cz = (OT + OBR) / 2, by = WH;
+    const u = Math.random(),
+      v = Math.random() * (1 - u);
+    const w2 = bW / 2,
+      d2 = bD / 2,
+      h = pyrHeight,
+      cz = (OT + OBR) / 2,
+      by = WH;
     let x, y, z;
-    if (face === 0) { x = -w2 + w2 * 2 * v; y = by + h * (1 - u); z = cz - d2; }
-    else if (face === 1) { x = w2; y = by + h * (1 - u); z = cz - d2 + d2 * 2 * v; }
-    else if (face === 2) { x = w2 - w2 * 2 * v; y = by + h * (1 - u); z = cz + d2; }
-    else { x = -w2; y = by + h * (1 - u); z = cz + d2 - d2 * 2 * v; }
+    if (face === 0) {
+      x = -w2 + w2 * 2 * v;
+      y = by + h * (1 - u);
+      z = cz - d2;
+    } else if (face === 1) {
+      x = w2;
+      y = by + h * (1 - u);
+      z = cz - d2 + d2 * 2 * v;
+    } else if (face === 2) {
+      x = w2 - w2 * 2 * v;
+      y = by + h * (1 - u);
+      z = cz + d2;
+    } else {
+      x = -w2;
+      y = by + h * (1 - u);
+      z = cz + d2 - d2 * 2 * v;
+    }
     return { x, y, z };
   }
 
@@ -47,18 +96,22 @@ export function createEffectsSystem(deps = {}) {
     const color = fwColors[Math.floor(Math.random() * fwColors.length)];
     const col = new THREE.Color(color);
     for (let i = 0; i < count; i++) {
-      const angle = (Math.PI * 2 / count) * i + Math.random() * 0.5;
+      const angle = ((Math.PI * 2) / count) * i + Math.random() * 0.5;
       const vel = Math.random() * speed + 0.5;
       const pitch = (Math.random() - 0.5) * Math.PI * 0.5;
       fwParticles.push({
-        x: ox, y: oy, z: oz,
+        x: ox,
+        y: oy,
+        z: oz,
         vx: Math.cos(angle) * Math.cos(pitch) * vel,
         vy: Math.sin(pitch) * vel + 1.5,
         vz: Math.sin(angle) * Math.cos(pitch) * vel,
         life: life + Math.random() * 15,
         maxLife: life + 15,
         size: size + Math.random() * 0.5,
-        cr: col.r, cg: col.g, cb: col.b,
+        cr: col.r,
+        cg: col.g,
+        cb: col.b,
         gen: generation,
         hasSplit: false,
       });
@@ -75,19 +128,32 @@ export function createEffectsSystem(deps = {}) {
     let idx = 0;
     for (let i = fwParticles.length - 1; i >= 0; i--) {
       const p = fwParticles[i];
-      p.vx *= 0.98; p.vy *= 0.98; p.vz *= 0.98;
+      p.vx *= 0.98;
+      p.vy *= 0.98;
+      p.vz *= 0.98;
       p.vy -= 0.04;
-      p.x += p.vx; p.y += p.vy; p.z += p.vz;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.z += p.vz;
       p.life--;
       const alpha = p.life / p.maxLife;
-      if (p.life <= 0) { fwParticles.splice(i, 1); continue; }
+      if (p.life <= 0) {
+        // swap-remove(2026-10-07):反向遍历下与末位交换再 pop,替代 splice 的 O(n) 搬家
+        fwParticles[i] = fwParticles[fwParticles.length - 1];
+        fwParticles.pop();
+        continue;
+      }
       if (p.life <= 4 && !p.hasSplit && p.gen < 2) {
         p.hasSplit = true;
         createFirework(p.x, p.y, p.z, p.gen + 1);
       }
       if (idx < 3000) {
-        fwPosArr[idx * 3] = p.x; fwPosArr[idx * 3 + 1] = p.y; fwPosArr[idx * 3 + 2] = p.z;
-        fwColArr[idx * 3] = p.cr; fwColArr[idx * 3 + 1] = p.cg; fwColArr[idx * 3 + 2] = p.cb;
+        fwPosArr[idx * 3] = p.x;
+        fwPosArr[idx * 3 + 1] = p.y;
+        fwPosArr[idx * 3 + 2] = p.z;
+        fwColArr[idx * 3] = p.cr;
+        fwColArr[idx * 3 + 1] = p.cg;
+        fwColArr[idx * 3 + 2] = p.cb;
         fwSizeArr[idx] = p.size * alpha;
         idx++;
       }
@@ -107,20 +173,41 @@ export function createEffectsSystem(deps = {}) {
     pC = 400;
     pPs = new Float32Array(pC * 3);
     for (let i = 0; i < pC; i++) {
-      let px, pz, ok = false;
+      let px,
+        pz,
+        ok = false;
       for (let t = 0; t < 30; t++) {
-        px = (Math.random() - 0.5) * floorW; pz = (Math.random() - 0.5) * floorD;
+        px = (Math.random() - 0.5) * floorW;
+        pz = (Math.random() - 0.5) * floorD;
         const inInner = px >= IL - 0.5 && px <= IR + 0.5 && pz >= IRT - 0.5 && pz <= IRB + 0.5;
-        if (!inInner) { ok = true; break; }
+        if (!inInner) {
+          ok = true;
+          break;
+        }
       }
-      if (!ok) { px = 0; pz = OT + 2; }
-      pPs[i * 3] = px; pPs[i * 3 + 1] = 0.5 + Math.random() * (WH - 0.5); pPs[i * 3 + 2] = pz;
+      if (!ok) {
+        px = 0;
+        pz = OT + 2;
+      }
+      pPs[i * 3] = px;
+      pPs[i * 3 + 1] = 0.5 + Math.random() * (WH - 0.5);
+      pPs[i * 3 + 2] = pz;
     }
     pG.setAttribute('position', new THREE.BufferAttribute(pPs, 3));
-    root.add(new THREE.Points(pG, new THREE.PointsMaterial({
-      color: '#ffb6c8', size: 0.035, transparent: true, opacity: 0.4,
-      depthWrite: false, sizeAttenuation: true, blending: THREE.AdditiveBlending,
-    })));
+    root.add(
+      new THREE.Points(
+        pG,
+        new THREE.PointsMaterial({
+          color: '#ffb6c8',
+          size: 0.035,
+          transparent: true,
+          opacity: 0.4,
+          depthWrite: false,
+          sizeAttenuation: true,
+          blending: THREE.AdditiveBlending,
+        })
+      )
+    );
   }
 
   function updateParticles(now) {
@@ -142,14 +229,20 @@ export function createEffectsSystem(deps = {}) {
     fwGeo.setAttribute('color', new THREE.BufferAttribute(fwColArr, 3));
     fwGeo.setAttribute('size', new THREE.BufferAttribute(fwSizeArr, 1));
     const fwPointsMat = new THREE.PointsMaterial({
-      color: 0xffffff, size: 3, transparent: true, opacity: 0.85,
-      blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true,
+      color: 0xffffff,
+      size: 3,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true,
     });
     fwPoints = new THREE.Points(fwGeo, fwPointsMat);
     root.add(fwPoints);
   }
 
-  let autoTimer = null, autoFirst = null;
+  let autoTimer = null,
+    autoFirst = null;
 
   return defineSystem({
     name: 'effects',
@@ -165,7 +258,20 @@ export function createEffectsSystem(deps = {}) {
     },
     update() {
       // 多世界切割(2026-09-06):烟花/漂浮粒子属主世界金字塔,小世界里不再模拟与 GPU 上传
-      if ((scene.activeWorld || 'main') !== 'main') return;
+      if ((scene.activeWorld || 'main') !== 'main') {
+        // 2026-10-07 修复只产不消:离开主世界连自动烟花产房一起停——此前只 return 模拟,
+        // autoTimer 仍每 2.8s 产 24 个粒子,小世界挂机 1 小时攒约 3 万颗,
+        // 回主世界当帧全部爆发(视觉错误 + 帧刺)。回主世界后由下方惰性重启。
+        if (autoTimer) {
+          clearInterval(autoTimer);
+          autoTimer = null;
+        }
+        if (autoFirst) {
+          clearTimeout(autoFirst);
+          autoFirst = null;
+        }
+        return;
+      }
       if (!autoFirst && !autoTimer) {
         autoFirst = setTimeout(autoFirework, 800);
         autoTimer = setInterval(autoFirework, 2800);
@@ -177,12 +283,20 @@ export function createEffectsSystem(deps = {}) {
       if (autoTimer) clearInterval(autoTimer);
       if (autoFirst) clearTimeout(autoFirst);
       autoTimer = autoFirst = null;
-      if (fwPoints) { root.remove(fwPoints); fwGeo && fwGeo.dispose(); fwPoints = null; }
+      if (fwPoints) {
+        root.remove(fwPoints);
+        fwGeo && fwGeo.dispose();
+        fwPoints = null;
+      }
       if (pG) {
         // 找到并移除粒子 Points(它是在 init 时 add 到 root 的那个对象)
         root.children
           .filter((o) => o.isPoints && o.geometry === pG)
-          .forEach((o) => { root.remove(o); o.geometry.dispose(); o.material.dispose(); });
+          .forEach((o) => {
+            root.remove(o);
+            o.geometry.dispose();
+            o.material.dispose();
+          });
         pG = null;
       }
       fwParticles.length = 0;

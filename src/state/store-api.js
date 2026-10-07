@@ -14,6 +14,11 @@
 // sessionStorage 键(同意书/欢迎语等会话级)不进本模块。
 // 注意:str/setStr 等方法不依赖 this,可安全地在导出的 storeApi 上直接调用;
 //   仅 getSpirits/addSpirit 内部用 this(灵蕴迁移链),调用时请走 storeApi.getSpirits() 形式。
+//
+// 读缓存(2026-10-07):rawGet 原每帧同步 localStorage.getItem(planets.js 的 ticker 每帧读
+//   page1/planetsChapter 1-2 次)。写路径本就是单入口(SCHEMA 登记制,set/unmark 全走本模块),
+//   故加一层内存镜像是安全的:读时先查内存,写/删时同步更新;跨标签页经 storage 事件失效
+//   (该事件只在其他标签页触发)。localStorage 不可用时(隐私模式)不缓存,行为同旧。
 
 // 六灵蕴 key 的收集顺序(与 spirits.js SPIRITS 数组同序;旧档迁移按"前 n 颗已集"重建)
 const SPIRIT_ORDER = ['sprout', 'flame', 'leaf', 'snow', 'dawn', 'dusk'];
@@ -104,17 +109,40 @@ function entry(name) {
   if (!e) throw new Error('store: 未登记的存档键「' + name + '」(先去 store-api.js SCHEMA 登记)');
   return e;
 }
+// 内存镜像缓存(键 → 字符串值|null)。只在本模块内读写;失效口有三个:
+//   本模块写/删(rawSet/rawRemove)、跨标签页 storage 事件、测试钩 storeApi._dropCache()。
+const cache = new Map();
 function rawGet(key) {
+  if (cache.has(key)) return cache.get(key);
   try {
-    return localStorage.getItem(key);
+    const v = localStorage.getItem(key);
+    cache.set(key, v);
+    return v;
   } catch (e) {
-    return null;
+    return null; // localStorage 不可用:不缓存,每次都真试(行为同旧)
   }
 }
 function rawSet(key, v) {
   try {
     localStorage.setItem(key, v);
+    cache.set(key, v);
+  } catch (e) {
+    cache.delete(key); // 写入失败不缓存,保持「读到的就是真存上的」
+  }
+}
+function rawRemove(key) {
+  cache.delete(key);
+  try {
+    localStorage.removeItem(key);
   } catch (e) {}
+}
+// 跨标签页同步:其他标签页写/清 localStorage 时,本页对应键缓存失效
+// (storage 事件不在本标签页触发,本标签页的写已由 rawSet/rawRemove 同步)
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('storage', function (e) {
+    if (e.key === null) cache.clear();
+    else cache.delete(e.key);
+  });
 }
 
 // ===================== 接口 =====================
@@ -154,10 +182,7 @@ export const storeApi = {
     rawSet(entry(name).key, '1');
   },
   unmark(name) {
-    const k = entry(name).key; // 未登记即抛(与 num/str 同语义)
-    try {
-      localStorage.removeItem(k);
-    } catch (e) {}
+    rawRemove(entry(name).key); // 未登记即抛(与 num/str 同语义)
   },
   // —— 灵蕴库存(含旧档迁移,迁移逻辑从 spirits.js 收编于此) ——
   getSpirits() {
@@ -185,8 +210,11 @@ export const storeApi = {
     rawSet('houseColor_' + g, hex);
   },
   clearHouseColor(g) {
-    try {
-      localStorage.removeItem('houseColor_' + g);
-    } catch (e) {}
+    rawRemove('houseColor_' + g);
+  },
+  // 测试专用(vitest 的 localStorage mock 直写 backing store,绕过本模块 → 缓存不会自动失效):
+  // 两个 store 测试文件的 beforeEach 与「直写 mock 后再读」的断言前调用。业务代码勿用。
+  _dropCache() {
+    cache.clear();
   },
 };

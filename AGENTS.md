@@ -1,5 +1,13 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-07 审查修复:烟花粒子只产不消 + planets.js 清理 + store 读缓存 + release.sh 补后端测试(本地,待发布)
+
+- **烟花粒子只产不消**(`core/effects-system.js`):`update()` 在非主世界直接 return,但 `autoTimer`(每 2.8s 产 24 粒子)永不停——小世界挂机 1 小时攒约 3 万粒子,回主世界当帧全部爆发。修法:非主世界分支连 `autoTimer`/`autoFirst` 一起 clearInterval/clearTimeout 并置 null,回主世界由既有惰性分支重启(与「开场电影期间惰性启动」同一风格)。顺手把粒子死亡的 `splice(i,1)` 改为反向遍历下安全的 swap-remove(末位交换+pop);粒子对象池未做(diff 会变大,收益小)。
+- **planets.js 三连清**:① 星屑旋转+点灯人亮灭的逐字重复块(原 tick 头部与太空分支各一份,非主世界两块都执行 → 转速×2、`setLampLit` 每帧两次)删太空分支那份,保留 tick 头部一份(它还管呼吸浮动,全世界每帧一次);② keydown/keyup/blur 监听清理死代码(removeEventListener 读从未赋值的 `spaceKeys._kd/_ku`,blur 监听从未移除)改为具名函数 `onSpaceKeyDown/Up/Blur`,`bag.custom` 真正移除三个监听(ark.js `onKey` 同款范式);③ 每帧 `p.clone()` 改模块级 scratch `_prevHome`(ark.js `_v2/_v3/_camPos` 范式;`model-surface.place()` 只同步读 `previous.x/z` 不持有引用,复用安全)。此段是场景接线,无单测钉住(逻辑单测全在 shared/planet-logic.mjs)。
+- **store 读缓存**(`state/store-api.js`):`rawGet` 原每帧同步 `localStorage.getItem`(planets ticker 每帧读 page1/planetsChapter)。写路径本就单入口(SCHEMA 登记制),故加模块级 `Map` 内存镜像:读先查内存,`rawSet`/新增 `rawRemove`(unmark/clearHouseColor 改走它)同步更新;写失败(隐私模式)不缓存;跨标签页经 `storage` 事件失效(`typeof window` 守卫,node 测试环境跳过)。登记豁免写入方(index.html 开机块 kunlunVer、music.html musicHistory)均在缓存惰性填充前/异页,不受影响。**测试配套**:`storeApi._dropCache()` 测试钩;store-api.test.js / store.test.js 的 beforeEach 与两处「直写 mock 后再读」断言前调用;新增缓存行为单测(重复读只打一次 getItem、写/删同步、直写失效)。scene6/7 的 `chapterCached` 0.5s 粒度缓存照旧保留(语义不同,不合并)。
+- **release.sh 补后端测试**:第 2 步原来只跑 `npx vitest run`;现为 `npm test`(= test-store.js 存档原子写 + test.js 后端 125 项 + test-mobile.js 手机渲染,定义在 package.json)+ `npx vitest run`,对齐「上线前必跑」节。场景截图回归 `test:scene` 需本机模型与基线,仍按文档手动跑,不进 release.sh。
+- 验证:vitest **521 项全绿**(520 +1:store-api 新增缓存行为用例;既有 store 用例做缓存适配);eslint 五个改动文件零错误;改动文件语法检查全过。
+
 ## 2026-10-06 台词三合一 + 中英对照测试(本地,待发布)
 
 - 主人要求对齐 hill-src 范本(「远方把所有台词放在一个文件里,还有一个测试检查中英文是否对应」):`src/shared/story-text-late.mjs`(460 行)与 `ending-text.mjs`(539 行)整体并入 `story-text.mjs`(现 ~1610 行,26 个数据导出名一字未改),两文件删除;WHO 说话人表上移到说话人区,late/ending 各自的 `const P/S/C` 简写收拢为 WHO 之后的一份共享解构块(P,S,C,B,L,G);late 节内私有的 SNAKE/FLOWER/ECHO/ROSES 保留原地。`tt()/retranslate` 机制与其唯一消费者零改动。

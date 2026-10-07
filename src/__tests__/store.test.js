@@ -28,6 +28,7 @@ const store = ctx.ui.store;
 describe('store', () => {
   beforeEach(() => {
     localStorageMock.clear();
+    store._dropCache(); // 读缓存(2026-10-07):mock setItem 直写绕过 store-api,缓存须手动失效
     localStorageMock.getItem.mockClear();
     localStorageMock.setItem.mockClear();
   });

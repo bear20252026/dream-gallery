@@ -894,28 +894,38 @@ function pl() {
 
 /* ===================== 太空人模式:独立世界内无重力+3D 自由移动 ===================== */
 const spaceKeys = {};
-window.addEventListener('keydown', (e) => {
+// 具名引用(2026-10-07 修复死代码:此前清理读 spaceKeys._kd/_ku——从未赋值的属性,
+// removeEventListener 形同虚设;blur 监听更是从没被移除)
+function onSpaceKeyDown(e) {
   spaceKeys[e.code] = true;
-});
-window.addEventListener('keyup', (e) => {
+}
+function onSpaceKeyUp(e) {
   spaceKeys[e.code] = false;
-});
-window.addEventListener('blur', () => {
+}
+function onSpaceBlur() {
   for (const k in spaceKeys) spaceKeys[k] = false;
-});
+}
+window.addEventListener('keydown', onSpaceKeyDown);
+window.addEventListener('keyup', onSpaceKeyUp);
+window.addEventListener('blur', onSpaceBlur);
 bag.custom.push(() => {
-  window.removeEventListener('keydown', spaceKeys._kd || function () {});
-  window.removeEventListener('keyup', spaceKeys._ku || function () {});
+  window.removeEventListener('keydown', onSpaceKeyDown);
+  window.removeEventListener('keyup', onSpaceKeyUp);
+  window.removeEventListener('blur', onSpaceBlur);
 });
 
 /* ===================== 主循环 ===================== */
 let hudT = 0,
   lampT = 0;
+// 模块级 scratch(ark.js _v2/_v3/_camPos 同款范式):B612 步行每帧的上一帧位置,
+// 替代每帧 p.clone() 的 GC 压力;model-surface.place() 只同步读 previous.x/z,不持有引用
+const _prevHome = new THREE.Vector3();
 onTick(function (dt) {
   const t = performance.now() * 0.001;
   // B612 小王子坐姿动画(SceneFull2)
   if (storybookMixer) storybookMixer.update(Math.min(dt || 0.016, 0.05));
-  // 星屑呼吸 + 点灯人路灯亮灭
+  // 星屑呼吸 + 点灯人路灯亮灭(全世界每帧一次——2026-10-07 删掉太空分支里的重复块,
+  // 此前非主世界两块都执行:星屑转速 ×2、setLampLit 每帧算两次)
   islands.forEach(function (isl, i) {
     isl.mote.rotation.y += 0.01;
     if (!isl.mote.visible) return;
@@ -929,7 +939,7 @@ onTick(function (dt) {
   const p = pl();
   const plRef = ctx.player.pl;
   const activeWorld = ctx.scene.activeWorld || 'main';
-  const previousHome = activeWorld === 'b612' ? p.clone() : null;
+  const previousHome = activeWorld === 'b612' ? _prevHome.copy(p) : null;
   updateStoryGuides(); // 剧情浮光指引(信标+悬浮箭,按世界/章节/距离同立同撤)
 
   // ==== 太空人模式:非主世界时自由飞行,无重力,3D 全方向移动 ====
@@ -1054,15 +1064,6 @@ onTick(function (dt) {
       }
       tickHomeReveal();
     }
-    // 星屑呼吸 + 点灯人路灯
-    islands.forEach(function (isl, i) {
-      isl.mote.rotation.y += 0.01;
-      if (!isl.mote.visible) return;
-      if (i === 4 && !isl.props.userData.lampHead.userData.manual) {
-        const on = Math.floor((performance.now() * 0.001) / 1.2) % 2 === 0;
-        setLampLit(isl.props.userData.lampHead, on);
-      }
-    });
     // 上下文导航(太空中常驻):B612=回主世界/去星球;星球=回 B612/回主世界
     // 诚实指引(2026-09-27):按钮只指向已建成的站 —— 325 完成后指"重返 325",
     // 不把玩家送进没内容的空岛;新站建成(built)后自动变"前往"
