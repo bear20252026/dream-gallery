@@ -6,6 +6,7 @@ import { createRequire } from 'node:module';
 
 const nodeRequire = createRequire(import.meta.url);
 const { hit, _reset } = nodeRequire('../../lib/ratelimit.js');
+const { realIP } = nodeRequire('../../lib/store.js');
 
 // 造假请求:socket=127.0.0.1 时 realIP 才信任 CF 头(可信反代语义,与线上 Cloudflare 回源一致)
 const proxied = (ip) => ({
@@ -55,5 +56,58 @@ describe('ratelimit.hit 洪水防护', () => {
   it('无任何头的请求落进 unknown 桶,不抛异常', () => {
     const bare = { socket: { remoteAddress: '127.0.0.1' }, headers: {} };
     expect(hit(bare, 'chat-bot', 6).ok).toBe(true);
+  });
+});
+
+describe('realIP 的 Cloudflare 可信代理判定(2026-10-07 审查#2 配套)', () => {
+  // CF 官方 IPv4 段内的边缘 IP:信任 cf-connecting-ip(它是 CF 自己盖的,访客伪造不进来)
+  it('CF 边缘 IP 回源 → 采用 cf-connecting-ip(172.64.0.0/13 与 104.16.0.0/13 边界各一)', () => {
+    expect(
+      realIP({
+        socket: { remoteAddress: '172.68.0.1' },
+        headers: { 'cf-connecting-ip': '8.8.8.8' },
+      })
+    ).toBe('8.8.8.8');
+    expect(
+      realIP({
+        socket: { remoteAddress: '104.16.0.1' },
+        headers: { 'cf-connecting-ip': '8.8.4.4' },
+      })
+    ).toBe('8.8.4.4');
+  });
+  it('段边界:172.63.255.1(段外)不信任,172.64.0.1(段内)信任', () => {
+    expect(
+      realIP({
+        socket: { remoteAddress: '172.63.255.1' },
+        headers: { 'cf-connecting-ip': '8.8.8.8' },
+      })
+    ).toBe('172.63.255.1');
+    expect(
+      realIP({
+        socket: { remoteAddress: '172.64.0.1' },
+        headers: { 'cf-connecting-ip': '8.8.8.8' },
+      })
+    ).toBe('8.8.8.8');
+  });
+  it('非 CF 公网直连伪造 CF 头 → 无效,回退 socket 地址(防绕过)', () => {
+    expect(
+      realIP({ socket: { remoteAddress: '9.9.9.9' }, headers: { 'cf-connecting-ip': '6.6.6.6' } })
+    ).toBe('9.9.9.9');
+  });
+  it('私网反代(自建隧道场景)照旧信任,行为不变', () => {
+    expect(
+      realIP({ socket: { remoteAddress: '127.0.0.1' }, headers: { 'cf-connecting-ip': '7.7.7.7' } })
+    ).toBe('7.7.7.7');
+  });
+  it('畸形地址不误判(999.1.1.1 / IPv6 不在 CF v4 段)', () => {
+    expect(
+      realIP({ socket: { remoteAddress: '999.1.1.1' }, headers: { 'cf-connecting-ip': '8.8.8.8' } })
+    ).toBe('999.1.1.1');
+    expect(
+      realIP({
+        socket: { remoteAddress: '::ffff:172.68.0.1' },
+        headers: { 'cf-connecting-ip': '8.8.8.8' },
+      })
+    ).toBe('8.8.8.8'); // ::ffff: 前缀已剥
   });
 });
