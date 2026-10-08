@@ -60,7 +60,7 @@
     "@gltf-transform/core": "^4.4.2",
     "@gltf-transform/extensions": "^4.4.2",
     "@gltf-transform/functions": "^4.4.2",
-    "@types/three": "^0.185.4",
+    "@types/three": "^0.186.0",
     "@vitest/coverage-v8": "^4.1.11",
     "dependency-cruiser": "^18.1.0",
     "esbuild": "^0.28.1",
@@ -81,7 +81,7 @@
     "better-sqlite3": "^13.0.3",
     "dotenv": "^17.4.2",
     "hls.js": "^1.6.16",
-    "three": "0.160.0",
+    "three": "^0.186.1",
     "ws": "^8.18.0"
   },
   "engines": {

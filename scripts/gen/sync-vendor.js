@@ -12,6 +12,8 @@ const DST_DIR = path.join(ROOT, 'vendor');
 // [npm 包名, 包内 ESM 文件, vendor 目标文件名]
 const VENDORS = [
   ['three', 'build/three.module.js', 'three.module.js'],
+  // r170 起构建拆分:three.module.js 顶部相对导入 './three.core.js',漏拷则 importmap 直跑模式白屏(2026-10-08 升级 0.186 补)
+  ['three', 'build/three.core.js', 'three.core.js'],
   ['hls.js', 'dist/hls.mjs', 'hls.mjs'],
 ];
 
