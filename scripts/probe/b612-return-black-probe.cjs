@@ -69,6 +69,19 @@ function pngBrightness(buf) {
   const page = await b.newPage({ viewport: { width: 1280, height: 800 } });
   const errs = [];
   page.on('pageerror', (e) => { if (!/dynamically imported module/.test(e.message)) errs.push(String(e).slice(0, 200)); });
+  // 2026-10-08 补剧情夹具(与场景 VR 探针同款):全新访客的开机对白链(叫醒词/画羊)
+  // 与旅途卡会把石门传送堵死;本探针只验「石门↔B612 返回」,不需要新手流程
+  await page.addInitScript(() => {
+    sessionStorage.setItem('nickPopOff', '1');
+    sessionStorage.setItem('dialogVoiceOff', String(Date.now()));
+    try {
+      localStorage.setItem('b612Scene2', '1');
+      localStorage.setItem('b612Page1', '1');
+      localStorage.setItem('b612PlanetChapter', '1');
+      localStorage.setItem('b612ControlsLesson', '1');
+      localStorage.setItem('kunlunWelcomed', String(Date.now()));
+    } catch (e) {}
+  });
   await page.goto(ORIGIN + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#b612Gate', { timeout: 90000 });
   await page.evaluate(() => {
@@ -93,14 +106,50 @@ function pngBrightness(buf) {
   ok('主世界基线(亮度=' + base.mean + ',后处理=' + prePP + ')', base.mean > 8 && prePP === 'function');
 
   // ① 走进石门 → 自动传送进 B612
+  // 2026-10-08 预置补丁(AGENTS 探针预置坑①,CI VR 探针同款):09-27 石门出场规矩后,
+  // 门需剧情点亮才可见/可传 —— 预置里手动 revealStarGate,等一帧再落进门圈
+  await page.evaluate(() => {
+    try { window.__ctx.kunlun.revealStarGate && window.__ctx.kunlun.revealStarGate(); } catch (e) {}
+  });
+  await page.waitForTimeout(800);
+  // 2026-10-08 补第二段(坑②/③):开机夹具会重播 exitBridge 对白 + 弹旅途卡(PR#3),
+  // 两者任一开着时进门圈的 fire 被守卫吃掉一次且 gateArmed 解除 —— 自愈循环:
+  // 选项 → 旅途卡「再待一会儿」→「继续」,全部收束才进圈,直到入梦
+  await page.evaluate(() => {
+    const iv = setInterval(() => {
+      try {
+        const ctx = window.__ctx;
+        if ((ctx.scene.activeWorld || '') !== 'main') { clearInterval(iv); return; }
+        const stay = document.querySelector('#voyage .vy-stay');
+        if (stay) { stay.click(); return; }
+        const d = document.getElementById('gameDialog');
+        const open = d && d.style.display !== 'none';
+        if (open) {
+          const c = d.querySelector('.gs-choice');
+          if (c) c.click();
+          else {
+            const n = d.querySelector('.gs-next');
+            if (n && n.style.display !== 'none') n.click();
+          }
+        }
+        const q = ctx.player.pl.p;
+        const busy = open || !!(ctx.ui.dialogOpen && ctx.ui.dialogOpen()) || !!(ctx.overlay && ctx.overlay.anyOpen());
+        q.x = 0.1;
+        q.z = busy ? 70 : 56;
+      } catch (e) {}
+    }, 900);
+    setTimeout(() => clearInterval(iv), 45000);
+  });
   await page.evaluate(() => { const q = window.__ctx.player.pl.p; q.x = 0.1; q.z = 56; });
-  await page.waitForFunction(() => window.__ctx.scene.activeWorld === 'b612', null, { timeout: 20000 });
+  await page.waitForFunction(() => window.__ctx.scene.activeWorld === 'b612', null, { timeout: 30000 });
   await page.waitForTimeout(1500);
   ok('主世界石门 → B612', true);
 
-  // ② 点真实「返回主世界」按钮,连续采样 5 秒抓回弹
+  // ② 点真实「返回主世界」按钮(B612 内文案=返回沙漠/Back to the desert;新上下文默认英文,两种都匹配)
   const clicked = await page.evaluate(() => {
-    const btn = [...document.querySelectorAll('button')].find((x) => x.textContent.includes('返回主世界') && x.style.display !== 'none');
+    const btn = [...document.querySelectorAll('button')].find(
+      (x) => x.style.display !== 'none' && (x.textContent.includes('返回沙漠') || /back to the desert/i.test(x.textContent))
+    );
     if (!btn) return false;
     btn.click(); return true;
   });

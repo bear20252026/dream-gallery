@@ -1,5 +1,13 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-08 审查#4 专项:three 0.160.0 → 0.186.1 升级(已上线)
+
+- **版本**:three `0.160.0→0.186.1`(与 hill-src 同版,主人点名的现成参照),`@types/three ^0.185.4→0.186.0` 运行时/类型对齐。升级之所以平顺:全库**零个** r152 后废弃 API(useLegacyLights/outputEncoding/.encoding 均无,colorSpace 时代写法)——此前 typecheck 就是用 0.185 类型过的,0.186 类型零错误直接通过。
+- **唯一机制改动**:sync-vendor.js 补拷 `build/three.core.js` —— r170 起构建拆分,`three.module.js` 顶部相对导入 `./three.core.js`,漏拷则 importmap 直跑模式(native ESM/test-mobile)全站白屏;Vite 生产打包自动解析不受影响。vendor 全量重建**零跳过**(既有 22 个 jsm 文件在 0.186 全部还在)。⚠️ 0.186 的 package.json exports 不再暴露 `./package.json`,`require('three/package.json')` 会 ERR_PACKAGE_PATH_NOT_EXPORTED,读版本用 fs 直读。
+- **验证链**:vitest 532 全绿;typecheck/build 零错误;本地 native-ESM 实跑零 pageerror(夜空着色器/GLTF 模型/阴影/对话管线全部正常,`.tmp/three-upgrade-shot.cjs` 截图人工核);**线上**版本戳核对 + `/healthz` ok + 实景截图正常 + `b612-return-black-probe` 全绿(后处理管线/avatar 迁回/防回弹/落点,真 GPU 全模型环境)。本地像素 VR 对比不可仲裁(本机模型不全 + 旅途卡叠加层盖世界,changedRatio 74-92% 但 maxΔ 仅 5.6/255=整体微移),基线**未重建**;语义检查点(世界/亮度/无异常)全过。
+- **顺带修 return-black 探针预置(欠账三连)**:①夹具缺失(全新访客的开机对白链会堵死传送)补 VR 同款存档夹具;②石门 revealStarGate+自愈循环(选项→旅途卡`#voyage .vy-stay`→继续,全收束才进圈——旅途卡是 PR#3 新增的 blocker,老探针都不知道它);③按钮文案「返回主世界」早已改名「返回沙漠/Back to the desert」,双语匹配。**script-fill 探针的完整重构仍挂待办**(同一族欠账,卡在旅途卡之后的跑站段)。
+- 排障记录:本机 curl localhost 走了系统代理返回空响应(exit 52)——本地测试一律 `curl --noproxy '*'`;后台 Bash 任务与常规调用的 localhost 网络不互通,服务器+探测须同一条命令内联。
+
 ## 2026-10-08 审查第四批:每帧分配治理 + P2 卫生七件(已上线)
 
 - **#8 每帧分配两处**:① `core/composition-root.js` 的 `ordered()` 原每帧 slice+sort(~40 系统),改排序缓存 + register/dispose 时置 null 惰性重建;dispose 从 `.reverse()`(会原地改共享缓存)改倒序下标遍历。② `kunlun/freeflight-physics.js` 拆成 `stepFlightInto`(原地变异核,模块级 scratch 向量/四元数/欧拉角,每帧约 10 个分配归零;生产 ark.js 改走它,freeFlight 就地推进)+ `stepFlight`(克隆包装,2026-08-30「纯函数/输入不被修改」契约与 8 项单测逐字保留)。scratch 单线程无重入(groundHeightAt 回调 desert.getH 不回本模块),安全。
