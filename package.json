@@ -30,7 +30,8 @@
     "optimize:images:dry": "node scripts/optimize/optimize-textures.js --dry-run",
     "optimize:models": "node scripts/optimize/optimize-models.js",
     "deps": "npx depcruise src --config .dependency-cruiser.cjs --output-type err",
-    "prepare": "husky"
+    "prepare": "husky",
+    "depcruise": "depcruise src --validate .dependency-cruiser.cjs"
   },
   "lint-staged": {
     "src/**/*.js": [
@@ -42,6 +43,15 @@
     ],
     "*.html": [
       "prettier --write"
+    ],
+    "lib/**/*.js": [
+      "eslint --fix"
+    ],
+    "server.js": [
+      "eslint --fix"
+    ],
+    "scripts/**/*.{js,mjs,cjs}": [
+      "eslint --fix"
     ]
   },
   "devDependencies": {
@@ -53,7 +63,6 @@
     "@types/three": "^0.185.4",
     "@vitest/coverage-v8": "^4.1.11",
     "dependency-cruiser": "^18.1.0",
-    "dexie": "^4.4.6",
     "esbuild": "^0.28.1",
     "eslint": "^10.8.0",
     "globals": "^17.8.0",
@@ -74,5 +83,8 @@
     "hls.js": "^1.6.16",
     "three": "0.160.0",
     "ws": "^8.18.0"
+  },
+  "engines": {
+    "node": ">=22.12"
   }
 }

@@ -92,7 +92,7 @@ export function setupAgreementSwipe(opts) {
       <style>
       #b612Pact{position:fixed;inset:0;z-index:${ZINDEX};display:flex;align-items:center;justify-content:center;
         background:rgba(30,22,14,.55);backdrop-filter:blur(2px);font-family:Georgia,'Times New Roman',serif}
-      #b612Pact .pFrame{width:100vw;height:100vh;display:flex;flex-direction:column;
+      #b612Pact .pFrame{width:100vw;height:100vh;height:100dvh;display:flex;flex-direction:column;
         background:#f7f2e6;border:0;border-radius:0;overflow:hidden;
         box-shadow:none}
       #b612Pact .pBar{display:flex;align-items:center;gap:10px;padding:10px 14px;flex:none;
@@ -121,7 +121,7 @@ export function setupAgreementSwipe(opts) {
         transition:all .18s ease}
       #b612Pact .pNext:disabled{background:transparent;color:#b3a48c;border-color:rgba(90,72,50,.25);cursor:default}
       @media (max-width:640px){
-        #b612Pact .pFrame{width:100vw;height:100vh;border-radius:0}
+        #b612Pact .pFrame{width:100vw;height:100vh;height:100dvh;border-radius:0}
         #b612Pact .pFoot{padding:9px 12px;gap:9px}
         #b612Pact .pProgress{margin-left:0;order:3;width:100%;text-align:center}
         #b612Pact .pNext{margin-left:auto}

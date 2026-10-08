@@ -92,6 +92,7 @@ body {
   overscroll-behavior: none;
   font-family: 'Courier New', monospace;
   height: 100vh;
+  height: 100dvh; /* 手机动态工具栏不顶出视野(2026-10-08 审查 P2;旧浏览器回退上一行) */
   width: 100vw;
   position: fixed;
 }

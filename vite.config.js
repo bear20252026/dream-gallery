@@ -99,7 +99,7 @@ export default defineConfig({
     sourcemap: false,
     // 产物清单(core-preload-inject 用来把核心链源路径换算成哈希 chunk 文件名)
     manifest: true,
-    target: 'es2020',
+    target: 'es2022',
     rollupOptions: {
       input: {
         main:       resolve(__dirname, 'index.html'),

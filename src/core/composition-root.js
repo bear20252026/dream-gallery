@@ -7,8 +7,17 @@ import { systemRank } from './system.js';
 
 export function createCompositionRoot() {
   const systems = [];
-  // 每次调用都重排,保证"后注册的系统"也能落到正确位置(确定性不依赖注册顺序)
-  const ordered = () => systems.slice().sort((a, b) => systemRank(a) - systemRank(b));
+  // 排序缓存(2026-10-08 审查#8):update 每帧调用 ordered(),原实现每帧 slice+sort
+  // (~40 系统 = 每帧两个数组一趟排序)。装配期终局后顺序不变,注册时置 null 惰性重建;
+  // 调用方只读遍历,dispose 改倒序下标遍历(不再 .reverse() 原地改缓存)。
+  let orderedCache = null;
+  const ordered = () => {
+    if (!orderedCache) {
+      // 每次重排保证"后注册的系统"也能落到正确位置(确定性不依赖注册顺序)
+      orderedCache = systems.slice().sort((a, b) => systemRank(a) - systemRank(b));
+    }
+    return orderedCache;
+  };
 
   return {
     register(system) {
@@ -16,6 +25,7 @@ export function createCompositionRoot() {
         throw new Error('[composition-root] 注册了无名系统');
       }
       systems.push(system);
+      orderedCache = null;
       return system;
     },
     // init 按层/相位正序(下层先建,上层依赖下层已就绪)
@@ -40,7 +50,9 @@ export function createCompositionRoot() {
     },
     // dispose 逆序(上层先拆,下层后拆)
     dispose() {
-      for (const s of ordered().reverse()) {
+      const arr = ordered();
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const s = arr[i];
         try {
           s.dispose && s.dispose();
         } catch (e) {
@@ -48,6 +60,7 @@ export function createCompositionRoot() {
         }
       }
       systems.length = 0;
+      orderedCache = null;
     },
     // 调试/可观测:打印当前确定性装配顺序
     list() {

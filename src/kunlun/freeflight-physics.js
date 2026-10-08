@@ -21,38 +21,38 @@ export const FLIGHT_PARAMS = {
 };
 
 const clampN = (v) => Math.max(-1, Math.min(1, v));
+// 模块级 scratch(2026-10-08 审查#8):stepFlightInto 每帧调用,原实现每帧 new 约 10 个
+// Vector3/Quaternion/Euler(60fps ≈ 600 分配/秒)。改共享复用;单线程无重入
+// (groundHeightAt 走 desert.getH,不回调本模块),安全。
+const _toT = new THREE.Vector3();
+const _fwd0 = new THREE.Vector3();
+const _fwd = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _cruise = new THREE.Vector3();
+const _euler = new THREE.Euler();
+const _qTmp = new THREE.Quaternion();
 
 /**
- * 单步飞行积分(纯函数)。
- * @param {object} state { pos, quat, vel, pitchRate, rollRate, energy, autoNav }
- * @param {object} input { pitchIn, rollIn, boostHold, boostKey, autoNavTarget(Vector3|null), groundHeightAt(x,z), centerX, centerZ }
- * @param {number} dt 秒(已钳制)
- * @returns {{ state, flags: { dock, groundHit, boundaryHit } }} 新状态(全新对象)与事件标志
+ * 单步飞行积分·原地变异核(生产路径,零分配)。
+ * 直接改写传入 state 的 pos/quat/vel/pitchRate/rollRate/energy/autoNav,返回事件标志。
+ * 调用方在两次调用之间不得持有对 pos/quat/vel 的旧引用(ark.js 每帧覆写,满足)。
+ * @returns {{ dock: boolean, groundHit: boolean, boundaryHit: boolean }} flags
  */
-export function stepFlight(state, input, dt) {
+export function stepFlightInto(s, input, dt) {
   const P = FLIGHT_PARAMS;
-  const s = {
-    pos: state.pos.clone(),
-    quat: state.quat.clone(),
-    vel: state.vel.clone(),
-    pitchRate: state.pitchRate,
-    rollRate: state.rollRate,
-    energy: state.energy,
-    autoNav: state.autoNav,
-  };
   const flags = { dock: false, groundHit: false, boundaryHit: false };
   let pitchIn = clampN(input.pitchIn);
   let rollIn = clampN(input.rollIn);
 
   // 自动导航:朝目标柔和转向,接近泊位交还游戏流程,任何手动输入立即接管
   if (s.autoNav && input.autoNavTarget) {
-    const toT = input.autoNavTarget.clone().sub(s.pos);
+    const toT = _toT.copy(input.autoNavTarget).sub(s.pos);
     if (toT.length() < P.DOCK_DIST) {
       flags.dock = true;
-      return { state: s, flags };
+      return flags;
     }
     toT.normalize();
-    const fwd0 = new THREE.Vector3(0, 0, 1).applyQuaternion(s.quat);
+    const fwd0 = _fwd0.set(0, 0, 1).applyQuaternion(s.quat);
     const crossY = fwd0.z * toT.x - fwd0.x * toT.z; // >0 目标在右侧
     if (Math.abs(pitchIn) > 0.15 || Math.abs(rollIn) > 0.15 || input.boostHold || input.boostKey) {
       s.autoNav = false;
@@ -71,9 +71,9 @@ export function stepFlight(state, input, dt) {
   const auth = Math.max(P.AUTH_MIN, Math.min(1, spd / P.AUTH_SPD));
 
   // 姿态角提取(限幅+松杆自动改平:纯角速度积分按住 2 秒会翻 183° 倒扣)
-  const fwd = new THREE.Vector3(0, 0, 1).applyQuaternion(s.quat);
+  const fwd = _fwd.set(0, 0, 1).applyQuaternion(s.quat);
   const pitchCur = Math.asin(clampN(fwd.y));
-  const right = new THREE.Vector3(1, 0, 0).applyQuaternion(s.quat);
+  const right = _right.set(1, 0, 0).applyQuaternion(s.quat);
   const rollCur = Math.asin(clampN(right.y));
   if (pitchCur > P.P_LIM && pitchIn > 0) pitchIn = 0;
   if (pitchCur < -P.P_LIM && pitchIn < 0) pitchIn = 0;
@@ -87,16 +87,15 @@ export function stepFlight(state, input, dt) {
   s.pitchRate += (tPitch - s.pitchRate) * k;
   s.rollRate += (tRoll - s.rollRate) * k;
   const yawRate = -s.rollRate * 0.5; // 协调转弯:倾斜自动带转向
-  const qTmp = new THREE.Quaternion().setFromEuler(
-    new THREE.Euler(-s.pitchRate * dt, yawRate * dt, s.rollRate * dt, 'YXZ')
-  );
-  s.quat.multiply(qTmp).normalize();
+  _qTmp.setFromEuler(_euler.set(-s.pitchRate * dt, yawRate * dt, s.rollRate * dt, 'YXZ'));
+  s.quat.multiply(_qTmp).normalize();
 
   // 灵蕴驱动·自动油门:速度向往巡航值
   const boosting = (input.boostHold || input.boostKey) && s.energy > 0;
   if (boosting) s.energy = Math.max(0, s.energy - P.BOOST_DRAIN * dt);
   else s.energy = Math.min(100, s.energy + P.REGEN * dt);
-  const cruise = new THREE.Vector3(0, 0, 1)
+  const cruise = _cruise
+    .set(0, 0, 1)
     .applyQuaternion(s.quat)
     .multiplyScalar(P.CRUISE * (boosting ? P.BOOST_MULT : 1));
   s.vel.lerp(cruise, Math.min(1, dt * 2.2));
@@ -125,5 +124,28 @@ export function stepFlight(state, input, dt) {
     s.vel.multiplyScalar(0.9);
     flags.boundaryHit = true;
   }
+  return flags;
+}
+
+/**
+ * 单步飞行积分(纯函数,契约与 2026-08-30 版逐位一致)。
+ * 克隆输入状态 → 原地核(stepFlightInto) → 返回全新对象;输入 state 不被修改
+ * (freeflight-physics.test.js 的「纯函数性」用例钉死此语义)。
+ * @param {object} state { pos, quat, vel, pitchRate, rollRate, energy, autoNav }
+ * @param {object} input { pitchIn, rollIn, boostHold, boostKey, autoNavTarget(Vector3|null), groundHeightAt(x,z), centerX, centerZ }
+ * @param {number} dt 秒(已钳制)
+ * @returns {{ state, flags: { dock, groundHit, boundaryHit } }} 新状态(全新对象)与事件标志
+ */
+export function stepFlight(state, input, dt) {
+  const s = {
+    pos: state.pos.clone(),
+    quat: state.quat.clone(),
+    vel: state.vel.clone(),
+    pitchRate: state.pitchRate,
+    rollRate: state.rollRate,
+    energy: state.energy,
+    autoNav: state.autoNav,
+  };
+  const flags = stepFlightInto(s, input, dt);
   return { state: s, flags };
 }

@@ -1,5 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-08 审查第四批:每帧分配治理 + P2 卫生七件(已上线)
+
+- **#8 每帧分配两处**:① `core/composition-root.js` 的 `ordered()` 原每帧 slice+sort(~40 系统),改排序缓存 + register/dispose 时置 null 惰性重建;dispose 从 `.reverse()`(会原地改共享缓存)改倒序下标遍历。② `kunlun/freeflight-physics.js` 拆成 `stepFlightInto`(原地变异核,模块级 scratch 向量/四元数/欧拉角,每帧约 10 个分配归零;生产 ark.js 改走它,freeFlight 就地推进)+ `stepFlight`(克隆包装,2026-08-30「纯函数/输入不被修改」契约与 8 项单测逐字保留)。scratch 单线程无重入(groundHeightAt 回调 desert.getH 不回本模块),安全。
+- **P2 七件**:① dexie 死依赖删除(全库零 import);② package.json 补 `engines: node>=22.12`(与 CI Node 22 对齐);③ lint-staged 补 `lib/**/*.js`/`server.js`/`scripts/**` 的 eslint --fix(后端漂移重灾区此前完全不设防;当日全量 eslint 已绿,历史文件无碍);④ Vite `target: es2020→es2022`(build 验证过);⑤ 100vh→100dvh 带回退(main.css 全局 + agreement-swipe 协议面板两处;admin.html 桌面后台跳过);⑥ `public/sw.min.js` 构建产物退出 git 跟踪(与 sw.js 双源真相;零引用,`scripts/minify-sw.js` 一并删,历史在 git);⑦ depcruise 接入 CI(`.dependency-cruiser.cjs` 9 月建好却从未跑,现 `npm run depcruise` 本地/CI 同闸,309 模块 942 依赖零违规)。
+- 验证:vitest **532 项全绿**;lint/typecheck/depcruise 零错误;`npm run build`(es2022)通过。
+- 部署:deploy.sh 全量(前端改动进 dist;本批无后端文件变更)。
+
 ## 2026-10-08 审查第三批:静态资源 304 协商缓存 + 优雅关闭 + /healthz(已上线)
 
 - **304 协商缓存(#5,报告称"全站最大性能改进点")**:`lib/files-static.js` 此前无任何 ETag/Last-Modified——no-cache 资源(含几十 MB 的 .glb 模型与全部 html/js)每次回源都全量 200 重下。现统一发 `Last-Modified`(mtime 秒级截断),条件 GET 命中即 304(Cache-Control/安全头照发,含 Vary);gzip 路径与 200/206 响应头都补了 Last-Modified;**Range 请求刻意不做 304 短路**(视频拖动不受影响)。Cloudflare 边缘与浏览器两侧同样受益——no-cache 的"每次校验"从重下变真校验。

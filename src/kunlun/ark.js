@@ -16,7 +16,7 @@ import { eventBus } from '../event-bus.js';
 import { expose } from '../debug-hooks.js';
 import { chime as blipChime } from '../shared/audio-blip.js';
 import { createFlightHUD } from './ark-freeflight-hud.js'; // 自由飞 HUD/摇杆/冲刺(B-d 外迁)
-import { stepFlight } from './freeflight-physics.js'; // 自由飞纯物理核(终审 TOP1 可单测)
+import { stepFlightInto } from './freeflight-physics.js'; // 自由飞物理核(终审 TOP1 可单测;生产走原地核,纯包装留给单测)
 const gs = getGameState();
 const bag = hotBegin('ark');
 // 星屑收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露;本模块内 3 处 ark.visible 判定用)
@@ -411,7 +411,9 @@ s.add(flightPts);
 const chime = (i) => blipChime([659, 698, 784, 880, 988, 1047][i] || 880);
 const tintOv = document.createElement('div');
 tintOv.style.cssText =
-  'position:fixed;inset:0;z-index:'+Z.arkHud+';pointer-events:none;opacity:0;transition:opacity 1.2s';
+  'position:fixed;inset:0;z-index:' +
+  Z.arkHud +
+  ';pointer-events:none;opacity:0;transition:opacity 1.2s';
 document.body.appendChild(tintOv);
 
 // ===================== 自由飞(飞机骨·2026-07-27:首飞后再登舟进入;配方来自两套飞机参考码,温和无失速) =====================
@@ -551,7 +553,9 @@ function freeTick() {
   let rollIn = (ks.a ? 1 : 0) - (ks.d ? 1 : 0) + flightHud.joy.x;
   // 单步积分抽到 kunlun/freeflight-physics.js(终审 TOP1 纯函数化,可单测);
   // 自动导航/能量/姿态限幅/疆域钳制全部在内,事件经 flags 回传。
-  const { state: ns, flags } = stepFlight(
+  // 2026-10-08 审查#8:生产路径改原地核 stepFlightInto(freeFlight 就地推进,零分配);
+  // 纯语义由同文件的 stepFlight(克隆包装)保留给单测,「输入不被修改」契约不破。
+  const flags = stepFlightInto(
     freeFlight,
     {
       pitchIn,
@@ -565,13 +569,6 @@ function freeTick() {
     },
     dt
   );
-  freeFlight.pos = ns.pos;
-  freeFlight.quat = ns.quat;
-  freeFlight.vel = ns.vel;
-  freeFlight.pitchRate = ns.pitchRate;
-  freeFlight.rollRate = ns.rollRate;
-  freeFlight.energy = ns.energy;
-  freeFlight.autoNav = ns.autoNav;
   if (flags.dock) {
     dock();
     return;

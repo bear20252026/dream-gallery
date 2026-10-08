@@ -36,6 +36,9 @@ jobs:
       - name: TypeScript type check
         run: npm run typecheck
 
+      - name: Dependency-cruiser boundary check (config existed since 2026-09; wired into CI 2026-10-08)
+        run: npm run depcruise
+
       - name: Vitest unit tests
         run: npm run test:unit
 
