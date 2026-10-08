@@ -66,7 +66,7 @@ if [ "$SYNC_BACKEND" = "1" ]; then
 else
   echo "(已用 --no-backend 跳过后端同步)"
 fi
-ssh -i "$KEY" -o StrictHostKeyChecking=no "root@$HOST" "pm2 restart gallery --update-env >/dev/null && sleep 2 && pm2 status gallery | grep -E 'gallery.*online'"
+ssh -i "$KEY" -o StrictHostKeyChecking=no "root@$HOST" "pm2 restart gallery --update-env --kill-timeout 9000 >/dev/null && sleep 2 && pm2 status gallery | grep -E 'gallery.*online'"
 
 echo "=== 6/7 同步 models/(只补服务器缺的) ==="
 # 2026-09-23:本步失败**不得阻断后续验证**(set -e 下曾因 rsync 缺失直接中止在第 6 步)。

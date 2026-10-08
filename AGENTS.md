@@ -1,11 +1,19 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-08 审查第三批:静态资源 304 协商缓存 + 优雅关闭 + /healthz(已上线)
+
+- **304 协商缓存(#5,报告称"全站最大性能改进点")**:`lib/files-static.js` 此前无任何 ETag/Last-Modified——no-cache 资源(含几十 MB 的 .glb 模型与全部 html/js)每次回源都全量 200 重下。现统一发 `Last-Modified`(mtime 秒级截断),条件 GET 命中即 304(Cache-Control/安全头照发,含 Vary);gzip 路径与 200/206 响应头都补了 Last-Modified;**Range 请求刻意不做 304 短路**(视频拖动不受影响)。Cloudflare 边缘与浏览器两侧同样受益——no-cache 的"每次校验"从重下变真校验。
+- **优雅关闭(#9)**:`server.js` 捕获 SIGTERM/SIGINT → `server.close()` 收束在途请求(最长 6 分钟的 AI 阅卷/大上传不再被腰斩),8s 兜底硬退;deploy.sh 与 backend-sync.sh 的 `pm2 restart` 加 `--kill-timeout 9000` 配合。存档无缓冲不补 flush(每次变更本就同步落盘,SQLite 为权威)。
+- **/healthz(#3 后半)**:路由单表新增公开 GET(契约快照 57→58),返回 `{ok, uptime, ts}`;部署验证以后可从"curl 首页 200"升级为探活不依赖静态资源。
+- 验证:vitest **532 项全绿**(路由快照同步);后端 **102 项**(原 97 + 304×4 + healthz×1,用 /data.js 测协商缓存避开首页强刷注入路径)+ 4 + 6 全过;eslint 零错误。saveGateData 防抖合并**刻意未做**(改持久化语义,SQLite 权威下收益小风险大,报告项保留待议)。
+- 部署:backend-sync 同步 lib/files-static.js、lib/routes.js、server.js,md5 双端一致;线上实测见当日探针记录。
+
 ## 2026-10-07 审查修复:烟花粒子只产不消 + planets.js 清理 + store 读缓存 + release.sh 补后端测试(本地,待发布)
 
 - **烟花粒子只产不消**(`core/effects-system.js`):`update()` 在非主世界直接 return,但 `autoTimer`(每 2.8s 产 24 粒子)永不停——小世界挂机 1 小时攒约 3 万粒子,回主世界当帧全部爆发。修法:非主世界分支连 `autoTimer`/`autoFirst` 一起 clearInterval/clearTimeout 并置 null,回主世界由既有惰性分支重启(与「开场电影期间惰性启动」同一风格)。顺手把粒子死亡的 `splice(i,1)` 改为反向遍历下安全的 swap-remove(末位交换+pop);粒子对象池未做(diff 会变大,收益小)。
 - **planets.js 三连清**:① 星屑旋转+点灯人亮灭的逐字重复块(原 tick 头部与太空分支各一份,非主世界两块都执行 → 转速×2、`setLampLit` 每帧两次)删太空分支那份,保留 tick 头部一份(它还管呼吸浮动,全世界每帧一次);② keydown/keyup/blur 监听清理死代码(removeEventListener 读从未赋值的 `spaceKeys._kd/_ku`,blur 监听从未移除)改为具名函数 `onSpaceKeyDown/Up/Blur`,`bag.custom` 真正移除三个监听(ark.js `onKey` 同款范式);③ 每帧 `p.clone()` 改模块级 scratch `_prevHome`(ark.js `_v2/_v3/_camPos` 范式;`model-surface.place()` 只同步读 `previous.x/z` 不持有引用,复用安全)。此段是场景接线,无单测钉住(逻辑单测全在 shared/planet-logic.mjs)。
 - **store 读缓存**(`state/store-api.js`):`rawGet` 原每帧同步 `localStorage.getItem`(planets ticker 每帧读 page1/planetsChapter)。写路径本就单入口(SCHEMA 登记制),故加模块级 `Map` 内存镜像:读先查内存,`rawSet`/新增 `rawRemove`(unmark/clearHouseColor 改走它)同步更新;写失败(隐私模式)不缓存;跨标签页经 `storage` 事件失效(`typeof window` 守卫,node 测试环境跳过)。登记豁免写入方(index.html 开机块 kunlunVer、music.html musicHistory)均在缓存惰性填充前/异页,不受影响。**测试配套**:`storeApi._dropCache()` 测试钩;store-api.test.js / store.test.js 的 beforeEach 与两处「直写 mock 后再读」断言前调用;新增缓存行为单测(重复读只打一次 getItem、写/删同步、直写失效)。scene6/7 的 `chapterCached` 0.5s 粒度缓存照旧保留(语义不同,不合并)。
-- **release.sh 补后端测试**:第 2 步原来只跑 `npx vitest run`;现为 `npm test`(= test-store.js 存档原子写 + test.js 后端 125 项 + test-mobile.js 手机渲染,定义在 package.json)+ `npx vitest run`,对齐「上线前必跑」节。场景截图回归 `test:scene` 需本机模型与基线,仍按文档手动跑,不进 release.sh。
+- **release.sh 补后端测试**:第 2 步原来只跑 `npx vitest run`;现为 `npm test`(= test-store.js 存档原子写 + test.js 后端 130 项 + test-mobile.js 手机渲染,定义在 package.json)+ `npx vitest run`,对齐「上线前必跑」节。场景截图回归 `test:scene` 需本机模型与基线,仍按文档手动跑,不进 release.sh。
 - **AI 接口洪水防护(#2,同日第二批)**:2026-09-24 拆除的是「按设备**日**配额」(正常访客用不到的量级);本次补的是另一维度——按 **realIP 每分钟**的洪水防护(主人 10-07 贴出审查报告点名「公开 AI 接口=无上限成本攻击面,建议按 realIP 每分钟限流」)。新模块 `lib/ratelimit.js`(固定窗口计数,内存 Map,MAX_KEYS 5000 防伪造 IP 撑爆):**tts-synth 20/分**(只对真触发合成的请求计数,`/tts-audio/<key>` 与缓存命中不占额)、**tts-batch 60/分**(客户端预热 53s 发 44 批,阈值放宽到不误伤;滥用上限仍由服务端队列 400+TTL 兜底)、**quiz-ai 6/分**(`gradeQAWithAI` 超限**静默返回 null** → 自动回退本地细则,访客交卷零感知)、**chat-bot 6/分**(超限跳过本次召唤,发言照常入库)。身份用 `store.realIP`(仅可信反代才采 CF-Connecting-IP,直连伪造头无效回退 socket 地址);**运维配套**:安全组仍须只放行 CF IP 段,否则直连可绕过。**配套修 realIP 缺口**:CF 回源边缘 IP 是公网段(172.64.0.0/13 等),原 realIP 只认私网网段 → 经 CF 的请求永远取不到访客真 IP,上线首测 61 连发不触发即此根因(服务器本机直打 60/1 精确触发,机制无恙);现把 CF 官方公布段(www.cloudflare.com/ips,零依赖 CIDR 匹配)加入可信名单——经 CF 取到真 IP,绕 CF 直连源站伪造头依旧无效;顺带 gate.js blockedIps/client-errors 从此记到真访客 IP。测试:`lib-ratelimit.test.js` 6+5 项(超限拒/分 IP/分桶/窗口滚动/直连伪造无效/空头 unknown 桶 + realIP 的 CF 段内外边界/伪造无效/私网照旧/畸形地址)。验证:vitest **527 项全绿**;后端 4+97+6 全过;eslint 零错误。
 - 验证:vitest **521 项全绿**(520 +1:store-api 新增缓存行为用例;既有 store 用例做缓存适配);eslint 五个改动文件零错误;改动文件语法检查全过。
 
@@ -233,7 +241,7 @@
 export PATH="/c/Program Files/nodejs:$PATH"
 npm test                          # = 下面三条(test-store + test.js + test-mobile)
 node scripts/test/test-store.js   # 存档原子写 4 项(并发保存/截断恢复/tmp 残留)
-node scripts/test/test.js         # 后端 125 项(数据校验/API/安全边界/审批门/上传限制/邀请)
+node scripts/test/test.js         # 后端 130 项(数据校验/API/安全边界/审批门/上传限制/邀请/协商缓存/健康检查)
 node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色器错误/JS异常/空屏)
 npx vitest run                    # 前端单测 245 项(物理/碰撞/状态机/游戏状态/存档/路由契约/配额/灯光预算/剧情纯逻辑等 24 文件)
 npx vitest run --coverage         # 覆盖率基线(2026-09-24 建):已测纯逻辑模块普遍 82-100%(game-state 94/collision-resolve 96/light-budget 100/store 100/vertical-physics 92);

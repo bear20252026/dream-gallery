@@ -109,6 +109,27 @@ const handler = (req, res) => {
 };
 
 const server = http.createServer(handler);
+
+// 优雅关闭(2026-10-07 审查#9):pm2 restart/reload 与 Ctrl+C 都走 SIGTERM/SIGINT ——
+// 停止接收新连接,让在途请求(最长 6 分钟的 AI 阅卷/大上传流)跑完再退;
+// 8 秒兜底硬退(pm2 侧把 kill_timeout 提到 9000,见 deploy.sh/backend-sync.sh)
+let shuttingDown = false;
+function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`[shutdown] 收到 ${signal}:停止接收新请求,等待在途请求收束…`);
+  server.close(() => {
+    console.log('[shutdown] 在途请求已收束,退出');
+    process.exit(0);
+  });
+  setTimeout(() => {
+    console.log('[shutdown] 8s 兜底到点,强制退出');
+    process.exit(0);
+  }, 8000).unref();
+}
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
 server.listen(PORT, () => {
   const { ROUTES } = require('./lib/routes');
   console.log(`服务器已启动: http://localhost:${PORT}`);

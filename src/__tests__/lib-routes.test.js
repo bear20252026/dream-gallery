@@ -81,7 +81,8 @@ describe('路由表结构契约', () => {
     // 2026-09-26: +1 /api/tts/batch 剧情台词批量预合成(预合成流水线)
     // 2026-09-26: +3 /api/tts/stats 打点(public) + admin tts-stats 查询/清空(token×2)
     // 2026-09-26: +1 GET /tts-audio/<key>.mp3 台词音频边缘可缓存出口(CF 默认缓存 .mp3)
-    expect(ROUTES.length).toBe(57);
+    // 2026-10-07: +1 GET /healthz 健康检查(审查#3 后半:发布后探活,只报进程活性与运行时长)
+    expect(ROUTES.length).toBe(58);
   });
 });
 

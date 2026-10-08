@@ -124,6 +124,22 @@ async function testApi(base) {
   res = await fetch(base + '/music/background.mp3', { headers: { Range: 'bytes=0-99' } });
   const buf = await res.arrayBuffer();
   ok(res.status === 206 && buf.byteLength === 100, 'Range 请求返回 206 且长度正确');
+
+  // 协商缓存(2026-10-07 审查#5):Last-Modified + If-Modified-Since → 304
+  res = await fetch(base + '/data.js');
+  const lastMod = res.headers.get('last-modified');
+  ok(res.status === 200 && !!lastMod, '静态文件响应带 Last-Modified(协商缓存锚点)');
+  res = await fetch(base + '/data.js', { headers: { 'If-Modified-Since': lastMod } });
+  ok(res.status === 304, 'If-Modified-Since 未变更 → 304(不再全量重下)');
+  res = await fetch(base + '/data.js', { headers: { 'If-Modified-Since': 'Wed, 21 Oct 2015 07:28:00 GMT' } });
+  ok(res.status === 200, 'If-Modified-Since 早于文件修改 → 全量 200');
+  res = await fetch(base + '/music/background.mp3', { headers: { Range: 'bytes=0-99', 'If-Modified-Since': lastMod } });
+  ok(res.status === 206, 'Range 请求不做 304 短路(拖动进度条不受影响)');
+
+  // 健康检查(2026-10-07 审查#3 后半)
+  res = await fetch(base + '/healthz');
+  const hz = await res.json();
+  ok(res.status === 200 && hz.ok === true && typeof hz.uptime === 'number', 'GET /healthz 报 ok 与运行时长');
 }
 
 // ---------- 3. 安全边界 ----------

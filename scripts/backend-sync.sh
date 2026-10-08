@@ -107,5 +107,5 @@ fi
 echo "✅ $N 个后端文件已上传,md5 一致"
 
 if [ "$BACKEND_SYNC_NO_RESTART" != "1" ]; then
-  $SSH "pm2 restart gallery --update-env >/dev/null && sleep 2 && pm2 status gallery | grep -E 'gallery.*online'"
+  $SSH "pm2 restart gallery --update-env --kill-timeout 9000 >/dev/null && sleep 2 && pm2 status gallery | grep -E 'gallery.*online'"
 fi
