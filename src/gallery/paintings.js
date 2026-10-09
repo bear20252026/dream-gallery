@@ -48,20 +48,15 @@ const aM = P.map((u, i) => ({ u: u, d: AI_DESC[i] })).concat(
   V.map((u, j) => ({ u: u, d: AI_DESC[P.length + j] }))
 );
 
-const hW = [];
-// 修复1：排除踢脚线（userData.isBaseboard），只选真正的墙壁
-// 婚礼拱廊装修(2026-09-03)：排除已隐藏的外围墙(visible=false)，挂画自动重分配到内墙
-s.traverse((o) => {
-  if (
-    o.isMesh &&
-    o.geometry.type === 'BoxGeometry' &&
-    !o.userData.isBaseboard &&
-    o.visible !== false
-  ) {
-    const p = o.geometry.parameters;
-    if (p.width < 0.5 && p.width > 0.15 && p.depth > 1.5) hW.push(o);
-  }
-});
+// 挂画墙清单(审查#10,2026-10-08):墙体 InstancedMesh 化后场景里不再有逐面墙的 Mesh 可遍历,
+// scene.js 装配时直供 wallSpecs(只含内墙/可挂墙面,外围墙在婚礼拱廊下整体未建)。
+// 本系统对墙的全部依赖 = position / rotation.y / userData._half(wallHalf 预计算),与原
+// BoxGeometry.parameters 筛选语义等价(踢脚线/隐藏墙天然不在清单内)。
+const hW = (ctx.gallery.wallSpecs || []).map((sp) => ({
+  position: sp.position,
+  rotation: sp.rotation,
+  userData: sp.userData,
+}));
 
 // iG 可交互画框数组由 scene.js 创建并经 ctx 共享
 iG.push(vidMesh); // 视频墙加入交互

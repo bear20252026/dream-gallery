@@ -12,7 +12,8 @@ import { eventBus } from './event-bus.js';
  * @returns {Object} 画廊命名空间代理对象
  */
 export function createGalleryNamespace(vault) {
-  const properties = ['zoomIn',
+  const properties = [
+    'zoomIn',
     'paintGroups',
     'onC3D',
     'zoomOut',
@@ -20,10 +21,11 @@ export function createGalleryNamespace(vault) {
     'hangOne',
     'houseMats',
     'openHouseColor',
+    'wallSpecs', // 审查#10(2026-10-08):墙体 InstancedMesh 化后,挂画墙清单由 scene.js 直供
   ];
-  
+
   const proxy = {};
-  
+
   for (const prop of properties) {
     Object.defineProperty(proxy, prop, {
       get() {
@@ -40,7 +42,7 @@ export function createGalleryNamespace(vault) {
       configurable: true,
     });
   }
-  
+
   return Object.freeze(proxy);
 }
 

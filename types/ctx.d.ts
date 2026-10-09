@@ -139,6 +139,8 @@ export interface GalleryNamespace {
   hangOne: (url: string) => void;
   houseMats: Material[];
   openHouseColor: () => void;
+  /** 审查#10(2026-10-08):墙体 InstancedMesh 化后的挂画墙清单(scene.js 直供)。挂画只依赖 position/rotation.y/userData._half */
+  wallSpecs: { position: { x: number; y: number; z: number }; rotation: { y: number }; userData: { _half: number } }[];
 }
 
 export interface ModeNamespace {

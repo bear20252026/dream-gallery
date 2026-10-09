@@ -178,7 +178,6 @@ ctx.scene.removeBounds = function (list) {
 ctx.scene.addBounds = function (list) {
   for (const b of list) bounds.push(b);
 };
-const wI = []; // 墙壁信息数组
 // ===================== 婚礼拱廊外壳(C方案·全体大装修,2026-09-03) =====================
 // 用婚礼拱廊 GLB(models/hall/wedding-arch.glb, CC-BY 4.0, 署名见 CREDITS.md)整体替换
 // 原始建筑的可见外观:三段拱廊沿 z 覆盖 36×40 全馆,旧外围墙隐藏但保留碰撞(边界不破),
@@ -191,6 +190,17 @@ const baseM = new THREE.MeshStandardMaterial({ color: '#3a1d0c', roughness: 0.4,
 // 天花板(可换色):平整顶面,默认米白
 // 可染色注册表(housecolor.js 分组染色;换色仅自己可见;ceil 组在屋顶创建处填入)
 const houseMats = { wall: [], base: [baseM], deco: [decoM], ceil: [] };
+// 审查#10(2026-10-08):墙体 InstancedMesh 化 —— 120 面墙+240 踢脚线+480 圆角管原为
+// ~840 个独立 Mesh(≈840 draw call)。改共享单位几何+实例矩阵承载位姿/长度,4 个 InstancedMesh
+// 全部装下;墙色走唯一共享材质(WEDDING_SHELL 常开,原本 120 个材质就同色,housecolor
+// 换色行为不变;休眠的随机粉路径由 spec.hue 记录,恢复开关时按实例色接线)。
+const wallMatShared = new THREE.MeshStandardMaterial({
+  color: WEDDING_SHELL ? new THREE.Color('hsl(40,18%,86%)') : 0xffffff,
+  roughness: WEDDING_SHELL ? 0.85 : 0.92,
+  metalness: 0.02,
+});
+houseMats.wall.push(wallMatShared); // 房屋换色(housecolor.js)对 wall 组逐材质 setColor,单材质一次全生效
+const wallSpecs = []; // {x1,z1,x2,z2,cx,cz,ang,len,hue,perim} — 装配段统一建实例
 
 function w(x1, z1, x2, z2) {
   const dx = x2 - x1,
@@ -200,27 +210,14 @@ function w(x1, z1, x2, z2) {
   const cx = (x1 + x2) / 2,
     cz = (z1 + z2) / 2,
     ang = Math.atan2(dx, dz);
-  const hue = 335 + Math.random() * 20;
-  const wallMat = new THREE.MeshStandardMaterial({
-    // 婚礼拱廊装修:内墙刷暖白(近似大理石),配合白拱+木格栅天花;关闭开关恢复随机粉
-    color: WEDDING_SHELL
-      ? new THREE.Color('hsl(40,18%,86%)')
-      : new THREE.Color(`hsl(${hue},45%,70%)`),
-    roughness: WEDDING_SHELL ? 0.85 : 0.92,
-    metalness: 0.02,
-  });
-  houseMats.wall.push(wallMat); // 房屋换色(housecolor.js)分组染色
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(0.3, WH, len), wallMat);
-  wall.position.set(cx, WH / 2, cz);
-  wall.rotation.y = ang;
-  s.add(wall);
-  const sA = Math.abs(Math.sin(ang)),
-    cA = Math.abs(Math.cos(ang));
+  const hue = 335 + Math.random() * 20; // 休眠路径(随机粉)保留色相记录
+  const sinA = Math.abs(Math.sin(ang)),
+    cosA = Math.abs(Math.cos(ang));
   const bBox = {
-    mnX: cx - ((sA * len) / 2 + cA * 0.2) - 0.1,
-    mxX: cx + ((sA * len) / 2 + cA * 0.2) + 0.1,
-    mnZ: cz - ((cA * len) / 2 + sA * 0.2) - 0.1,
-    mxZ: cz + ((cA * len) / 2 + sA * 0.2) + 0.1,
+    mnX: cx - ((sinA * len) / 2 + cosA * 0.2) - 0.1,
+    mxX: cx + ((sinA * len) / 2 + cosA * 0.2) + 0.1,
+    mnZ: cz - ((cosA * len) / 2 + sinA * 0.2) - 0.1,
+    mxZ: cz + ((cosA * len) / 2 + sinA * 0.2) + 0.1,
   };
   // 婚礼拱廊装修:标记外围墙(四至边线)的碰撞盒,供外壳装配时整批移除。
   //   不标记的话旧房隐形墙会把落地窗全堵死——看得见通、走不过去(2026-09-03 用户反馈)
@@ -228,24 +225,18 @@ function w(x1, z1, x2, z2) {
     bBox.perim =
       (x1 === x2 && (x1 === OL || x1 === OR)) || (z1 === z2 && (z1 === OT || z1 === OBR));
   bounds.push(bBox);
-  wI.push({ x1, z1, x2, z2, cx, cz, ang, len, mesh: wall, bases: [], tubes: [] });
-  // 法线方向（版本27验证：cos(ang), -sin(ang)）
-  const pX = Math.cos(ang),
-    pZ = -Math.sin(ang);
-  // 踢脚线：墙两侧（正面+反面）
-  // 内侧（走廊方向）
-  const bm1 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, len), baseM);
-  bm1.userData = { isBaseboard: true }; // 标记为踢脚线，挂画系统排除
-  bm1.position.set(cx + pX * 0.2, 0.05, cz + pZ * 0.2);
-  bm1.rotation.y = ang;
-  s.add(bm1);
-  // 外侧（场景外方向）
-  const bm2 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, len), baseM);
-  bm2.userData = { isBaseboard: true }; // 标记为踢脚线，挂画系统排除
-  bm2.position.set(cx - pX * 0.2, 0.05, cz - pZ * 0.2);
-  bm2.rotation.y = ang;
-  s.add(bm2);
-  wI[wI.length - 1].bases.push(bm1, bm2); // 婚礼拱廊装修:外围墙隐藏时一并隐藏
+  wallSpecs.push({
+    x1,
+    z1,
+    x2,
+    z2,
+    cx,
+    cz,
+    ang,
+    len,
+    hue,
+    perim: !!bBox.perim,
+  });
 }
 
 // ===== 外围（覆盖整体范围） =====
@@ -416,52 +407,103 @@ const edgeTubeMat = new THREE.MeshStandardMaterial({
   roughness: 0.4,
   metalness: 0.2,
 });
-wI.forEach((wi) => {
-  const pX = Math.cos(wi.ang),
-    pZ = -Math.sin(wi.ang); // 法线（正面方向）
-  const tX = Math.sin(wi.ang),
-    tZ = Math.cos(wi.ang); // 切线（沿墙方向）
-  const off = 0.17; // 管中心到墙表面的距离
-  // 正面四根管状圆角条
+// ===== 审查#10:墙体/踢脚线/圆角管 InstancedMesh 装配(2026-10-08) =====
+// 外围墙(perim)在婚礼拱廊模式下跳过不建(原逻辑是建后 visible=false,效果等同);
+// 挂画墙清单 wallSpecs 直供 paintings.js(挂画只依赖 position/rotation.y/半长,见该文件)。
+const dummy = new THREE.Object3D();
+const visSpecs = wallSpecs.filter((sp) => !sp.perim);
+{
+  // 墙体:单位 Box(0.3,WH,1),实例 z 缩放承载长度
+  const wallsIM = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.3, WH, 1),
+    wallMatShared,
+    visSpecs.length
+  );
+  visSpecs.forEach((sp, i) => {
+    dummy.position.set(sp.cx, WH / 2, sp.cz);
+    dummy.rotation.set(0, sp.ang, 0);
+    dummy.scale.set(1, 1, sp.len);
+    dummy.updateMatrix();
+    wallsIM.setMatrixAt(i, dummy.matrix);
+    if (!WEDDING_SHELL) wallsIM.setColorAt(i, new THREE.Color(`hsl(${sp.hue},45%,70%)`)); // 休眠随机粉路径
+  });
+  s.add(wallsIM);
+  // 踢脚线:墙两侧各一条(0.1×0.1×len),挂画系统按 userData.isBaseboard 整组排除
+  const bbIM = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(0.1, 0.1, 1),
+    baseM,
+    visSpecs.length * 2
+  );
+  bbIM.userData.isBaseboard = true;
+  let bi = 0;
+  visSpecs.forEach((sp) => {
+    const pX = Math.cos(sp.ang),
+      pZ = -Math.sin(sp.ang);
+    for (const sgn of [1, -1]) {
+      dummy.position.set(sp.cx + pX * 0.2 * sgn, 0.05, sp.cz + pZ * 0.2 * sgn);
+      dummy.rotation.set(0, sp.ang, 0);
+      dummy.scale.set(1, 1, sp.len);
+      dummy.updateMatrix();
+      bbIM.setMatrixAt(bi++, dummy.matrix);
+    }
+  });
+  s.add(bbIM);
+  // 圆角管:横管(顶/底,长=len)×2 + 竖管(墙两端,高=WH)×2
   const tubeR = 0.07,
     seg = 6;
-  // 顶边管（沿墙长度，在顶部）
-  const topT = new THREE.Mesh(new THREE.CylinderGeometry(tubeR, tubeR, wi.len, seg), edgeTubeMat);
-  topT.rotation.x = Math.PI / 2;
-  topT.rotation.z = wi.ang;
-  topT.position.set(wi.cx + pX * off, WH - 0.05, wi.cz + pZ * off);
-  s.add(topT);
-  // 底边管（沿墙长度，在底部/地板处）
-  const botT = new THREE.Mesh(new THREE.CylinderGeometry(tubeR, tubeR, wi.len, seg), edgeTubeMat);
-  botT.rotation.x = Math.PI / 2;
-  botT.rotation.z = wi.ang;
-  botT.position.set(wi.cx + pX * off, 0.05, wi.cz + pZ * off);
-  s.add(botT);
-  // 左边管（沿墙高度，在墙起始端）
-  const lT = new THREE.Mesh(new THREE.CylinderGeometry(tubeR, tubeR, WH, seg), edgeTubeMat);
-  lT.position.set(wi.x1 + tX * 0.15 + pX * off, WH / 2, wi.z1 + tZ * 0.15 + pZ * off);
-  s.add(lT);
-  // 右边管（沿墙高度，在墙结束端）
-  const rT = new THREE.Mesh(new THREE.CylinderGeometry(tubeR, tubeR, WH, seg), edgeTubeMat);
-  rT.position.set(wi.x2 - tX * 0.15 + pX * off, WH / 2, wi.z2 - tZ * 0.15 + pZ * off);
-  s.add(rT);
-  wi.tubes.push(topT, botT, lT, rT); // 婚礼拱廊装修:外围墙隐藏时一并隐藏
-});
+  const off = 0.17; // 管中心到墙表面的距离
+  const tubesH = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(tubeR, tubeR, 1, seg),
+    edgeTubeMat,
+    visSpecs.length * 2
+  );
+  const tubesV = new THREE.InstancedMesh(
+    new THREE.CylinderGeometry(tubeR, tubeR, WH, seg),
+    edgeTubeMat,
+    visSpecs.length * 2
+  );
+  let hi = 0,
+    vi = 0;
+  visSpecs.forEach((sp) => {
+    const pX = Math.cos(sp.ang),
+      pZ = -Math.sin(sp.ang);
+    const tX = Math.sin(sp.ang),
+      tZ = Math.cos(sp.ang);
+    for (const y of [WH - 0.05, 0.05]) {
+      dummy.position.set(sp.cx + pX * off, y, sp.cz + pZ * off);
+      dummy.rotation.set(Math.PI / 2, 0, sp.ang);
+      dummy.scale.set(1, sp.len, 1);
+      dummy.updateMatrix();
+      tubesH.setMatrixAt(hi++, dummy.matrix);
+    }
+    for (const end of [0, 1]) {
+      dummy.position.set(
+        (end ? sp.x2 - tX * 0.15 : sp.x1 + tX * 0.15) + pX * off,
+        WH / 2,
+        (end ? sp.z2 - tZ * 0.15 : sp.z1 + tZ * 0.15) + pZ * off
+      );
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      tubesV.setMatrixAt(vi++, dummy.matrix);
+    }
+  });
+  s.add(tubesH);
+  s.add(tubesV);
+}
+// 挂画墙清单:挂画系统(paintings.js)对墙的全部依赖 = position / rotation.y / 半长,
+// 这里按原 wallHalf 公式预计算 _half(Box3 投影 ≈ len/2 + 0.3*|sin2ang|/2,差异 ≤0.15 不影响排画)
+ctx.gallery.wallSpecs = visSpecs.map((sp) => ({
+  position: new THREE.Vector3(sp.cx, WH / 2, sp.cz),
+  rotation: { y: sp.ang },
+  userData: { _half: Math.max(0.6, sp.len / 2 - 0.9) },
+}));
 
 // ===================== 婚礼拱廊外壳装配（C方案,2026-09-03） =====================
 // 旧外围墙(含踢脚线/圆角管)与东门框隐藏,但 bounds 保留——碰撞边界不破,门洞仍通行;
 // 三段拱廊实例沿 z 均布覆盖 36×40 全馆(单段 36×14.1×6.65m,南端外挑 2.3m 入沙漠);
-// 挂画墙筛选(paintings.js)同步排除隐藏墙,挂画自动重分配到内墙。
+// 挂画墙清单已只含内墙(见上方 wallSpecs 装配),挂画自动重分配到内墙。
 if (WEDDING_SHELL) {
-  const isPerimeter = (wi) =>
-    (wi.x1 === wi.x2 && (wi.x1 === OL || wi.x1 === OR)) ||
-    (wi.z1 === wi.z2 && (wi.z1 === OT || wi.z1 === OBR));
-  wI.forEach((wi) => {
-    if (!isPerimeter(wi)) return;
-    wi.mesh.visible = false;
-    wi.bases.forEach((b) => (b.visible = false));
-    wi.tubes.forEach((t) => (t.visible = false));
-  });
   df1.visible = df2.visible = df4.visible = false; // 东门框让位拱廊柱
   // 拆掉旧外围墙的碰撞盒:拱廊是开敞建筑,落地窗应当可以径直走出去(用户要求,不设权限)。
   //   内墙(展厅隔断/回字内墙)碰撞保留——那是实心墙,照旧挡人。
