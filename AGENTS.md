@@ -1,5 +1,14 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-09 巨石拆分第一批:admin.js 1623→1086 行,四模块(cc3995d,已上线)
+
+- **切割方案**(依赖分析代理产出函数级依赖表后执行):新建 `admin-core.js`(无状态共享工具:token/adminFetch/confirmAsync/$/esc/j/fmt/day0/todayStr/toast/brandIcon×2)、`admin-tabs.js`(报错反馈+一念墙+TTS 播放追踪,export loadErrors)、`admin-docs.js`(协议文档编辑,状态自持,export loadDocs)、`admin-chat.js`(在线对话,export startChat/chatSelect/chatSend + 新封装 `stopChatLive()`——原 switchTab 内联的 SSE/轮询清理随分区搬入)。**本体保留**:DATA/RANGE/CAL_DATE 三个可变态横跨 8 个互相成环的分区(数据/访客/预警/统计/历史/答题/文件/展示/大屏/杂项),第一阶段刻意不动;30 个 window 内联 onclick 契约在末尾 Object.assign 原样装配。
+- **执行要点**(分析代理标了 10 个风险点,全部绕开或单独修):①switchTab 对 chatSse/chatPoll 的直接读写必须封装成 stopChatLive 随模块走,否则切割即失败;②模板 onclick 引用的函数(跨分区如 loadFiles→dl/copyTxt/editCaption)必须在 Object.assign 存活——构建期不报错、运行期静默死,已按 33 处 onclick 清单逐一核对;③顶层 DOM wiring 11 处保持模块顶层执行;④boot(load()+#docs 直达)留在 admin.js 最底;⑤`async function` 声明的 export 要单独处理(机械 export 脚本只匹配 const/let/function,loadDocs/chatSend/adminFetch 三处漏挂,构建期 MISSING_EXPORT 抓住补齐)。
+- **顺带修潜伏 bug**(依赖审计发现):统计页日历"本月"按钮 `onclick="CAL_DATE=null;renderStats();"`——两者都不在 window 上,点击必 ReferenceError(抽出模块时就已存在)。新增 `calReset()` 挂 window,模板改引它。
+- **附带发现与防御**(本地 admin 探针顺带暴露):本地 client_errors 里有 2 条(累计)“startWorld 模块失败: 场景 Cannot add property wallSpecs”——scene.js 模块执行曾在中间态会话炸过(疑似文件热编辑窗口的模块图不一致,5 连跑+探针均未复现)。已把 `ctx.gallery.wallSpecs` 直供改为防御性 try/catch:真复发时 `__reportError` 上报全栈+挂画缺席降级,绝不允许核心链 scene.js 半途炸掉整局重试。
+- 验证:532 单测/lint/typecheck/build 全绿;**admin-errors-tab 探针本地+线上全绿**(真实 ADMIN_TOKEN 点 tab→loadErrors→SSE,走全新模块结构);版本戳 cc3995d 双端核对;0 pageerror。
+- 下批候选:ending-journey.js(1295 行)与 planets.js(1200 行身兼 5 职)——后者是剧情核心,拆前需同等粒度的依赖分析。
+
 ## 2026-10-09 空 catch 全量治理:102 处分级,危险 8+1 修复(已上线)
 
 - **分级结论**(两个并行审计逐处打开核实,grep 只能搜到单行版,括号配平法补出 12 处跨行注释版):**危险 9 处已全部修复**;可疑 12 处已全部补 console.warn 留痕;自愿静默 84 处维持原样(氛围音频/自动播放策略/store 自兜底/`&&`+`?.` 已判空的装饰性 UI/显式回退路径/HMR 清理——全站错误静默铁律下的合理形态,分类清单存审计记录,不再逐处加注释)。
