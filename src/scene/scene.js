@@ -493,11 +493,19 @@ const visSpecs = wallSpecs.filter((sp) => !sp.perim);
 }
 // 挂画墙清单:挂画系统(paintings.js)对墙的全部依赖 = position / rotation.y / 半长,
 // 这里按原 wallHalf 公式预计算 _half(Box3 投影 ≈ len/2 + 0.3*|sin2ang|/2,差异 ≤0.15 不影响排画)
-ctx.gallery.wallSpecs = visSpecs.map((sp) => ({
-  position: new THREE.Vector3(sp.cx, WH / 2, sp.cz),
-  rotation: { y: sp.ang },
-  userData: { _half: Math.max(0.6, sp.len / 2 - 0.9) },
-}));
+// 防御性直供(2026-10-09):本地 client_errors 曾录得 2 次"Cannot add property wallSpecs"
+// (间歇,冻结白名单代理疑云,5 连跑未复现)。真复发时:上报全栈 + 挂画缺席降级,
+// 绝不能让 scene.js 模块在半途炸掉(核心链失败会整局重试)。paintings.js 对空清单已容错。
+try {
+  ctx.gallery.wallSpecs = visSpecs.map((sp) => ({
+    position: new THREE.Vector3(sp.cx, WH / 2, sp.cz),
+    rotation: { y: sp.ang },
+    userData: { _half: Math.max(0.6, sp.len / 2 - 0.9) },
+  }));
+} catch (e) {
+  console.error('[scene] wallSpecs 直供失败,本局挂画将缺席:', e);
+  if (window.__reportError) window.__reportError('boot', 'wallSpecs 直供失败: ' + (e && e.message));
+}
 
 // ===================== 婚礼拱廊外壳装配（C方案,2026-09-03） =====================
 // 旧外围墙(含踢脚线/圆角管)与东门框隐藏,但 bounds 保留——碰撞边界不破,门洞仍通行;

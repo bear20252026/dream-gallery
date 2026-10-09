@@ -1,296 +1,35 @@
-// admin.js — 后台脚本(2026-09-24 自 admin.html 内联抽出,逐字迁移不改逻辑)
-// 动机:100KB 单文件内联无 lint 无压缩无缓存;抽出后进 Vite 构建拿 lint+压缩+hash 缓存。
-// ⚠️ 兼容关键:module 顶层不再自动挂 window,而 markup 与 innerHTML 模板里的 21+22 处
-//   内联 onclick 依赖全局函数 → 文件末尾统一 Object.assign(window, {...}) 兜底,勿删。
+// admin.js — 后台脚本(2026-09-24 自 admin.html 内联抽出;2026-10-09 审查 P2 切分为四模块)
+// 本体保留:共享可变状态 DATA/RANGE/CAL_DATE + 数据/访客/预警/统计/历史/答题/文件/展示/大屏/杂项
+// (这些分区横跨读写 DATA 且互相成环,第一阶段不动);报错/一念墙/TTS→admin-tabs.js,
+// 协议文档→admin-docs.js,在线对话→admin-chat.js,共享工具→admin-core.js。
+// ⚠️ 兼容关键:markup 与 innerHTML 模板里的内联 onclick 依赖全局函数
+//   → 文件末尾统一 Object.assign(window, {...}) 兜底,勿删;模板里引用的名字必须存活于此。
 
-const TOKEN = new URLSearchParams(location.search).get('token') || '';
-// 2026-09-18 审计 P1#2:API 一律走 x-token 请求头;URL query 仅用于首次打开后台页
-const authH = () => (TOKEN ? { 'x-token': TOKEN } : {});
-const tk = () => ''; // 兼容旧调用拼接位,token 已在 header
-const tk2 = () => '';
-const tkq = () => '';
-async function adminFetch(url, init) {
-  init = init || {};
-  const headers = Object.assign({}, init.headers || {}, authH());
-  return fetch(url, Object.assign({}, init, { headers }));
-}
-function confirmAsync(msg) {
-  return new Promise(function (resolve) {
-    var m = $('cfm'),
-      ok = $('cfmOk'),
-      cancel = $('cfmCancel');
-    $('cfmMsg').textContent = msg;
-    m.classList.add('show');
-    ok.onclick = function () {
-      m.classList.remove('show');
-      resolve(true);
-    };
-    cancel.onclick = function () {
-      m.classList.remove('show');
-      resolve(false);
-    };
-  });
-}
+import {
+  TOKEN,
+  tk,
+  tk2,
+  tkq,
+  adminFetch,
+  confirmAsync,
+  $,
+  esc,
+  j,
+  fmt,
+  day0,
+  todayStr,
+  toast,
+  brandIcon,
+  brandShow,
+} from './admin-core.js';
+import { loadErrors } from './admin-tabs.js';
+import { loadDocs } from './admin-docs.js';
+import { startChat, stopChatLive, chatSelect, chatSend } from './admin-chat.js';
+
 let DATA = null,
   RANGE = 'day',
   CAL_DATE = null;
-const $ = (id) => document.getElementById(id);
-const esc = (s) => {
-  const d = document.createElement('div');
-  d.textContent = String(s == null ? '' : s);
-  return d.innerHTML;
-};
-// j():onclick 内联 JS 字符串专用转义(2026-07-28 OWASP 审计 🔴:esc() 不转引号,
-// 文件名/备注可含 ' " → 公开上传构造文件名即可在后台页执行 JS 偷地址栏 token)。
-// 凡把用户数据插进 onclick='…' / onclick="…" 的 JS 字符串位置,一律用 j() 不用 esc()。
-const j = (s) =>
-  String(s == null ? '' : s)
-    .replace(/\\/g, '\\\\')
-    .replace(/'/g, "\\'")
-    .replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;');
-const fmt = (t) => (t ? new Date(t).toLocaleString('zh-CN', { hour12: false }) : '-');
-const day0 = (t) => {
-  const d = new Date(t);
-  d.setHours(0, 0, 0, 0);
-  return d.getTime();
-};
-const todayStr = (t) => {
-  var d = new Date(t || Date.now());
-  var y = d.getFullYear(),
-    m = String(d.getMonth() + 1).padStart(2, '0'),
-    day = String(d.getDate()).padStart(2, '0');
-  return y + '-' + m + '-' + day;
-};
-function toast(msg, err) {
-  const t = $('toast');
-  t.textContent = msg;
-  t.className = 'toast' + (err ? ' err' : '');
-  t.style.display = 'block';
-  setTimeout(() => (t.style.display = 'none'), 2200);
-}
-// ===================== 报错反馈(2026-08-30) =====================
-const TYPE_ICON = { js: '⚡', promise: '⏳', resource: '📦', webgl: '🖥', network: '🌐' };
-const TYPE_NAME = {
-  js: 'JS 异常',
-  promise: 'Promise',
-  resource: '资源',
-  webgl: 'WebGL',
-  network: '网络',
-};
-// ===================== 一念墙管理(2026-09-04) =====================
-async function loadWishes() {
-  try {
-    const r = await adminFetch('/api/admin/wishes' + tk());
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || '加载失败');
-    $('wishTotal').textContent = '共 ' + d.total + ' 念';
-    const box = $('wishAdminList');
-    box.innerHTML = '';
-    if (!d.list.length) {
-      box.innerHTML =
-        '<div class="card" style="color:var(--muted)">墙还空着——还没有访客写过一念。</div>';
-      return;
-    }
-    for (const w of d.list) {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.style.cssText = 'padding:10px 14px;margin-bottom:8px';
-      const txt = document.createElement('div');
-      txt.style.cssText = 'font-size:14px;word-break:break-all';
-      txt.textContent = w.t;
-      const row = document.createElement('div');
-      row.style.cssText = 'display:flex;align-items:center;gap:10px;margin-top:6px';
-      const meta = document.createElement('span');
-      meta.style.cssText = 'color:var(--muted);font-size:12px';
-      meta.textContent = w.n + ' · ' + fmt(w.ts);
-      const del = document.createElement('button');
-      del.className = 'btn-del';
-      del.textContent = '删除';
-      del.addEventListener('click', async function () {
-        if (!(await confirmAsync('确定删除这条一念?'))) return;
-        try {
-          const rr = await adminFetch('/api/admin/wish' + tk(), {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'del', id: w.id }),
-          });
-          if (!rr.ok) throw new Error('删除失败');
-          toast('已删除');
-          loadWishes();
-        } catch (e) {
-          toast(e.message, true);
-        }
-      });
-      row.appendChild(meta);
-      row.appendChild(del);
-      card.appendChild(txt);
-      card.appendChild(row);
-      box.appendChild(card);
-    }
-  } catch (e) {
-    $('wishAdminList').innerHTML =
-      '<div class="card" style="color:#c64545">加载失败: ' + esc(e.message) + '</div>';
-  }
-}
-$('wishRefresh').addEventListener('click', loadWishes);
 
-async function loadErrors() {
-  try {
-    const type = $('errType').value;
-    const q = $('errQ').value.trim();
-    // token 已由 adminFetch 统一走 x-token 头,tk() 恒返空串;查询串必须自起 "?",
-    // 再写 '+ tk() + "&type="' 会拼出 client-errors&type= 畸形 URL → 404(2026-09-25 血泪)
-    const r = await adminFetch(
-      '/api/admin/client-errors?type=' + encodeURIComponent(type) + '&q=' + encodeURIComponent(q)
-    );
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || '加载失败');
-    // 统计卡
-    const cards = [
-      ['总次数', d.total],
-      ['独立错误', d.unique],
-      ['近 24h', d.recent24],
-    ];
-    for (const [k, v] of Object.entries(d.byType || {})) cards.push([TYPE_NAME[k] || k, v]);
-    $('errStats').innerHTML = cards
-      .map(
-        ([k, v]) =>
-          `<div class="stat"><div class="stat-num">${v}</div><div class="stat-lab">${esc(k)}</div></div>`
-      )
-      .join('');
-    // 列表
-    if (!d.list.length) {
-      $('errList').innerHTML =
-        '<div class="card" style="color:var(--muted)">暂无报错 —— 访客端一切正常 🎉</div>';
-      return;
-    }
-    $('errList').innerHTML = d.list
-      .map((e) => {
-        const ctxBits = [];
-        if (e.viewMode !== undefined && e.viewMode !== null)
-          ctxBits.push(e.viewMode === 1 ? '第三人称' : '第一人称');
-        if (e.playerPos) ctxBits.push('位置(' + e.playerPos + ')');
-        if (e.count > 1) ctxBits.push('×' + e.count + ' 次');
-        return `<div class="card" style="padding:10px 14px">
-                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-                  <span style="font-size:16px">${TYPE_ICON[e.type] || '•'}</span>
-                  <b>${TYPE_NAME[e.type] || esc(e.type)}</b>
-                  <span style="color:var(--muted);font-size:12px">${fmt(e.lastT)}</span>
-                  ${ctxBits.map((x) => `<span style="font-size:11px;background:var(--surface-2,#eee);padding:2px 8px;border-radius:10px">${esc(x)}</span>`).join('')}
-                </div>
-                <div style="margin-top:6px;font-family:monospace;font-size:12px;word-break:break-all">${esc(e.message)}</div>
-                ${e.source ? `<div style="color:var(--muted);font-size:11px;margin-top:4px;font-family:monospace">${esc(e.source)}${e.lineno ? ':' + e.lineno + ':' + e.colno : ''}</div>` : ''}
-                ${e.stack ? `<details style="margin-top:6px"><summary style="cursor:pointer;font-size:12px;color:var(--muted)">堆栈</summary><pre style="font-size:11px;white-space:pre-wrap;word-break:break-all;background:var(--surface-2,#f4f4f4);padding:8px;border-radius:6px;margin:4px 0 0">${esc(e.stack)}</pre></details>` : ''}
-                ${e.ua ? `<div style="color:var(--muted);font-size:11px;margin-top:4px">${esc(e.ua)}</div>` : ''}
-              </div>`;
-      })
-      .join('');
-  } catch (e) {
-    $('errList').innerHTML =
-      '<div class="card" style="color:#c64545">加载失败: ' + esc(e.message) + '</div>';
-  }
-}
-$('errRefresh').addEventListener('click', loadErrors);
-$('errType').addEventListener('change', loadErrors);
-$('errClear').addEventListener('click', async function () {
-  if (!(await confirmAsync('确定清空全部报错记录?此操作不可恢复'))) return;
-  try {
-    await adminFetch('/api/admin/client-errors/clear' + tk(), { method: 'POST' });
-    toast('已清空');
-    loadErrors();
-  } catch (e) {
-    toast('清空失败: ' + e.message, true);
-  }
-});
-$('errQ').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') loadErrors();
-});
-
-// ===================== 语音播放追踪(2026-09-26 主人令:播放过/错误/条数全记录) =====================
-const TTS_EV_NAME = {
-  speak: '发起朗读',
-  ok: '开播成功',
-  cut: '播一半被掐',
-  fail: '播放失败',
-  muted: '静音跳过',
-  skip: '缓存未命中',
-};
-async function loadTtsStats() {
-  try {
-    const r = await adminFetch('/api/admin/tts-stats');
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || '加载失败');
-    const c = d.counters || {};
-    const cards = [
-      ['发起朗读', c.speak || 0],
-      ['开播成功', c.ok || 0],
-      ['播一半被掐', c.cut || 0],
-      ['播放失败', c.fail || 0],
-      ['静音跳过', c.muted || 0],
-      ['开播率', d.audibleRate == null ? '—' : d.audibleRate + '%'],
-      ['近 24h', d.recent24 || 0],
-    ];
-    $('ttsStatsCards').innerHTML = cards
-      .map(
-        ([k, v]) =>
-          `<div class="stat"><div class="stat-num">${v}</div><div class="stat-lab">${esc(k)}</div></div>`
-      )
-      .join('');
-    if (!(d.list || []).length) {
-      $('ttsStatsList').innerHTML =
-        '<div class="card" style="color:var(--muted)">暂无记录 —— 进游戏触发一段剧情对话后点刷新</div>';
-      return;
-    }
-    $('ttsStatsList').innerHTML = d.list
-      .map((e) => {
-        const color =
-          e.ev === 'ok'
-            ? 'var(--ok,#2a2)'
-            : e.ev === 'fail'
-              ? '#c64545'
-              : e.ev === 'cut'
-                ? '#b8860b'
-                : 'var(--muted)';
-        return `<div class="card" style="padding:8px 14px">
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <b style="color:${color}">${TTS_EV_NAME[e.ev] || esc(e.ev)}</b>
-            <span style="font-family:monospace;font-size:12px">${esc(e.text)}…</span>
-            <span style="font-size:11px;color:var(--muted)">音色 ${esc(e.voice || '—')}</span>
-            ${e.ms != null ? `<span style="font-size:11px;color:var(--muted)">起播 ${e.ms}ms</span>` : ''}
-            ${e.err ? `<span style="font-size:11px;color:#c64545">${esc(e.err)}</span>` : ''}
-            <span style="font-size:11px;color:var(--muted);margin-left:auto">${fmt(e.t)}</span>
-          </div>
-        </div>`;
-      })
-      .join('');
-  } catch (e) {
-    $('ttsStatsList').innerHTML =
-      '<div class="card" style="color:#c64545">加载失败: ' + esc(e.message) + '</div>';
-  }
-}
-$('ttsRefresh').addEventListener('click', loadTtsStats);
-$('ttsClear').addEventListener('click', async function () {
-  if (!(await confirmAsync('确定清空语音播放记录?此操作不可恢复'))) return;
-  try {
-    await adminFetch('/api/admin/tts-stats/clear' + tk(), { method: 'POST' });
-    toast('已清空');
-    loadTtsStats();
-  } catch (e) {
-    toast('清空失败: ' + e.message, true);
-  }
-});
-
-function brandIcon(b) {
-  var s = typeof b === 'object' ? b.brand || '' : b || '';
-  if (/iPhone|iPad/.test(s)) return '🍎';
-  if (/Windows|Mac|Linux/.test(s)) return '💻';
-  return '📱';
-}
-function brandShow(b) {
-  if (typeof b === 'object') return b.full || b.brand || '未知';
-  return String(b || '未知');
-}
 function switchTab(t) {
   var panels = [
     'approve',
@@ -311,16 +50,7 @@ function switchTab(t) {
   document.querySelectorAll('.tab').forEach(function (e) {
     e.classList.toggle('active', e.dataset.tab === t);
   });
-  if (t !== 'chat' && chatSse) {
-    try {
-      chatSse.close();
-    } catch (e) {}
-    chatSse = null;
-    if (chatPoll) {
-      clearInterval(chatPoll);
-      chatPoll = null;
-    }
-  }
+  if (t !== 'chat') stopChatLive();
   var loadFn = null;
   if (t === 'files') loadFn = loadFiles;
   else if (t === 'quiz') loadFn = loadQuiz;
@@ -330,130 +60,6 @@ function switchTab(t) {
   else if (t === 'errors') loadFn = loadErrors;
   if (loadFn) setTimeout(loadFn, 200);
 }
-// ---------- 协议文档编辑(designMode 原页直改;不进自动刷新) ----------
-let docCur = 'agreement.html',
-  docDirty = false,
-  docHead = '',
-  docTail = '';
-async function loadDocs() {
-  if (docDirty) return; // 有未保存修改时绝不重载(防刷没)
-  try {
-    const r = await adminFetch('/api/admin/docs?file=' + encodeURIComponent(docCur) + tk2());
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || '加载失败');
-    const f = $('docFrame'),
-      bi = d.content.indexOf('<body>'),
-      be = d.content.lastIndexOf('</body>');
-    if (bi < 0 || be < 0) throw new Error('文件结构异常');
-    docHead = d.content.slice(0, bi + 6);
-    docTail = d.content.slice(be);
-    f.srcdoc = d.content;
-    f.onload = () => {
-      try {
-        const doc = f.contentDocument;
-        doc.body.contentEditable = 'true';
-        doc.body.style.outline = 'none';
-        new MutationObserver(() => {
-          docDirty = true;
-          $('docSave').disabled = false;
-        }).observe(doc.body, { childList: true, subtree: true, characterData: true });
-      } catch (e) {
-        docMsg('编辑器初始化失败:' + (e.message || e), false); // 原:静默吞掉,假报"已加载"
-        return;
-      }
-      docMsg('已加载 ' + docCur);
-    };
-  } catch (e) {
-    docMsg(e.message, false);
-  }
-}
-function docMsg(t, ok) {
-  const m = $('docMsg');
-  m.textContent = t;
-  m.style.color = ok === false ? '#ff8a8a' : '#16a34a';
-  setTimeout(() => {
-    if (m.textContent === t) m.textContent = '';
-  }, 4000);
-}
-document.querySelectorAll('.doc-tabs button').forEach(
-  (b) =>
-    (b.onclick = async () => {
-      if (docDirty && !(await confirmAsync('当前修改未保存,切换文件将丢弃。继续?'))) return;
-      document.querySelectorAll('.doc-tabs button').forEach((x) => x.classList.remove('on'));
-      b.classList.add('on');
-      docCur = b.dataset.f;
-      docDirty = false;
-      $('docSave').disabled = true;
-      loadDocs();
-    })
-);
-$('docSave').onclick = async () => {
-  if (!docDirty || !(await confirmAsync('确定保存并立即对访客生效?'))) return;
-  $('docSave').disabled = true;
-  try {
-    const body = $('docFrame').contentDocument.body.innerHTML;
-    const r = await adminFetch('/api/admin/docs' + tk(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file: docCur, content: docHead + body + docTail }),
-    });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || '保存失败');
-    docDirty = false;
-    $('docSave').disabled = true;
-    loadDocBaks();
-    docMsg('已保存并生效(备份:' + d.backup + ')');
-  } catch (e) {
-    $('docSave').disabled = false;
-    docMsg(e.message, false);
-  }
-};
-$('docReload').onclick = async () => {
-  if (!docDirty || (await confirmAsync('放弃当前修改,重新加载?'))) {
-    docDirty = false;
-    $('docSave').disabled = true;
-    loadDocs();
-  }
-};
-async function loadDocBaks() {
-  try {
-    const d = await (
-      await adminFetch('/api/admin/docs?backups=' + encodeURIComponent(docCur) + tk2())
-    ).json();
-    $('docBak').innerHTML =
-      '<option value="">选择备份回滚…</option>' +
-      d.backups.map((b) => '<option>' + b + '</option>').join('');
-    $('docRestore').disabled = true;
-  } catch (e) {
-    // 原:静默吞掉 → 下拉空白,管理员误以为无备份可回滚
-    $('docBak').innerHTML = '<option value="">备份列表加载失败</option>';
-    docMsg('备份列表加载失败:' + (e.message || e), false);
-  }
-}
-$('docBak').onchange = () => {
-  $('docRestore').disabled = !$('docBak').value;
-};
-$('docRestore').onclick = async () => {
-  if (
-    !$('docBak').value ||
-    !(await confirmAsync('回滚到 ' + $('docBak').value + ' ?(会先自动备份当前版)'))
-  )
-    return;
-  try {
-    const r = await adminFetch('/api/admin/docs' + tk(), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file: docCur, restore: $('docBak').value }),
-    });
-    if (!r.ok) throw new Error((await r.json()).error || '回滚失败');
-    docDirty = false;
-    $('docSave').disabled = true;
-    docMsg('已回滚');
-    loadDocs();
-  } catch (e) {
-    docMsg(e.message, false);
-  }
-};
 // ---------- 数据 ----------
 async function load() {
   let r, d;
@@ -837,7 +443,7 @@ function renderCalendar() {
     ym +
     '</span>' +
     '<button class="range-btn" onclick="calMonth(1)" style="padding:2px 10px;font-size:14px">▶</button>' +
-    '<button class="range-btn" onclick="CAL_DATE=null;renderStats();" style="padding:2px 10px;font-size:12px;margin-left:auto">本月</button>' +
+    '<button class="range-btn" onclick="calReset();" style="padding:2px 10px;font-size:12px;margin-left:auto">本月</button>' +
     '</div>';
   html += ['一', '二', '三', '四', '五', '六', '日']
     .map((d) => '<div class="cal-head">' + d + '</div>')
@@ -1449,137 +1055,9 @@ async function exportPdf() {
   setTimeout(() => w.print(), 1500);
 }
 
-// =====  在线对话 =====
-let chatCurDk = null,
-  chatSse = null,
-  chatPoll = null,
-  chatDevices = [];
-function startChat() {
-  if (!$('tab-chat') || $('tab-chat').style.display === 'none') return;
-  if (chatSse) return;
-  chatSse = new EventSource('/api/admin/online-sse');
-  chatSse.onmessage = (e) => {
-    try {
-      const d = JSON.parse(e.data);
-      chatDevices = d.devices || [];
-      renderChatDevices();
-    } catch (x) {
-      console.warn('[admin] 在线设备 SSE 坏帧', x); // 原:静默,设备列表停留旧值
-    }
-  };
-  chatSse.onerror = () => {
-    try {
-      chatSse.close();
-    } catch (x) {}
-    chatSse = null;
-    setTimeout(startChat, 8000);
-  };
-}
-function renderChatDevices() {
-  if (!$('chatOnlineCount')) return;
-  $('chatOnlineCount').textContent = chatDevices.length + ' 人在线';
-  const l = $('chatDeviceList');
-  if (!l) return;
-  if (!chatDevices.length) {
-    l.innerHTML =
-      '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:20px">暂无在线设备</div>';
-    return;
-  }
-  l.innerHTML = chatDevices
-    .map((d) => {
-      const active =
-        d.dk === chatCurDk ? ' style="border-color:#cc785c;background:rgba(204,120,92,.1)"' : '';
-      return (
-        '<div' +
-        active +
-        ' class="file-row" onclick="chatSelect(\'' +
-        d.dk +
-        '\')" style="cursor:pointer;margin-bottom:4px"><div><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#4caf50;margin-right:4px"></span><b>' +
-        esc(d.name) +
-        '</b></div><div style="font-size:10px;color:#9ca3af;margin-top:2px">' +
-        Math.floor((Date.now() - d.onlineSince) / 60000) +
-        '分钟前</div></div>'
-      );
-    })
-    .join('');
-}
-function chatSelect(dk) {
-  chatCurDk = dk;
-  renderChatDevices();
-  const d = chatDevices.find((x) => x.dk === dk);
-  $('chatSubTitle').textContent = '点对点 · ' + esc(d ? d.name : dk);
-  $('chatMsgInput').disabled = false;
-  $('chatSendBtn').disabled = false;
-  $('chatMsgInput').placeholder = '发送消息…';
-  loadChatMsgs();
-  if (chatPoll) clearInterval(chatPoll);
-  chatPoll = setInterval(loadChatMsgs, 2500);
-}
-async function loadChatMsgs() {
-  if (!chatCurDk) return;
-  try {
-    const r = await adminFetch('/api/admin/chats?dk=' + chatCurDk);
-    const d = await r.json();
-    const cs = d.chats || [],
-      box = $('chatMsgArea');
-    if (!box) return;
-    if (!cs.length) {
-      box.innerHTML =
-        '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:30px">暂无消息</div>';
-      return;
-    }
-    box.innerHTML = cs
-      .map((m) => {
-        const isAdmin = m.from === 'admin' || m.dir === 'admin->user';
-        const t = new Date(m.ts).toLocaleTimeString('zh-CN', {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
-        const bg = isAdmin
-          ? 'linear-gradient(135deg,rgba(102,126,234,.5),rgba(118,75,162,.4))'
-          : 'rgba(255,255,255,.1)';
-        const self = isAdmin ? 'flex-end' : 'flex-start';
-        const br = isAdmin ? 'right' : 'left';
-        return (
-          '<div style="max-width:75%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5;align-self:' +
-          self +
-          ';background:' +
-          bg +
-          ';border-bottom-' +
-          br +
-          '-radius:4px;margin-bottom:4px">' +
-          esc(m.text) +
-          '<div style="font-size:10px;opacity:.5;margin-top:4px;text-align:right">' +
-          t +
-          (m.name ? ' · ' + esc(m.name) : ' · 管理员') +
-          '</div></div>'
-        );
-      })
-      .join('');
-    box.scrollTop = box.scrollHeight;
-  } catch (e) {
-    // 原:静默吞掉 → 消息区空白,管理员误以为访客没留言(box 是 try 内 const,直取容器)
-    const msgBox = $('chatMsgArea');
-    if (msgBox)
-      msgBox.innerHTML = `<div style="opacity:.6;padding:8px">聊天记录加载失败:${esc(String(e.message || e))}</div>`;
-  }
-}
-async function chatSend() {
-  const t = $('chatMsgInput').value.trim();
-  if (!t || !chatCurDk) return;
-  $('chatMsgInput').value = '';
-  $('chatSendBtn').disabled = true;
-  try {
-    await adminFetch('/api/admin/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: t, target: chatCurDk }),
-    });
-    loadChatMsgs();
-  } catch (e) {
-    toast('发送失败', 1);
-  }
-  $('chatSendBtn').disabled = false;
+function calReset() {
+  CAL_DATE = null;
+  renderStats();
 }
 
 load();
@@ -1595,6 +1073,7 @@ Object.assign(window, {
   calMonth,
   chatSelect,
   chatSend,
+  calReset,
   clearAlerts,
   clearClicks,
   copyTxt,
