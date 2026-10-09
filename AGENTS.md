@@ -1,5 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-09 巨石拆分第二批:ending-journey 1295→791 行,三叶(f83de2d,已上线)
+
+- **切割方案**(依赖分析结论:按"四阶段"拆是负收益——四段共享单一 mode 状态机/单一 actionFn 槽/同步链(画嘴套→veil→startFarewell→…→fall→playEpilogue);按"可分离叶子"拆是正收益):①`ending-audio.js`(135 行,自持 WebAudio:水声/水滴/会笑的铃铛;trunk 用 `isWaterActive()` 替换对模块内 water 状态的外读);②`ending-prince.js`(165 行,小王子 rig:加载/动画/摆放/透明度/跟随与倒下;princeMode 自持,`set/getPrinceMode`/`resetFall` 访问器,`initPrinceRig({scene:getter, groundH})` 注入);③`ending-epilogue.js`(325 行,星空/字幕/落版/保存星星卡;控制器注入 `{stageEl getter, getMode/setMode, setStep, hideAction, stopListening, wait}`;`getStageEntry()` 供主干 script:lang 换字;`stopStarfield()` 供 dispose)。主干保留编排(状态机/行动卡/DOM/speakSeq/找井+告别两段/tick/组件),endingApi 形状一字未动。
+- **执行陷阱实录**:①注入块最初放在状态声明之后——`wait` 是 const(不提升),顶层引用直接 TDZ,**闸门都不出现**(整页 module 链死);挪到 const 声明之后(主循环段之前)修复。②探针失败会泄漏它自起的服务器进程,下次跑同端口 EADDRINUSE→探针服务器死→假象"闸门超时";重跑前先清泄漏进程。③机械 export 脚本再抓三处 `async function` 漏挂(build 期 MISSING_EXPORT 兜住)。
+- 验证:**ending-portfolio 探针双变体 + hill-ending 探针全绿(18 项,本地+线上各一轮)**——正好覆盖被搬走的三叶代码经真实剧情流端到端跑通;532 单测/lint/typecheck/build 全绿;版本戳 f83de2d 双端核对。
+- 下批候选:planets.js(1201 行)——依赖分析已完成,**结论"两拆三留"**:可外拆 story-guides(剧情指引,~110 行)与 nav-buttons(导航按钮+tick 决策块,~85 行)两个低耦合叶子(消费方零感知),世界注册/章节权威/传送垫/主循环物理必须留本体且核心链槽位不变;拆前先清 4 处死码(travelTo/backToGallery/hudT/lampT/HUD 段,约 60 行);需同时补 registerWorld 幂等守卫(HMR 重放隐患)。风险点已全部列档(加载顺序/portal 时序/boot-check/探针形状/storyTarget 单写者/HMR/tick 早退语义)。
+
 ## 2026-10-09 巨石拆分第一批:admin.js 1623→1086 行,四模块(cc3995d,已上线)
 
 - **切割方案**(依赖分析代理产出函数级依赖表后执行):新建 `admin-core.js`(无状态共享工具:token/adminFetch/confirmAsync/$/esc/j/fmt/day0/todayStr/toast/brandIcon×2)、`admin-tabs.js`(报错反馈+一念墙+TTS 播放追踪,export loadErrors)、`admin-docs.js`(协议文档编辑,状态自持,export loadDocs)、`admin-chat.js`(在线对话,export startChat/chatSelect/chatSend + 新封装 `stopChatLive()`——原 switchTab 内联的 SSE/轮询清理随分区搬入)。**本体保留**:DATA/RANGE/CAL_DATE 三个可变态横跨 8 个互相成环的分区(数据/访客/预警/统计/历史/答题/文件/展示/大屏/杂项),第一阶段刻意不动;30 个 window 内联 onclick 契约在末尾 Object.assign 原样装配。
