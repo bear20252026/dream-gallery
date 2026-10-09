@@ -17,21 +17,11 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { eventBus } from '../core/event-bus.js';
-import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { Z } from '../shared/z-layers.mjs';
 import { tt, scriptLang } from '../shared/story-text.mjs';
-import { avAllowed } from '../core/av-switch.js';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { openBook, sketchSvg } from '../ui/book-pages.js';
-import { epilogueKeepsake, keepsakeIds } from '../shared/portfolio-logic.mjs';
-import {
-  BOOK_PAGES,
-  SCENE_WELL,
-  SCENE_FAREWELL,
-  SCENE_EPILOGUE,
-  ENDING_UI,
-  WHO,
-} from '../shared/story-text.mjs';
+import { BOOK_PAGES, SCENE_WELL, SCENE_FAREWELL, ENDING_UI, WHO } from '../shared/story-text.mjs';
 import {
   ENDING,
   clampEnding,
@@ -42,9 +32,31 @@ import {
   walkLinesDue,
   WELL_POS,
   WELL_REACH,
-  HILL_TEXT,
-  hillUrl,
 } from '../shared/ending-logic.mjs';
+import {
+  startWater,
+  setWater,
+  stopWater,
+  isWaterActive,
+  drip,
+  bellOnce,
+  bellsOn,
+  bellsOff,
+} from './ending-audio.js';
+import {
+  initPrinceRig,
+  loadPrince,
+  placePrince,
+  princeAnim,
+  crashPrinceVisible,
+  sheepBoxVisible,
+  updatePrince,
+  getPrinceMode,
+  setPrinceMode,
+  resetFall,
+  disposePrince,
+} from './ending-prince.js';
+import { initEpilogue, playEpilogue, getStageEntry, stopStarfield } from './ending-epilogue.js';
 
 const OWNER = 'ending-journey';
 const PRINCE_MODEL = '/models/b612/chibi-prince-rigged-v2.glb';
@@ -129,18 +141,12 @@ let walkSaid = 0;
 let stillSec = 0;
 let lastPos = null;
 let lastDrip = 0;
-let uiAcc = 0;
 // 3D
 let wellGroup = null;
 let waterMesh = null;
 let wallMesh = null;
 let prince = null; // { wrap, mixer, acts, cur }
 let princeMode = 'hidden'; // hidden | follow | well | wall | falling
-let fallT = 0;
-// 声音
-let ac = null;
-let water = null;
-let bellTimer = null;
 let speakTimer = null;
 let speakGen = 0;
 
@@ -327,131 +333,6 @@ function flashTint(color, ms) {
   }, ms || 900);
 }
 
-// ===================== 声音(剧情机制音,av-switch 'story' 豁免) =====================
-function audio() {
-  if (!avAllowed('story')) return null;
-  try {
-    if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
-    if (ac.state === 'suspended') ac.resume().catch(() => {});
-    return ac;
-  } catch (e) {
-    return null;
-  }
-}
-function startWater() {
-  const a = audio();
-  if (!a || water) return;
-  try {
-    const len = a.sampleRate * 2;
-    const buf = a.createBuffer(1, len, a.sampleRate);
-    const d = buf.getChannelData(0);
-    let last = 0;
-    for (let i = 0; i < len; i++) {
-      last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
-      d[i] = last * 3.5;
-    }
-    const src = a.createBufferSource();
-    src.buffer = buf;
-    src.loop = true;
-    const bp = a.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = 600;
-    bp.Q.value = 0.8;
-    const g = a.createGain();
-    g.gain.value = 0;
-    const pan = a.createStereoPanner ? a.createStereoPanner() : null;
-    src.connect(bp);
-    bp.connect(g);
-    if (pan) {
-      g.connect(pan);
-      pan.connect(a.destination);
-    } else g.connect(a.destination);
-    src.start();
-    water = { src, bp, g, pan };
-  } catch (e) {
-    water = null;
-  }
-}
-function setWater(level, clarity, pan) {
-  if (!water || !ac) return;
-  const t = ac.currentTime;
-  water.g.gain.setTargetAtTime(level * (0.25 + 0.75 * clarity) * 0.18, t, 0.25);
-  if (water.pan) water.pan.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), t, 0.2);
-  water.bp.frequency.setTargetAtTime(450 + clarity * 800, t, 0.4);
-}
-function stopWater() {
-  if (!water || !ac) return;
-  const w = water;
-  water = null;
-  try {
-    w.g.gain.setTargetAtTime(0.0001, ac.currentTime, 0.4);
-    setTimeout(() => {
-      try {
-        w.src.stop();
-      } catch (e) {}
-    }, 1600);
-  } catch (e) {}
-}
-function drip(level, pan) {
-  const a = audio();
-  if (!a) return;
-  try {
-    const t = a.currentTime;
-    const o = a.createOscillator();
-    const g = a.createGain();
-    const p = a.createStereoPanner ? a.createStereoPanner() : null;
-    o.type = 'sine';
-    o.frequency.setValueAtTime(1500, t);
-    o.frequency.exponentialRampToValueAtTime(620, t + 0.14);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.02 + level * 0.06, t + 0.01);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
-    o.connect(g);
-    if (p) {
-      p.pan.value = Math.max(-1, Math.min(1, pan));
-      g.connect(p);
-      p.connect(a.destination);
-    } else g.connect(a.destination);
-    o.start(t);
-    o.stop(t + 0.35);
-  } catch (e) {}
-}
-// 会笑的小铃铛:五声音阶高音区,随机轻响
-const BELLS = [1046.5, 1174.7, 1318.5, 1568, 1760, 2093];
-function bellOnce(gain) {
-  const a = audio();
-  if (!a) return;
-  try {
-    const t = a.currentTime;
-    const f = BELLS[(Math.random() * BELLS.length) | 0];
-    [1, 2.01].forEach((k, i) => {
-      const o = a.createOscillator();
-      const g = a.createGain();
-      o.type = 'sine';
-      o.frequency.value = f * k;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime((gain || 0.025) * (i ? 0.35 : 1), t + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 2.4);
-      o.connect(g);
-      g.connect(a.destination);
-      o.start(t);
-      o.stop(t + 2.5);
-    });
-  } catch (e) {}
-}
-function bellsOn(rateMs, gain) {
-  bellsOff();
-  const tick = () => {
-    bellOnce(gain);
-    bellTimer = setTimeout(tick, rateMs * (0.5 + Math.random()));
-  };
-  bellTimer = setTimeout(tick, 400);
-}
-function bellsOff() {
-  clearTimeout(bellTimer);
-  bellTimer = null;
-}
-
 // ===================== 3D:井、墙、小王子 =====================
 function buildWell() {
   if (wellGroup || !mainScene) return;
@@ -514,136 +395,6 @@ function buildWall() {
   wallMesh.rotation.y = 0.35;
   mainScene.add(wallMesh);
 }
-function loadPrince(cb) {
-  if (prince) {
-    cb && cb();
-    return;
-  }
-  createGLTFLoader().load(
-    PRINCE_MODEL,
-    (g) => {
-      const m = g.scene;
-      const box = new THREE.Box3().setFromObject(m, true);
-      const h = box.max.y - box.min.y || 1;
-      m.scale.setScalar(PRINCE_H / h);
-      m.updateWorldMatrix(true, true);
-      let rootBone = null;
-      m.traverse((o) => {
-        if (!rootBone && o.isBone && o.name === 'root') rootBone = o;
-        if (o.isMesh) {
-          o.frustumCulled = false;
-          const mats = Array.isArray(o.material) ? o.material : [o.material];
-          if (mats.some((mm) => /Layer_1/i.test(mm.name || ''))) o.visible = false;
-          // 倒下时要淡出:材质克隆成可透明(只影响本实例)
-          o.material = Array.isArray(o.material)
-            ? o.material.map((mm) => cloneFade(mm))
-            : cloneFade(o.material);
-        }
-      });
-      if (rootBone) m.position.y -= rootBone.getWorldPosition(new THREE.Vector3()).y;
-      const wrap = new THREE.Group();
-      wrap.name = 'endingPrince';
-      wrap.add(m);
-      wrap.visible = false;
-      let mixer = null,
-        acts = null;
-      if (g.animations && g.animations.length) {
-        mixer = new THREE.AnimationMixer(m);
-        const pick = (n) => g.animations.find((c) => c.name === n) || g.animations[0];
-        acts = {
-          idle: mixer.clipAction(pick('ChibiIdle')),
-          walk: mixer.clipAction(pick('ChibiWalk')),
-          wave: mixer.clipAction(pick('ChibiWave')),
-        };
-        acts.idle.play();
-      }
-      prince = { wrap, mixer, acts, cur: acts ? acts.idle : null, model: m };
-      mainScene.add(wrap);
-      cb && cb();
-    },
-    undefined,
-    (e) => console.error('[ending] 小王子模型加载失败(结局照常推进):', e.message)
-  );
-}
-function cloneFade(mm) {
-  if (!mm || !mm.clone) return mm;
-  const c = mm.clone();
-  c.transparent = true;
-  return c;
-}
-function princeAnim(name) {
-  if (!prince || !prince.acts || !prince.acts[name]) return;
-  const a = prince.acts[name];
-  if (prince.cur === a) return;
-  a.reset();
-  if (prince.cur) a.crossFadeFrom(prince.cur, 0.35, false);
-  a.play();
-  prince.cur = a;
-}
-function placePrince(x, z, y, faceX, faceZ) {
-  if (!prince) return;
-  prince.wrap.position.set(x, y == null ? groundH(x, z) : y, z);
-  if (faceX != null) prince.wrap.rotation.y = Math.atan2(faceX - x, faceZ - z);
-  prince.wrap.visible = true;
-  prince.wrap.rotation.z = 0;
-  setPrinceOpacity(1);
-}
-function setPrinceOpacity(o) {
-  if (!prince) return;
-  prince.wrap.traverse((n) => {
-    if (!n.isMesh) return;
-    (Array.isArray(n.material) ? n.material : [n.material]).forEach((mm) => {
-      if (mm) mm.opacity = o;
-    });
-  });
-}
-// 坠机点原来那位小王子:结局线里由同行的这位接替;告别之后,他回家了
-function crashPrinceVisible(v) {
-  const o = mainScene && mainScene.getObjectByName('littlePrince');
-  if (o && o.visible !== v) o.visible = v;
-}
-function sheepBoxVisible(v) {
-  const o = mainScene && mainScene.getObjectByName('sheepBox');
-  if (o && o.visible !== v) o.visible = v;
-}
-function updatePrince(dt) {
-  if (!prince || !prince.wrap.visible) return;
-  if (prince.mixer) prince.mixer.update(dt);
-  const w = prince.wrap;
-  if (princeMode === 'follow') {
-    const pl = ctx.player.pl;
-    if (!pl || !pl.p) return;
-    const yaw = pl.y || 0;
-    // 走在玩家右前侧(前向 = (-sin y, -cos y),右 = (cos y, -sin y))
-    const tx = pl.p.x + Math.cos(yaw) * 2.8 - Math.sin(yaw) * 0.8;
-    const tz = pl.p.z - Math.sin(yaw) * 2.8 - Math.cos(yaw) * 0.8;
-    const dx = tx - w.position.x,
-      dz = tz - w.position.z;
-    const d = Math.hypot(dx, dz);
-    if (d > 14) {
-      w.position.set(tx, groundH(tx, tz), tz); // 传送/跌落兜底
-      return;
-    }
-    const speed = d > 5 ? 6.5 : 3.2;
-    const travel = Math.min(Math.max(0, d - 0.4), speed * Math.min(0.05, dt));
-    if (travel > 0.002) {
-      w.position.x += (dx / d) * travel;
-      w.position.z += (dz / d) * travel;
-      w.rotation.y = Math.atan2(dx, dz);
-      princeAnim('walk');
-    } else princeAnim('idle');
-    w.position.y = groundH(w.position.x, w.position.z);
-  } else if (princeMode === 'falling') {
-    fallT += dt;
-    const k = Math.min(1, fallT / 1.8);
-    w.rotation.z = (k * k * Math.PI) / 2.2; // 轻得像一棵树倒下
-    if (fallT > 1.6) setPrinceOpacity(Math.max(0, 1 - (fallT - 1.6) / 1.6));
-    if (fallT > 3.3) {
-      w.visible = false;
-      princeMode = 'hidden';
-    }
-  }
-}
 
 // ===================== 0 · 画册页 =====================
 function openTheBook() {
@@ -669,7 +420,7 @@ function startWell(resumed) {
   loadPrince(() => {
     const p = playerPos();
     if (p) placePrince(p.x + 2.5, p.z + 1, null);
-    princeMode = 'follow';
+    setPrinceMode('follow');
   });
   crashPrinceVisible(false);
   shiftDayTo(21.8, resumed ? 1200 : 5000);
@@ -749,7 +500,7 @@ function wakeWell() {
   // 唤醒:井在唱歌 —— 一串清亮的水音
   [0, 180, 420, 700].forEach((ms, i) => setTimeout(() => bellOnce(0.03 - i * 0.004), ms));
   shiftDayTo(6.2, 7000); // 黎明
-  princeMode = 'well';
+  setPrinceMode('well');
   placePrince(WELL_POS.x + 2.1, WELL_POS.z + 0.6, null, WELL_POS.x, WELL_POS.z);
   princeAnim('idle');
   if (waterMesh) waterMesh.material.color.set(0x7fb2d6);
@@ -792,7 +543,7 @@ function startFarewell(arrive) {
   crashPrinceVisible(false);
   shiftDayTo(18.4, 900); // 黄昏
   loadPrince(() => {
-    princeMode = 'wall';
+    setPrinceMode('wall');
     const gy = groundH(WALL.x, WALL.z) + WALL_H - 0.05;
     placePrince(WALL.x, WALL.z, gy, WALL.x - 4, WALL.z + 3); // 背对玩家,和看不见的谁说话
     princeAnim('idle');
@@ -824,7 +575,7 @@ function farewellNear() {
       fz = p.z - Math.cos(yaw) * 2.6;
     placePrince(fx, fz, null, p.x, p.z);
   }
-  princeMode = 'still';
+  setPrinceMode('still');
   speakSeq(SCENE_FAREWELL.near, () => {
     sheepBoxVisible(false); // 羊跟他回家了
     shiftDayTo(22.6, 6500); // 天暗透
@@ -842,8 +593,8 @@ function fall() {
     380
   );
   setTimeout(() => {
-    princeMode = 'falling';
-    fallT = 0;
+    setPrinceMode('falling');
+    resetFall();
   }, 700);
   setTimeout(() => {
     speakSeq([{ who: WHO.caption, en: SCENE_FAREWELL.fall.en, zh: SCENE_FAREWELL.fall.zh }], () => {
@@ -854,305 +605,25 @@ function fall() {
   }, 2600);
 }
 
-// ===================== 3 · 尾声 · 六年后 =====================
-let starRaf = 0;
-function starfield(canvas) {
-  const cx = canvas.getContext('2d');
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
-  let W = 0,
-    H = 0,
-    stars = [];
-  function resize() {
-    W = canvas.clientWidth;
-    H = canvas.clientHeight;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    cx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    stars = Array.from({ length: Math.round((W * H) / 2600) }, () => ({
-      x: Math.random() * W,
-      y: Math.random() * H * 0.92,
-      r: Math.random() * 1.3 + 0.3,
-      p: Math.random() * Math.PI * 2,
-      s: 0.6 + Math.random() * 1.8,
-    }));
-  }
-  resize();
-  const onResize = () => resize();
-  window.addEventListener('resize', onResize);
-  let laughUntil = 0;
-  const draw = (now) => {
-    cx.clearRect(0, 0, W, H);
-    const t = now / 1000;
-    const laugh = now < laughUntil ? 1 : 0;
-    for (const s of stars) {
-      const tw = 0.55 + 0.45 * Math.sin(t * s.s + s.p) * (laugh ? 1.6 : 1);
-      cx.globalAlpha = Math.max(0.08, Math.min(1, tw));
-      cx.fillStyle = '#fff6dc';
-      cx.beginPath();
-      cx.arc(s.x, s.y, s.r * (laugh ? 1.25 : 1), 0, Math.PI * 2);
-      cx.fill();
-    }
-    cx.globalAlpha = 1;
-    starRaf = requestAnimationFrame(draw);
-  };
-  starRaf = requestAnimationFrame(draw);
-  return {
-    laugh(ms) {
-      laughUntil = performance.now() + (ms || 4000);
-    },
-    stop() {
-      cancelAnimationFrame(starRaf);
-      window.removeEventListener('resize', onResize);
-    },
-  };
-}
-function stageCaption(entry, opts = {}) {
-  return new Promise((resolve) => {
-    const cap = stageEl.querySelector('.cap');
-    const other = (e) => (tt(e) === e.en ? e.zh : e.en);
-    stageEntry = entry;
-    cap.innerHTML = `${opts.kick ? `<div class="kick">${esc(tt(opts.kick))}</div>` : ''}${
-      opts.sketch ? `<div class="sk">${sketchSvg(opts.sketch)}</div>` : ''
-    }${opts.own ? '<div class="own"></div>' : ''}${
-      opts.own ? `<div class="own-note">${esc(tt(opts.own.note))}</div>` : ''
-    }<div class="txt">${esc(tt(entry))}</div><div class="txt2">${esc(other(entry) || '')}</div><div class="btns"></div>`;
-    if (opts.own) {
-      // The player's own drawing; if it cannot be drawn, drop the frame and its note rather than show an empty one.
-      const frame = cap.querySelector('.own');
-      const thumb = ctx.ui.portfolio?.thumb?.(opts.own.id);
-      if (thumb) frame.appendChild(thumb);
-      else {
-        frame.remove();
-        cap.querySelector('.own-note')?.remove();
-      }
-    }
-    requestAnimationFrame(() => {
-      cap.querySelector('.txt').classList.add('on');
-      setTimeout(() => cap.querySelector('.txt2').classList.add('on'), 700);
-    });
-    const btns = cap.querySelector('.btns');
-    let done = false;
-    const finish = (v) => {
-      if (done) return;
-      done = true;
-      stageEl.onclick = null;
-      document.removeEventListener('keydown', onKey, true);
-      clearTimeout(auto);
-      const t = cap.querySelector('.txt'),
-        t2 = cap.querySelector('.txt2');
-      t.classList.remove('on');
-      t2.classList.remove('on');
-      btns.classList.remove('on');
-      setTimeout(() => resolve(v), 1100);
-    };
-    const onKey = (e) => {
-      const k = (e.key || '').toLowerCase();
-      if (!opts.choices && (k === ' ' || k === 'enter' || k === 'e' || k === 'arrowright')) {
-        e.preventDefault();
-        e.stopPropagation();
-        finish();
-      }
-    };
-    let auto = 0;
-    if (opts.choices) {
-      opts.choices.forEach((c) => {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.textContent = tt(c.label);
-        b.onclick = (ev) => {
-          ev.stopPropagation();
-          finish(c.value);
-        };
-        btns.appendChild(b);
-      });
-      setTimeout(() => btns.classList.add('on'), 1600);
-    } else {
-      // 点任意处继续;长句给足阅读时间后自动前进
-      setTimeout(() => {
-        stageEl.onclick = () => finish();
-        document.addEventListener('keydown', onKey, true);
-      }, 1200);
-      auto = setTimeout(
-        () => finish(),
-        opts.hold || Math.max(6500, (entry.en || '').length * 75 + 3500)
-      );
-    }
-  });
-}
-async function playEpilogue() {
-  if (mode === 'epilogue') return;
-  mode = 'epilogue';
-  hideAction();
-  stopListening();
-  bellsOff();
-  stageEl.innerHTML = '<canvas></canvas><div class="cap"></div><div class="hint"></div>';
-  stageEl.querySelector('.hint').textContent = tt({ en: 'tap to continue', zh: '点击继续' });
-  stageEl.classList.add('show');
-  await wait(40);
-  stageEl.classList.add('in');
-  const sky = starfield(stageEl.querySelector('canvas'));
-  await wait(2200);
-  const E = SCENE_EPILOGUE;
-  await stageCaption(E.captions[0], { kick: ENDING_UI.sixYears, hold: 5200 });
-  sky.laugh(5000);
-  bellsOn(900, 0.02);
-  await stageCaption(E.captions[1]);
-  bellsOff();
-  await stageCaption(E.captions[2], { sketch: 'muzzle' });
-  const keepsake = epilogueKeepsake(ctx.store.json('portfolio', {}));
-  const ans = await stageCaption(E.question, {
-    own: keepsake,
-    choices: [
-      { label: ENDING_UI.answerNo, value: 'no' },
-      { label: ENDING_UI.answerYes, value: 'yes' },
-    ],
-  });
-  try {
-    ctx.store.setStr('endingAnswer', ans === 'yes' ? 'yes' : 'no');
-  } catch (e) {}
-  if (ans === 'yes') {
-    await stageCaption(E.yes, { hold: 6500 });
-  } else {
-    sky.laugh(6000);
-    bellsOn(700, 0.022);
-    await stageCaption(E.no, { hold: 6500 });
-    bellsOff();
-  }
-  await stageCaption(E.close);
-  await stageCaption(E.captions[3]);
-  setStep(ENDING.DONE);
-  await stageCaption(E.dedication, { hold: 6000 });
-  // 落版
-  const cap = stageEl.querySelector('.cap');
-  stageEl.querySelector('.hint').textContent = '';
-  cap.innerHTML = `<div class="kick">B612</div><div class="end txt on">${esc(tt(ENDING_UI.theEnd))}</div>
-    <div class="btns on"><button type="button" class="hill" data-e="hill">${esc(tt(HILL_TEXT.go))}</button>
-    <button type="button" data-e="again">${esc(tt(ENDING_UI.again))}</button>
-    <button type="button" data-e="share">${esc(tt(ENDING_UI.share))}</button>
-    <button type="button" data-e="portfolio">${esc(tt({ zh: '翻开我的作品集', en: 'Open my portfolio' }))}</button></div>
-    <div class="txt on pf-note">${esc(tt(HILL_TEXT.note))}</div>
-    <div class="txt on pf-note">${esc(
-      tt({
-        zh: '每一幅未完成的画,都在等一个人。你画给他的画,收在作品集里。',
-        en: 'Every unfinished drawing waits for someone. The drawings you made for him are in your portfolio.',
-      })
-    )}</div>`;
-  sky.laugh(8000);
-  // Keepsakes: small copies of the drawings the player actually made, each opening the portfolio.
-  const kept = keepsakeIds(ctx.store.json('portfolio', {}));
-  if (kept.length) {
-    const strip = document.createElement('div');
-    strip.className = 'pf-strip';
-    for (const id of kept) {
-      const thumb = ctx.ui.portfolio?.thumb?.(id);
-      if (!thumb) continue;
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.appendChild(thumb);
-      b.onclick = (ev) => {
-        ev.stopPropagation();
-        ctx.ui.portfolio?.open();
-      };
-      strip.appendChild(b);
-    }
-    if (strip.childElementCount) cap.querySelector('.btns').before(strip);
-  }
-  /** @type {HTMLElement} */ (cap.querySelector('[data-e="portfolio"]')).onclick = (ev) => {
-    ev.stopPropagation();
-    ctx.ui.portfolio?.open();
-  };
-  cap.querySelector('[data-e="hill"]').onclick = (ev) => {
-    ev.stopPropagation();
-    goToHill();
-  };
-  cap.querySelector('[data-e="share"]').onclick = (ev) => {
-    ev.stopPropagation();
-    saveStarCard();
-  };
-  cap.querySelector('[data-e="again"]').onclick = (ev) => {
-    ev.stopPropagation();
-    stageEl.classList.remove('in');
-    setTimeout(() => {
-      sky.stop();
-      stageEl.classList.remove('show');
-      stageEl.innerHTML = '';
-      mode = 'done';
-      shiftDayTo(22.5, 300); // 回到沙漠的夜里,抬头就是星星
-    }, 2000);
-  };
-}
-/** 故事之后:淡出,走向远方山丘(独立页面 /hill/,带上剧情语言) */
-function goToHill() {
-  stageEl.classList.remove('in');
-  setTimeout(() => {
-    location.href = hillUrl(scriptLang());
-  }, 1600);
-}
-function saveStarCard() {
-  try {
-    const c = document.createElement('canvas');
-    c.width = 1080;
-    c.height = 1350;
-    const g = c.getContext('2d');
-    const grad = g.createRadialGradient(540, 1500, 100, 540, 900, 1500);
-    grad.addColorStop(0, '#1d2448');
-    grad.addColorStop(0.55, '#0b0d1c');
-    grad.addColorStop(1, '#04050b');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 1080, 1350);
-    for (let i = 0; i < 520; i++) {
-      g.globalAlpha = 0.2 + Math.random() * 0.8;
-      g.fillStyle = '#fff6dc';
-      g.beginPath();
-      g.arc(Math.random() * 1080, Math.random() * 1100, Math.random() * 1.8 + 0.4, 0, Math.PI * 2);
-      g.fill();
-    }
-    // 他的那一颗
-    g.globalAlpha = 1;
-    const sx = 700,
-      sy = 360;
-    const halo = g.createRadialGradient(sx, sy, 2, sx, sy, 90);
-    halo.addColorStop(0, 'rgba(255,226,150,.95)');
-    halo.addColorStop(1, 'rgba(255,226,150,0)');
-    g.fillStyle = halo;
-    g.beginPath();
-    g.arc(sx, sy, 90, 0, Math.PI * 2);
-    g.fill();
-    g.fillStyle = '#fff3cf';
-    g.beginPath();
-    for (let k = 0; k < 10; k++) {
-      const r = k % 2 ? 9 : 24,
-        a = (k * Math.PI) / 5 - Math.PI / 2;
-      g.lineTo(sx + Math.cos(a) * r, sy + Math.sin(a) * r);
-    }
-    g.closePath();
-    g.fill();
-    g.textAlign = 'center';
-    g.fillStyle = '#f1e6cc';
-    g.font = 'italic 54px Georgia, serif';
-    g.fillText(tt(ENDING_UI.shareLine), 540, 980);
-    g.font = '28px Georgia, serif';
-    g.fillStyle = '#c9b07c';
-    g.fillText('B 6 1 2', 540, 1060);
-    g.font = '22px Georgia, serif';
-    g.fillStyle = '#8f8572';
-    g.fillText('“' + SCENE_EPILOGUE.no.en + '”', 540, 1230);
-    const a = document.createElement('a');
-    a.href = c.toDataURL('image/png');
-    a.download = 'b612-my-star.png';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  } catch (e) {
-    console.warn('[ending] 星星卡片生成失败:', e.message);
-  }
-}
-function esc(s) {
-  return String(s == null ? '' : s).replace(
-    /[&<>"]/g,
-    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]
-  );
-}
+// 叶子注入(2026-10-09 三叶拆):主场景 getter/地面函数/字幕 DOM 与状态机由主干供给。
+// getter 惰性取值(mainScene/stageEl 在组件 init() 时才赋值);函数声明已提升,顶层调用安全。
+initPrinceRig({
+  scene: () => mainScene,
+  groundH,
+});
+initEpilogue({
+  get stageEl() {
+    return stageEl;
+  },
+  getMode: () => mode,
+  setMode: (m) => {
+    mode = m;
+  },
+  setStep,
+  hideAction,
+  stopListening,
+  wait,
+});
 
 // ===================== 主循环:按存档进度把玩家接上 =====================
 function tick(dt) {
@@ -1161,7 +632,7 @@ function tick(dt) {
   if (!main) {
     // 离开沙漠(进石门等):收起提示与水声,回来再接上
     if (listenEl.classList.contains('show')) listenEl.classList.remove('show');
-    if (water) setWater(0, 0, 0);
+    if (isWaterActive()) setWater(0, 0, 0);
     if (actionFn) hideAction();
     return;
   }
@@ -1214,9 +685,10 @@ export function createEndingJourney() {
       const onLang = () => {
         if (actionFn && actionLabel) actionEl.querySelector('button').textContent = tt(actionLabel);
         const cap = stageEl && stageEl.querySelector('.cap');
-        if (cap && stageEntry && cap.querySelector('.txt')) {
-          cap.querySelector('.txt').textContent = tt(stageEntry);
-          const o = tt(stageEntry) === stageEntry.en ? stageEntry.zh : stageEntry.en;
+        const se = getStageEntry();
+        if (cap && se && cap.querySelector('.txt')) {
+          cap.querySelector('.txt').textContent = tt(se);
+          const o = tt(se) === se.en ? se.zh : se.en;
           if (cap.querySelector('.txt2')) cap.querySelector('.txt2').textContent = o || '';
         }
         const hint = stageEl && stageEl.querySelector('.hint');
@@ -1242,7 +714,7 @@ export function createEndingJourney() {
         state: () => ({
           step,
           mode,
-          princeMode,
+          princeMode: getPrinceMode(),
           dist: Math.round(distToWell() * 10) / 10,
           action: !!actionFn,
           still: Math.round(stillSec * 10) / 10,
@@ -1285,10 +757,10 @@ export function createEndingJourney() {
       [styleEl, actionEl, listenEl, tintEl, veilEl, sketchEl, stageEl].forEach(
         (n) => n && n.remove()
       );
-      cancelAnimationFrame(starRaf);
-      [wellGroup, wallMesh, prince && prince.wrap].forEach((o) => o && o.removeFromParent());
+      stopStarfield();
+      disposePrince();
+      [wellGroup, wallMesh].forEach((o) => o && o.removeFromParent());
       wellGroup = wallMesh = waterMesh = null;
-      prince = null;
       ctx.scene.endingApi = null;
     },
   };
