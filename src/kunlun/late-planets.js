@@ -537,9 +537,19 @@ ctx.onTick(function latePlanetsTick() {
   if (s.doorArmed && near(active, 'sproutDoor', 9)) {
     s.doorArmed = false;
     dropBeacon(active, 'doorBeacon');
-    try {
-      ctx.scene.worldManager && ctx.scene.worldManager.back();
-    } catch (e) {}
+    const wm = ctx.scene.worldManager;
+    if (!wm) return;
+    // back() 是 async:失败静默返回 false,原 try/catch 包不住,不恢复门/信标玩家被困小岛
+    // (2026-10-09 空 catch 治理,scene6-king 同批)
+    Promise.resolve(wm.back())
+      .then((ok) => {
+        if (!ok) {
+          s.doorArmed = true;
+          armBeacon(active, 'doorBeacon', 'sproutDoor', 3.4);
+          console.warn('[late-planets] 回程传送未成,石环已重置');
+        }
+      })
+      .catch(() => {});
     return;
   }
   tickN = (tickN + 1) % 30;

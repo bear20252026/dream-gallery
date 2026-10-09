@@ -1,5 +1,14 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-09 空 catch 全量治理:102 处分级,危险 8+1 修复(已上线)
+
+- **分级结论**(两个并行审计逐处打开核实,grep 只能搜到单行版,括号配平法补出 12 处跨行注释版):**危险 9 处已全部修复**;可疑 12 处已全部补 console.warn 留痕;自愿静默 84 处维持原样(氛围音频/自动播放策略/store 自兜底/`&&`+`?.` 已判空的装饰性 UI/显式回退路径/HMR 清理——全站错误静默铁律下的合理形态,分类清单存审计记录,不再逐处加注释)。
+- **危险修复①——回程传送 4 处**(late-planets/scene6-king/scene7-tippler/scene7-vanity):`worldManager.back()` 是 **async**,原 `try/catch{}` 包不住异步失败;失败(切换中/飞行锁/目标未加载)时返回 false 但门已 disarm、信标已删——玩家被困外星。修法:Promise 链接住返回值,失败即 `doorArmed=true` + 重立信标(各文件现成的幂等 `armDoorBeacon()`/`armBeacon()`)+console.warn。**配套修根因**:`scene-manager.enterWithoutPush` 的 `commit().catch(() => {})` 吞掉切换半程失败(leave/enter/restore 抛错)且照返 true——现回滚 `activeWorld=source` 并按 false 返回,调用方的"未成"恢复路径才接得到信号(否则上面 4 处的恢复只覆盖返回 false、覆盖不了半程抛错)。
+- **危险修复②——admin 后台 4 处**(admin.js:文档编辑器初始化失败假报"已加载"改页内报错+return;备份列表/大屏槽位/访客聊天记录三处 `adminFetch` await 失败静默 → 各自区块渲染"加载失败"提示):后台页不走访客静默铁律,失败必须页内可见。
+- **可疑 12 处补 console.warn**(warn 不进访客上报、无噪音风险):quizgate 轮询连续失败≥3 一次、chat-room 渲染失败、wish-page 网络失败/非 200、dialog-voice 静音开关持久化失败(新增 `voiceOffMem` 内存兜底,修"按了静音只静一句")+播放/结束回调异常×3、media-push SSE 建立失败、audio-manager 挤出旧提示音的 onEnd 失败、store-api rawRemove 失败(旧值可能复活)、gl-lost 流畅画质写入失败、admin 在线设备 SSE 坏帧。
+- **审计两处新发现(未改,存档待议)**:①error-report.js 的 console.error 上报钩子**默认关闭**(需 `__errCaptureConsole(true)` 手动开),默认开的只有 window.onerror+unhandledrejection——"console.error=进后台"的直觉不成立,后续要不要开属产品决策(有刷屏风险);②14 处箭头函数式 `.catch(() => {})`(prewarm/统计类)不在 try/catch 口径,均属自愿。
+- 验证:vitest **532 全绿**;lint/typecheck/build 零错误(治理过程中 lint 抓到一处我补丁的 box 作用域错误——门禁兑现价值)。
+
 ## 2026-10-09 审查#10+#11:墙体 InstancedMesh 化(已上线)+ KTX2 运行时就绪(转码待 toktx)
 
 - **#10 墙体 instancing(bb3b295)**:画廊 120 段墙 ×(墙体+2 踢脚线)+每墙 4 根圆角管 ≈ **840 个独立 Mesh → 4 个 InstancedMesh**(共享单位几何,实例矩阵承载位姿/长度;外围墙在婚礼拱廊下装配时直接跳过,原"建后隐藏"效果等同)。墙色走唯一共享材质——WEDDING_SHELL 常开时 120 个材质本就同色,housecolor 换色对 `houseMats.wall` 逐材质 setColor 的行为不变(休眠随机粉路径由 spec.hue 记录)。**挂画适配**:挂画系统对墙的全部依赖只有 position/rotation.y/半长(wallHalf),scene.js 按原公式预计算 `_half` 经 `ctx.gallery.wallSpecs` 直供(已登记 ctx-gallery/ctx.d.ts),paintings.js 的 BoxGeometry 遍历筛选退役。同机位实测 **573→370 draw call(−35%)**,截图逐像素一致,挂画 5 幅照常。

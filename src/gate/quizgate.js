@@ -13,7 +13,9 @@ const { s, iG, onTick } = ctx;
 // ===================== 提示条(节流) =====================
 const toastEl = document.createElement('div');
 toastEl.style.cssText =
-  'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#feca57;padding:10px 24px;border-radius:24px;font-size:14px;z-index:' + Z.worldToast + ';display:none;pointer-events:none;font-family:"Microsoft YaHei",sans-serif;letter-spacing:1px;';
+  'position:fixed;top:70px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#feca57;padding:10px 24px;border-radius:24px;font-size:14px;z-index:' +
+  Z.worldToast +
+  ';display:none;pointer-events:none;font-family:"Microsoft YaHei",sans-serif;letter-spacing:1px;';
 document.body.appendChild(toastEl);
 let toastTimer = 0,
   lastToast = 0;
@@ -56,13 +58,18 @@ function lockGallery(reason) {
 }
 
 // 权限监视:每5秒检查一次(仅更新状态,不再有墙体操作)
+let quizPollFails = 0; // 连续失败计数(≥3 告警一次,自愈重试不刷屏)
 setInterval(async function () {
   try {
     const r = await fetch('/api/quiz/state');
     const d = await r.json();
     if (d.passed && !gs.get('quizPassed')) gs.set('quizPassed', true);
     else if (!d.passed && gs.get('quizPassed')) gs.set('quizPassed', false);
-  } catch (e) {}
+    quizPollFails = 0;
+  } catch (e) {
+    // 瞬时失败无害(5s 后自愈重试);连续失败说明通过状态同步已断,告警一次留痕
+    if (++quizPollFails === 3) console.warn('[quizgate] 通过状态轮询连续失败', e);
+  }
 }, 5000);
 
 // ===================== 悬浮答题屏(3D) =====================
@@ -343,7 +350,9 @@ const quizCloseBtn = document.createElement('button');
 quizCloseBtn.id = 'quizCloseBtn';
 quizCloseBtn.textContent = '✕ 退出';
 quizCloseBtn.style.cssText =
-  'position:absolute;top:14px;right:14px;z-index:'+Z.quizPanel+';padding:8px 16px;border-radius:20px;border:1px solid rgba(255,182,200,.5);background:rgba(0,0,0,.55);color:#fff;font-size:13px;cursor:pointer;font-family:"Microsoft YaHei",sans-serif';
+  'position:absolute;top:14px;right:14px;z-index:' +
+  Z.quizPanel +
+  ';padding:8px 16px;border-radius:20px;border:1px solid rgba(255,182,200,.5);background:rgba(0,0,0,.55);color:#fff;font-size:13px;cursor:pointer;font-family:"Microsoft YaHei",sans-serif';
 ov.appendChild(quizCloseBtn);
 // 三铁律注册即得(2026-07-28 深化⑤):✕/Esc 任何阶段可关;点外圈答题中(stage=quiz)拦截
 const quizOvApi = ctx.overlay.register(ov, {

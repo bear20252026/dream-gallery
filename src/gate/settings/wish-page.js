@@ -7,7 +7,9 @@ import { expose } from '../../debug-hooks.js';
 const wOv = document.createElement('div');
 wOv.id = 'wishOv';
 wOv.style.cssText =
-  'position:fixed;inset:0;z-index:' + Z.modal + ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+  'position:fixed;inset:0;z-index:' +
+  Z.modal +
+  ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
 const wCard = document.createElement('div');
 wCard.style.cssText =
   'width:min(460px,92vw);max-height:84vh;overflow-y:auto;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)';
@@ -17,7 +19,8 @@ export const wishApi = ctx.overlay.register(wOv, { x: '#wishX' });
 
 function wishDust() {
   const box = document.createElement('div');
-  box.style.cssText = 'position:fixed;inset:0;z-index:' + Z.kickNotice + ';pointer-events:none;overflow:hidden';
+  box.style.cssText =
+    'position:fixed;inset:0;z-index:' + Z.kickNotice + ';pointer-events:none;overflow:hidden';
   document.body.appendChild(box);
   for (let i = 0; i < 22; i++) {
     const p = document.createElement('div');
@@ -72,8 +75,9 @@ async function loadWall() {
     const r = await fetch('/api/wishes');
     const d = await r.json();
     if (r.ok) renderWall(d.msgs || []);
+    else console.warn('[wish-page] 许愿墙响应异常', r.status); // 原:连空态都没有
   } catch (e) {
-    /* 静默 */
+    console.warn('[wish-page] 许愿墙加载失败', e); /* 原静默:网络抖动=墙面永久空白 */
   }
 }
 

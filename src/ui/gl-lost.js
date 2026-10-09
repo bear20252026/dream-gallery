@@ -83,7 +83,7 @@ export function showGlLost(reason) {
       try {
         ctx.store.setJson('lowQuality', true);
       } catch (e) {
-        /* 存不进也照常刷新 */
+        console.warn('[gl-lost] 流畅画质写入失败,刷新后可能仍是原画质', e);
       }
       location.reload();
     };

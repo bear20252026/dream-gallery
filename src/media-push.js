@@ -20,10 +20,16 @@ function ensure() {
         const d = JSON.parse(ev.data || '{}');
         if (d.type !== 'media_changed') return;
         for (const cb of listeners) {
-          try { cb(d); } catch (e) {}
+          try {
+            cb(d);
+          } catch (e) {}
         }
       } catch (e) {}
     };
-    es.onerror = function () { /* 浏览器自动重连 */ };
-  } catch (e) {}
+    es.onerror = function () {
+      /* 浏览器自动重连 */
+    };
+  } catch (e) {
+    console.warn('[media-push] SSE 建立失败,退化为 45~60s 轮询', e); // 原:静默,推送层永久不可用无痕
+  }
 }

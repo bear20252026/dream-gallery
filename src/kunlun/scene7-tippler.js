@@ -254,9 +254,19 @@ function tryDoorTeleport(pl) {
   if (dx * dx + dz * dz >= 9) return false;
   doorArmed = false;
   removeDoorBeacon(); // 玩家已到:信标完成使命
-  try {
-    ctx.scene.worldManager && ctx.scene.worldManager.back(); // 回 B612
-  } catch (e) {}
+  const wm = ctx.scene.worldManager;
+  if (!wm) return true;
+  // back() 是 async:失败静默返回 false,原 try/catch 包不住,不恢复门/信标玩家被困本星
+  // (2026-10-09 空 catch 治理,scene6-king 同批)
+  Promise.resolve(wm.back())
+    .then((ok) => {
+      if (!ok) {
+        doorArmed = true;
+        armDoorBeacon();
+        console.warn('[scene7-tippler] 回程传送未成,石环已重置');
+      }
+    })
+    .catch(() => {});
   return true;
 }
 
@@ -381,7 +391,8 @@ ctx.onTick(function scene7Tick() {
         setTimeout(function () {
           // Witness card: count the three bottles at his feet (optional, skippable; he never reacts).
           window.__scene7b.stage = 'witness';
-          if (ctx.ui.witness) ctx.ui.witness.ask('tippler327', { target: 3 }).then(armPickup, armPickup);
+          if (ctx.ui.witness)
+            ctx.ui.witness.ask('tippler327', { target: 3 }).then(armPickup, armPickup);
           else armPickup();
         }, 2200);
       });

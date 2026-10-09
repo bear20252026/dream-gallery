@@ -81,7 +81,9 @@ async function loadChat() {
       box.appendChild(row);
     }
     box.scrollTop = box.scrollHeight;
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[chat-room] 消息渲染失败', e); // 原:静默 → 整块消息区空白无痕
+  }
 }
 
 async function sendChat() {

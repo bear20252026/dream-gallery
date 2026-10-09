@@ -275,9 +275,22 @@ export class SceneManager {
       this.restore(snapshot);
       eventBus.emit('world:changed', { from: source.id, to: target.id });
     };
-    await runWarp(() => commit().catch(() => {}), warpOpts(id));
+    // 提交半程失败(leave/enter/restore 抛错)原被 .catch(() => {}) 吞掉:指针可能停在
+    // 半装配状态且调用方(back/toMain)拿到 true 以为成功。现回滚世界指针并按 false 返回,
+    // 调用方的"未成"恢复路径(重武装门/信标)才接得到信号(2026-10-09 空 catch 治理)
+    let commitOk = true;
+    await runWarp(
+      () =>
+        commit().catch((e) => {
+          commitOk = false;
+          this.activeWorld = source.id;
+          this.syncCtx();
+          console.warn('[scene-manager] 世界切换提交失败:', source.id, '→', id, e);
+        }),
+      warpOpts(id)
+    );
     this.transitioning = false;
-    return true;
+    return commitOk;
   }
 
   async dispose() {

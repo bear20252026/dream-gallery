@@ -357,7 +357,10 @@ async function loadDocs() {
           docDirty = true;
           $('docSave').disabled = false;
         }).observe(doc.body, { childList: true, subtree: true, characterData: true });
-      } catch (e) {}
+      } catch (e) {
+        docMsg('编辑器初始化失败:' + (e.message || e), false); // 原:静默吞掉,假报"已加载"
+        return;
+      }
       docMsg('已加载 ' + docCur);
     };
   } catch (e) {
@@ -421,7 +424,11 @@ async function loadDocBaks() {
       '<option value="">选择备份回滚…</option>' +
       d.backups.map((b) => '<option>' + b + '</option>').join('');
     $('docRestore').disabled = true;
-  } catch (e) {}
+  } catch (e) {
+    // 原:静默吞掉 → 下拉空白,管理员误以为无备份可回滚
+    $('docBak').innerHTML = '<option value="">备份列表加载失败</option>';
+    docMsg('备份列表加载失败:' + (e.message || e), false);
+  }
 }
 $('docBak').onchange = () => {
   $('docRestore').disabled = !$('docBak').value;
@@ -1021,7 +1028,10 @@ async function loadFiles() {
       </div>`
           )
           .join('');
-      } catch (e) {}
+      } catch (e) {
+        // 原:静默吞掉 → 整个大屏区块凭空消失
+        bsHtml = `<div class="fname" style="color:#c0392b">大屏槽位加载失败:${esc(String(e.message || e))}</div>`;
+      }
     }
     html += `${bsHtml ? `<div class="section-title">🎬 户外大屏 1~5 号(画廊内循环播放;与「户外大屏」页编号一致)</div>${bsHtml}` : ''}<div class="section-title">${dir === 'videos' ? '🎬 其他视频(不在大屏循环内)' : label} (${files.length})</div>
 <div class="upload-box"><input type="file" id="up-${dir}"><button class="btn-day" onclick="upload('${dir}')">上传到 ${dir}</button></div>
@@ -1453,7 +1463,9 @@ function startChat() {
       const d = JSON.parse(e.data);
       chatDevices = d.devices || [];
       renderChatDevices();
-    } catch (x) {}
+    } catch (x) {
+      console.warn('[admin] 在线设备 SSE 坏帧', x); // 原:静默,设备列表停留旧值
+    }
   };
   chatSse.onerror = () => {
     try {
@@ -1545,7 +1557,12 @@ async function loadChatMsgs() {
       })
       .join('');
     box.scrollTop = box.scrollHeight;
-  } catch (e) {}
+  } catch (e) {
+    // 原:静默吞掉 → 消息区空白,管理员误以为访客没留言(box 是 try 内 const,直取容器)
+    const msgBox = $('chatMsgArea');
+    if (msgBox)
+      msgBox.innerHTML = `<div style="opacity:.6;padding:8px">聊天记录加载失败:${esc(String(e.message || e))}</div>`;
+  }
 }
 async function chatSend() {
   const t = $('chatMsgInput').value.trim();

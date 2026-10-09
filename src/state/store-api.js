@@ -134,7 +134,9 @@ function rawRemove(key) {
   cache.delete(key);
   try {
     localStorage.removeItem(key);
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[store] 删除持久键失败', key, e); // 旧值可能被下次 rawGet 读回(缓存已删)
+  }
 }
 // 跨标签页同步:其他标签页写/清 localStorage 时,本页对应键缓存失效
 // (storage 事件不在本标签页触发,本标签页的写已由 rawSet/rawRemove 同步)

@@ -268,7 +268,7 @@ audioManager.playHint = function (audio, onEnd, bypassSwitch) {
         try {
           stale.onEnd();
         } catch (e) {
-          /* 静默 */
+          console.warn('[audio] 挤出旧提示音,其 onEnd 回调失败', e); // onEnd 驱动对话推进,吞掉=对话停滞无痕
         }
       }
     }

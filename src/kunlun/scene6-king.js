@@ -219,9 +219,19 @@ function tryDoorTeleport(pl) {
   if (dx * dx + dz * dz >= 9) return false;
   doorArmed = false;
   removeDoorBeacon(); // 玩家已到:信标完成使命
-  try {
-    ctx.scene.worldManager && ctx.scene.worldManager.back(); // 同 goB612Back
-  } catch (e) {}
+  const wm = ctx.scene.worldManager;
+  if (!wm) return true;
+  // back() 是 async:失败(切换中/飞行锁/目标未加载)静默返回 false,原 try/catch 包不住,
+  // 且门已 disarm+信标已删 —— 不恢复的话玩家被困本星(2026-10-09 空 catch 治理)
+  Promise.resolve(wm.back())
+    .then((ok) => {
+      if (!ok) {
+        doorArmed = true;
+        armDoorBeacon();
+        console.warn('[scene6-king] 回程传送未成,石环已重置');
+      }
+    })
+    .catch(() => {});
   return true;
 }
 
@@ -305,7 +315,10 @@ function runKingStep(step) {
     total: 6,
     hint:
       step >= 5
-        ? { zh: '在心里答一句，或者跳过，然后去拾起星屑。', en: 'Answer in your head, or skip, then go and pick up the stardust.' }
+        ? {
+            zh: '在心里答一句，或者跳过，然后去拾起星屑。',
+            en: 'Answer in your head, or skip, then go and pick up the stardust.',
+          }
         : {
             zh: '按「继续」读完当前对白，再完成这一段观察。',
             en: 'Continue the current dialogue, then complete this observation.',

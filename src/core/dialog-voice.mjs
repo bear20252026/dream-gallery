@@ -309,7 +309,9 @@ export function prefetchLine(text, spk) {
   return d;
 }
 
+let voiceOffMem = false; // sessionStorage 不可用(隐私模式/配额)时的内存兜底
 export function isVoiceOff() {
+  if (voiceOffMem) return true;
   try {
     const v = sessionStorage.getItem(OFF_KEY);
     if (!v) return false;
@@ -333,7 +335,11 @@ export function toggleVoiceOff() {
   try {
     if (next) sessionStorage.setItem(OFF_KEY, String(Date.now())); // 存时间戳供 24h 过期
     else sessionStorage.removeItem(OFF_KEY);
-  } catch (e) {}
+  } catch (e) {
+    // 隐私模式/配额下 setItem 真会抛:无兜底会"按了静音只静一句"(读回 false 又出声)
+    voiceOffMem = next;
+    console.warn('[dialog-voice] 静音开关持久化失败,本会话内存生效', e);
+  }
   if (next) stopSpeaking();
   return next;
 }
@@ -363,13 +369,17 @@ export function onVoiceStart(cb) {
   if (a._started) {
     try {
       cb();
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[dialog-voice] 播放回调异常', e); // 吞掉会让"语音加载中"提示永不熄灭
+    }
     return;
   }
   a.addEventListener('playing', () => {
     try {
       cb();
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[dialog-voice] 播放回调异常', e);
+    }
   }, { once: true });
 }
 
@@ -393,7 +403,9 @@ export function onVoiceEnd(cb) {
     done = true;
     try {
       cb();
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[dialog-voice] 播放结束回调异常', e); // 吞掉会挂起对白 autoHide 倒计时
+    }
   };
   a.addEventListener('ended', fin, { once: true });
   let guard = setTimeout(() => {
