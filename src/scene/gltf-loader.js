@@ -10,6 +10,7 @@
 //   源站不再吃模型流量(源站单请求 TTFB 实测 2.3s,是加载慢的主因)。
 //   本地开发(localhost)不改写;CDN 失联时本会话自动回退源站(__modelCdnDown)。
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { KTX2Loader } from 'three/examples/jsm/loaders/KTX2Loader.js';
 import { LoadingManager } from 'three';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
@@ -34,11 +35,30 @@ function rewrite(url) {
   return MODEL_CDN + '/' + stripped.replace(/^\/+/, '');
 }
 
+// KTX2 纹理支持(审查#11,2026-10-08 小流量实验的运行时半边):KTX2Loader 只在 GLB 内
+// 出现 .ktx2 纹理时才解析(转码器 wasm 按需拉取,存量 WebP 模型零成本);renderer 依赖
+// detectSupport —— 极早调用(window.__ctx 尚未挂)时本帧不带 KTX2,后续 loader 再取。
+// 注意 KTX2Loader 需要跨域凭据语义与 CDN 一致:transcoder 从本站 /vendor/basis/ 拉,无跨域问题。
+let _ktx2 = null;
+function getKTX2() {
+  if (_ktx2) return _ktx2;
+  const renderer =
+    typeof window !== 'undefined' && window.__ctx && window.__ctx.scene && window.__ctx.scene.rnd;
+  if (!renderer) return null; // 场景渲染器未就绪;KTX2 纹理的 GLB 不会在这些极早加载点出现
+  // 转码器路径:开发(native ESM)= repo vendor/;生产(dist 根)= public/basis/ 拷贝
+  _ktx2 = new KTX2Loader()
+    .setTranscoderPath(IS_LOCAL ? 'vendor/basis/' : 'basis/')
+    .detectSupport(renderer);
+  return _ktx2;
+}
+
 export function createGLTFLoader() {
   const manager = new LoadingManager();
   manager.setURLModifier(rewrite);
   const loader = new GLTFLoader(manager);
   loader.setMeshoptDecoder(MeshoptDecoder);
+  const ktx2 = getKTX2();
+  if (ktx2) loader.setKTX2Loader(ktx2);
   // 失败回退:CDN 上的请求一旦报错,标记回退源站并立刻用原 URL 重试一次
   const origLoad = loader.load.bind(loader);
   loader.load = function (url, onLoad, onProgress, onError) {

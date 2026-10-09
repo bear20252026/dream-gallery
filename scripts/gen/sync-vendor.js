@@ -37,6 +37,11 @@ for (const [pkg, inner, out] of VENDORS) {
 const THREE_EXAMPLES = [
   'examples/jsm/loaders/FBXLoader.js',
   'examples/jsm/loaders/GLTFLoader.js',
+  'examples/jsm/loaders/KTX2Loader.js', // 审查#11:KTX2 纹理支持(传递闭包四件一起拷)
+  'examples/jsm/utils/WorkerPool.js',
+  'examples/jsm/libs/ktx-parse.module.js',
+  'examples/jsm/libs/zstddec.module.js',
+  'examples/jsm/math/ColorSpaces.js',
   'examples/jsm/renderers/CSS2DRenderer.js', // 小世界对话气泡(2026-09-06)
   'examples/jsm/libs/fflate.module.js',
   'examples/jsm/libs/meshopt_decoder.module.js', // planets/marker 静态导入;漏拷会让 CI 干净检出整个模块图死亡(2026-09-06)
@@ -72,4 +77,28 @@ for (const rel of THREE_EXAMPLES) {
   fs.mkdirSync(dstDir, { recursive: true });
   fs.copyFileSync(src, dst);
   console.log(`[sync-vendor] vendor/${rel} 已同步`);
+}
+
+// KTX2 / Basis 转码器(审查#11,2026-10-08):KTX2Loader 的 transcoder 路径由
+// gltf-loader.js 按 IS_LOCAL 二选一 —— 开发(native ESM)取 'vendor/basis/'(上方
+// vendor/ 副本),生产取 'basis/'(public/basis/ 由 Vite 拷进 dist 根;public/vendor
+// 在 .gitignore 里,故 prod 副本放 public/basis/)。转码器按需加载:GLB 里没有 KTX2
+// 纹理就一个字节都不下载,存量 WebP 模型零成本。
+const BASIS = [
+  'examples/jsm/libs/basis/basis_transcoder.js',
+  'examples/jsm/libs/basis/basis_transcoder.wasm',
+];
+for (const rel of BASIS) {
+  const src = path.join(ROOT, 'node_modules', 'three', ...rel.split('/'));
+  if (!fs.existsSync(src)) {
+    console.warn(`[sync-vendor] 跳过 ${rel}(node_modules 中不存在)`);
+    continue;
+  }
+  const file = rel.split('/').pop();
+  fs.mkdirSync(path.join(DST_DIR, 'basis'), { recursive: true });
+  fs.copyFileSync(src, path.join(DST_DIR, 'basis', file));
+  const pub = path.join(ROOT, 'public', 'basis', file);
+  fs.mkdirSync(path.dirname(pub), { recursive: true });
+  fs.copyFileSync(src, pub);
+  console.log(`[sync-vendor] vendor/basis/${file} + public/basis/${file} 已同步`);
 }

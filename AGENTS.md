@@ -1,5 +1,12 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-09 审查#10+#11:墙体 InstancedMesh 化(已上线)+ KTX2 运行时就绪(转码待 toktx)
+
+- **#10 墙体 instancing(bb3b295)**:画廊 120 段墙 ×(墙体+2 踢脚线)+每墙 4 根圆角管 ≈ **840 个独立 Mesh → 4 个 InstancedMesh**(共享单位几何,实例矩阵承载位姿/长度;外围墙在婚礼拱廊下装配时直接跳过,原"建后隐藏"效果等同)。墙色走唯一共享材质——WEDDING_SHELL 常开时 120 个材质本就同色,housecolor 换色对 `houseMats.wall` 逐材质 setColor 的行为不变(休眠随机粉路径由 spec.hue 记录)。**挂画适配**:挂画系统对墙的全部依赖只有 position/rotation.y/半长(wallHalf),scene.js 按原公式预计算 `_half` 经 `ctx.gallery.wallSpecs` 直供(已登记 ctx-gallery/ctx.d.ts),paintings.js 的 BoxGeometry 遍历筛选退役。同机位实测 **573→370 draw call(−35%)**,截图逐像素一致,挂画 5 幅照常。
+- **#11 KTX2 运行时就绪(2b4e16c 后续)**:gltf-loader.js 接 `KTX2Loader`(惰性单例,detectSupport 绑 ctx.scene.rnd;极早加载点 renderer 未就绪时不带 KTX2,后续 loader 正常)。转码器 basis_transcoder.js/.wasm 双路分发:开发走 vendor/basis/(sync-vendor 从 node_modules 拷),生产走 public/vendor/basis/(Vite 拷进 dist 根)——KTX2Loader 按需拉取,GLB 无 KTX2 纹理就零下载,存量 WebP 模型零成本。**native-ESM 闭包五件**进 vendor+importmap:KTX2Loader/WorkerPool/ktx-parse/zstddec/ColorSpaces(r186 新增 math/ColorSpaces)。回归:532 单测+typecheck/build 零错误+本地实跑零 pageerror(挂画/墙体全正常)。
+- **#11 转码半边待办**:gltf-transform 的 etc1s/uastc 命令 shell 出 **KTX-Software 的 toktx**(未随包,本机与服务器均未装)——装好后一条命令即可转首个模型并 R2 镜像,管线脚本无需改结构(textureCompress targetFormat 换 ktx2 + AGENTS 三坑照避)。
+- 排障:install 后 postinstall 可能被 npm allow-scripts 拦截,sync-vendor 手动跑即可;vendor/ 是 git-ignored,记得 public/vendor/basis/ 两文件随 git 分发。
+
 ## 2026-10-08 审查#4 专项:three 0.160.0 → 0.186.1 升级(已上线)
 
 - **版本**:three `0.160.0→0.186.1`(与 hill-src 同版,主人点名的现成参照),`@types/three ^0.185.4→0.186.0` 运行时/类型对齐。升级之所以平顺:全库**零个** r152 后废弃 API(useLegacyLights/outputEncoding/.encoding 均无,colorSpace 时代写法)——此前 typecheck 就是用 0.185 类型过的,0.186 类型零错误直接通过。
