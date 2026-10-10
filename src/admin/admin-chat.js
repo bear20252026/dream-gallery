@@ -32,28 +32,19 @@ export async function startChat() {
     if (probe.status === 404) {
       if ($('chatDeviceList'))
         $('chatDeviceList').innerHTML =
-          '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:20px">在线设备推送服务端未启用<br><span style="opacity:.6">(api/admin/online-sse 未实现)</span></div>';
+          '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:20px">点对点推送服务端未启用<br><span style="opacity:.6">下方输入框可直接回话到公开聊天室(以「管理员」身份)</span></div>';
       if ($('chatOnlineCount')) $('chatOnlineCount').textContent = '—';
-      return;
     }
   } catch (e) {}
-  chatSse = new EventSource('/api/admin/online-sse');
-  chatSse.onmessage = (e) => {
-    try {
-      const d = JSON.parse(e.data);
-      chatDevices = d.devices || [];
-      renderChatDevices();
-    } catch (x) {
-      console.warn('[admin] 在线设备 SSE 坏帧', x); // 原:静默,设备列表停留旧值
-    }
-  };
-  chatSse.onerror = () => {
-    try {
-      chatSse.close();
-    } catch (x) {}
-    chatSse = null;
-    setTimeout(startChat, 8000);
-  };
+  // 公开聊天室:历史 + 3s 轮询(2026-10-10 管理员回话功能的主视图)
+  loadPublicRoom();
+  if (chatPoll) clearInterval(chatPoll);
+  chatPoll = setInterval(loadPublicRoom, 3000);
+  if (!$('chatMsgInput').disabled) return;
+  $('chatMsgInput').disabled = false;
+  $('chatSendBtn').disabled = false;
+  $('chatMsgInput').placeholder = '回话到聊天室(以「管理员」身份)…';
+  return;
 }
 function renderChatDevices() {
   if (!$('chatOnlineCount')) return;
@@ -83,6 +74,54 @@ function renderChatDevices() {
     })
     .join('');
 }
+async function loadPublicRoom() {
+  const box = $('chatMsgArea');
+  if (!box) return;
+  try {
+    const r = await adminFetch('/api/chat');
+    const cs = await r.json();
+    const msgs = (cs.chat || cs.msgs || []).slice(-30).reverse();
+    if (!msgs.length) {
+      box.innerHTML =
+        '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:30px">聊天室暂无消息</div>';
+      return;
+    }
+    box.innerHTML = msgs
+      .map((m) => {
+        const isAdmin = m.admin || m.n === '管理员' || m.n === BOT_HINT;
+        const t = new Date(m.ts).toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        const bg = isAdmin
+          ? 'linear-gradient(135deg,rgba(102,126,234,.5),rgba(118,75,162,.4))'
+          : 'rgba(255,255,255,.1)';
+        const self = isAdmin ? 'flex-end' : 'flex-start';
+        const br = isAdmin ? 'right' : 'left';
+        const name = esc(m.n || '访客');
+        return (
+          '<div style="max-width:75%;padding:10px 14px;border-radius:14px;font-size:13px;line-height:1.5;align-self:' +
+          self +
+          ';background:' +
+          bg +
+          ';border-bottom-' +
+          br +
+          '-radius:4px;margin-bottom:4px">' +
+          esc(m.t) +
+          '<div style="font-size:10px;opacity:.5;margin-top:4px;text-align:right">' +
+          t +
+          ' · ' +
+          name +
+          '</div></div>'
+        );
+      })
+      .join('');
+  } catch (e) {
+    console.warn('[admin] 聊天室加载失败', e); // 原:静默(2026-10-10 空 catch 治理口径)
+  }
+}
+const BOT_HINT = '管理员';
+
 export function chatSelect(dk) {
   chatCurDk = dk;
   renderChatDevices();
@@ -90,8 +129,8 @@ export function chatSelect(dk) {
   $('chatSubTitle').textContent = '点对点 · ' + esc(d ? d.name : dk);
   $('chatMsgInput').disabled = false;
   $('chatSendBtn').disabled = false;
-  $('chatMsgInput').placeholder = '发送消息…';
-  loadChatMsgs();
+  $('chatMsgInput').placeholder = '回话到聊天室(以「管理员」身份)…';
+  loadPublicRoom();
   if (chatPoll) clearInterval(chatPoll);
   chatPoll = setInterval(loadChatMsgs, 2500);
 }
@@ -146,16 +185,18 @@ async function loadChatMsgs() {
 }
 export async function chatSend() {
   const t = $('chatMsgInput').value.trim();
-  if (!t || !chatCurDk) return;
+  if (!t) return; // 2026-10-10 改公开聊天室回话:不再要求先点选设备(点对点端点未实现)
   $('chatMsgInput').value = '';
   $('chatSendBtn').disabled = true;
   try {
-    await adminFetch('/api/admin/chat', {
+    // 2026-10-10:改走公开聊天室(以「管理员」身份,服务端按 x-token 识别);原点对点端点从未实现
+    const r = await adminFetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: t, target: chatCurDk }),
+      body: JSON.stringify({ text: t }),
     });
-    loadChatMsgs();
+    if (r.ok) loadPublicRoom();
+    else toast('发送失败', 1);
   } catch (e) {
     toast('发送失败', 1);
   }
