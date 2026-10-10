@@ -7,6 +7,13 @@
 - 验证:532 单测/lint/typecheck/build 全绿;十 tab 全扫:缩略图 200、chat 显示降级态、零页面异常;线上 admin 探针全绿、版本戳 4440887 双端核对。
 - **chat tab 转为可用功能(f157392,主人按推荐项默认执行)**:三端点不做,chat tab 改为「看公开聊天室 + 以管理员回话」——读 `GET /api/chat`(公开,后 30 条,3s 轮询),输入框经 adminFetch POST `/api/chat`,服务端 handleChatPost 以 `tokenOk(req)` 识别 x-token:带头即记 `n:'管理员',admin:true`(普通访客 POST 行为不变,3s 限流对管理员同样生效);`lib/chat.js` 顶部 `require('./admin')` 无环。后台 chat tab 现在是"看聊天室 + 回话"的真实闭环。**教训**:lib/*.js 是启动时加载,改完必须重启服务器再验(同一晚两次踩:static 文件即时生效,backend 模块不是)。
 
+## 2026-10-10 运维小批:gzip 缓存 mtime 失效 + SW 探针自动 VER + PWA manifest(ce32c4d,已上线)
+
+- **gzip 内存缓存 mtime 失效**(`lib/files-static.js`):原命中判定只看 5 分钟 TTL——文件更新后旧 gz 副本最长供 5 分钟(2026-07-27 血泪"改完验证误判没部署上"的根因,本次会话验证时又踩两次)。缓存条目现在带 `mtimeMs`,命中时 stat 比对,**不同即立刻重压**;TTL 保留为冷条目淘汰。后端 +2 测试(临时 .mjs 文件改内容断言新内容立即可达;根 .js 有黑名单白名单,测试用 .mjs)。**收益**:发布落地后旧 gz 立即失效,本地"改完要重启验证"与线上"5 分钟陈旧窗口"双双消灭。
+- **SW 探针 VER 自动化**:`sw-admin-bypass-probe.cjs` 的 `VER='gallery-v14'` 改为从 `public/sw.js` 源码正则直读——SW 升版只改 sw.js 一处,探针不再手工跟(审查 P2"升版易漏"关闭)。
+- **PWA manifest**(审查 P2 收尾):补 `id:'/'` + 512px **maskable** 图标(sharp 从 icon-512 生成:内容缩至 80% 居中+主题金底);shortcuts 未加(需要真实二级页面,暂无)。
+- 验证:104 项后端/lint/typecheck/532 单测/build 全绿;线上 manifest id/maskable 图标 200、healthz 200、版本戳 ce32c4d 最新 entrygate 核对。
+
 ## 2026-10-10 KTX2 转码实验完成:管线打通,生产启用卡 CSP 决策(3f9109f)
 
 - **编码半边打通**:装 KTX-Software 4.3.2(用户目录,可执行 toktx v4.3.0~28)。直转踩两个坑:①toktx **不吃 WEBP 输入**(CLI 直转全部 skip);②gltf-transform CLI 4.5 的 etc1s 用 `ktx create` 的 assign-tf 选项,**要求 toktx 4.4+**(4.3 报 fatal)。解法两步:`scripts/optimize/webp2png.mjs`(sharp 解码 WEBP→PNG,6 张全过)→ `npx @gltf-transform/cli@4.1.0 etc1s`(4.1 兼容 toktx 4.3,4.5 不兼容)。hero-rose 实测:10.67MB PNG 中间态 → 2.1MB KTX2,`KHR_texture_basisu` + 全部 image/ktx2 ETC1S,**单张 1024² 显存 5.59MB→699KB(约 8 倍省)**;scan-uncompressed 对 KTX2 文件正确放行(PNG 中间态会被标,预期)。
