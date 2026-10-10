@@ -6,6 +6,13 @@
 - **chat tab 恢复 + 优雅降级**:admin.html 的在线对话按钮 markup 曾丢失(面板不可达),已恢复(.chat-tab 虚线样式原样)。核实发现该功能**服务端半边从未实现**(online-sse/chat/chats 三端点全 404,客户端重试循环每 8s 刷一条 404):startChat 改为先探测,404 即渲染"服务端未启用"并停手——要启用需补服务端三端点(功能决策,存档待议)。
 - 验证:532 单测/lint/typecheck/build 全绿;十 tab 全扫:缩略图 200、chat 显示降级态、零页面异常;线上 admin 探针全绿、版本戳 4440887 双端核对。
 
+## 2026-10-10 KTX2 转码实验完成:管线打通,生产启用卡 CSP 决策(3f9109f)
+
+- **编码半边打通**:装 KTX-Software 4.3.2(用户目录,可执行 toktx v4.3.0~28)。直转踩两个坑:①toktx **不吃 WEBP 输入**(CLI 直转全部 skip);②gltf-transform CLI 4.5 的 etc1s 用 `ktx create` 的 assign-tf 选项,**要求 toktx 4.4+**(4.3 报 fatal)。解法两步:`scripts/optimize/webp2png.mjs`(sharp 解码 WEBP→PNG,6 张全过)→ `npx @gltf-transform/cli@4.1.0 etc1s`(4.1 兼容 toktx 4.3,4.5 不兼容)。hero-rose 实测:10.67MB PNG 中间态 → 2.1MB KTX2,`KHR_texture_basisu` + 全部 image/ktx2 ETC1S,**单张 1024² 显存 5.59MB→699KB(约 8 倍省)**;scan-uncompressed 对 KTX2 文件正确放行(PNG 中间态会被标,预期)。
+- **渲染半边结论(已接好)**:KTX2Loader + basis 转码器在 dev/vendor 与 dist/public 双路就绪。**生产阻断点 = 站点 CSP**(OWASP 加固版:script-src 无 unsafe-eval):basis 转码器(emscripten)在其 blob worker 内用 `new Function` 做函数表调用(craftInvokerFunction),被 CSP 的 EvalError 拦截——堆栈已抓实。**选项(主人决策)**:①script-src 加 unsafe-eval(页面级 eval 全放开,削弱 XSS 加固,不推荐);②自构 NO_DYNAMIC_EXECUTION=1 的 basis_transcoder.js(无 eval 版,需源码构建);③KTX2 搁置,维持 WEBP(现状无恙)。实验产物(hero-rose-ktx2.glb 等)在 .tmp/,未进生产。
+- 验证:532 单测/lint/typecheck/build 全绿;本地经游戏真实加载路径(createGLTFLoader)验证 KTX2 解码被 CSP 拦(堆栈实证);webp2png.mjs 已入库为管线工具。
+- **运维注**:KTX-Software 装在 C:\Users\17296\KTX-Software\bin(toktx);静默安装会被系统策略拦,需手动跑安装器。
+
 ## 2026-10-10 巨石拆分第四批:admin.js 第二阶段,1086→478 行(已上线)
 
 - **切割方案**(依赖分析的第二阶段建议落地):`admin-state.js`(15 行,DATA/RANGE/CAL_DATE 改 **ESM live binding** + setter——各分区 `import { DATA }` 读到最新值零改写,唯一 rebind 点 load() 收拢为 `setData()`)+ `admin-content.js`(469 行,文件页+展示区+户外大屏+杂项 handler——分区内环自洽:loadFiles↔toggleDemo/editCaption、loadDisplay↔大屏/链接三件套互调全在模块内)+ `admin-stats.js`(206 行,统计页 30 天柱状图/日历/时段榜 + statCards + calReset 从 trunk 搬入)。**本体保留 478 行**:数据/访客/预警/历史/答题分区 + switchTab + boot + 30 名 window 装配(逐字未动)。
