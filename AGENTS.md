@@ -5,6 +5,7 @@
 - **缩略图/预览 401 修复(断图十几天)**:`<img>/<video>` 标签发不了 x-token 头,2026-09-18 令牌改 header 后文件页缩略图、页内预览、导出 PDF 原图附录全部 401。`admin-content.js` 加 `mediaQ/mediaUrl` 助手:内嵌 `/admin-media/*` 元素 URL 带查询令牌;**复制的分享链接(copyTxt)刻意仍不带令牌**(守住 09-18 审计"防 token 进 URL/日志"红线,服务端 tokenOk 本就接受 query.token)。
 - **chat tab 恢复 + 优雅降级**:admin.html 的在线对话按钮 markup 曾丢失(面板不可达),已恢复(.chat-tab 虚线样式原样)。核实发现该功能**服务端半边从未实现**(online-sse/chat/chats 三端点全 404,客户端重试循环每 8s 刷一条 404):startChat 改为先探测,404 即渲染"服务端未启用"并停手——要启用需补服务端三端点(功能决策,存档待议)。
 - 验证:532 单测/lint/typecheck/build 全绿;十 tab 全扫:缩略图 200、chat 显示降级态、零页面异常;线上 admin 探针全绿、版本戳 4440887 双端核对。
+- **chat tab 转为可用功能(f157392,主人按推荐项默认执行)**:三端点不做,chat tab 改为「看公开聊天室 + 以管理员回话」——读 `GET /api/chat`(公开,后 30 条,3s 轮询),输入框经 adminFetch POST `/api/chat`,服务端 handleChatPost 以 `tokenOk(req)` 识别 x-token:带头即记 `n:'管理员',admin:true`(普通访客 POST 行为不变,3s 限流对管理员同样生效);`lib/chat.js` 顶部 `require('./admin')` 无环。后台 chat tab 现在是"看聊天室 + 回话"的真实闭环。**教训**:lib/*.js 是启动时加载,改完必须重启服务器再验(同一晚两次踩:static 文件即时生效,backend 模块不是)。
 
 ## 2026-10-10 KTX2 转码实验完成:管线打通,生产启用卡 CSP 决策(3f9109f)
 
