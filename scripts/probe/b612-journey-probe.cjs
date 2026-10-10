@@ -157,7 +157,11 @@ async function checkFinalUi(p) {
       if (!d || getComputedStyle(d).display === 'none') return false;
       const choice = d.querySelector('.gs-choice');
       if (choice) choice.click();
-      else d.click();
+      else {
+        const next = d.querySelector('.gs-next'); // autoHide:0(2026-10-03):非选项对白点「继续 →」
+        if (next) next.click();
+        else d.click();
+      }
       return true;
     });
     if (!open) break;
@@ -349,7 +353,11 @@ async function run() {
         const choice = d.querySelector('.gs-choice');
         if (choice && choice.offsetParent && window.__ctx.scene.activeWorld === 'main')
           choice.click();
-        else if (!choice) d.click();
+        else if (!choice) {
+          const next = d.querySelector('.gs-next'); // autoHide:0 补丁(2026-10-10)
+          if (next && next.offsetParent) next.click();
+          else d.click();
+        }
       }, 220);
     });
     await p.waitForSelector('#scene2Board', { timeout: 60000 });
@@ -721,7 +729,11 @@ async function run() {
         if (!d || getComputedStyle(d).display === 'none') return;
         const choice = d.querySelector('.gs-choice');
         if (choice && choice.offsetParent) choice.click();
-        else d.click();
+        else {
+          const next = d.querySelector('.gs-next'); // autoHide:0 补丁(2026-10-10)
+          if (next && next.offsetParent) next.click();
+          else d.click();
+        }
       }, 220);
     });
     await p.waitForTimeout(5000);
