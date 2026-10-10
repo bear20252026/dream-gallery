@@ -17,6 +17,11 @@ import {
 } from './admin-core.js';
 import { DATA } from './admin-state.js';
 
+// 内嵌媒体元素(img/video)URL 带令牌:<img> 发不了 x-token 头,2026-09-18 令牌改 header 后
+// 缩略图/预览全部 401 断图十几天。仅页面内嵌元素补查询参数;复制的分享链接(copyTxt)仍不带令牌(守住审计红线)。
+const mediaQ = () => (TOKEN ? '?token=' + encodeURIComponent(TOKEN) : '');
+const mediaUrl = (u) => (u.startsWith('/admin-media/') && !u.includes('token=') ? u + mediaQ() : u);
+
 // ---------- 文件页 ----------
 export async function loadFiles() {
   const dirs = [
@@ -58,7 +63,7 @@ export async function loadFiles() {
       files
         .map((f) => {
           const isImg = /\.(jpe?g|png|gif|webp)$/i.test(f.name);
-          const url = `/admin-media/${dir}/${encodeURIComponent(f.name)}` + tkq();
+          const url = mediaUrl(`/admin-media/${dir}/${encodeURIComponent(f.name)}`);
           const cap = caps[f.name]
             ? `<div style="font-size:12px;color:#ffd9a8;padding:2px 0">✍ ${esc(caps[f.name])}</div>`
             : '';
@@ -92,6 +97,7 @@ export function pv(dir, name) {
 }
 // 支持任意 URL 的媒体预览(文件页用 /admin-media 相对路径,大屏页用 CDN 绝对地址)
 export function pvUrl(url, ext) {
+  url = mediaUrl(url);
   const m = $('pvMask');
   if (
     [
@@ -461,7 +467,7 @@ export async function exportPdf() {
     )
     .join('')}
   <h2 class="pg">三、照片原图(上传照片 + 希沃白板画作,共 ${imgs.length} 张)</h2>
-  ${imgs.map((f) => `<div class="ph"><img src="/admin-media/photos/${encodeURIComponent(f.name)}${tkq()}"><div>${escH(f.name)}</div>${DATA.photoCaptions && DATA.photoCaptions[f.name] ? `<div class="cap">✍ ${escH(DATA.photoCaptions[f.name])}</div>` : ''}</div>`).join('')}
+  ${imgs.map((f) => `<div class="ph"><img src="${mediaUrl('/admin-media/photos/' + encodeURIComponent(f.name))}"><div>${escH(f.name)}</div>${DATA.photoCaptions && DATA.photoCaptions[f.name] ? `<div class="cap">✍ ${escH(DATA.photoCaptions[f.name])}</div>` : ''}</div>`).join('')}
   </body></html>`;
   w.document.write(html);
   w.document.close();

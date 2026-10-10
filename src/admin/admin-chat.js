@@ -22,9 +22,21 @@ let chatCurDk = null,
   chatSse = null,
   chatPoll = null,
   chatDevices = [];
-export function startChat() {
+export async function startChat() {
   if (!$('tab-chat') || $('tab-chat').style.display === 'none') return;
-  if (chatSse) return;
+  if (chatSse || chatPoll) return;
+  // 优雅降级(2026-10-10 核实):/api/admin/online-sse|chat|chats 服务端从未实现,
+  // 原 EventSource 对 404 每 8s 无限重试刷日志。先探测,404 则明示"未启用"。
+  try {
+    const probe = await adminFetch('/api/admin/online-sse');
+    if (probe.status === 404) {
+      if ($('chatDeviceList'))
+        $('chatDeviceList').innerHTML =
+          '<div style="text-align:center;color:#9ca3af;font-size:12px;padding:20px">在线设备推送服务端未启用<br><span style="opacity:.6">(api/admin/online-sse 未实现)</span></div>';
+      if ($('chatOnlineCount')) $('chatOnlineCount').textContent = '—';
+      return;
+    }
+  } catch (e) {}
   chatSse = new EventSource('/api/admin/online-sse');
   chatSse.onmessage = (e) => {
     try {
