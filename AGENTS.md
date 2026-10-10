@@ -7,6 +7,13 @@
 - 验证:532 单测/lint/typecheck/build 全绿;十 tab 全扫:缩略图 200、chat 显示降级态、零页面异常;线上 admin 探针全绿、版本戳 4440887 双端核对。
 - **chat tab 转为可用功能(f157392,主人按推荐项默认执行)**:三端点不做,chat tab 改为「看公开聊天室 + 以管理员回话」——读 `GET /api/chat`(公开,后 30 条,3s 轮询),输入框经 adminFetch POST `/api/chat`,服务端 handleChatPost 以 `tokenOk(req)` 识别 x-token:带头即记 `n:'管理员',admin:true`(普通访客 POST 行为不变,3s 限流对管理员同样生效);`lib/chat.js` 顶部 `require('./admin')` 无环。后台 chat tab 现在是"看聊天室 + 回话"的真实闭环。**教训**:lib/*.js 是启动时加载,改完必须重启服务器再验(同一晚两次踩:static 文件即时生效,backend 模块不是)。
 
+## 2026-10-10 移动性能取证第一步:取证页上线(forensics.html,随本次部署)
+
+- `public/forensics.html`(免构建,public/ 直出):iframe 载入游戏本体(同源),父页每秒向子页注入采样器——FPS/帧均/峰值帧时长/长帧占比/draw calls/三角形/纹理与几何数/JS 堆。约 5 分钟会话分四段(出生点→B612→国王星→自由活动,「切到下一段」按钮),结束 POST 到既有错误信道(后台「报错反馈」tab 可见)+ 剪贴板复制备用。
+- **用法**:手机打开 `https://cloudbear.cloud/forensics.html` → 开始采样 → 按面板上的清单操作 5 分钟 → 结束并上传;开发者从后台读报告。
+- 桌面冒烟全过(注入/采样/报告结构;SwiftShader 数值保守仅验工具,真机数据才有裁决力)。**决策挂账**:报告回来后定 KTX2(方案②)与移动优化优先级。
+- 已知限制:iframe 里 gallery-v2/rose-gallery 的 JSON-module import 在 dev 失败( longstanding dev-only,生产 Vite 构建无此问题,不影响取证)。
+
 ## 2026-10-10 运维小批:gzip 缓存 mtime 失效 + SW 探针自动 VER + PWA manifest(ce32c4d,已上线)
 
 - **gzip 内存缓存 mtime 失效**(`lib/files-static.js`):原命中判定只看 5 分钟 TTL——文件更新后旧 gz 副本最长供 5 分钟(2026-07-27 血泪"改完验证误判没部署上"的根因,本次会话验证时又踩两次)。缓存条目现在带 `mtimeMs`,命中时 stat 比对,**不同即立刻重压**;TTL 保留为冷条目淘汰。后端 +2 测试(临时 .mjs 文件改内容断言新内容立即可达;根 .js 有黑名单白名单,测试用 .mjs)。**收益**:发布落地后旧 gz 立即失效,本地"改完要重启验证"与线上"5 分钟陈旧窗口"双双消灭。
