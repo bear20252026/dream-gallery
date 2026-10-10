@@ -1,5 +1,13 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-10 巨石拆分第四批:admin.js 第二阶段,1086→478 行(已上线)
+
+- **切割方案**(依赖分析的第二阶段建议落地):`admin-state.js`(15 行,DATA/RANGE/CAL_DATE 改 **ESM live binding** + setter——各分区 `import { DATA }` 读到最新值零改写,唯一 rebind 点 load() 收拢为 `setData()`)+ `admin-content.js`(469 行,文件页+展示区+户外大屏+杂项 handler——分区内环自洽:loadFiles↔toggleDemo/editCaption、loadDisplay↔大屏/链接三件套互调全在模块内)+ `admin-stats.js`(206 行,统计页 30 天柱状图/日历/时段榜 + statCards + calReset 从 trunk 搬入)。**本体保留 478 行**:数据/访客/预警/历史/答题分区 + switchTab + boot + 30 名 window 装配(逐字未动)。
+- **执行要点**:①`loadFiles` 是 `async function`,机械 export 正则只挂了 const/function 形态,构建期 MISSING_EXPORT 抓住补齐(admin.js 全量三处同款,均构建期兜住);②`statCards` 小函数随唯一消费方搬进 stats;③stats 的 RANGE 改 live import,写入走 `setRangeValue`。**验证新增十 tab 全扫工具**(.tmp/admin-tabs-sweep.cjs):十个 tab 逐个点击全渲染 ✓。
+- **顺带浮出两个存量页面问题(非本次回归,已存档)**:①文件页缩略图 `<img src="/admin-media/...">` 自 2026-09-18 令牌改 header 起就 401(tkq() 恒空串,img 标签带不了 header)——后台文件页缩略图断图十几天了;②admin.html 的 chat tab 无 data-tab 属性,十 tab 扫描点不到(对话功能经独立入口可用)。修复待办,与拆分无关。
+- **运维注再实证**:本地验页面读到旧响应=服务端 5 分钟 gzip 内存缓存(2026-07-27 血泪同款),重启服务器清缓存后探针即绿;"线上验版本戳要用 index.html 实际引用的 chunk"再+1:entrygate 是运行时动态 import,index.html 只静态引用共享 main chunk(跨版本同名),正确姿势=取服务器最新 entrygate-*.js grep 提交哈希。
+- 验证:532 单测/lint/typecheck/build 全绿;admin-errors-tab 探针本地+线上全绿;版本戳 7dc8330 双端核对(最新 entrygate chunk)。
+
 ## 2026-10-10 巨石拆分第三批:planets.js 1201→884 行,两拆三留(已上线)
 
 - **切割方案**(依赖分析结论"两拆三留";五路全拆属时序耦合太深):`story-guides.js`(140 行,剧情浮光指引:信标+悬浮箭+`ctx.ui.storyTarget` 单一权威写入;`initStoryGuides({getScene,getWorldManager,getChapter,isGateRevealed,getIslands,getMainGateY})` getter 注入——章节/门现身/岛表全是 planets.js 可变状态)+ `nav-buttons.js`(187 行,上下文导航按钮 + 原 onTick 内联决策块封装为 `tickNav(activeWorld)`,早退语义=函数 return 等价;`setNav` 仍导出给主干早退分支)。**本体保留**(world-loader 核心链槽位不变):worldManager 创建与注册(boot-check 断言)、章节权威 setChapter、石门契约(revealStarGate/isStarGateOut——portal.js 每 tick 轮询且失败按已现身放行)、传送垫、主循环物理、GARGANTUA legacy。消费方(scene6/7/late-planets/portal/spirits/8 个探针)零感知——只认场景对象名与 ctx 契约。
