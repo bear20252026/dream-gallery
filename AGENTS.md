@@ -1,5 +1,11 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-10 admin 存量修复:媒体元素令牌 + chat tab 恢复(已上线)
+
+- **缩略图/预览 401 修复(断图十几天)**:`<img>/<video>` 标签发不了 x-token 头,2026-09-18 令牌改 header 后文件页缩略图、页内预览、导出 PDF 原图附录全部 401。`admin-content.js` 加 `mediaQ/mediaUrl` 助手:内嵌 `/admin-media/*` 元素 URL 带查询令牌;**复制的分享链接(copyTxt)刻意仍不带令牌**(守住 09-18 审计"防 token 进 URL/日志"红线,服务端 tokenOk 本就接受 query.token)。
+- **chat tab 恢复 + 优雅降级**:admin.html 的在线对话按钮 markup 曾丢失(面板不可达),已恢复(.chat-tab 虚线样式原样)。核实发现该功能**服务端半边从未实现**(online-sse/chat/chats 三端点全 404,客户端重试循环每 8s 刷一条 404):startChat 改为先探测,404 即渲染"服务端未启用"并停手——要启用需补服务端三端点(功能决策,存档待议)。
+- 验证:532 单测/lint/typecheck/build 全绿;十 tab 全扫:缩略图 200、chat 显示降级态、零页面异常;线上 admin 探针全绿、版本戳 4440887 双端核对。
+
 ## 2026-10-10 巨石拆分第四批:admin.js 第二阶段,1086→478 行(已上线)
 
 - **切割方案**(依赖分析的第二阶段建议落地):`admin-state.js`(15 行,DATA/RANGE/CAL_DATE 改 **ESM live binding** + setter——各分区 `import { DATA }` 读到最新值零改写,唯一 rebind 点 load() 收拢为 `setData()`)+ `admin-content.js`(469 行,文件页+展示区+户外大屏+杂项 handler——分区内环自洽:loadFiles↔toggleDemo/editCaption、loadDisplay↔大屏/链接三件套互调全在模块内)+ `admin-stats.js`(206 行,统计页 30 天柱状图/日历/时段榜 + statCards + calReset 从 trunk 搬入)。**本体保留 478 行**:数据/访客/预警/历史/答题分区 + switchTab + boot + 30 名 window 装配(逐字未动)。
