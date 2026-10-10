@@ -31,8 +31,14 @@ function start() {
   await p.addInitScript(() => {
     try {
       sessionStorage.setItem('nickPopOff', '1');
+      sessionStorage.setItem('dialogVoiceOff', String(Date.now()));
       localStorage.setItem('kunlunWelcomed', String(Date.now()));
       localStorage.setItem('b612Scene2', '1');
+      // 2026-10-10 补夹具(与 return-black 同款):09-30 起 page1 完成前不立指引信标
+      // (产品设计:书页一没读完,主世界不该有"去石门"浮光),夹具必须跟上
+      localStorage.setItem('b612Page1', '1');
+      localStorage.setItem('b612PlanetChapter', '2');
+      localStorage.setItem('b612ControlsLesson', '1');
       localStorage.setItem('b612Page1', '1');
       localStorage.setItem('b612PlanetChapter', '2');
     } catch (e) {}

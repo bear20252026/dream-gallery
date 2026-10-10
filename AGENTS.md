@@ -27,7 +27,7 @@
 - **死码清理约 60 行**:退役的屏顶指引 HUD(755-768 + tick 内 5 处 display:none + bag.remove)、travelTo/backToGallery(零调用)、hudT/lampT(从未读写);连带 spawnFor/worldForIsland 出 import(仅死码引用)。
 - **registerWorld 幂等守卫**:b612 与 king 各注册点改 `getWorld(id) || registerWorld(id, ...)`——HMR 重放不再因重复 id throw(分析标定的隐患,顺手补上)。
 - **执行实录**(手术脚本三轮迭代,教训:跨 shell 的正则替换转义不可靠,锚点修正一律用 Edit 工具;行级手术前先精确核对每条边界):①extract 起点抓错——tick 决策块误带太空物理边界钳制片段,删除重切;②两段定义区删除时切片方向反了一刀,lint no-undef 连环抓出(worldNav/removeFloatArrow/hud 残留);③最终 884/140/187 行,lint/typecheck/build 全绿。
-- **验证**:532 单测全绿;本地世界启动(后台链推进至回忆层,零报错);**线上 return-black 9 项全绿**(世界切换/门契约/portal 时序——正是被拆路径);**聚焦诊断实证 story-guides 在生产正常**(29m 处 storyBeaconStarGate+guideArrowStarGate 同立、chapter/page1/pos 全对)。guide-shot 探针失败为**其自身预置债**(夜链与对白守卫的交互,script-fill 同族;本轮已给它补自愈式进场+双语按钮匹配两笔债,b612 段截图正常拍到指引),完整断言待按夜链感知重设计(待办,同 script-fill)。
+- **验证**:532 单测全绿;本地世界启动(后台链推进至回忆层,零报错);**线上 return-black 9 项全绿**(世界切换/门契约/portal 时序——正是被拆路径);**聚焦诊断实证 story-guides 在生产正常**(29m 处 storyBeaconStarGate+guideArrowStarGate 同立、chapter/page1/pos 全对)。guide-shot 探针失败为**其自身预置债**(script-fill 同族;本轮已还三笔:自愈式进场、双语按钮匹配、page1/chapter 夹具——b612 段截图正常拍到指引;聚焦诊断证明信标在往返全程正确:进 b612 撤、回主世界 29m 重立)。**剩余断言本身已过时**:portal 按钮"29m 应显示"违背 09-30 现行设计(>15m 只给罗盘+光柱),须按夜链感知整体重设计(待办,同 script-fill)。
 - **运维注**:deploy.sh 的 `npm run build | tail` 管道有 pipefail 保护;但线上验版本戳要用 index.html 实际引用的 chunk(grep assets/entrygate-*.js 会匹配到历史保留 chunk 造成误读)。
 
 ## 2026-10-09 巨石拆分第二批:ending-journey 1295→791 行,三叶(f83de2d,已上线)
