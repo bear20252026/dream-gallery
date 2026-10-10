@@ -11,7 +11,12 @@ const os = require('os');
 const ROOT = path.join(__dirname, '..', '..');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'swbypass-'));
 const PORT = process.env.SW_BYPASS_PORT || 3252;
-const VER = 'gallery-v14'; // 与 public/sw.js 的 VER 同步;升版时这里要跟
+// 2026-10-10:改为从 public/sw.js 源码直读 VER——升版只改 sw.js 一处,探针不再手工跟
+const VER = (() => {
+  const m = require('fs').readFileSync(require('path').join(__dirname, '../../public/sw.js'), 'utf8').match(/const VER = ['"]([^'"]+)['"]/);
+  if (!m) throw new Error('public/sw.js 里找不到 VER 常量');
+  return m[1];
+})();
 
 function startServer(port) {
   return new Promise((resolve, reject) => {

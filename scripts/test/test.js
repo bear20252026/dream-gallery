@@ -125,6 +125,20 @@ async function testApi(base) {
   const buf = await res.arrayBuffer();
   ok(res.status === 206 && buf.byteLength === 100, 'Range 请求返回 206 且长度正确');
 
+  // gzip 内存缓存的 mtime 失效(2026-10-10):文件一变,旧 gz 副本立即失效(消灭 5 分钟陈旧窗口)
+  const gzFile = path.join(ROOT, '_gzip_mtime_test.mjs'); // 根 .js 有黑名单白名单(data.js/sw.js),.mjs 可服务
+  const contentA = 'export const A = "' + 'x'.repeat(30 * 1024) + '";';
+  fs.writeFileSync(gzFile, contentA);
+  try {
+    res = await fetch(base + '/_gzip_mtime_test.mjs');
+    ok(res.status === 200 && (await res.text()).includes('const A'), 'gzip 首次缓存:新文件 200 且内容 A');
+    fs.writeFileSync(gzFile, 'export const B = "' + 'y'.repeat(30 * 1024) + '";'); // 改内容(必然改 mtime)
+    res = await fetch(base + '/_gzip_mtime_test.mjs');
+    ok(res.status === 200 && (await res.text()).includes('const B'), '文件更新后 gz 立即失效:新内容 B(不等 5 分钟)');
+  } finally {
+    fs.unlinkSync(gzFile);
+  }
+
   // 协商缓存(2026-10-07 审查#5):Last-Modified + If-Modified-Since → 304
   res = await fetch(base + '/data.js');
   const lastMod = res.headers.get('last-modified');
