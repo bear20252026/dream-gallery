@@ -60,12 +60,42 @@ function start() {
   });
   await p.evaluate(() => window.__ctx.kunlun.revealStarGate && window.__ctx.kunlun.revealStarGate());
   await p.waitForTimeout(800);
+  // 2026-10-10 预置补丁(坑②/③,return-black 同款):对白开着时进门圈的 fire 被守卫吃掉
+  // 一次且 gateArmed 解除;主线对白 autoHide:0 还要点「继续 →」。自愈循环:选项→旅途卡
+  // 「再待一会儿」→继续,全收束才进圈,直到入梦。
   await p.evaluate(() => {
-    const q = window.__ctx.player.pl.p;
-    q.x = 0.1;
-    q.z = 56;
+    const iv = setInterval(() => {
+      try {
+        const ctx = window.__ctx;
+        if ((ctx.scene.activeWorld || '') !== 'main') {
+          clearInterval(iv);
+          return;
+        }
+        const stay = document.querySelector('#voyage .vy-stay');
+        if (stay) {
+          stay.click();
+          return;
+        }
+        const d = document.getElementById('gameDialog');
+        const open = d && d.style.display !== 'none';
+        if (open) {
+          const c = d.querySelector('.gs-choice');
+          if (c) {
+            c.click();
+            return;
+          }
+          const n = d.querySelector('.gs-next');
+          if (n && n.style.display !== 'none') n.click();
+        }
+        const q = ctx.player.pl.p;
+        const busy = open || !!(ctx.ui.dialogOpen && ctx.ui.dialogOpen()) || !!(ctx.overlay && ctx.overlay.anyOpen());
+        q.x = 0.1;
+        q.z = busy ? 70 : 56;
+      } catch (e) {}
+    }, 900);
+    setTimeout(() => clearInterval(iv), 120000);
   });
-  await p.waitForFunction(() => window.__ctx.scene.activeWorld === 'b612', null, { timeout: 25000 });
+  await p.waitForFunction(() => window.__ctx.scene.activeWorld === 'b612', null, { timeout: 120000 });
   await p.waitForTimeout(6000); // 等模型/相机稳定
   // 断言:B612 岛内小王子信标+悬浮箭已立(出生点距原点 8.5m > 5m)
   const b612Guide = await p.evaluate(() => {
@@ -142,7 +172,11 @@ function start() {
   // 回主世界:远离星门 → 星门信标+箭应立起
   await p.evaluate(() => {
     const btns = [...document.querySelectorAll('button')];
-    const back = btns.find((x) => x.textContent.includes('返回主世界'));
+    const back = btns.find(
+      (x) =>
+        x.style.display !== 'none' &&
+        (x.textContent.includes('返回沙漠') || /back to the desert/i.test(x.textContent))
+    ); // 2026-10-10:按钮早已改名(返回沙漠/Back to the desert),双语匹配
     if (back) back.click();
   });
   await p.waitForFunction(() => (window.__ctx.scene.activeWorld || 'main') === 'main', null, { timeout: 20000 });

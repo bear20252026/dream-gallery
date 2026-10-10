@@ -1,5 +1,15 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-10 巨石拆分第三批:planets.js 1201→884 行,两拆三留(已上线)
+
+- **切割方案**(依赖分析结论"两拆三留";五路全拆属时序耦合太深):`story-guides.js`(140 行,剧情浮光指引:信标+悬浮箭+`ctx.ui.storyTarget` 单一权威写入;`initStoryGuides({getScene,getWorldManager,getChapter,isGateRevealed,getIslands,getMainGateY})` getter 注入——章节/门现身/岛表全是 planets.js 可变状态)+ `nav-buttons.js`(187 行,上下文导航按钮 + 原 onTick 内联决策块封装为 `tickNav(activeWorld)`,早退语义=函数 return 等价;`setNav` 仍导出给主干早退分支)。**本体保留**(world-loader 核心链槽位不变):worldManager 创建与注册(boot-check 断言)、章节权威 setChapter、石门契约(revealStarGate/isStarGateOut——portal.js 每 tick 轮询且失败按已现身放行)、传送垫、主循环物理、GARGANTUA legacy。消费方(scene6/7/late-planets/portal/spirits/8 个探针)零感知——只认场景对象名与 ctx 契约。
+- **死码清理约 60 行**:退役的屏顶指引 HUD(755-768 + tick 内 5 处 display:none + bag.remove)、travelTo/backToGallery(零调用)、hudT/lampT(从未读写);连带 spawnFor/worldForIsland 出 import(仅死码引用)。
+- **registerWorld 幂等守卫**:b612 与 king 各注册点改 `getWorld(id) || registerWorld(id, ...)`——HMR 重放不再因重复 id throw(分析标定的隐患,顺手补上)。
+- **执行实录**(手术脚本三轮迭代,教训:跨 shell 的正则替换转义不可靠,锚点修正一律用 Edit 工具;行级手术前先精确核对每条边界):①extract 起点抓错——tick 决策块误带太空物理边界钳制片段,删除重切;②两段定义区删除时切片方向反了一刀,lint no-undef 连环抓出(worldNav/removeFloatArrow/hud 残留);③最终 884/140/187 行,lint/typecheck/build 全绿。
+- **验证**:532 单测全绿;本地世界启动(后台链推进至回忆层,零报错);**线上 return-black 9 项全绿**(世界切换/门契约/portal 时序——正是被拆路径);**聚焦诊断实证 story-guides 在生产正常**(29m 处 storyBeaconStarGate+guideArrowStarGate 同立、chapter/page1/pos 全对)。guide-shot 探针失败为**其自身预置债**(夜链与对白守卫的交互,script-fill 同族;本轮已给它补自愈式进场+双语按钮匹配两笔债,b612 段截图正常拍到指引),完整断言待按夜链感知重设计(待办,同 script-fill)。
+- **运维注**:deploy.sh 的 `npm run build | tail` 管道有 pipefail 保护;但线上验版本戳要用 index.html 实际引用的 chunk(grep assets/entrygate-*.js 会匹配到历史保留 chunk 造成误读)。
+
+## 2026-10-09 巨石拆分第二批:ending-journey 1295→791 行,三叶(f83de2d,已上线)
 ## 2026-10-09 巨石拆分第二批:ending-journey 1295→791 行,三叶(f83de2d,已上线)
 
 - **切割方案**(依赖分析结论:按"四阶段"拆是负收益——四段共享单一 mode 状态机/单一 actionFn 槽/同步链(画嘴套→veil→startFarewell→…→fall→playEpilogue);按"可分离叶子"拆是正收益):①`ending-audio.js`(135 行,自持 WebAudio:水声/水滴/会笑的铃铛;trunk 用 `isWaterActive()` 替换对模块内 water 状态的外读);②`ending-prince.js`(165 行,小王子 rig:加载/动画/摆放/透明度/跟随与倒下;princeMode 自持,`set/getPrinceMode`/`resetFall` 访问器,`initPrinceRig({scene:getter, groundH})` 注入);③`ending-epilogue.js`(325 行,星空/字幕/落版/保存星星卡;控制器注入 `{stageEl getter, getMode/setMode, setStep, hideAction, stopListening, wait}`;`getStageEntry()` 供主干 script:lang 换字;`stopStarfield()` 供 dispose)。主干保留编排(状态机/行动卡/DOM/speakSeq/找井+告别两段/tick/组件),endingApi 形状一字未动。
