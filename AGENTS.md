@@ -36,6 +36,13 @@
 - **运维注再实证**:本地验页面读到旧响应=服务端 5 分钟 gzip 内存缓存(2026-07-27 血泪同款),重启服务器清缓存后探针即绿;"线上验版本戳要用 index.html 实际引用的 chunk"再+1:entrygate 是运行时动态 import,index.html 只静态引用共享 main chunk(跨版本同名),正确姿势=取服务器最新 entrygate-*.js grep 提交哈希。
 - 验证:532 单测/lint/typecheck/build 全绿;admin-errors-tab 探针本地+线上全绿;版本戳 7dc8330 双端核对(最新 entrygate chunk)。
 
+## 2026-10-10 剧情探针现代化第一批:金标准 journey-probe 复活(已推送)
+
+- **发现**:线上跑金标准 `b612-journey-probe` 基线,发现它**也死于第一句对白**——与 script-fill 同根:三处 220ms 对白泵只点选项和对话框背景,而 10-03 起主线对白 autoHide:0,普通台词等「继续 →」点击。三处泵统一补 `.gs-next` 点击。
+- **线上重跑结果(重大)**:探针从"死在第一句对白"复活为**端到端跑通全书**——画羊四轮→B612 四站(火山/树苗/日落/玫瑰)→国王历书+老耗子+星屑→返回→家 step4→飞机登机段,60+ 断言深处,仅最后一条断言漂移:合成 `lock:true` 对白在 home-step4 状态下按两次 E 不再关闭(10-02 输入轮后的分层 E 消费链:InputManager 消费/journey/ending 捕获叠加)。
+- **定性**:该断言需产品语义核对而非盲改——E 在 lock 对白上"应推进"的旧语义与现行分层消费冲突点在哪,属探针重设计的收尾范围。script-fill 的泵本会话早已现代化,其剩余欠账仅为跑站段重设计。
+- 验证:线上(真 GPU 全模型)端到端;本地 probe 语法/lint 过。
+
 ## 2026-10-10 巨石拆分第三批:planets.js 1201→884 行,两拆三留(已上线)
 
 - **切割方案**(依赖分析结论"两拆三留";五路全拆属时序耦合太深):`story-guides.js`(140 行,剧情浮光指引:信标+悬浮箭+`ctx.ui.storyTarget` 单一权威写入;`initStoryGuides({getScene,getWorldManager,getChapter,isGateRevealed,getIslands,getMainGateY})` getter 注入——章节/门现身/岛表全是 planets.js 可变状态)+ `nav-buttons.js`(187 行,上下文导航按钮 + 原 onTick 内联决策块封装为 `tickNav(activeWorld)`,早退语义=函数 return 等价;`setNav` 仍导出给主干早退分支)。**本体保留**(world-loader 核心链槽位不变):worldManager 创建与注册(boot-check 断言)、章节权威 setChapter、石门契约(revealStarGate/isStarGateOut——portal.js 每 tick 轮询且失败按已现身放行)、传送垫、主循环物理、GARGANTUA legacy。消费方(scene6/7/late-planets/portal/spirits/8 个探针)零感知——只认场景对象名与 ctx 契约。
