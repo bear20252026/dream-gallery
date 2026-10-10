@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <title>B612 移动性能取证</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      body {
+        margin: 0;
+        background: #0b0d1c;
+        color: #f1e6cc;
+        font:
+          14px/1.5 Georgia,
+          serif;
+      }
+      #game {
+        position: fixed;
+        inset: 0;
+        border: 0;
+        width: 100%;
+        height: 100%;
+      }
+      #panel {
+        position: fixed;
+        top: 8px;
+        left: 8px;
+        right: 8px;
+        z-index: 9999;
+        background: rgba(10, 10, 20, 0.88);
+        border: 1px solid rgba(232, 200, 140, 0.5);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font:
+          12px/1.6 -apple-system,
+          sans-serif;
+        max-height: 46vh;
+        overflow: auto;
+      }
+      #panel h1 {
+        font-size: 14px;
+        margin: 0 0 6px;
+        color: #e8c98a;
+      }
+      #panel .steps {
+        opacity: 0.85;
+        white-space: pre-line;
+        margin: 6px 0;
+      }
+      #panel button {
+        font: inherit;
+        padding: 7px 14px;
+        margin: 4px 6px 4px 0;
+        border-radius: 18px;
+        cursor: pointer;
+        color: #2c2014;
+        background: linear-gradient(135deg, #f3d79a, #d7a65a);
+        border: none;
+        min-height: 40px;
+      }
+      #panel button.ghost {
+        background: none;
+        border: 1px solid rgba(240, 214, 160, 0.5);
+        color: #f6e6c4;
+      }
+      #panel .live {
+        font-family: monospace;
+        font-size: 11px;
+        color: #9fe0a0;
+        margin-top: 6px;
+        white-space: pre-line;
+      }
+      #panel.min {
+        max-height: none;
+        overflow: hidden;
+      }
+      #panel.min .steps,
+      #panel.min .live,
+      #panel.min h1 {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <iframe id="game" src="/?noopening" allow="autoplay; fullscreen"></iframe>
+    <div id="panel">
+      <h1>B612 性能取证（约 5 分钟）</h1>
+      <div class="steps">
+        操作清单（照做即可，采样自动进行）: 1. 点「开始采样」→ 输入手机型号 → 在游戏里出生点停留 30
+        秒 2. 点「进入 B612」（石门）→ 岛内走动 60 秒 3. 去国王星球 → 停留 40 秒 → 返回 4.
+        随意走动/跳跃/滑翔 60 秒 5. 点「结束并上传」→ 把结果显示给开发者
+      </div>
+      <div>
+        <button id="bStart">开始采样</button>
+        <button id="bStop" class="ghost" disabled>结束并上传</button>
+        <button id="bMin" class="ghost">收起面板</button>
+      </div>
+      <div class="live" id="live">未开始</div>
+    </div>
+    <script>
+      (function () {
+        'use strict';
+        var game = document.getElementById('game');
+        var live = document.getElementById('live');
+        var panel = document.getElementById('panel');
+        var device = '';
+        var segments = []; // { name, t0, t1, fps:[], frames:[], draws:[], tris:[], tex:[], geo:[], jsHeap:[] }
+        var cur = null;
+        var sampler = 0;
+
+        function child() {
+          return game.contentWindow;
+        }
+
+        // 向子页面注入采样器(同源;游戏 CSP 允许 inline script)
+        function injectSampler() {
+          var doc = game.contentDocument;
+          if (!doc) return false;
+          var s = doc.createElement('script');
+          s.textContent = `
+      (function () {
+        if (window.__forensics) return;
+        var st = { frames: 0, last: 0, ft: [], long: 0 };
+        function raf(now) {
+          if (st.last) {
+            var dt = now - st.last;
+            st.ft.push(dt);
+            if (dt > 50) st.long++;
+          }
+          st.last = now;
+          st.frames++;
+          requestAnimationFrame(raf);
+        }
+        requestAnimationFrame(raf);
+        window.__forensics = {
+          snap: function () {
+            var ctx = window.__ctx || {};
+            var r = ctx.scene && ctx.scene.rnd;
+            var info = r && r.info ? r.info : null;
+            var mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null;
+            return {
+              fps: window.__ctx && window.__ctx.loopManager ? Math.round(window.__ctx.loopManager.getFPS()) : null,
+              frames: st.frames,
+              avgFt: st.ft.length ? +(st.ft.reduce((a, b) => a + b, 0) / st.ft.length).toFixed(1) : null,
+              maxFt: st.ft.length ? Math.max.apply(null, st.ft) : null,
+              longPct: st.ft.length ? +((st.long / st.ft.length) * 100).toFixed(1) : null,
+              drawCalls: info && info.render ? info.render.calls : null,
+              triangles: info && info.render ? info.render.triangles : null,
+              textures: info && info.memory ? info.memory.textures : null,
+              geometries: info && info.memory ? info.memory.geometries : null,
+              jsHeapMB: mem,
+              world: (ctx.scene && ctx.scene.activeWorld) || 'main',
+            };
+          },
+        };
+      })();`;
+          doc.body.appendChild(s);
+          return !!game.contentWindow.__forensics;
+        }
+
+        function snap() {
+          if (!injectSampler()) return null;
+          return child().__forensics.snap();
+        }
+
+        function fmtMB(n) {
+          return n == null ? '-' : n + 'MB';
+        }
+
+        function tick() {
+          var s = snap();
+          if (!s) {
+            live.textContent = '等待游戏就绪…';
+            return;
+          }
+          if (cur) {
+            cur.fps.push(s.fps);
+            cur.frames.push(s);
+          }
+          live.textContent =
+            '世界 ' +
+            s.world +
+            ' | FPS ' +
+            s.fps +
+            ' | 帧均 ' +
+            s.avgFt +
+            'ms 峰值 ' +
+            s.maxFt +
+            'ms' +
+            ' | 长帧 ' +
+            s.longPct +
+            '%' +
+            ' | draw ' +
+            s.drawCalls +
+            ' | 三角形 ' +
+            (s.triangles == null ? '-' : s.triangles) +
+            ' | 纹理 ' +
+            s.textures +
+            ' | JS堆 ' +
+            fmtMB(s.jsHeapMB);
+        }
+
+        function segSummary(seg) {
+          var fps = seg.fps.filter(function (x) {
+            return x > 0;
+          });
+          var avg = fps.length
+            ? +(
+                fps.reduce(function (a, b) {
+                  return a + b;
+                }, 0) / fps.length
+              ).toFixed(1)
+            : 0;
+          var min = fps.length ? Math.min.apply(null, fps) : 0;
+          var last = seg.frames[seg.frames.length - 1] || {};
+          var maxFt = seg.frames.reduce(function (m, f) {
+            return Math.max(m, f.maxFt || 0);
+          }, 0);
+          var longs = seg.frames.reduce(function (a, f) {
+            return a + (f.longPct || 0);
+          }, 0);
+          var n = seg.frames.length || 1;
+          var lastOk = last.drawCalls != null ? last : seg.frames[0] || {};
+          return {
+            segment: seg.name,
+            world: lastOk.world,
+            fpsAvg: avg,
+            fpsMin: min,
+            frameMsAvg: last.avgFt,
+            frameMsMax: Math.round(maxFt * 10) / 10,
+            longFramePct: +(longs / n).toFixed(1),
+            drawCalls: lastOk.drawCalls,
+            triangles: lastOk.triangles,
+            textures: lastOk.textures,
+            geometries: lastOk.geometries,
+            jsHeapMB: lastOk.jsHeapMB,
+          };
+        }
+
+        document.getElementById('bStart').onclick = function () {
+          device = prompt('手机型号(如 iPhone 13 / 小米 14):', '') || '未填写';
+          segments = [];
+          cur = { name: '1-出生点', t0: Date.now(), fps: [], frames: [] };
+          segments.push(cur);
+          sampler = setInterval(tick, 1000);
+          document.getElementById('bStop').disabled = false;
+          live.textContent = '采样中…';
+        };
+
+        // 按分段切:用户每换一个检查点,点一下「切段」(按钮动态加)——简化:每 75s 自动切段
+        var segNames = ['1-出生点', '2-B612', '3-国王星', '4-自由活动'];
+        document
+          .getElementById('bStart')
+          .insertAdjacentHTML(
+            'afterend',
+            '<button id="bSeg" class="ghost" disabled>切到下一段</button>'
+          );
+        document.getElementById('bSeg').onclick = function () {
+          if (!cur) return;
+          var idx = segNames.indexOf(cur.name);
+          if (idx < 0 || idx >= segNames.length - 1) return;
+          cur = { name: segNames[idx + 1], t0: Date.now(), fps: [], frames: [] };
+          segments.push(cur);
+        };
+
+        document.getElementById('bStop').onclick = function () {
+          clearInterval(sampler);
+          document.getElementById('bSeg').disabled = true;
+          this.disabled = true;
+          var report = {
+            type: 'perf-forensics',
+            device: device,
+            ua: navigator.userAgent,
+            viewport:
+              window.innerWidth +
+              'x' +
+              window.innerHeight +
+              '@' +
+              (window.devicePixelRatio || 1) +
+              'x',
+            when: new Date().toISOString(),
+            segments: segments.map(segSummary),
+          };
+          report.summary = report.segments
+            .map(function (s) {
+              return (
+                s.segment +
+                '[' +
+                s.world +
+                '] fps ' +
+                s.fpsAvg +
+                '(min ' +
+                s.fpsMin +
+                ') 长帧 ' +
+                s.longFramePct +
+                '% draw ' +
+                s.drawCalls
+              );
+            })
+            .join(' | ');
+          live.textContent = '报告: ' + report.summary;
+          // 回传:走既有错误信标通道(后台「报错反馈」tab 可见)
+          try {
+            fetch('/api/track/error', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: report.type,
+                message: report.summary,
+                stack: JSON.stringify(report.segments),
+                url: 'forensics://' + device,
+              }),
+            });
+          } catch (e) {}
+          try {
+            localStorage.setItem('forensicsReport', JSON.stringify(report, null, 1));
+          } catch (e) {}
+          window.__forensicsReport = report;
+          // 复制到剪贴板(备用)
+          if (navigator.clipboard && navigator.clipboard.writeText)
+            navigator.clipboard.writeText(JSON.stringify(report, null, 1)).catch(function () {});
+        };
+
+        document.getElementById('bMin').onclick = function () {
+          panel.classList.toggle('min');
+          this.textContent = panel.classList.contains('min') ? '展开面板' : '收起面板';
+        };
+      })();
+    </script>
+  </body>
+</html>
