@@ -6,6 +6,7 @@ import { ctx } from '../ctx.js';
 import { createPaperTerrainMaterial, updatePaperTerrain } from './paper-floor.js'; // 山河舆图·纸质地形地板(2026-08-29)
 import { createGLTFLoader } from './gltf-loader.js'; // 婚礼拱廊外壳加载(museum.js 同款静态导入,项目验证过)
 import { LAYOUT } from './layout.mjs'; // 建筑布局尺寸唯一源(2026-09-07 P4)
+import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表;此处只借主干名口径)
 import { showGlLost, watchGlContext } from '../ui/gl-lost.js'; // WebGL 失效友好提示(2026-10-03)
 
 const L = document.getElementById('l'),
@@ -77,7 +78,7 @@ function loadTexCapped(url, onErr, pos) {
   let tries = 0,
     queued = false,
     noThumb = false;
-  // 缩略图优先(gen-thumbs.js 预生成 photos/thumbs/*.webp),404 回退原图
+  // 缩略图优先(gen-thumbs.js 预生成 photos/thumbs/*.webp),取不到(404 或权限判定与原图一致而 403)回退原图
   const thumbUrl =
     /^photos\//.test(url) && !/\.webp$/i.test(url)
       ? url.replace(/\.[^.]+$/, '.webp').replace(/^photos\//, 'photos/thumbs/')
@@ -85,8 +86,21 @@ function loadTexCapped(url, onErr, pos) {
   // 本人上传媒体令牌(2026-07-27 血泪①:QQ 浏览器图片代理改用代理 UA 请求 <img>,dk 对不上 → 403 粉框;
   // 血泪②:令牌必须 attempt 内现取——loadTexCapped 常在 refreshMode 拉回 myUploadTokens 之前启动,
   //         外层一次性取值会让三次重试全部裸奔 403 → 粉框)
+  // 缩略图这一跳还得按主干名回查:gen-thumbs.js 把任意扩展名统一成 <主干>.webp,而 myUploadTokens
+  //   是按原条目名发令的。DG-SEC-003 后缩略图与原图同判可见性,不带 mt 就必然先 403 再回退原图,
+  //   图片代理(UA 漂移、只能靠 mt 认人)下等于每张图白跑一趟。
   function tok(u) {
-    const t = (ctx.mode.myUploadTokens || {})[u.split('/').pop().split('?')[0]];
+    const toks = ctx.mode.myUploadTokens || {};
+    const key = u.split('/').pop().split('?')[0];
+    let t = toks[key];
+    if (!t && u.includes('thumbs/')) {
+      const stem = MR.mediaStem(key);
+      for (const n in toks)
+        if (MR.mediaStem(n) === stem) {
+          t = toks[n];
+          break;
+        }
+    }
     return t ? u + '?mt=' + t : u;
   }
   function attempt() {

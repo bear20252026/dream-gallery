@@ -16,6 +16,26 @@
 export function stripThumbs(name) {
   return name.startsWith('thumbs/') ? name.slice(7) : name;
 }
+// 缩略图与原图是同一件内容(DG-SEC-003):可见性一律继承原图,不再有"thumbs 恒公开"这条短路。
+// gen-thumbs.js 把任意扩展名统一写成 thumbs/<主干>.webp —— 前缀去掉了扩展名却换了,
+// 所以归类要按"主干名"回查原条目,只比全名会把私有照片的缩略图误判成"查无此名"而公开。
+export function isThumbName(name) {
+  return String(name || '').startsWith('thumbs/');
+}
+export function mediaStem(name) {
+  const base = stripThumbs(String(name || ''));
+  const dot = base.lastIndexOf('.');
+  return dot > 0 ? base.slice(0, dot) : base;
+}
+// thumbs/<x>.webp → 候选原图条目名(在调用方自备的已知条目名单里按主干名找)。
+// 名单里没有就返回剥前缀后的名字本身,由决策表按"无归属"拒绝(fail-closed)。
+export function thumbSourceNames(name, entryNames) {
+  const base = stripThumbs(name);
+  if (!isThumbName(name)) return [base];
+  const stem = mediaStem(base);
+  const hits = (entryNames || []).filter((n) => mediaStem(n) === stem);
+  return hits.length ? Array.from(new Set(hits)) : [base];
+}
 // 白板作品:全员展品(仅 photos 目录)
 export function isWhiteboard(dir, base) {
   return dir === 'photos' && /^whiteboard-/i.test(base);
@@ -60,13 +80,18 @@ export function captionAllowed(o) {
 }
 
 // ===================== 下载放行决策(服务端 canServeMedia,2026-07-26/27 堵口版) =====================
-// 输入:{dir, base(已 stripThumbs), isDemo, isMine, hasMt, pending, globalSpecial/deviceSpecial(已废弃,忽略)}
+// 输入:{dir, base(缩略图必须先经 thumbSourceNames 归一成**原图条目名**;isThumb 声明这一形态),
+//        isDemo, isMine, hasMt, pending, globalSpecial/deviceSpecial(已废弃,忽略)}
 // 输出:{allow, pub} pub=true 表示可按公开名给 CDN 边缘缓存(req._mediaPublic)
 // 表:白板/大屏/演示=公开;本人上传(dk 或 mt)=仅本人;其余一律拒绝
 // pending 在最前面短路:待审核展品即便走的是"按名字公开"的白板/大屏路径也不下发
 //   (否则审核失败的内容会先被 CDN 缓存成公开对象)
+// 缩略图不另立规则:归一后吃的就是原图那一条,所以私有照片的缩略图与原图同判(陌生人拒、本人放行、
+//   CDN 分级同样是 private)——DG-SEC-003 的成因正是旧的 `if (name.includes('thumbs/')) return true` 无条件短路
 export function serveDecision(o) {
   if (isPending(o)) return { allow: false, pub: false };
+  // 带着 thumbs/ 前缀进来=调用方漏了归一,一律拒:宁可挡住也不留第二条绕过原图判定的路
+  if (isThumbName(o.base)) return { allow: false, pub: false };
   if (isWhiteboard(o.dir, o.base)) return { allow: true, pub: true };
   if (isBigscreen(o.dir, o.base)) return { allow: true, pub: true };
   if (o.isDemo) return { allow: true, pub: true };

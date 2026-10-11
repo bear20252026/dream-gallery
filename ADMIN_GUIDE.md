@@ -1,5 +1,16 @@
 # 梦幻画廊 · 后台操作手册(仅限展出方阅读)
 
+## 2026-10-12 第四轮审计整改后的变化(只看这一节就知道"对访客有什么影响")
+
+- **「踢出」和「拉黑 IP」现在是真的断开**。以前只挡主页:被踢的人只要直接调用接口,聊天、留言、上传、语音合成照用不误。现在整个 `/api/*` 都先过这道判定,被拦返回 403 且禁止任何缓存回放。**只有 4 条"回心转意"的通道仍然开着**——查看自己的状态、提交重新申请、补充身份凭据、以及那条让踢出动作秒级生效的推送;所以被踢的人看得到"你已被请出"的页面,也能正常递交申请,但进不来。
+- **白板作品不能再被陌生人顶掉**。以前知道墙上某幅画的文件名(后台列表、作品墙、`/api/files` 里都能看到)就能匿名覆盖它。现在新画的名字由服务器发,想改动只能改**自己那幅**:没表明身份 → 401;别人的或 2026-10-12 之前的老作品 → 409(原画一个字节都不会动)。**你(后台 token)的权限照旧**:可以自己挑名字、可以直接覆盖换画。⚠️ 存量老作品在台账里**没有归属记录**,任何人都不能匿名覆盖(等于永久保护),也不会自动归给某个访客——要认领只能人工核对。
+- **照片缩略图与原图同权**。以前本人私有照片的原图 403、但 1024px 缩略图人人可取;现在缩略图先归回原图再判定,CDN 缓存分级也跟着改成 private。前台画面不会因此断图(取不到缩略图会自动回退原图)。
+- **访客自建链接(「📷 上传/链接」里加的自定义链接)加了限制**:必须有有效入馆身份才能提交(否则 401,提示回游戏页重新进入)、每人最多 10 条(超了 400)、全站最多 300 条(超了 503 并给出恢复时间)、每分钟最多 20 次请求(超了 429)。全站上限在**写数据库之前**判,不是写完再说"不行"——旧口径是"单条记录最多 10 项 + 无总量",刷一条新记录就能绕过,现在两条都封住了。**300 这个量级是我定的,要改告诉我**(改代码里的常量,不是环境变量);批量清理去后台「展示区」。
+- **磁盘与并发有了硬闸门(防写满)**:剩余空间低于 2GB、或在途上传超过 4 个,匿名上传直接 503(带"稍后再试"的秒数,此时一个字节都还没写);**你的后台 token 上传不受此限**(归档批量是正当负载)。空间读数取自系统调用,读不到时只保留并发闸并告警一次。
+- **改昵称**:`POST /api/entry/rename` 仍是公开接口,但被封禁身份会被上面那道闸 403;访客端的自助改名入口早就是死代码,实际只有后台审批页在用。要给访客改名就走审批页的「备注设备名」。
+- **紧急开关汇总(环境变量)**:`TOKEN_QUERY=0`(公网禁 query 传 token,生产已启用)、`DISK_MIN_FREE_BYTES`(默认 2GB,低于它就拒匿名上传)、`UPLOAD_MAX_INFLIGHT`(默认 4)、`RETENTION_DISABLED=1`、`RETENTION_DELETE_APPLICANTS=1`(默认关,只打标记)、`R2_OUTBOX_DISABLE=1`、`NSFW_MODERATE=1`。⚠️ 开着 `TOKEN_QUERY=0` 时,白板页请从画廊内正常进馆后打开(吃访客 Cookie);旧的"甩一个 `whiteboard.html?token=<TOKEN>` 链接"仍然可用(走后台权限),但**别把带 token 的 URL 发进聊天/群**——它会留在浏览器历史与访问日志里。
+- **不是环境变量、写死在代码里的数**:`USER_LINKS_PER_PERSON=10` / `USER_LINKS_MAX=300` / `MYLINKS_RATE=20`(都在 `lib/siteconfig.js:187-189`)。要调这几个口径得改代码再发布——告诉我数字即可,别自己在服务器上改。
+
 ## 2026-10-03 发布版本
 
 本次网站版本包含下述小羊同行、首次旅程第四轮及引导改造。保留原B612星球外观和开场→沙漠→家的回忆→国王星的顺序，增加主动观察、任务续接与手机飞行操作。下方“本地待发布”是开发时的历史记录。此次发布保留现有访客数据与配置。
@@ -46,7 +57,7 @@
 
 - **开启邀请函即放行**:访客首页看到 💌 邀请函,点「开启邀请函」直接进,无需你同意。身份以 IP+UA 为主、设备指纹(屏幕/时区/语言/平台/canvas)为辅;同一个人换 App(如千问转接)也会归并到同一条记录。
 - **昵称**:访客进馆后自己设置(5 秒弹窗 + ⚙设置),你在审批页看到他的最新昵称。
-- **审批页仍可**:撤销批准(送回首页)、拒绝、拉黑/关注 IP、备注设备名。被踢/待重审设备**无法用伪造探针头绕过**门禁(2026-09-18 P1#1)。
+- **审批页仍可**:撤销批准(送回首页)、拒绝、拉黑/关注 IP、备注设备名。被踢/待重审设备**无法用伪造探针头绕过门禁**(2026-09-18 P1#1),**且 2026-10-12 起连 API 也一起挡住**(聊天/留言/上传/语音/AI 配文全部 403;只有"看状态、重新申请、补身份、接收踢出推送"这 4 条还开着)。
 
 ## 二、入馆答题(建筑内第二道门)
 
@@ -79,8 +90,10 @@
 
 ## 六、反刷防护(2026-09-20 起**超限硬拒**,不再只预警)
 
-- **公开上传(照片/视频/白板)四类自动检测**:🚨 速率(同设备 10 分钟 >8 个文件)、📦 大单(单文件 >300MB)、💾 累计(同设备 >2GB)——**超限即删文件并返回 429**;🛑 全盘(photos+videos >10GB)仍只预警不拦单人(不因他人占盘连坐)。
+- **公开上传(照片/视频/白板)四类自动检测**:🚨 速率(同设备 10 分钟 >8 个文件)、📦 大单(单文件 >300MB)、💾 累计(同设备 >2GB)——**超限即删文件并返回 429**;🛑 **全盘水位 2026-10-12 起改为真拦截**:剩余空间低于 `DISK_MIN_FREE`(默认 2GB)或在途上传超过 `UPLOAD_MAX_INFLIGHT`(默认 4 个)时,匿名上传直接 503 + `Retry-After`,**此时一个字节都还没写到盘上**;你自己的后台 token 上传豁免(归档批量是正当负载)。此前"占满 >10GB 只预警不拦单人"这条已作废——磁盘被写满时连正常上传都做不了,预警救不了场。
 - **白板作品同样受速率硬拒**(匿名公开通道,2026-09-20 起),且图片过 NSFW 审核;**开启审核且审核不可用时白板 fail-closed**(挂 `pending`:文件保留、暂不上墙、复核通过后自动上墙)。未开启审核时照旧放行(成本策略,见「环境变量」)。
+- **白板覆盖只认归属(2026-10-12)**:新作品名由服务器签发,前端保存后必须改用服务器返回的名字;再次保存同一幅要靠 Cookie 里的入馆身份,服务器台账上 `aid` 是你才允许覆盖。**没身份 401、动别人的或老作品 409**,判定发生在打开文件之前,原图字节与它的分享令牌一个都不动。你走后台 token 上传仍可挑名与覆盖。
+- **访客自建链接 `/api/mylinks`(2026-10-12 加固)**:必须有有效入馆身份(否则 401)、每人 10 条(`USER_LINKS_PER_PERSON`,按归属 vid 计,超了 400)、全站 300 条(`USER_LINKS_MAX`,超限 503 + `Retry-After`,而且**在写库之前**就拒)、每分钟 20 次(`MYLINKS_RATE`,走 `lib/abuse.js` 的 `mylinks` 桶,超了 429)。旧行为是"单条记录最多 10 项 + 无总量",刷一条新记录就能绕过,现在两条都封住了。
 - **「我的上传」归属只认本人浏览器 Cookie 里的 vid(2026-10-11 变更)**:此前"同 UA 即同一人"的兜底已摘除——**同款机型/同版本浏览器的两个陌生访客,过去能互相看到对方私有上传的文件名并拿到其永久 `?mt=` 令牌**(审计 DG-SEC-001/002)。现在:①带归属标记 `aid` 的记录(2026-09-18 之后全部)只认 `aid === 本人有效 vid`;②极老的无 `aid` 记录仍可按 UA 命中,但**必须该访客自己有一个有效 vid**,并在命中当场把归属绑给这个 vid(一次性迁移,之后别人撞 UA 也领不走)。
 - **对访客的可见后果(须知)**:清理过 Cookie、或 App 内置浏览器拒 Cookie 的人,**其 2026-09-18 之后上传的照片无法自助认领**(文件仍在服务器,按数据保留铁律不删),需后台人工核对;会话 30 天空闲过期则由 `entryGate` 自愈(本人 Cookie 即恢复,不需批准)。**聊天/一念墙的昵称显示仍按 UA 取**(纯展示、不涉数据),同 UA 撞车时可能显示他人昵称 —— 挂待议。
 - **表现**:审批页顶部红色预警卡实时列出(类型/明细/设备/IP/文件),涉事设备自动打「⚠ 可疑」标记。
@@ -117,17 +130,23 @@
 | `USE_SQLITE` | 开 | 设 `0` 回退 JSON-only(测试探针自动使用) |
 | `GATE_DATA_FILE` | 根/gate_data.json | 数据文件重定向(测试隔离用);SQLite db 随之同目录派生 |
 | `NSFW_MODERATE` | 关 | 设 `1` 开启上传图片 AI 审核(有调用成本)。**2026-10-11 语义变更**:审核已开却**拿不到结论**(AI 全通道失败/超时/取样失败)时,匿名公开展品(白板)改为 **fail-closed**——文件保留但挂 `pending`、不上墙也不下发,复核通过后自动回归;私人上传仍按"自己看自己"放行。默认关这一成本策略不变 |
+| `DISK_MIN_FREE_BYTES` | 2GB | **2026-10-12 新增**:目标盘(photo/video 所在目录)剩余低于此 ⇒ 匿名上传一律 503 + `Retry-After`,**此时一个字节都没写**;`DISK_MAX`(旧的水位线)从"只预警"升为真拦截。**你的后台 token 上传豁免**(归档批量是正当负载)。`statfs` 读不到时(某些容器/特殊挂载)只保留并发闸并告警一次,不阻断服务 |
+| `UPLOAD_MAX_INFLIGHT` | 4 | **2026-10-12 新增**:进程内同时写盘的请求数上限(2 核小机的实测口径)。超出的匿名上传直接被拒并记一条预警。没带 `Content-Length` 的匿名请求按 8MB 预约额度——**没声明就不给匿名体积开空头**;漏还的槽位由 5 分钟兜底闸自动回收 |
+| 访客链接三上限 | 10 / 300 / 20 | ⚠️**不是环境变量**,是 `lib/siteconfig.js` 里的常量 `USER_LINKS_PER_PERSON` / `USER_LINKS_MAX` / `MYLINKS_RATE`(2026-10-12 起生效:每人 10 条按归属身份计、全站 300 条在写库之前拒、每 IP 每分钟 20 次)。要调口径改代码并发布 |
 
 ## 服务器与部署纪律
 
 - **服务器**:阿里云 `101.133.235.110`,pm2 名 `gallery`,目录 `/opt/gallery/`(**不是 git 仓库**,同步靠 scp);SSH 密钥 `~/Downloads/网站私钥bear1.pem`。
 - **SSH 信任(2026-10-11)**:脚本不再用 `StrictHostKeyChecking=no`,改 **`accept-new`**(首次信任、之后主机密钥变更即拒);仓库里存在 `scripts/known_hosts` 时自动固定使用。锁定动作:`bash scripts/deploy.sh --pin-hostkey` → **带外核对打印的 SHA256 指纹** → `mv scripts/known_hosts.new scripts/known_hosts` 并提交(信任锚不凭空写死)。私钥解析优先级 `SSH_KEY`/`GIT_SSH_COMMAND` → `~/.ssh/gk-deploy.pem` → 桌面「交接笔记」兜底(仅这条 `chmod 600` 且退出时删);登录用户抽成 `SSH_USER`(默认仍 root,切非 root 属服务器侧改造)。
 - **后端备份位置(2026-10-11)**:`backend-sync.sh` 的 `.bak-<时间戳>` 已**移出 web root** → `/opt/gallery-backups/backend/`(相对路径扁平化防撞名,留最近 10 份)。此前它落在 `/opt/gallery`,而 `*.bak-时间戳` 同时绕过黑名单的两条结尾锚规则,等于公网可下载后端源码。
-- **改前端**(src/ 或根 html):`npm run build` → 先传 `dist/assets/*` 再传 `dist/*.html`+`sw.js`+`manifest.json`,不用重启。`deploy.sh` 现按**本次 tar 清单差集**清理 `assets/`(仍保留最新 3 个 `main-*.js`,防旧 HTML 被 Cloudflare 边缘缓存后 404),根级只删"受控 Vite 入口清单"里的旧入口,拿不准的只打印 WARN 不删;`--no-prune` 跳过,`--no-models`/`--no-backend`/`--dry`/`--yes` 原义不变。**新增根级公开文件必须同时登记进 `lib/security.js` 的根级白名单**,否则公网 404(与 deploy 的入口清单同源,防漂移)。
-- **改后端**(server.js/lib/):scp 后**必须** `pm2 restart gallery --update-env`;`pm2 restart` 现用 `--kill-timeout 25000` 配合服务端 15s 优雅排空(旧值 9000 会把排空中的长请求 SIGKILL)。
+- **改前端**(src/ 或根 html):`npm run build` → 先传 `dist/assets/*` 再传 `dist/*.html`+`sw.js`+`manifest.json`,不用重启。`deploy.sh` 现按**本次 tar 清单差集**清理 `assets/`(仍保留最新 3 个 `main-*.js`,防旧 HTML 被 Cloudflare 边缘缓存后 404),根级只删"受控 Vite 入口清单"里的旧入口,拿不准的只打印 WARN 不删;`--no-prune` 跳过清理。**⚠️2026-10-12 起这批开关的语义变了**:`--yes` = 授权非交互同步后端(不加它而在管道/CI 里跑,后端同步直接硬失败 exit 4,部署在上传前端**之前**就中止);`--no-backend` = 不上传后端**但仍校验**,一旦真有差异就 exit 6(确认要带着差异上线才加 `--allow-backend-drift`,此时结尾打 `DEPLOY_PARTIAL`);`--no-models`/`--pin-hostkey` 原义不变;新增 `--check`(强制逐文件漂移复检,默认已开)与 `--no-drift`(主动放弃字节级证据,会打 `::AUDIT::`)。完整用法 `bash scripts/deploy.sh --help`。**新增根级公开文件必须同时登记进 `lib/security.js` 的根级白名单**,否则公网 404(与 deploy 的入口清单同源,防漂移)。
+- **改后端**(server.js/lib/):顺序是**后端先、前端后**(新后端跑旧前端是安全的;反过来新页面会打到没有的接口上)。`backend-sync.sh` 现在有**退出码契约**:`0` 一致或已上传且 md5 复核通过 / `1` 上传或复核出错 / `3` 你在终端里答了 N / `4` 非交互又没 `--yes` / `5` `--check` 发现有差异。任何一个非 0 都会**中止部署**,不再"警告一句然后继续"。独立跑同步:`bash scripts/backend-sync.sh`(会列差异并问 y/N)或 `--yes`;只想看差异:`--dry`;只问有没有差异(给脚本用):`--check`。
+- **改完必须重启**:`pm2 restart gallery --update-env --kill-timeout 25000`(配合服务端 15s 优雅排空;旧值 9000 会把排空中的长请求 SIGKILL)。`deploy.sh` 第 6 步现在**从 `pm2 status` 的输出里读到 `gallery … online` 才算过**,读不到就把 `ssh … 'pm2 logs gallery --lines 50'` 的处置命令打出来并退出;第 8b 步用 **`scripts/verify-drift.sh`(新,只读)** 逐文件比对"服务器上的字节 == 本次发出去的字节"(后端 + 前端 dist;退出码 0 一致 / 1 有漂移 / 2 连不上或清单为空——**2 也算失败,状态未知不等于一致**),可随时单独跑一次:`bash scripts/verify-drift.sh --backend-only`。
+- **每步结论有台账**:部署过程会把 BACKEND/FRONTEND/RESTART/MODELS/VERIFY/DRIFT 六项结论写进 `.tmp/deploy-state.env`,失败收尾时打印"已发出的部分"。结尾标记四种:**`DEPLOY_OK`**(前后端同源 + 线上 http_code/healthz/chunk 三项齐)、`DEPLOY_PARTIAL`(后端被你放行没同步 / 模型同步出错)、`DEPLOY_FAILED verify`、`DEPLOY_FAILED drift`。**别只看"脚本没报错"**——过去 `cmd | tail` 这类写法把真实退出码吃掉,就是"新前端 + 旧后端"事故的成因。
 - **数据层**:SQLite 主库(`gate_data.db`,WAL)+ JSON 镜像原子写双保险;`USE_SQLITE=0` 可回退。⚠️ 例外:链接埋点现走**内存攒批(2s / 20 条)**再落库——公开接口每请求做一次整库 snapshot 写会被刷成 DoS;代价是后台 `linkClicks` 最多滞后 2s,「清空点击」会连带作废在途批次。
-- **上线前必跑**:`npm test`(test-store 4 + test.js 108 + **test-session 46** + **test-upload-security 20** + test-mobile 6)、`npx vitest run`(**713 项 / 71 文件**)、`npm run lint`、`npm run typecheck`、`npm run deps`、checkJs 计数不得超过 `scripts/checkjs-baseline.txt`(单一真相,**CI 超基线即 fail**,不再只 warning;每批重构往下压)、`npm run test:scene`(截图回归 4 检查点)、`node scripts/probe/security-fix-probe.js`(13 项)、**`scripts/probe/sw-admin-bypass-probe.cjs`(14 项)+ `scripts/probe/admin-credential-hygiene-probe.cjs`(24 项)**。全绿才部署。
-- **发布闸门(2026-10-11)**:`scripts/release.sh` 在 `git push origin main` 之后会**等 GitHub Actions 跑完、读 `conclusion` 字段判成败,红了或取不到即中止**(此前 CI 只是"线上已发布"的事后验证)。急用 `--no-ci`(或 `SKIP_CI_GATE=1`),或 `bash scripts/deploy.sh` 直接部署已 push 的 HEAD。
+- **上线前必跑**:`npm test`(test-store 4 + test.js 108 + **test-session 46** + **test-upload-security 20** + test-mobile 6)、`npx vitest run`(**871 项 / 79 文件**,2026-10-12 校对)、`npm run lint`、`npm run typecheck`、`npm run deps`(depcruise,**no-circular 是硬闸**:后端模块之间成环直接红;`lib/local-request.js` 就是为了断 `admin → security → siteconfig → admin` 那个环而存在的纯谓词叶子模块,别把它合并回去)、checkJs 计数不得超过 `scripts/checkjs-baseline.txt`(单一真相,**CI 超基线即 fail**,不再只 warning;每批重构往下压)、`npm run test:scene`(截图回归 4 检查点)、`node scripts/probe/security-fix-probe.js`(13 项)、**`scripts/probe/sw-admin-bypass-probe.cjs`(14 项)+ `scripts/probe/admin-credential-hygiene-probe.cjs`(24 项)**。全绿才部署。⚠️**"全绿"要读结果字段而不是看命令跑完**:`cmd | tail` 的 `$?` 属于 `tail`;`--check`/`--dry` 这类只读命令也必须看退出码。
+- **发布闸门(2026-10-11 建,2026-10-12 收紧)**:`scripts/release.sh` 在 `git push origin main` 之后会**等 GitHub Actions 跑完、读 `conclusion` 字段判成败,红了或取不到即中止**。新增:`--yes` 整套非交互(透传到 deploy.sh 再到 backend-sync.sh);第 2 步会先做一次**后端漂移预检**(`backend-sync.sh --check`,只读不上传),确有差异而你又不在终端里、也没给 `--yes` ⇒ 立刻 `RELEASE_FAILED` 收场,不再烧完十几分钟构建才卡在部署阶段。**逃生门现在必须署名**:`--no-ci=<一句原因>`(或 `SKIP_CI_GATE=1 NO_CI_REASON='…'`),**不给原因直接拒绝执行**;每次绕过会往 `.tmp/no-ci-audit.log` 追加一行 `ts/actor/branch/commit/reason`(本地、不进仓库),半年后还能复盘"当时为什么绕的"。失败一律打 `RELEASE_FAILED`,成功打 `RELEASE_OK <commit>`。
+- **分支保护(2026-10-12 配置)**:`main` 要求状态检查 **`build-and-test`** 与 **`smoke`** 通过才能合并,且禁 force push / 禁删分支 / 分支必须与 HEAD 同步。这两个名字是从真实 run 的 check-runs 里核对来的(GitHub Actions 的 check 名 = job 名,工作流文件里那个 `name: CI` 是**工作流**名,不是必须检查项的名字——照抄它会永远 pending)。`build-and-test` 现在跑 4 条后端脚本(test-store / test / test-session / test-upload-security)+ lint + typecheck + depcruise + vitest + build + checkJs 基线 + 体积闸;`smoke` 跑无头浏览器冒烟与场景截图比对。⚠️ `test-mobile.js` 只在本地 `npm test` 里跑,CI 的 `build-and-test` 作业没装 Chromium,加不进去(见工作流里的 KNOWN GAP 注释)。
 - **部署后**:`node scripts/probe/debug-browser.js https://cloudbear.cloud/ 15` 确认无 pageerror。**后台凭据/SW 这批改动上线后额外必做**:线上跑 `sw-admin-bypass-probe`(14)与 `admin-credential-hygiene-probe`(24),确认 `.env` 已设 `TOKEN`(未设且 `NODE_ENV=production` 会让进程拒绝启动),并考虑把 `TOKEN_QUERY=0` 打开。
 - **生产环境现状(2026-10-11 已配置)**:`.env` 里除 `TOKEN` 外已加 **`NODE_ENV=production`**(启用启动期 TOKEN fail-fast)与 **`TOKEN_QUERY=0`**(公网禁 query 传 token;后台引导仍可用 `?token=`,API 走会话 Cookie 或 `x-token`)。改这两项务必**先确认 `TOKEN` 在**——顺序反了 `pm2 restart` 后进程会拒绝启动。`.env` 改动属部署盲区,备份写 `/opt/gallery-backups/env-<时间戳>`(绝不写 web root)。
 - **web root 卫生**:历史 29 个 `*.bak*`(含 `server.js.bak-*`、`gate_data.json.bak-*` 访客数据、104MB `photos.bak.tgz`、11 个点开头的)已全部移入 `/opt/gallery-backups/webroot-bak-quarantine-20261011/`,根级零残留;新备份由 `backend-sync.sh` 直接写到 web root 外。**建议**:Cloudflare 边缘可能仍缓存这些 URL(旧响应曾带 `public,max-age=86400`),Dashboard→缓存→Purge Everything(R2 令牌无 purge 权限,需你手动)。

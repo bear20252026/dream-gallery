@@ -1,6 +1,21 @@
 # Automated test gate: turns "deploy only when everything is green" from a human rule into automation
 # Triggers: pushes to main / any PR
 # Steps: lint -> typecheck -> unit tests -> build -> backend regression -> browser smoke test (including the light-budget gate)
+#
+# ── branch protection: exact required check contexts (do not rename these job ids without it) ──
+# GitHub reports one check run PER JOB, and the check-run name is the job's `name:` (falling back to
+# the job id). The jobs below pin `name:` explicitly so the context strings cannot drift silently if
+# someone reorders/re-keys a job. Verified live on main commit a9ff064 (2026-10-12) via
+#   gh api repos/<owner>/<repo>/commits/<sha>/check-runs --jq '.check_runs[].name'
+# → ["smoke","build-and-test"]  (total_count 2, no legacy status contexts)
+# Put BOTH of these in branch protection for main:
+#     build-and-test
+#     smoke
+# The workflow roll-up name "CI" is a check SUITE, not a required check context — requiring "CI" silently
+# matches nothing, so the run can go red while protection still passes. Require the two job contexts instead.
+# `smoke` has needs: [build-and-test]; if the first fails, `smoke` is skipped and never reports → the
+# required check stays "pending" → protection keeps blocking. That is the intended fail-closed behaviour
+# (a green workflow therefore cannot be produced by skipping the gates).
 name: CI
 
 on:
@@ -15,9 +30,15 @@ on:
         type: boolean
         default: false
 
+# No `paths:`/`paths-ignore` filters and no `concurrency:` group on purpose:
+# a path filter would let a commit that only touches e.g. lib/ or hill-src/ produce NO checks at all
+# (required contexts then sit "pending" forever, or worse, protection reports "Expected — Waiting for status"),
+# and a `concurrency: cancel-in-progress` group would cancel the run whose contexts protection needs.
 jobs:
   build-and-test:
+    name: build-and-test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -56,6 +77,22 @@ jobs:
       - name: Backend API regression (127 assertions - data validation / security boundaries / quiz gate / approval gate)
         run: node scripts/test/test.js
 
+      # 会话机制 46 项(吊销永久 + 过期自愈 + 兼容护栏 + dk 归并收紧)与上传归属 20 项(同 UA 陌生人互不可见)。
+      # 这两条只 require lib/*、把 GATE_DATA_FILE 指到系统临时目录,零网络零浏览器 ⇒ 与 npm test 同口径。
+      # 补它们的理由:release.sh 跑的是 `npm test`(5 条),而这里原来只跑 2 条 ⇒ "CI 绿"并不等于"后端全测过",
+      # 而 CI 绿现在是 main 分支保护的必要项,口径必须对齐。
+      - name: Backend session regression (revocation permanence / expiry self-heal / legacy guards)
+        run: node scripts/test/test-session.js
+
+      - name: Upload ownership security regression (same-UA strangers isolated / legacy claim binds aid)
+        run: node scripts/test/test-upload-security.js
+
+      # ⚠️ KNOWN GAP(刻意不补,别照抄上面两条):scripts/test/test-mobile.js(6 项)要无头浏览器,
+      # 而 build-and-test 作业不装 Chromium(只有 smoke 作业装了 playwright-core 的浏览器),
+      # 加进来会把 CI 直接打红。它由本地 `npm test`(release.sh 第 3 步)与 smoke 作业分别覆盖。
+      #
+      # Also non-blocking by design: the `npm audit` step above swallows its own failure (`|| echo warning`),
+      # so a high/critical advisory can never turn the workflow red. That is a reporting step, not a gate.
       - name: Type-health baseline (checkJs tiers, BLOCKING)
         run: |
           COUNT=$(npx tsc -p tsconfig.checkjs.json 2>&1 | grep -c "error TS" || true)
@@ -90,7 +127,10 @@ jobs:
 
   # Browser smoke test: start the local server and run the health gate in a headless browser (canvas / ctx / light budget / page errors)
   smoke:
+    # pinned so the required-check context stays literally "smoke" (same value as the job id)
+    name: smoke
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     needs: build-and-test
     steps:
       - uses: actions/checkout@v5

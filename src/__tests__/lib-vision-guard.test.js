@@ -6,6 +6,8 @@
 //   ④ vision 补上 ratelimit 桶(每 IP 每分钟 6 次,缓存命中免检);
 //   ⑤ moderateImage 三态 'allow'|'block'|'unavailable';
 //   ⑥ 公开展品(白板)审核不可用 → 文件保留 + uploads[name].pending + 202,决策表据此不上墙/不下发。
+//     DG-SEC-001(2026-10-12)后白板名由服务端签发、覆盖只认 aid === 本人 vid,故这三条按
+//     "本人重保存既有作品"来钉(见 VID_WB):pending 语义本身一字未变。
 // 约定:lib/*.js 走 createRequire;aichannels/r2sync/siteconfig 在加载前打 require.cache 桩
 //   ⇒ 零真网络、零真 AI 调用;isMineUpload 用本地替身(授权语义正由另一条整改线改,本文件不钉它)。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -71,6 +73,13 @@ const PHOTOS = path.join(ROOT, 'photos');
 const TAG = 'lib-vision-guard-';
 let seqNo = 0;
 const uniq = () => `${TAG}${Date.now().toString(36)}-${(seqNo++).toString(36)}`;
+
+// 白板这一路现在吃 store.authVid(req)(Cookie vid → 有有效会话的档案;不带 sess 的存量档案按
+// 迁移护栏视为有效)。没有身份时匿名保存会被换成服务端签发名 ⇒ 断言打不到本文件准备的路径,
+// 每次还会往 photos/ 泄漏一个改名后的文件。固定一个本人身份,名字保得住、清理也清得掉。
+const VID_WB = 'vid-wb-' + TAG;
+gateData.applicants[VID_WB] = { id: VID_WB, status: 'approved' };
+const asOwner = () => ({ cookie: 'vid=' + VID_WB });
 
 // ---------- req/res 桩 ----------
 function fakeRes() {
@@ -382,8 +391,8 @@ describe('DG-UP-003 公开展品 pending:不上墙、不下发、不删文件', 
     process.env.NSFW_MODERATE = '1';
     chatVisionMock.mockResolvedValue(null);
     const name = wb();
-    const p = path.join(PHOTOS, name);
-    created.push(p);
+    const p = mkPhoto(name, Buffer.alloc(64, 0x11)); // 既有作品:先有文件
+    gateData.uploads[name] = { aid: VID_WB, dk: 'test-dk', ts: 1, mt: 'test-mt' }; // 且有归属
     let keptDuringReview = null;
     chatVisionMock.mockImplementation(async () => {
       await new Promise((r) => setTimeout(r, 60)); // 审核"进行中"时文件必须还在盘上
@@ -391,10 +400,11 @@ describe('DG-UP-003 公开展品 pending:不上墙、不下发、不删文件', 
       return null;
     });
     const res = fakeRes();
-    handleUpload(bodyReq(Buffer.alloc(200, 0x66)), res, { dir: 'photos', name }); // 白板走非公开分支
+    handleUpload(bodyReq(Buffer.alloc(200, 0x66), asOwner()), res, { dir: 'photos', name }); // 本人重保存
     await waitRes(res);
 
     expect(res.code).toBe(202);
+    expect(res.json().name).toBe(name); // 本人重保存:名字不被换走
     expect(res.json().pending).toBe(true);
     expect(String(res.json().message)).toContain('审核');
     expect(keptDuringReview).toBe(true);
@@ -405,18 +415,19 @@ describe('DG-UP-003 公开展品 pending:不上墙、不下发、不删文件', 
 
   it('重画同名且审核通过 → 201 且 pending 标记被摘掉', async () => {
     const name = wb();
-    const p = path.join(PHOTOS, name);
-    created.push(p);
+    const p = mkPhoto(name, Buffer.alloc(64, 0x11));
     gateData.uploads = gateData.uploads || {};
-    gateData.uploads[name] = { mine: true, dk: 'x', ts: 1, mt: 'aaaa', pending: Date.now() };
+    gateData.uploads[name] = { aid: VID_WB, dk: 'x', ts: 1, mt: 'aaaa', pending: Date.now() };
 
     process.env.NSFW_MODERATE = '1';
     chatVisionMock.mockResolvedValue({ text: 'PASS' });
     const res = fakeRes();
-    handleUpload(bodyReq(Buffer.alloc(200, 0x66)), res, { dir: 'photos', name });
+    handleUpload(bodyReq(Buffer.alloc(200, 0x66), asOwner()), res, { dir: 'photos', name });
     await waitRes(res);
 
     expect(res.code).toBe(201);
+    expect(res.json().name).toBe(name);
+    expect(fs.existsSync(p)).toBe(true);
     expect(gateData.uploads[name].pending).toBeUndefined();
   });
 
@@ -424,12 +435,14 @@ describe('DG-UP-003 公开展品 pending:不上墙、不下发、不删文件', 
     process.env.NSFW_MODERATE = '1';
     chatVisionMock.mockResolvedValue({ text: 'BLOCK' });
     const name = wb();
-    const p = path.join(PHOTOS, name);
+    const p = mkPhoto(name, Buffer.alloc(64, 0x11));
+    gateData.uploads[name] = { aid: VID_WB, dk: 'test-dk', ts: 1, mt: 'test-mt' };
     const res = fakeRes();
-    handleUpload(bodyReq(Buffer.alloc(200, 0x66)), res, { dir: 'photos', name });
+    handleUpload(bodyReq(Buffer.alloc(200, 0x66), asOwner()), res, { dir: 'photos', name });
     await waitRes(res);
 
     expect(res.code).toBe(422);
+    expect(res.json().name).toBeUndefined(); // 未通过审核不回作品名
     expect(fs.existsSync(p)).toBe(false);
     expect(gateData.uploads[name]).toBeUndefined();
   });

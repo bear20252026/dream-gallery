@@ -9,7 +9,9 @@
 // 配置文件: 以上均可在 .env 中设置(真实环境变量优先)
 //
 // 路由(2026-09-02 拆分):所有 API 端点集中声明在 lib/routes.js(带 auth 标注),
-// 本文件只负责:安全头 → 路由分发 → 入口守卫 → 访问统计 → 静态服务。
+// 本文件只负责:安全头 → API 封禁守卫 → 路由分发 → 入口守卫 → 访问统计 → 静态服务。
+//   API 封禁守卫(lib/gate.apiBanGuard,2026-10-12):拉黑 IP / 被踢设备在 dispatch 之前即拒,
+//   堵住「entryGate 排在路由分发之后 → public API 绕过封禁校验」的洞;豁免入口/重进流四端点。
 
 const http = require('http');
 const fs = require('fs');
@@ -40,7 +42,7 @@ process.on('unhandledRejection', (e) => {
 const { ROOT, PORT, TOKEN, IS_PROD } = require('./lib/config');
 const { sendJson, safeJoin } = require('./lib/util');
 const { recordVisit } = require('./lib/store');
-const { entryGate } = require('./lib/gate');
+const { entryGate, apiBanGuard } = require('./lib/gate');
 const { serveStatic } = require('./lib/files');
 const { dispatch } = require('./lib/routes');
 const { canServeMedia } = require('./lib/siteconfig');
@@ -92,6 +94,15 @@ const handler = (req, res) => {
     res.end();
     return;
   }
+
+  // ===================== API 层封禁守卫(2026-10-12 外部审计第四轮 Batch1) =====================
+  // dispatch 整张声明式路由表排在 entryGate 之前 ⇒ 被拉黑 IP / 被踢设备过去能打通所有 auth:'public'
+  // 的接口(/api/chat、/api/wish、匿名 /api/uploads、/api/mylinks、/api/tts、/api/clicks、/api/report、
+  // /api/entry/rename、vision……)。身份封禁裁决在此前移,覆盖整个 /api/ 面。
+  // 豁免入口/重进流(POST collect/reapply、GET status/watch——SSE 秒级踢出通道,拦了踢出就隐身),
+  // 详见 lib/gate.js 的 apiBanGuard。命中封禁即 403 JSON + Cache-Control: no-store(sendJson 自带)。
+  // ⚠️ 只读裁决:不建档、不计数、不改会话、不落盘。静态/页面请求不在此管辖(下面 entryGate 管)。
+  if (apiBanGuard(req, res, pathname)) return;
 
   // ===================== 路由分发(声明式路由表,见 lib/routes.js) =====================
   if (dispatch(req, res, pathname, query)) return;

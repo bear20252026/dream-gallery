@@ -1,6 +1,6 @@
 // lib/siteconfig.js canServeMedia 媒体门禁矩阵测试(2026-09-02 补覆盖)
 // 门禁决策单一源 = src/shared/mediarules.mjs;本测试锁行为:
-//   缩略图永远公开;演示照片/白板/大屏公开;普通模式下私有上传只有"本人有效 vid 会话"或本人 mt 可见
+//   缩略图继承原图可见性(DG-SEC-003);演示照片/白板/大屏公开;普通模式下私有上传只有"本人有效 vid 会话"或本人 mt 可见
 //   (2026-10-11 DG-SEC-001/002:UA 哈希 dk 不再单独构成授权;特殊模式已于 2026-09-06 删除)。
 // 注意:必须用 createRequire 与被测模块共享同一 Node require 缓存——
 //   vitest 的 ESM import 会为 lib/*.js 产生独立模块实例,gateData 改动传不进
@@ -81,9 +81,15 @@ afterEach(() => {
 });
 
 describe('canServeMedia 门禁矩阵', () => {
-  it('缩略图(thumbs/)永远公开——不涉及隐私', () => {
-    expect(canServeMedia(mockReq(), 'photos', 'thumbs/theirs.jpg')).toBe(true);
-    expect(canServeMedia(mockReq(), 'photos', 'thumbs/nobody.jpg')).toBe(true);
+  it('缩略图继承原图可见性(DG-SEC-003:旧语义"thumbs/ 永远公开"已废)', () => {
+    // 他人上传/查无归属的照片:原图拒,它的缩略图同样拒(旧实现在此无条件 return true = 私有内容经 1024px 缩略图泄露)
+    expect(canServeMedia(mockReq(), 'photos', 'thumbs/theirs.jpg')).toBe(false);
+    expect(canServeMedia(mockReq(), 'photos', 'thumbs/nobody.jpg')).toBe(false);
+    // 本人上传:带本人有效 vid 才放行;生成器把扩展名统一写成 .webp,按主干名回查原条目
+    expect(canServeMedia(mockReq('', asVid('owner')), 'photos', 'thumbs/mine.webp')).toBe(true);
+    expect(canServeMedia(mockReq('', asVid('other')), 'photos', 'thumbs/mine.webp')).toBe(false);
+    // 演示照片(按名字公开)的缩略图仍公开
+    expect(canServeMedia(mockReq(), 'photos', 'thumbs/201.webp')).toBe(true);
   });
 
   it('演示照片公开', () => {
@@ -136,6 +142,11 @@ describe('canServeMedia 门禁矩阵', () => {
     expect(pub._mediaPublic).toBe(true);
     const priv = mockReq();
     canServeMedia(priv, 'photos', 'nobody.jpg');
-    expect(priv._mediaPublic).toBeFalsy();
+    expect(priv._mediaPublic).toBe(false);
+    // 私有内容的缩略图同样不得被标成可公开缓存(DG-SEC-003;脏 true 也要被覆盖掉)
+    const privThumb = mockReq();
+    privThumb._mediaPublic = true;
+    expect(canServeMedia(privThumb, 'photos', 'thumbs/nobody.webp')).toBe(false);
+    expect(privThumb._mediaPublic).toBe(false);
   });
 });
