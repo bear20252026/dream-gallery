@@ -13,6 +13,7 @@
 const { launch } = require('./browser.js');
 const { spawn } = require('child_process');
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -50,7 +51,10 @@ function raw(pathname, opts) {
   const o = opts || {};
   const u = new URL(BASE);
   return new Promise((resolve, reject) => {
-    const req = http.request(
+    // https 必须走 https 模块:用 http.request 打 443 是明文送进 TLS 端口,
+    // Cloudflare 直接 400(线上模式 6 条 raw 断言因此假红,本地 http 口测不出来)。
+    const transport = u.protocol === 'https:' ? https : http;
+    const req = transport.request(
       {
         method: o.method || 'GET',
         hostname: u.hostname,
