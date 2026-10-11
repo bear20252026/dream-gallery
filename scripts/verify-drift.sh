@@ -21,7 +21,8 @@
 #
 #  SSH 参数与 deploy.sh / backend-sync.sh 完全一致:StrictHostKeyChecking=accept-new,
 #  信任锚用仓库内 scripts/known_hosts(存在才加 -o UserKnownHostsFile),私钥按
-#  SSH_KEY/GIT_SSH_COMMAND → ~/.ssh/gk-deploy.pem → 桌面交接笔记(兜底临时文件,退出即删) 的优先级解析。
+#  SSH_KEY/GIT_SSH_COMMAND 的 -i → ~/.ssh/gk-deploy.pem 的优先级解析(2026-10-12 起已删掉
+#  "从桌面交接笔记抽明文私钥写 /tmp"那条兜底:拿不到受控私钥就 exit 2,不做明文兜底)。
 #  本脚本**只读**远端,不写、不重启、不碰 .env / gate_data.*(数据与凭据按 AGENTS 明文属人工范围)。
 #  SSH_BIN/SCP_BIN 只是"绝不碰生产"的演练注入口,正常发布不要设。
 set -e -o pipefail
@@ -33,7 +34,6 @@ SSH_USER="${SSH_USER:-root}"
 SSH_BIN="${SSH_BIN:-ssh}"
 SCP_BIN="${SCP_BIN:-scp}"
 KNOWN_HOSTS="${KNOWN_HOSTS:-$ROOT_DIR/scripts/known_hosts}"
-HANDOVER_NOTE="${HANDOVER_NOTE:-C:/Users/17296/Desktop/梦幻画廊-交接笔记.md}"
 
 CHECK_BACKEND=1
 CHECK_DIST=1
@@ -47,7 +47,7 @@ for a in "$@"; do
       echo "用法: bash scripts/verify-drift.sh [--backend-only|--dist-only] [--pin-hostkey]"
       echo "  比对本地要发布的文件与服务器上的同名文件(\$SRV,默认 /opt/gallery),CRLF 两侧归一后比 md5。"
       echo "  退出码 0=一致 / 1=有漂移 / 2=无法比对(后两者都要当失败处理)。"
-      echo "  环境变量:HOST SSH_USER SRV KNOWN_HOSTS SSH_KEY HANDOVER_NOTE SSH_BIN SCP_BIN"
+      echo "  环境变量:HOST SSH_USER SRV KNOWN_HOSTS SSH_KEY SSH_BIN SCP_BIN"
       exit 0 ;;
   esac
 done
@@ -57,9 +57,8 @@ if [ "$DO_PIN" = "1" ]; then
   exec bash scripts/deploy.sh --pin-hostkey
 fi
 
-# ---- 私钥解析(与 deploy.sh/backend-sync.sh 同一优先级) ----
+# ---- 私钥解析(与 deploy.sh/backend-sync.sh 同一口径:只有两个受控来源,2026-10-12 删掉明文兜底) ----
 if [ -z "${KEY:-}" ]; then
-  OWN_KEY=0
   if [ -n "${SSH_KEY:-}" ] && [ -f "$SSH_KEY" ]; then
     KEY="$SSH_KEY"
   elif [ -n "${GIT_SSH_COMMAND:-}" ]; then
@@ -69,13 +68,10 @@ if [ -z "${KEY:-}" ]; then
   elif [ -f "$HOME/.ssh/gk-deploy.pem" ]; then
     KEY="$HOME/.ssh/gk-deploy.pem"
   else
-    [ -f "$HANDOVER_NOTE" ] || { echo "❌ 无可用私钥(SSH_KEY 未设、~/.ssh/gk-deploy.pem 不存在、交接笔记也不在 $HANDOVER_NOTE)—— 无法比对"; exit 2; }
-    KEY=/tmp/gk-verify.pem; OWN_KEY=1
-    awk '/BEGIN/{f=1} f{print} /END/{if(f)exit}' "$HANDOVER_NOTE" | tr -d '\r' > "$KEY"
-    chmod 600 "$KEY"
+    echo "❌ 无可用私钥:SSH_KEY 未设且 ~/.ssh/gk-deploy.pem 不存在 —— 无法比对(退出码 2,不是成功)。"
+    echo "   恢复:SSH_KEY=<私钥路径> bash scripts/verify-drift.sh   或把部署私钥放回 ~/.ssh/gk-deploy.pem"
+    exit 2
   fi
-else
-  OWN_KEY=0
 fi
 [ -f "$KEY" ] || { echo "❌ 私钥文件不存在:$KEY —— 无法比对(退出码 2,不是成功)"; exit 2; }
 
@@ -90,7 +86,6 @@ TARGET="$SSH_USER@$HOST"
 TMP=$(mktemp -d)
 cleanup() {
   rm -rf "$TMP"
-  [ "${OWN_KEY:-0}" = "1" ] && rm -f "$KEY"
   return 0
 }
 trap cleanup EXIT

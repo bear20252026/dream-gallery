@@ -22,11 +22,12 @@
 #    改用 md5 清单比对 + tar 打包上传,只用 ssh/scp/tar/find/md5sum 这些一定有的工具。
 #    模型同步失败**不阻断验证**(中途死更糟),但会计入状态并在第 7/8 步之后让整体以非 0 退出。
 #
-# ⚠️ 凭据风险(2026-10-11 记录):兜底路径仍从桌面 markdown「梦幻画廊-交接笔记.md」抽取 SSH 私钥。
-#    那台机器上把私钥以明文存在 markdown 里是已知风险 —— 迁移到 Windows OpenSSH Agent / 1Password /
-#    GitHub Secrets 属主人本人的凭据管理动作,本脚本**不删**那台机器上的任何文件,只改读取优先级:
-#    ①SSH_KEY(或 GIT_SSH_COMMAND 里的 -i) 环境变量 ②~/.ssh/gk-deploy.pem(2026-10-05 重建的耐久私钥)
-#    ③桌面 markdown 兜底。三处都用同一把即可,别再造第二份临时私钥。
+# ⚠️ 凭据纪律(2026-10-12 收紧):私钥**只**接受两个受控来源——
+#    ①SSH_KEY 环境变量(或 GIT_SSH_COMMAND 里的 -i 指向的文件) ②~/.ssh/gk-deploy.pem(2026-10-05 重建的耐久私钥)。
+#    原先的第③条"从桌面 markdown「梦幻画廊-交接笔记.md」awk 出私钥写到 /tmp/gk.pem"已**删除**(审计第二批
+#    「清理部署私钥的明文回退路径」):那条路把明文私钥落到世界可读目录,脚本崩溃就留在盘上,源头本身也是
+#    桌面明文 md。找不到受控私钥现在直接 exit 1,并打印两条恢复办法。
+#    把私钥从桌面 md 迁进 Windows OpenSSH Agent / 1Password 属主人本人的凭据管理动作,脚本不碰你机器上的文件。
 #
 # ⚠️ SSH 主机信任(2026-10-11):改用 StrictHostKeyChecking=accept-new —— 首次信任、之后主机密钥变更即拒。
 #    信任锚优先用仓库内 scripts/known_hosts(若存在);用 --pin-hostkey 生成后提交进仓库即可锁定。
@@ -41,7 +42,6 @@ SRV="${SRV:-/opt/gallery}"
 # SSH_BIN/SCP_BIN:默认 ssh/scp;只有"绝不碰生产"的离线演练才覆盖(与 backend-sync.sh 同一套)
 SSH_BIN="${SSH_BIN:-ssh}"
 SCP_BIN="${SCP_BIN:-scp}"
-HANDOVER_NOTE="${HANDOVER_NOTE:-C:/Users/17296/Desktop/梦幻画廊-交接笔记.md}"
 KNOWN_HOSTS="${KNOWN_HOSTS:-$ROOT_DIR/scripts/known_hosts}"
 SYNC_MODELS=1
 SYNC_BACKEND=1
@@ -50,8 +50,7 @@ DEPLOY_PARTIAL=0   # 1 = 后端与服务器有差异且已被明确放行 ⇒ �
 DO_PRUNE=1
 DO_DRIFT=1         # 末尾逐文件比对本地 dist 与服务器(verify-drift.sh);--no-drift 才关
 MODELS_BAD=0       # 1 = 模型同步出错(不阻断验证,但结尾不让它报 DEPLOY_OK)
-KEY=""
-KEY_OWNED=0        # 1 = 本脚本临时生成的私钥文件,退出时要删;0 = 主人耐久私钥,绝不删
+KEY=""             # 由 pick_key 赋值:只接受 SSH_KEY / GIT_SSH_COMMAND 的 -i / ~/.ssh/gk-deploy.pem 三个受控来源
 
 # ---- 每一步的结论落盘(2026-10-12):"部署成功"必须是读得出来的字段,不是"脚本没报错" ----
 # release.sh 与人工靠这份快照回答"到底发出去了什么":后端上去没、dist 上去没、重启了没、验证过没。
@@ -77,10 +76,8 @@ write_state() {
   } > "$STATE_FILE"
 }
 # 任何一步栽在 set -e 上都要留下"到哪一步为止"的快照,否则失败即失忆
-# 注意:EXIT trap 只有一个(后设的会覆盖先设的),所以私钥清理也必须走这里
 on_exit() {
   rc=$?
-  cleanup_key
   write_state
   if [ "$rc" != "0" ]; then
     echo ""
@@ -108,15 +105,16 @@ pick_key() {
   fi
   # ②耐久部署私钥
   if [ -f "$HOME/.ssh/gk-deploy.pem" ]; then KEY="$HOME/.ssh/gk-deploy.pem"; return 0; fi
-  # ③桌面交接笔记兜底(临时文件,退出删)
-  if [ ! -f "$HANDOVER_NOTE" ]; then
-    echo "❌ 找不到可用私钥:SSH_KEY 未设、~/.ssh/gk-deploy.pem 不存在、交接笔记也不在($HANDOVER_NOTE)"
-    echo "   请用 --help 查看凭据优先级说明,或设 SSH_KEY=<私钥路径> 再跑。"
-    exit 1
-  fi
-  KEY="/tmp/gk.pem"; KEY_OWNED=1
-  awk '/BEGIN/{f=1} f{print} /END/{if(f)exit}' "$HANDOVER_NOTE" | tr -d '\r' > "$KEY"
-  chmod 600 "$KEY"
+  # ③(已删除)桌面「交接笔记」markdown 兜底:那条路每次都用 awk 把**明文 SSH 私钥**抽成
+  #   /tmp/gk.pem(世界可读目录里的临时文件,崩溃就留在盘上,而且私钥长期躺在桌面明文 md 里)。
+  #   现在只剩两个受控来源;拿不到就硬失败,不做"明文兜底"。
+  echo "❌ 找不到可用私钥:SSH_KEY 未设(或指向不存在的文件)、GIT_SSH_COMMAND 里没有可读的 -i 路径、"
+  echo "   且 $HOME/.ssh/gk-deploy.pem 不存在。"
+  echo "   恢复办法(任选其一,都不要把私钥内容贴进任何文档/聊天/仓库):"
+  echo "     1) SSH_KEY=/path/to/deploy-key bash scripts/deploy.sh"
+  echo "     2) 把部署私钥放回 ~/.ssh/gk-deploy.pem 并 chmod 600"
+  echo "   (2026-10-12 起不再有「从桌面交接笔记抽取私钥」的兜底 —— 那是审计点名的明文泄露路径)"
+  exit 1
 }
 
 # 组装 ssh/scp 参数数组(数组防空格)
@@ -134,8 +132,6 @@ build_ssh_args() {
   fi
   TARGET="$SSH_USER@$HOST"
 }
-
-cleanup_key() { [ "$KEY_OWNED" = "1" ] && rm -f "$KEY"; return 0; }
 
 # ---- 参数解析 ----
 DO_PIN=0
@@ -172,8 +168,10 @@ bash scripts/deploy.sh [--yes] [--no-models] [--no-backend] [--no-prune] [--pin-
   --pin-hostkey  本地跑 ssh-keyscan 把服务器主机密钥落盘到 scripts/known_hosts + 打印指纹请主人核对
                  (会联网,仅生成信任锚,不部署任何东西,运行后自行退出)
 
-凭据优先级:SSH_KEY/GIT_SSH_COMMAND 环境变量 → ~/.ssh/gk-deploy.pem → 桌面交接笔记(兜底,临时文件)
-环境变量:HOST / SSH_USER(默认 root) / HANDOVER_NOTE / KNOWN_HOSTS / SSH_KEY 皆可覆盖
+凭据来源(只有这两个受控路径,2026-10-12 起**删掉了"从桌面交接笔记抽明文私钥写 /tmp"的兜底**):
+  SSH_KEY / GIT_SSH_COMMAND 里的 -i  →  ~/.ssh/gk-deploy.pem
+  两个都没有 ⇒ exit 1 并打印恢复办法(绝不拿明文兜底继续跑)
+环境变量:HOST / SSH_USER(默认 root) / KNOWN_HOSTS / SSH_KEY 皆可覆盖
 HELP
   exit 0
 fi
@@ -234,7 +232,7 @@ echo "=== 3/8 同步后端文件(server.js / lib)——先于前端上传 ==="
 # 调 backend-sync.sh 的统一入口:把本机已解析好的凭据/主机/SSH 注入口一路带过去
 # (不带 SSH_BIN/SCP_BIN 的话,离线演练时 deploy.sh 用假 ssh、backend-sync 用真 ssh —— 测了个假的)
 run_backend_sync() {
-  KEY="$KEY" KEY_OWNED=0 HOST="$HOST" SSH_USER="$SSH_USER" SRV="$SRV" \
+  KEY="$KEY" HOST="$HOST" SSH_USER="$SSH_USER" SRV="$SRV" \
   KNOWN_HOSTS="$KNOWN_HOSTS" SSH_BIN="$SSH_BIN" SCP_BIN="$SCP_BIN" \
     bash scripts/backend-sync.sh "$@"
 }

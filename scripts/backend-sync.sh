@@ -27,8 +27,9 @@
 #    但从源头治理更稳妥:备份写到 web root **之外**的 $BACKUP_ROOT(/opt/gallery-backups/backend),
 #    文件名带上原相对路径(server.js 与 lib/config.js 才不会撞名)。
 #
-# ⚠️ 凭据优先级同 deploy.sh:SSH_KEY/GIT_SSH_COMMAND → ~/.ssh/gk-deploy.pem → 桌面交接笔记(兜底临时文件)。
-#    deploy.sh 调用时会把 KEY 传进来(OWN_KEY=0,不在这里删);独立运行才走下面的解析并按需清理临时文件。
+# ⚠️ 凭据来源同 deploy.sh,只有两个受控路径:SSH_KEY/GIT_SSH_COMMAND 的 -i → ~/.ssh/gk-deploy.pem。
+#    2026-10-12 删掉了"从桌面交接笔记 awk 出明文私钥写 /tmp"的第③条兜底(审计点名);
+#    deploy.sh 调用时把 KEY 传进来,独立运行才走下面的解析。找不到就 exit 1,不做明文兜底。
 set -e -o pipefail
 cd "$(dirname "$0")/.."
 
@@ -50,25 +51,23 @@ SSH_BIN="${SSH_BIN:-ssh}"
 SCP_BIN="${SCP_BIN:-scp}"
 ROOT_DIR="$PWD"
 KNOWN_HOSTS="${KNOWN_HOSTS:-$ROOT_DIR/scripts/known_hosts}"
-HANDOVER_NOTE="${HANDOVER_NOTE:-C:/Users/17296/Desktop/梦幻画廊-交接笔记.md}"
 BACKUP_ROOT="${BACKUP_ROOT:-/opt/gallery-backups/backend}"
 KEEP_BACKUP="${KEEP_BACKUP:-10}"
 
-# 密钥:deploy.sh 传入则直接用;独立运行按优先级解析
+# 密钥:deploy.sh 传入则直接用;独立运行按优先级解析。
+# ⚠️2026-10-12:删除"从桌面交接笔记 markdown 里 awk 出明文私钥写到 /tmp"的兜底(审计第二批
+#   「清理部署私钥的明文回退路径」)。那个临时文件一旦脚本崩溃就留在世界可读目录里,而源头
+#   本身就是把私钥明文存在桌面 md 文件中 —— 现在只接受两个受控来源,拿不到就硬失败。
 if [ -z "$KEY" ]; then
-  OWN_KEY=0
   if [ -n "${SSH_KEY:-}" ] && [ -f "$SSH_KEY" ]; then
     KEY="$SSH_KEY"
   elif [ -f "$HOME/.ssh/gk-deploy.pem" ]; then
     KEY="$HOME/.ssh/gk-deploy.pem"
   else
-    [ -f "$HANDOVER_NOTE" ] || { echo "❌ 无可用私钥(SSH_KEY 未设、~/.ssh/gk-deploy.pem 不存在、交接笔记也不在 $HANDOVER_NOTE)"; exit 1; }
-    KEY=/tmp/gk-backend.pem; OWN_KEY=1
-    awk '/BEGIN/{f=1} f{print} /END/{if(f)exit}' "$HANDOVER_NOTE" | tr -d '\r' > "$KEY"
-    chmod 600 "$KEY"
+    echo "❌ 无可用私钥:SSH_KEY 未设(或指向不存在的文件),且 ~/.ssh/gk-deploy.pem 不存在。"
+    echo "   恢复:SSH_KEY=<私钥路径> bash scripts/backend-sync.sh   或把部署私钥放回 ~/.ssh/gk-deploy.pem(chmod 600)"
+    exit 1
   fi
-else
-  OWN_KEY=0
 fi
 
 # ssh/scp 参数(数组防空格);accept-new:首次信任、之后主机密钥变更即拒
@@ -87,7 +86,6 @@ TARGET="$SSH_USER@$HOST"
 TMP=$(mktemp -d)
 cleanup() {
   rm -rf "$TMP"
-  [ "$OWN_KEY" = "1" ] && rm -f "$KEY"
   return 0
 }
 trap cleanup EXIT
