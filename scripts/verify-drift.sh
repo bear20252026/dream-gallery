@@ -227,7 +227,36 @@ fi
 
 if printf '%s\n' "$STATS" | grep -qE '^  ✗'; then
   echo ""
+  # 前端半边有个陷阱,2026-10-12 实测踩到:本项目**构建不可复现** —— 同一棵工作树连续两次
+  # `npm run build`,79 个 chunk 的文件名会全部变掉(vite/rolldown 的内容哈希里掺了每次构建都变的量)。
+  # 于是"事后单独再跑一次本脚本"必然报一堆「服务器缺文件」,看起来像部署是半成品,实际只是
+  # 本地 dist 已经不是当初上传的那一份。判据不在"本地 vs 服务器",而在"服务器自洽不自洽":
+  #   线上 index.html 引用的每个资源都取得到 ⇒ 线上是自洽的一次构建,但**没法证明是我们要的那一次**
+  #     ⇒ 结论是「无法比对」(exit 2),不是「有漂移」(exit 1),也不是「通过」(exit 0)
+  #   线上 index.html 引用的资源取不到 ⇒ 真·半成品,照旧 exit 1
+  # deploy.sh 第 8b 步不受影响:它比的就是刚上传的那一份 dist。
+  SELF_OK=-1
+  if [ "$CHECK_DIST" = "1" ]; then
+    SRV_REFS=$("${SSHRO[@]}" "$TARGET" "cd $SRV && grep -oE '(assets/[A-Za-z0-9_.-]+\.(js|css)|[A-Za-z0-9_.-]+\.html|sw\.js|manifest\.json|data\.js)' index.html 2>/dev/null | sort -u" 2>/dev/null | tr -d '\r' || true)
+    if [ -n "$SRV_REFS" ]; then
+      # 这条要往远端喂 stdin(引用清单),所以必须用 SSH(不带 -n);SSHRO 的 -n 会把本地 stdin 换成 /dev/null
+      ABSENT=$("${SSH[@]}" "$TARGET" "cd $SRV && while IFS= read -r r; do [ -f \"\$r\" ] || echo \"ABSENT \$r\"; done" <<<"$SRV_REFS" 2>/dev/null | tr -d '\r' || true)
+      SELF_OK=1
+      [ -n "$ABSENT" ] && SELF_OK=0
+    fi
+  fi
+  if [ "$SELF_OK" = "1" ]; then
+    echo "❌ 无法判定(不是「有漂移」):本地 dist 与线上不是同一份构建 —— 退出码 2。"
+    echo "   依据:线上 index.html 引用的资源全部取得到(站点自洽),但本项目构建不可复现"
+    echo "   (2026-10-12 实测:同一棵工作树连续两次 npm run build,79 个 chunk 名全变),"
+    echo "   所以「逐字节 == 本地」这个判据在这里无效 —— 既不能说部署成功,也不能说部署坏了。"
+    echo "   要真正核对:①只比后端 bash scripts/verify-drift.sh --backend-only ②或重发一次,"
+    echo "   deploy.sh 第 8b 步比的就是它刚上传的那一份 dist:bash scripts/deploy.sh --yes"
+    echo "DRIFT=unverifiable-different-build"
+    exit 2
+  fi
   echo "❌ 漂移复核未通过:$SUM"
+  [ "$SELF_OK" = "0" ] && echo "   ⚠️ 且线上 index.html 引用的资源在服务器上取不到 ⇒ 站点不自洽,这是真·半成品"
   echo "   线上与本地要发的内容不一致 —— 本次发布**不能**当作完成。"
   echo "   后端补传:bash scripts/backend-sync.sh --yes      前端补传:bash scripts/deploy.sh --yes --no-models"
   echo "   再核对:  bash scripts/verify-drift.sh"

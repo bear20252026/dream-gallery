@@ -68,7 +68,7 @@
 
 ## R6 · 不变发布目录（immutable release）
 
-已单独成文：`scripts/release-symlink-plan.md`（`releases/<sha>` + `current` 符号链接原子切换 + 失败回滚 + 只部署 CI 验过的 artifact）。本轮已完成的相邻改进：CI 闸门（`release.sh` 读 `conclusion` 才部署）、`--no-prune` 差集清理、后端备份移出 web root、`accept-new` + 可固定 `known_hosts`。**未做**：服务器目录结构与 pm2/nginx 指向改造（需停机窗口）。
+已单独成文：`scripts/release-symlink-plan.md`（`releases/<sha>` + `current` 符号链接原子切换 + 失败回滚 + 只部署 CI 验过的 artifact）。本轮已完成的相邻改进：CI 闸门（`release.sh` 读 `conclusion` 才部署）、`--no-prune` 差集清理、后端备份移出 web root、`accept-new` + 可固定 `known_hosts`。**前提条件(2026-10-12 实测补记)**:本项目**构建不可复现** —— 同一棵工作树连续两次 `npm run build`,`dist/assets` 的 79 个 chunk 文件名会全部变掉(内容哈希掺了每次构建都变的量;`buildStamp()` 只读 git 版本号/短哈希/提交日期,不是来源)。所以 R6 不能实现成"重新构建再与线上比对",必须实现成"**构建一次 → 产物固化进 `releases/<sha>/` → 只切 `current` 符号链**",并且回滚切的是目录而不是重建。附带三条已经落地的应对:①`deploy.sh` 第 8b 步的漂移复检只在"紧跟上传的那一份 dist"上做;②`verify-drift.sh` 事后单独跑前端半边时按"线上 index.html 自洽性"区分真半成品与"另一次构建",后者给 exit 2「无法判定」而不是假装通过或假装失败;③"线上是哪一次提交"以**构建里嵌的短哈希**为准(`grep -rl <短哈希> assets/entrygate-*.js`),不看文件 mtime。
 
 ## R7 · CSP nonce 化
 
