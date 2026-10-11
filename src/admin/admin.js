@@ -1,7 +1,9 @@
 // admin.js — 后台脚本(2026-09-24 自 admin.html 内联抽出;2026-10-09 审查 P2 切分为四模块)
 // 本体保留:共享可变状态 DATA/RANGE/CAL_DATE + 数据/访客/预警/统计/历史/答题/文件/展示/大屏/杂项
 // (这些分区横跨读写 DATA 且互相成环,第一阶段不动);报错/一念墙/TTS→admin-tabs.js,
-// 协议文档→admin-docs.js,在线对话→admin-chat.js,共享工具→admin-core.js。
+// 协议文档→admin-docs.js,在线对话→admin-chat.js,AI 用量统计→admin-ai.js,共享工具→admin-core.js。
+// AI 用量 tab 的 markup 由 admin-ai.js 运行时注入(admin.html 本次未改):新增 tab 若走注入,
+// 必须同时在这里的 panels 清单与 switchTab 的 loadFn 分支登记,否则点 tab 不显示/不加载。
 // ⚠️ 兼容关键:markup 与 innerHTML 模板里的内联 onclick 依赖全局函数
 //   → 文件末尾统一 Object.assign(window, {...}) 兜底,勿删;模板里引用的名字必须存活于此。
 
@@ -25,6 +27,7 @@ import {
 import { loadErrors } from './admin-tabs.js';
 import { loadDocs } from './admin-docs.js';
 import { startChat, stopChatLive, chatSelect, chatSend } from './admin-chat.js';
+import { loadAiUsage } from './admin-ai.js';
 
 import { DATA, RANGE, CAL_DATE, setData } from './admin-state.js';
 import { renderStats, setRange, calDay, calMonth, calReset } from './admin-stats.js';
@@ -61,6 +64,7 @@ function switchTab(t) {
     'docs',
     'errors',
     'ttsstats',
+    'ai',
     'chat',
   ];
   for (var i = 0; i < panels.length; i++) {
@@ -78,6 +82,7 @@ function switchTab(t) {
   else if (t === 'docs') loadFn = loadDocs;
   else if (t === 'chat') loadFn = startChat;
   else if (t === 'errors') loadFn = loadErrors;
+  else if (t === 'ai') loadFn = loadAiUsage;
   if (loadFn) setTimeout(loadFn, 200);
 }
 // ---------- 数据 ----------
@@ -502,6 +507,7 @@ Object.assign(window, {
   editNote,
   exportPdf,
   kickAsk,
+  loadAiUsage,
   presetLink,
   pv,
   pvUrl,

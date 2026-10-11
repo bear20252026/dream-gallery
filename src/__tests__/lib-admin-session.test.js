@@ -222,11 +222,12 @@ describe('三条鉴权通道并存', () => {
 });
 
 describe('/admin 入口:一次性引导 + 302 去凭据', () => {
-  it('路由表没被改动:GET /admin 仍只有一条,端点总数不变(58)', () => {
+  it('路由表没被改动:GET /admin 仍只有一条,且是 adminPage 档', () => {
     const adminRoutes = ROUTES.filter((r) => r.match === '/admin');
     expect(adminRoutes.length).toBe(1);
     expect(adminRoutes[0].auth).toBe('adminPage');
-    expect(ROUTES.length).toBe(58);
+    // 端点总数快照只在 src/__tests__/lib-routes.test.js 一处拥有。
+    // 这里曾再抄一个字面量,结果新增一条路由就多一处假红 —— 双份真相必漂移。
   });
 
   it('带 token 打开 → 302 到不带 query 的 /admin + Set-Cookie 全属性 + Vary 含 Cookie', async () => {

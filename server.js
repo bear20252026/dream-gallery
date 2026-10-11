@@ -148,6 +148,12 @@ const SHUTDOWN_DRAIN_MS = 15000;
 let shuttingDown = false;
 function beginShutdown(exit) {
   try { flushTrack(); } catch (e) { console.error('[shutdown] 埋点批量落盘失败:', e && (e.message || e)); }
+  // AI 用量台账是合并写盘(5s / 20 条),退出前必须 stop() 收尾,否则窗口内最后几条丢盘。
+  try { require('./lib/aiusage').stop(); } catch (e) { console.error('[shutdown] AI 用量收尾失败:', e && (e.message || e)); }
+  // 保留期清扫的日定时器(已 unref),与其它后台定时器口径一致:显式停一次不留悬挂。
+  try { require('./lib/retention').stopRetention(); } catch (e) { console.error('[shutdown] 保留期清扫停止失败:', e && (e.message || e)); }
+  // R2 待发台账:stopOutbox() = 合并落盘 + 清两个定时器(不要只调 flush(),那会留悬挂句柄)。
+  try { require('./lib/r2outbox').stopOutbox(); } catch (e) { console.error('[shutdown] R2 台账收尾失败:', e && (e.message || e)); }
   try { closeMediaSse(); } catch (e) { console.error('[shutdown] SSE 收束失败:', e && (e.message || e)); }
   try {
     const filesUpload = require('./lib/files-upload');
@@ -178,6 +184,11 @@ server.listen(PORT, () => {
   console.log(TOKEN ? `API 鉴权已启用(TOKEN),请求需带 ?token= 或 x-token 头` : `API 未启用鉴权(设置环境变量 TOKEN 可开启)`);
   console.log(`入口守卫已启用:自由进画廊;仅拦截被踢出设备(重进需申请)与拉黑 IP。后台: /admin?token=<TOKEN>`);
   if (!TOKEN) console.error('[安全告警] TOKEN 未设置:后台 /admin 不可用(fail-closed),auth:write 档的上传/大屏/删除接口仅本地可达。生产请在 .env 设置 TOKEN 后 pm2 restart gallery --update-env');
+  // 保留期清扫(lib/retention.js)与 R2 待发台账(lib/r2outbox.js)的启动点都在入口这一层:
+  // 两者都反向依赖 store/client-errors,接进底座会造出循环依赖(《npm run deps》是硬门禁)。
+  // RETENTION_DISABLED=1 由 retention 自己守;两个 start 都幂等且定时器 unref。
+  try { require('./lib/retention').startRetention(); } catch (e) { console.error('[startup] 保留期清扫启动失败(不影响服务):', e && (e.message || e)); }
+  try { require('./lib/r2outbox').startOutbox(); } catch (e) { console.error('[startup] R2 待发台账启动失败(不影响服务):', e && (e.message || e)); }
   console.log(`路由: ${ROUTES.length} 个端点已注册(明细见 lib/routes.js)`);
 });
 

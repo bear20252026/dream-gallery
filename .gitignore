@@ -63,3 +63,9 @@ photos/thumbs/
 # sw.min.js 是 vite minifySw 构建时生成的产物(2026-10-08 已让 sw.js 单一真相退出 git);
 # 不加这条,release.sh 的 `git add public` 会把构建产物重新收进仓库,变成双源真相。
 public/sw.min.js
+
+# R2 待发台账(本机运行时数据;服务器自持,公网被 staticDenied 挡住)
+.r2-outbox.json
+
+# deploy.sh --pin-hostkey 的暂存产物(带外核对指纹无误后再 mv 成 scripts/known_hosts 并入库)
+scripts/known_hosts.new

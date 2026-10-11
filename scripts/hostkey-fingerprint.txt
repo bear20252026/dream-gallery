@@ -1,14 +1,2 @@
-# SSH 主机密钥指纹(服务器侧信任锚的人类可读记录)
-# 仓库: bear20252026/dream-gallery   目标主机: 101.133.235.110
-#
-# 本文件由 `bash scripts/deploy.sh --pin-hostkey` 生成/更新(它会 ssh-keyscan 抓主机密钥,
-# 落到 scripts/known_hosts 并把指纹写在这里)。**请勿手写指纹值** —— 错的锚比没有锚更危险。
-#
-# 状态: PENDING —— 尚未 pin。
-#   在此之前 deploy.sh / backend-sync.sh 用 StrictHostKeyChecking=accept-new:
-#   首次连接自动信任(TOFU),之后服务器主机密钥一旦变更即拒连(挡住中间人)。
-#
-# 建议操作(离线核对,不经本脚本):
-#   1) 跑 `bash scripts/deploy.sh --pin-hostkey`
-#   2) 通过可信渠道(阿里云控制台/其他已知环境)核对打印出的 SHA256 指纹
-#   3) 核对无误后,把生成的 scripts/known_hosts 与本文件提交进仓库长期锁定
+3072 SHA256:Wh0BuxSRgM3Kmc+LH1ZshWn95ffP6X402+DYsN36/Ug 101.133.235.110 (RSA)
+256 SHA256:R5xJj0fcpba1a94Y9ZnZr6anApzUYXWtlqJYd7lnlww 101.133.235.110 (ED25519)
