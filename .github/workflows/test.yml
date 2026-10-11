@@ -30,6 +30,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Dependency audit (npm, report-only — not blocking)
+        # 供应链体检:先只报告不阻断(npm audit 会因上游新公告频繁变红,硬闸会让单人开发者被第三方公告卡死发布)。
+        # 想升级就照输出开 PR;真要变闸门时,去掉下面的 `|| true` 即可(需主人拍板)。
+        run: npm audit --audit-level=high || echo "::warning::npm audit reported high/critical advisories (informational, not blocking)"
+
       - name: ESLint code-style check
         run: npm run lint
 
@@ -51,14 +56,24 @@ jobs:
       - name: Backend API regression (127 assertions - data validation / security boundaries / quiz gate / approval gate)
         run: node scripts/test/test.js
 
-      - name: Type-health trend (checkJs tiers, non-blocking)
+      - name: Type-health baseline (checkJs tiers, BLOCKING)
         run: |
           COUNT=$(npx tsc -p tsconfig.checkjs.json 2>&1 | grep -c "error TS" || true)
-          # Baseline 420 (measured 417 on 2026-10-02): the old baseline of 87 had long been meaningless, and a warning that is always on is no warning.
-          # Reset to "current measured value + 3 spare" so only **new** type debt is caught; historical debt is cleaned up by topic separately.
-          echo "checkJs errors: ${COUNT} (baseline 420; more means new type debt was added)"
-          if [ "${COUNT:-0}" -gt 420 ]; then
-            echo "::warning::checkJs errors ${COUNT} exceed the baseline of 420 (reset 2026-10-02); please do not keep accumulating type debt"
+          # 单一真相:基线数字只在 scripts/checkjs-baseline.txt 一处。CI 与本地读同一文件,不再手抄。
+          # 超过基线即 fail(旧版只 ::warning,恒开的告警等于没有告警)。每批重构后把基线往**下**压。
+          BASELINE=$(grep -Eo '[0-9]+' scripts/checkjs-baseline.txt | head -n1 || echo 0)
+          [ -n "$BASELINE" ] || BASELINE=0
+          DELTA=$(( COUNT - BASELINE ))
+          echo "checkJs errors: ${COUNT} (baseline ${BASELINE}, delta ${DELTA})"
+          {
+            echo "### checkJs baseline"
+            echo "- 当前计数: **${COUNT}**"
+            echo "- 基线(scripts/checkjs-baseline.txt): **${BASELINE}**"
+            echo "- 差值: **${DELTA}** $( [ "$DELTA" -gt 0 ] && echo '(超出 → 阻断,勿再堆类型债)' || [ "$DELTA" -lt 0 ] && echo '(低于基线 → 请把基线往下压到这个数)' || echo '(与基线一致)' )"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$COUNT" -gt "$BASELINE" ]; then
+            echo "::error::checkJs errors ${COUNT} exceed baseline ${BASELINE}. 修掉新增类型债,或确有正当理由时把 baseline 调低并说明(每批重构应往下压,不是往上抬)。"
+            exit 1
           fi
 
       - name: Bundle size check (blocking)

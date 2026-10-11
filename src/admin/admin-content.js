@@ -2,7 +2,6 @@
 // 分区内环自洽:loadFiles↔toggleDemo/editCaption、loadDisplay↔loadBigscreen/链接三件套互调均在模块内。
 // DATA 经 admin-state.js live binding 读(就地 mutate 无需 setter,唯一 rebind 点 load() 在 admin.js)。
 import {
-  TOKEN,
   brandIcon,
   tk,
   tk2,
@@ -17,10 +16,25 @@ import {
 } from './admin-core.js';
 import { DATA } from './admin-state.js';
 
-// 内嵌媒体元素(img/video)URL 带令牌:<img> 发不了 x-token 头,2026-09-18 令牌改 header 后
-// 缩略图/预览全部 401 断图十几天。仅页面内嵌元素补查询参数;复制的分享链接(copyTxt)仍不带令牌(守住审计红线)。
-const mediaQ = () => (TOKEN ? '?token=' + encodeURIComponent(TOKEN) : '');
-const mediaUrl = (u) => (u.startsWith('/admin-media/') && !u.includes('token=') ? u + mediaQ() : u);
+// 内嵌媒体元素一律**裸路径**(2026-10-11 凭据治理):`<img>/<video>` 靠浏览器自动携带的 HttpOnly
+// admin_session cookie 过 /admin-media 鉴权,凭据不再进 URL(地址栏/历史/访问日志/缓存键全部干净)。
+// 顺带把任何来源遗留的 token/mt/sig 查询串剥掉——mediaUrl 是后台所有内嵌媒体 URL 的唯一出口。
+// 复制出去的分享链接(copyTxt)从不带凭据,这条红线不变(AGENTS 2026-10-10)。
+const mediaUrl = (u) => {
+  const s = String(u || '');
+  const q = s.indexOf('?');
+  if (q < 0) return s;
+  try {
+    const p = new URLSearchParams(s.slice(q + 1));
+    p.delete('token');
+    p.delete('mt');
+    p.delete('sig');
+    const rest = p.toString();
+    return s.slice(0, q) + (rest ? '?' + rest : '');
+  } catch {
+    return s.slice(0, q);
+  }
+};
 
 // ---------- 文件页 ----------
 export async function loadFiles() {
@@ -31,6 +45,7 @@ export async function loadFiles() {
   ];
   const caps = (DATA && DATA.photoCaptions) || {},
     ups = (DATA && DATA.uploaderInfo) || {};
+  const mtOf = (DATA && DATA.uploads) || {}; // 上传记录:带 mt(访客端 ?mt= 私有媒体令牌)的文件才能重签
   const demos = (DATA && DATA.siteConfig && DATA.siteConfig.demoPhotos) || [];
   let html = '';
   for (const [dir, label] of dirs) {
@@ -74,6 +89,10 @@ export async function loadFiles() {
                 ? `<button class="btn-revoke" onclick="toggleDemo('${j(f.name)}',false)">取消演示</button>`
                 : `<button class="btn-day" onclick="toggleDemo('${j(f.name)}',true)">设为演示</button>`
               : '';
+          const mtBtn =
+            mtOf[f.name] && mtOf[f.name].mt
+              ? `<button class="btn-revoke" onclick="rotateMtAsk('${j(f.name)}')" title="重签该文件的访客端媒体令牌(?mt=);怀疑链接外泄点一下,旧链接当场失效">重签令牌</button>`
+              : '';
           return `<div class="file-row" style="align-items:flex-start">
         ${isImg ? `<img src="${url}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="pv('${dir}','${j(f.name)}')">` : ''}
         <span class="fname" onclick="pv('${dir}','${j(f.name)}')" title="点击预览">${esc(f.name)}<br>${who}${cap}</span>
@@ -82,6 +101,7 @@ export async function loadFiles() {
         <button class="btn-day" onclick="copyTxt(location.origin+'/admin-media/${dir}/' + encodeURIComponent('${j(f.name)}') + '${tkq()}')">复制链接</button>
         ${dir === 'photos' ? `<button class="btn-day" onclick="editCaption('${j(f.name)}','${j(caps[f.name] || '')}')">编辑配文</button>` : ''}
         ${demoBtn}
+        ${mtBtn}
         <button class="btn-del" onclick="delFile('${dir}','${encodeURIComponent(f.name)}')">删除</button></div>`;
         })
         .join('') || '<div class="empty">空</div>'
@@ -90,10 +110,7 @@ export async function loadFiles() {
   $('fileSections').innerHTML = html;
 }
 export function pv(dir, name) {
-  pvUrl(
-    `/admin-media/${dir}/${name}` + tkq(),
-    decodeURIComponent(name).split('.').pop().toLowerCase()
-  );
+  pvUrl(`/admin-media/${dir}/${name}`, decodeURIComponent(name).split('.').pop().toLowerCase());
 }
 // 支持任意 URL 的媒体预览(文件页用 /admin-media 相对路径,大屏页用 CDN 绝对地址)
 export function pvUrl(url, ext) {
@@ -133,6 +150,24 @@ export async function delFile(dir, name) {
     toast('已删除');
     loadFiles();
   } else toast('删除失败', 1);
+}
+// 重签该文件的媒体令牌 mt(/api/admin/bulk action=rotate-mt):mt 是 bearer,链接外泄即重签,旧 ?mt= 立刻失效
+// 入参是 uploads 的原始文件名(uploads 的键就是文件名,不做 URL 编码)
+export async function rotateMtAsk(name) {
+  if (
+    !(await confirmAsync(
+      '重签「' + name + '」的媒体令牌?\n访客端旧的图片链接(?mt=)当场失效,画廊刷新后自动换新链接。'
+    ))
+  )
+    return;
+  const r = await adminFetch('/api/admin/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'rotate-mt', name }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok && d.ok) toast('已重签令牌(旧链接即刻失效)');
+  else toast(d.error || '重签失败', 1);
 }
 export async function upload(dir) {
   const inp = $('up-' + dir);
@@ -401,10 +436,11 @@ export function copyTxt(t) {
       prompt('手动复制:', t);
     });
 }
-// 带令牌头的下载(fetch x-token → blob → 本地保存),不再依赖 URL 参数存活,任何浏览器都不会"需要授权"
+// 后台鉴权下载(adminFetch 统一带凭据:有 x-token 用头,正常登录态靠 HttpOnly cookie → blob 落盘,
+// 绝不用 URL 参数,任何浏览器都不会"需要授权")
 export async function dl(url, filename) {
   try {
-    const r = await adminFetch(url, { headers: { 'x-token': TOKEN } });
+    const r = await adminFetch(url);
     if (!r.ok) {
       toast('下载失败:HTTP ' + r.status, 1);
       return;

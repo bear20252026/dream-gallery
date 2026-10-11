@@ -34,9 +34,13 @@
 
 > 本文记录后台全部设置项与玩法机关,**不可给访客看**。2026-09-20 全面校对(对齐 x-token 鉴权/SQLite 主库/CSP 收敛/测试现状)。
 >
-> **后台入口**:`https://cloudbear.cloud/admin?token=<TOKEN>`(TOKEN 在服务器 pm2 环境里)。
-> 页面打开后所有 API 自动改用 `x-token` 请求头(页面自动处理,无需手工)。
-> `TOKEN_QUERY=0`(见「环境变量」)时:后台**页面**仍可用 query 打开,但**数据 API 只认 x-token 头**——正常用浏览器后台不受影响。
+> **后台入口**:日常直接开 `https://cloudbear.cloud/admin`(8 小时会话内免密)。`/admin?token=<TOKEN>` 现在是**一次性引导**:验过即签 `admin_session` 并 302 回不带密码的地址,主 TOKEN 不再留在 URL/浏览器历史/日志里(TOKEN 在服务器 pm2 环境里)。
+> 之后所有后台请求(含文件页缩略图这类 `<img>` 元素)自动带该会话 Cookie,不再拼查询令牌;**`x-token` 头与 `?token=` 两条旧通道仍可用**(CI、命令行运维、探针依赖它们)。
+> 会话**硬到期 8 小时、不滑动续期、没有登出按钮**(自然过期或清 Cookie 即可);只存哈希、不落明文,`pm2 restart` 不会把人踢掉。
+> `TOKEN_QUERY=0`(见「环境变量」)时:公网禁用 query 传 token(仅 x-token 头与会话 Cookie)。**2026-10-11 起可以放心打开**——过去"开了后台缩略图就 401 断图"的互斥已消解,因为内嵌元素本来就不带令牌了。
+>
+> **吊销会话 ≠ 踢出(2026-10-11 语义变更)**:后台「吊销会话」现在**永久失效、不会自动恢复**——访客下次带旧 Cookie 来访也不会被"重新识别"换发新会话;要恢复只能你在后台**批准放行**。真正的 force logout 仍是「踢出」(status=kicked,重进必须提交申请)。UI 已按此措辞,服务端响应带 `revoked_permanently:true`。
+> **代价(须知)**:被吊销档案的**自有上传也一并认领不回来**(归属按 vid 绑定),批准放行后需人工核对。**清理令牌**:文件页新增「重签令牌」,某张照片的 `?mt=` 链接外泄时点它即可让旧链接当场失效;访客面板新增「清空 IP 定位缓存」。
 
 ## 一、访客进出
 
@@ -76,7 +80,9 @@
 ## 六、反刷防护(2026-09-20 起**超限硬拒**,不再只预警)
 
 - **公开上传(照片/视频/白板)四类自动检测**:🚨 速率(同设备 10 分钟 >8 个文件)、📦 大单(单文件 >300MB)、💾 累计(同设备 >2GB)——**超限即删文件并返回 429**;🛑 全盘(photos+videos >10GB)仍只预警不拦单人(不因他人占盘连坐)。
-- **白板作品同样受速率硬拒**(匿名公开通道,2026-09-20 起),且图片过 NSFW 审核(未开启则放行)。
+- **白板作品同样受速率硬拒**(匿名公开通道,2026-09-20 起),且图片过 NSFW 审核;**开启审核且审核不可用时白板 fail-closed**(挂 `pending`:文件保留、暂不上墙、复核通过后自动上墙)。未开启审核时照旧放行(成本策略,见「环境变量」)。
+- **「我的上传」归属只认本人浏览器 Cookie 里的 vid(2026-10-11 变更)**:此前"同 UA 即同一人"的兜底已摘除——**同款机型/同版本浏览器的两个陌生访客,过去能互相看到对方私有上传的文件名并拿到其永久 `?mt=` 令牌**(审计 DG-SEC-001/002)。现在:①带归属标记 `aid` 的记录(2026-09-18 之后全部)只认 `aid === 本人有效 vid`;②极老的无 `aid` 记录仍可按 UA 命中,但**必须该访客自己有一个有效 vid**,并在命中当场把归属绑给这个 vid(一次性迁移,之后别人撞 UA 也领不走)。
+- **对访客的可见后果(须知)**:清理过 Cookie、或 App 内置浏览器拒 Cookie 的人,**其 2026-09-18 之后上传的照片无法自助认领**(文件仍在服务器,按数据保留铁律不删),需后台人工核对;会话 30 天空闲过期则由 `entryGate` 自愈(本人 Cookie 即恢复,不需批准)。**聊天/一念墙的昵称显示仍按 UA 取**(纯展示、不涉数据),同 UA 撞车时可能显示他人昵称 —— 挂待议。
 - **表现**:审批页顶部红色预警卡实时列出(类型/明细/设备/IP/文件),涉事设备自动打「⚠ 可疑」标记。
 - **处置**:预警卡上「封闭 IP」一键全站拦截;误封随时可在设备卡片「解除拉黑」恢复。单条「忽略」/「全部忽略」。
 - 数据存 `alerts`(留 500 条),接口 `POST /api/admin/alerts {action:'dismiss'|'clear'}`。
@@ -104,20 +110,23 @@
 
 | 变量 | 默认 | 说明 |
 |------|------|------|
-| `TOKEN` | 空 | 后台与写接口鉴权;**生产必设** |
-| `TOKEN_QUERY` | 未设 | 设 `0`:公网禁 query 传 token(仅 x-token 头);后台页面仍可 query 打开,API 用 x-token |
+| `TOKEN` | 空 | 后台与写接口鉴权;**`NODE_ENV=production` 且未设 → 服务器启动即退出**(2026-10-11,不再靠"猜是不是 localhost";未设 NODE_ENV 时只 console.error 告警,免得打崩现网)。`pm2 restart gallery --update-env` 后生效 |
+| `TOKEN_QUERY` | 未设 | 设 `0`:公网禁 query 传 token(仅 x-token 头与后台会话 Cookie);**2026-10-11 起对后台缩略图无副作用**(元素不再带查询令牌) |
 | `CSP_UNSAFE_EVAL` | 未设 | 设 `1` 恢复完整 unsafe-eval(排查 Three 动态着色器;默认 wasm-unsafe-eval 已够用) |
-| `CORS_ORIGIN` | cloudbear.cloud | 跨域允许源;本地 localhost 自动放行 `*` |
+| `CORS_ORIGIN` | cloudbear.cloud | 跨域允许源,**按逗号分隔的 allowlist 解析**(预检与真响应同一处判定,命中才回显该 Origin + `Vary: Origin`;把逗号串当单值回显永远匹配不上);本地(按 socket 来源判定)自动放行 `*` |
 | `USE_SQLITE` | 开 | 设 `0` 回退 JSON-only(测试探针自动使用) |
 | `GATE_DATA_FILE` | 根/gate_data.json | 数据文件重定向(测试隔离用);SQLite db 随之同目录派生 |
-| `NSFW_MODERATE` | 关 | 设 `1` 开启上传图片 AI 审核(有调用成本) |
+| `NSFW_MODERATE` | 关 | 设 `1` 开启上传图片 AI 审核(有调用成本)。**2026-10-11 语义变更**:审核已开却**拿不到结论**(AI 全通道失败/超时/取样失败)时,匿名公开展品(白板)改为 **fail-closed**——文件保留但挂 `pending`、不上墙也不下发,复核通过后自动回归;私人上传仍按"自己看自己"放行。默认关这一成本策略不变 |
 
 ## 服务器与部署纪律
 
-- **服务器**:阿里云 `101.133.235.110`,pm2 名 `gallery`,目录 `/opt/gallery/`;SSH 密钥 `~/Downloads/网站私钥bear1.pem`。
-- **改前端**(src/ 或根 html):`npm run build` → 先传 `dist/assets/*` 再传 `dist/*.html`+`sw.js`+`manifest.json`,不用重启。
-- **改后端**(server.js/lib/):scp 后**必须** `pm2 restart gallery`。
-- **数据层**:SQLite 主库(`gate_data.db`,WAL)+ JSON 镜像原子写双保险;`USE_SQLITE=0` 可回退。
-- **上线前必跑**:`npm test`(test-store 4 + test.js 127 断言 + test-mobile 6)、`npx vitest run`(241)、`npm run lint`、`npm run test:scene`(截图回归 4 检查点)、`node scripts/probe/security-fix-probe.js`(13 项,已隔离测试数据不动真实库)。全绿才部署。
-- **部署后**:`node scripts/probe/debug-browser.js https://cloudbear.cloud/ 15` 确认无 pageerror。
+- **服务器**:阿里云 `101.133.235.110`,pm2 名 `gallery`,目录 `/opt/gallery/`(**不是 git 仓库**,同步靠 scp);SSH 密钥 `~/Downloads/网站私钥bear1.pem`。
+- **SSH 信任(2026-10-11)**:脚本不再用 `StrictHostKeyChecking=no`,改 **`accept-new`**(首次信任、之后主机密钥变更即拒);仓库里存在 `scripts/known_hosts` 时自动固定使用。锁定动作:`bash scripts/deploy.sh --pin-hostkey` → **带外核对打印的 SHA256 指纹** → `mv scripts/known_hosts.new scripts/known_hosts` 并提交(信任锚不凭空写死)。私钥解析优先级 `SSH_KEY`/`GIT_SSH_COMMAND` → `~/.ssh/gk-deploy.pem` → 桌面「交接笔记」兜底(仅这条 `chmod 600` 且退出时删);登录用户抽成 `SSH_USER`(默认仍 root,切非 root 属服务器侧改造)。
+- **后端备份位置(2026-10-11)**:`backend-sync.sh` 的 `.bak-<时间戳>` 已**移出 web root** → `/opt/gallery-backups/backend/`(相对路径扁平化防撞名,留最近 10 份)。此前它落在 `/opt/gallery`,而 `*.bak-时间戳` 同时绕过黑名单的两条结尾锚规则,等于公网可下载后端源码。
+- **改前端**(src/ 或根 html):`npm run build` → 先传 `dist/assets/*` 再传 `dist/*.html`+`sw.js`+`manifest.json`,不用重启。`deploy.sh` 现按**本次 tar 清单差集**清理 `assets/`(仍保留最新 3 个 `main-*.js`,防旧 HTML 被 Cloudflare 边缘缓存后 404),根级只删"受控 Vite 入口清单"里的旧入口,拿不准的只打印 WARN 不删;`--no-prune` 跳过,`--no-models`/`--no-backend`/`--dry`/`--yes` 原义不变。**新增根级公开文件必须同时登记进 `lib/security.js` 的根级白名单**,否则公网 404(与 deploy 的入口清单同源,防漂移)。
+- **改后端**(server.js/lib/):scp 后**必须** `pm2 restart gallery --update-env`;`pm2 restart` 现用 `--kill-timeout 25000` 配合服务端 15s 优雅排空(旧值 9000 会把排空中的长请求 SIGKILL)。
+- **数据层**:SQLite 主库(`gate_data.db`,WAL)+ JSON 镜像原子写双保险;`USE_SQLITE=0` 可回退。⚠️ 例外:链接埋点现走**内存攒批(2s / 20 条)**再落库——公开接口每请求做一次整库 snapshot 写会被刷成 DoS;代价是后台 `linkClicks` 最多滞后 2s,「清空点击」会连带作废在途批次。
+- **上线前必跑**:`npm test`(test-store 4 + test.js 108 + **test-session 46** + **test-upload-security 20** + test-mobile 6)、`npx vitest run`(**713 项 / 71 文件**)、`npm run lint`、`npm run typecheck`、`npm run deps`、checkJs 计数不得超过 `scripts/checkjs-baseline.txt`(单一真相,**CI 超基线即 fail**,不再只 warning;每批重构往下压)、`npm run test:scene`(截图回归 4 检查点)、`node scripts/probe/security-fix-probe.js`(13 项)、**`scripts/probe/sw-admin-bypass-probe.cjs`(14 项)+ `scripts/probe/admin-credential-hygiene-probe.cjs`(24 项)**。全绿才部署。
+- **发布闸门(2026-10-11)**:`scripts/release.sh` 在 `git push origin main` 之后会**等 GitHub Actions 跑完、读 `conclusion` 字段判成败,红了或取不到即中止**(此前 CI 只是"线上已发布"的事后验证)。急用 `--no-ci`(或 `SKIP_CI_GATE=1`),或 `bash scripts/deploy.sh` 直接部署已 push 的 HEAD。
+- **部署后**:`node scripts/probe/debug-browser.js https://cloudbear.cloud/ 15` 确认无 pageerror。**后台凭据/SW 这批改动上线后额外必做**:线上跑 `sw-admin-bypass-probe`(14)与 `admin-credential-hygiene-probe`(24),确认 `.env` 已设 `TOKEN`(未设且 `NODE_ENV=production` 会让进程拒绝启动),并考虑把 `TOKEN_QUERY=0` 打开。
 - **排障**:URL 加 `?shaderdebug` 恢复着色器同步诊断;`?storyreset` 重走 B612 剧情链。

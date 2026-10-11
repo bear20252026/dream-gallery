@@ -8,7 +8,7 @@ import globals from 'globals';
 export default [
   {
     ignores: [
-      'node_modules/**', 'dist/**', 'vendor/**', 'origin/**',
+      'node_modules/**', 'dist/**', 'vendor/**', 'origin/**', '.tmp/**',
       'three.mjs', 'scripts/artifacts/**', '**/*.min.js',
       // 远方山丘:独立的 TypeScript 子项目(自带 tsc/vitest),产物在 public/hill/
       'hill-src/**', 'public/hill/**',

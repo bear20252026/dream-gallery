@@ -81,10 +81,15 @@ export class LoopManager {
     this.fps = 0;
     this.fpsUpdateInterval = 1000; // 每秒更新一次 FPS
     this.lastFpsUpdate = 0;
+
+    // 循环句柄(stop 时据此撤销下一帧;2026-10-11 DG-LOOP-001)
+    this._rafId = 0;
+    /** 本模块起的定时器(目前无;stop 统一清,新增定时器 push 进来即可) */
+    this._timers = [];
   }
 
   /**
-   * 启动统一循环
+   * 启动统一循环(幂等:已在跑则不叠第二条 RAF 链)
    */
   start() {
     if (this._running) return;
@@ -94,6 +99,24 @@ export class LoopManager {
 
     // 触发循环启动事件
     eventBus.emit('loop:started');
+  }
+
+  /**
+   * 停止循环:与 start() 对称的终点(组合根 dispose / core/loop.js facade 的 stop 走这里)。
+   * 可重复调用;stop() 后 start() 能重新跑。pause/resume 只管 timeScale,不停 RAF。
+   */
+  stop() {
+    this._running = false;
+    if (this._rafId) {
+      cancelAnimationFrame(this._rafId);
+      this._rafId = 0;
+    }
+    for (const t of this._timers) {
+      clearInterval(t);
+      clearTimeout(t);
+    }
+    this._timers.length = 0;
+    eventBus.emit('loop:stopped');
   }
 
   /**
@@ -175,8 +198,11 @@ export class LoopManager {
    * 主循环帧
    */
   _frame() {
-    if (!this._running) return;
-    requestAnimationFrame(() => this._frame());
+    if (!this._running) {
+      this._rafId = 0; // stop() 之后仍被排进来的旧句柄:只收句柄,不再续链
+      return;
+    }
+    this._rafId = requestAnimationFrame(() => this._frame());
 
     const now = performance.now();
     let dt = Math.min((now - this._lastTime) / 1000, 0.1);

@@ -25,33 +25,48 @@ export function isBigscreen(dir, base) {
   return dir === 'videos' && base.startsWith('户外大屏/');
 }
 
+// ===================== 待审核态(2026-10-11 DG-UP-003) =====================
+// 审核通道已开启却拿不到结论(失败/超时/无响应)的**公开展品**,服务端软处理:文件保留,
+// gateData.uploads[name].pending = 时间戳。调用方(服务端 canServeMedia / 客户端 paintInputs)
+// 把该标记随同一批输入传进本表,于是"不上墙"与"不放行下载"仍是一张表说了算,不出现两套口径。
+// 认 pending 也认 isPending,免得两侧调用点为字段名再分叉一次。
+export function isPending(o) {
+  return !!(o && (o.pending || o.isPending));
+}
+
 // ===================== 上墙决策(客户端 mode.js applyPaintMode) =====================
-// 输入:{mode(已废弃,忽略), isDemo, isMine, isLib}
+// 输入:{mode(已废弃,忽略), isDemo, isMine, isLib, pending}
 // 输出:{visible 整框显隐, content 内容面显隐(empty 标记)}
 // 表(2026-09-06 特殊模式删除后):演示照片上墙;本人上传上墙出内容;其余(图库/他人)整框隐藏
+// 待审核(pending)内容一律不上墙 —— 审核结论出来之前不自动见客
 export function wallDecision(o) {
+  if (isPending(o)) return { visible: false, content: false };
   if (o.isDemo) return { visible: true, content: true };
   if (o.isMine) return { visible: true, content: true };
   return { visible: false, content: false };
 }
 
 // ===================== 内容/纹理门禁(scene.js texAllowed / paintings.js 视频调度) =====================
-// 与 wallDecision().content 一致:演示+本人上传放行。
+// 与 wallDecision().content 恒一致:演示+本人上传放行,待审核拒绝。
 export function contentAllowed(o) {
   return wallDecision(o).content;
 }
 
 // ===================== 配文门禁(paintings.js captionAllowed,2026-07-25 主人修订) =====================
-// 只显示演示照片和本人上传的配文。
+// 只显示演示照片和本人上传的配文;待审核内容连配文一起压住。
 export function captionAllowed(o) {
+  if (isPending(o)) return false;
   return !!(o.isDemo || o.isMine);
 }
 
 // ===================== 下载放行决策(服务端 canServeMedia,2026-07-26/27 堵口版) =====================
-// 输入:{dir, base(已 stripThumbs), isDemo, isMine, hasMt(带媒体令牌), globalSpecial/deviceSpecial(已废弃,忽略)}
+// 输入:{dir, base(已 stripThumbs), isDemo, isMine, hasMt, pending, globalSpecial/deviceSpecial(已废弃,忽略)}
 // 输出:{allow, pub} pub=true 表示可按公开名给 CDN 边缘缓存(req._mediaPublic)
 // 表:白板/大屏/演示=公开;本人上传(dk 或 mt)=仅本人;其余一律拒绝
+// pending 在最前面短路:待审核展品即便走的是"按名字公开"的白板/大屏路径也不下发
+//   (否则审核失败的内容会先被 CDN 缓存成公开对象)
 export function serveDecision(o) {
+  if (isPending(o)) return { allow: false, pub: false };
   if (isWhiteboard(o.dir, o.base)) return { allow: true, pub: true };
   if (isBigscreen(o.dir, o.base)) return { allow: true, pub: true };
   if (o.isDemo) return { allow: true, pub: true };

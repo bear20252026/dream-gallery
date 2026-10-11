@@ -441,7 +441,11 @@ export function installMuteBtn(dialogEl) {
     );
     b.setAttribute('aria-label', tt({ en: 'Voice on / off', zh: '台词朗读开关' }));
   };
-  if (typeof window !== 'undefined') window.addEventListener('script:lang', () => sync());
+  // 换字监听必须**具名并可摘**(2026-10-11 监听器族整改):旧实现注册匿名 `() => sync()`,
+  // 重复装配时旧对话框的监听与新的并存(同句换字跑多份),且连 removeEventListener 都做不到。
+  // 句柄记在按钮上,由 disposeMuteBtn 精确移除;.gs-voice 存在性守卫照旧(同元素不重复装)。
+  b._langHandler = sync;
+  if (typeof window !== 'undefined') window.addEventListener('script:lang', sync);
   b.onclick = (e) => {
     e.stopPropagation(); // 别触发对话框推进
     toggleVoiceOff();
@@ -449,4 +453,21 @@ export function installMuteBtn(dialogEl) {
   };
   sync();
   dialogEl.appendChild(b);
+}
+
+/**
+ * 收掉静音钮:摘掉它的 script:lang 监听并移出 DOM(gameshell-dialog dispose 调用)。
+ * 2026-10-11 监听器族整改——没有这一步,重复装配对话框就会重复挂监听(旧的一直在)。
+ * @param {HTMLElement} dialogEl 装有 .gs-voice 的对话框元素
+ * @returns {boolean} true=确实收掉了一只静音钮
+ */
+export function disposeMuteBtn(dialogEl) {
+  if (!dialogEl || !dialogEl.querySelector) return false;
+  const b = dialogEl.querySelector('.gs-voice');
+  if (!b) return false;
+  if (b._langHandler && typeof window !== 'undefined') window.removeEventListener('script:lang', b._langHandler);
+  b._langHandler = null;
+  b.onclick = null;
+  b.remove();
+  return true;
 }

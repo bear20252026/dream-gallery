@@ -1,6 +1,10 @@
 // admin-errors-tab-probe.cjs — 后台「报错反馈」tab 实测探针(2026-09-25 排查主人报"后台看不到报错")
 // 用法: ADMIN_TOKEN=<token> [BASE_URL=https://cloudbear.cloud/] node scripts/probe/admin-errors-tab-probe.cjs
 // 流程:打开 /admin?token= → 点「报错反馈」tab → 等 loadErrors 完成 → 抓 pageerror/4xx + dump errList/errStats + 截图
+// 2026-10-11 凭据治理后:`/admin?token=` 只是**一次性引导**(服务端 302 到 /admin + 签发 HttpOnly
+//   admin_session cookie),本探针照旧用它登录;tab 内 API 走 cookie,x-token 通道也仍然可用。
+//   「URL 里不许再有 token / 内嵌元素不许带 token」由 admin-credential-hygiene-probe.cjs 硬断言,
+//   本探针只打印最终 URL 供人核对,不改自己的通过判据(避免两探针互踩)。
 const { launch, BASE_URL } = require('./browser.js');
 const fs = require('fs');
 const path = require('path');
@@ -21,6 +25,7 @@ const OUT = path.join(__dirname, 'admin-errors-tab-shot.png');
 
   await page.goto(BASE_URL + 'admin?token=' + encodeURIComponent(TOKEN), { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(3000);
+  console.log('登录后最终 URL=' + page.url() + (/token=/.test(page.url()) ? '  ⚠️ 仍带 token(引导 302 未生效?)' : '  (无凭据,正常)'));
 
   const before = await page.evaluate(() => ({
     tabs: [...document.querySelectorAll('.tab')].map((t) => t.dataset.tab),

@@ -506,8 +506,13 @@ function createGameShellSystem() {
       if (unsub) unsub();
       unsubWorld?.();
       window.removeEventListener('script:lang', refreshQuest);
+      // 对话状态机自己的监听收口(2026-10-11 监听器族整改):它也在 attach 里注册了
+      // window 'script:lang'(换语言)与静音钮换字监听,此前只摘 refreshQuest → 重复装配时双份在。
+      dialogApi.dispose();
       if (prevKunlunSpeak) ctx.ui.kunlunSpeak = prevKunlunSpeak;
       if (menuApi) menuApi.unregister();
+      // 对话框自身的 DOM 监听也精确摘掉(与 init 的 addEventListener 成对;元素随后被 remove)
+      if (dialogEl) dialogEl.removeEventListener('click', dialogApi.advance);
       [styleEl, dialogEl, questEl, menuBtn, menuEl].forEach((n) => n && n.remove());
     },
   });

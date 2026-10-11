@@ -1,0 +1,42 @@
+# Dependabot — supply-chain version + security updates (added 2026-10-11)
+# Repo is PUBLIC and single-developer; keep PR volume low so it never buries the owner.
+version: 2
+updates:
+  # Root npm project (package-lock.json; CI installs with `npm ci`).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "07:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    # Security alerts keep coming even past the PR limit, so vuln bumps are not lost.
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # Collapse routine/minor bumps into one PR to cut noise (single-dev reality).
+      production-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # hill-src is a separate pnpm sub-project (hill-src/pnpm-lock.yaml).
+  # Dependabot handles pnpm under the "npm" ecosystem; it reads pnpm-lock.yaml in that directory.
+  - package-ecosystem: "npm"
+    directory: "/hill-src"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+      time: "07:30"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "hill-src"
+    commit-message:
+      prefix: "chore(deps-hill)"

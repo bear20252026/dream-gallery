@@ -71,6 +71,32 @@ async function testData() {
 // 用稳定 IP 让封禁/拦截断言确定性通过(避免 me.ip 取到回环地址导致时好时坏)
 const TEST_IP = '203.0.113.5';
 const XFF = { 'x-forwarded-for': TEST_IP };
+
+// ---------- 访客身份夹具 ----------
+// 2026-10-11 DG-SEC-001/002 之后,"本人"= 带有效 vid 会话的浏览器:
+// 上传归属(uploads[name].aid)与私有媒体可见性一律只认 authVid(req),
+// dk=sha256(UA) 单独不再构成授权。真实浏览器的顺序是先进页(服务端建档并下发 vid Cookie),
+// 再上传、再取图——测试照此办理,否则"本人"会退化成无身份的空 Cookie 请求而 403。
+// UA 每次运行唯一:保证拿到的是新建档案+新签发会话(不被上一次运行的残留状态影响),
+// 且不得含 store.BOT_UA_RE 的词(headless/testagent/perm-test/curl/… 会被判自动化而不建档)。
+const RUN_TAG = Date.now().toString(36) + '-' + process.pid.toString(36);
+async function newVisitor(base, label) {
+  const ua = 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 DreamGallery' + label + '-' + RUN_TAG;
+  const jar = {};
+  const r = await fetch(base + '/', { headers: { 'user-agent': ua, ...XFF } });
+  const sc = r.headers.getSetCookie ? r.headers.getSetCookie() : [r.headers.get('set-cookie')].filter(Boolean);
+  for (const c of sc) { const [kv] = c.split(';'); const i = kv.indexOf('='); if (i > 0) jar[kv.slice(0, i).trim()] = kv.slice(i + 1).trim(); }
+  return { ua, label, jar };
+}
+function vHeaders(v, extra) {
+  const cookie = Object.entries(v.jar).map(([k, val]) => k + '=' + val).join('; ');
+  return { 'user-agent': v.ua, ...XFF, ...(cookie ? { cookie } : {}), ...(extra || {}) };
+}
+// 同一 UA 但没有任何 Cookie 的陌生访客(正是本次整改要钉住的那条路径)
+function bareHeaders(v, extra) {
+  return { 'user-agent': v.ua, ...XFF, ...(extra || {}) };
+}
+
 async function testApi(base) {
   console.log('\n[服务器 API(无鉴权)]');
   // 媒体目录自愈:CI/新环境 checkout 后 videos 可能不存在(git 不跟踪空目录),先确保目录在
@@ -87,19 +113,24 @@ async function testApi(base) {
   res = await fetch(base + '/api/files?dir=bad');
   ok(res.status === 400, 'GET /api/files?dir=bad 返回 400');
 
-  // 上传 → 列表可见 → 删除 → 列表消失
+  // 上传 → 本人列表可见 → 删除 → 列表消失
   try {
-    res = await fetch(base + '/api/upload?dir=photos&name=' + TEST_NAME, { method: 'POST', body: 'hello-test' });
+    const up = await newVisitor(base, 'Uploader');
+    res = await fetch(base + '/api/upload?dir=photos&name=' + TEST_NAME, { method: 'POST', headers: vHeaders(up), body: 'hello-test' });
     ok(res.status === 201 && fs.readFileSync(testPath, 'utf8') === 'hello-test', 'POST 上传文件成功且内容正确');
 
     // 列表可能异步刷新,轮询最多 3 秒确认文件出现(消除偶发时序竞态)
     let listed = false;
     for (let i = 0; i < 15 && !listed; i++) {
-      const list1 = await (await fetch(base + '/api/files?dir=photos')).json();
+      const list1 = await (await fetch(base + '/api/files?dir=photos', { headers: vHeaders(up) })).json();
       if (list1.photos.some(f => f.name === TEST_NAME)) { listed = true; break; }
       await new Promise(r => setTimeout(r, 200));
     }
-    ok(listed, '上传后文件出现在列表中');
+    ok(listed, '上传后文件出现在本人列表中(带本人 vid 会话)');
+
+    const anonList = await (await fetch(base + '/api/files?dir=photos', { headers: bareHeaders(up) })).json();
+    ok(!anonList.photos.some(f => f.name === TEST_NAME),
+      '同 UA 但不带 vid 的陌生访客列不到别人的私有上传(dk 不再构成授权)');
 
     res = await fetch(base + '/api/files/photos/' + TEST_NAME, { method: 'DELETE' });
     ok(res.status === 200 && !fs.existsSync(testPath), 'DELETE 删除成功且磁盘文件已移除');
@@ -204,14 +235,28 @@ async function testToken(base) {
   res = await fetch(base + '/api/upload?dir=photos&name=x.txt', { method: 'POST', body: 'x' });
   ok(res.status === 400, '公开上传拒绝非媒体文件');
 
-  // 媒体文件级门禁(2026-07-26 紧急堵口):普通用户仅 演示照片/白板/户外大屏/本人上传
+  // 媒体文件级门禁(2026-07-26 紧急堵口;2026-10-11 DG-SEC-001/002 收紧身份)
+  // 普通用户仅可见:演示照片 / 白板 / 户外大屏 / 本人上传。
+  // "本人"只认带有效 vid 会话的浏览器——先 GET / 拿 vid Cookie 再上传再取图;
+  // 同 UA 而不带 Cookie 的陌生访客必须 403(旧实现按 dk=sha256(UA) 命中即放行,同型号设备互相能看图)。
   const uaB = { headers: { 'user-agent': 'perm-test-B' } };
-  res = await fetch(base + '/api/upload?dir=photos&name=perm-a.png', { method: 'POST', headers: { 'user-agent': 'perm-test-A' }, body: 'fakepng' });
-  ok(res.status === 201, '媒体门禁前置:A 上传成功');
-  res = await fetch(base + '/photos/perm-a.png', { headers: { 'user-agent': 'perm-test-A' } });
-  ok(res.status === 200, '本人上传:本人可访问');
-  res = await fetch(base + '/photos/perm-a.png', uaB);
+  const owner = await newVisitor(base, 'MediaGateOwner');
+  const MINE_NAME = 'perm-a-' + RUN_TAG + '.png';
+  res = await fetch(base + '/api/upload?dir=photos&name=' + MINE_NAME, { method: 'POST', headers: vHeaders(owner), body: 'fakepng' });
+  ok(res.status === 201, '媒体门禁前置:本人上传成功');
+  res = await fetch(base + '/photos/' + MINE_NAME, { headers: vHeaders(owner) });
+  ok(res.status === 200, '本人上传:带本人 vid 会话可访问');
+  res = await fetch(base + '/photos/' + MINE_NAME, { headers: bareHeaders(owner) });
+  ok(res.status === 403, '本人上传:同 UA 无 vid 的陌生访客 403(纯 UA 不再构成授权)');
+  res = await fetch(base + '/photos/' + MINE_NAME, uaB);
   ok(res.status === 403, '本人上传:他人访问 403');
+  res = await fetch(base + '/api/myuploads', { headers: vHeaders(owner) });
+  const muMine = await res.json();
+  ok(res.status === 200 && (muMine.names || []).includes(MINE_NAME), '本人上传清单:列出自己的文件');
+  res = await fetch(base + '/api/myuploads', { headers: bareHeaders(owner) });
+  const muBare = await res.json();
+  ok(!(muBare.names || []).includes(MINE_NAME),
+    '本人上传清单:同 UA 无 vid 列不出他人文件名(旧 `dk!==dk && aid!==aid` 的 OR 泄漏点)');
   res = await fetch(base + '/photos/1000000850.jpg', uaB);
   ok(res.status === 403, '图库照片:普通用户 403');
   // 户外大屏视频可能不在本地仓库中，跳过检查
@@ -231,11 +276,11 @@ async function testToken(base) {
   ok(res.status === 403, '演示照片:取消标记后恢复 403');
   res = await fetch(base + '/api/files?dir=photos', uaB);
   const fl = await res.json();
-  ok(!(fl.photos || []).some(f => f.name === '1000000850.jpg' || f.name === 'perm-a.png'), '无 token 文件列表已按权限过滤');
+  ok(!(fl.photos || []).some(f => f.name === '1000000850.jpg' || f.name === MINE_NAME), '无 token 文件列表已按权限过滤');
   res = await fetch(base + '/api/files?dir=photos&token=t1');
   const fl2 = await res.json();
   ok((fl2.photos || []).length > (fl.photos || []).length, '带 token 文件列表为全量');
-  await fetch(base + '/api/files/photos/perm-a.png?token=t1', { method: 'DELETE' }); // 清理
+  await fetch(base + '/api/files/photos/' + MINE_NAME + '?token=t1', { method: 'DELETE' }); // 清理
 
   // 协议文档编辑器(2026-07-27):白名单;读写+备份+回滚
   let dres = await fetch(base + '/api/admin/docs?file=server.js&token=t1');

@@ -3,6 +3,8 @@
 // location.reload(),玩家看到的是一闪白屏甚至反复刷新;②浏览器根本起不来 3D。
 // 现在停在一张纸面提示上:说清发生了什么、进度没丢,给「继续」与「换流畅画质再继续」两个按钮。
 // 上下文自己恢复(webglcontextrestored)时也只提示,不擅自刷新——由玩家决定。
+// ⚠️ 2026-10-11 DG-STATE-002:「进度已经保存」这句是**对用户的承诺**,必须按 store 的真实写入
+// 结果呈现(store-api 的 hasWriteFailure() 粘性旗)。隐私模式/配额满时写不进去,不能再报平安。
 import { ctx } from '../ctx.js';
 import { tt } from '../shared/story-text.mjs';
 import { Z } from '../shared/z-layers.mjs';
@@ -13,6 +15,11 @@ const TEXT = {
     body: {
       zh: '显卡暂时收回了画面(手机内存吃紧或切到后台时常见)。你的进度已经保存,点「继续」从刚才的地方接着走。',
       en: 'Your device took the graphics back for a moment (common when memory is low or the app went to the background). Your progress is saved — tap Continue to pick up where you were.',
+    },
+    // 本段会话里出现过写失败(隐私模式/存储配额满)时的同一句话,按事实改成不报平安
+    bodyUnsaved: {
+      zh: '显卡暂时收回了画面(手机内存吃紧或切到后台时常见)。刚才的进度没能写进浏览器(浏览器限制了本地存储),这一小段可能要重走一遍;更早的存档仍然在。点「继续」从刚才的地方接着走。',
+      en: 'Your device took the graphics back for a moment (common when memory is low or the app went to the background). This last stretch could not be saved — your browser is blocking local storage, so you may have to replay it; earlier saves are still there. Tap Continue to pick up where you were.',
     },
   },
   unsupported: {
@@ -28,13 +35,28 @@ const TEXT = {
     zh: '进度会在每一段剧情后自动保存。',
     en: 'Progress saves itself after every part of the story.',
   },
+  savedFailed: {
+    zh: '注意:这台浏览器拦住了本地存档,本段进度可能没能保存(无痕/隐私模式常见)。',
+    en: 'Heads-up: this browser is blocking local saves, so this part of your progress may not be stored (common in private/incognito mode).',
+  },
 };
+
+/** 本会话是否发生过 localStorage 写失败(store-api 的粘性旗;取不到就当没有) */
+function saveBlocked() {
+  try {
+    const st = ctx.store;
+    return !!(st && typeof st.hasWriteFailure === 'function' && st.hasWriteFailure());
+  } catch (e) {
+    return false;
+  }
+}
 
 const RECENT_KEY = 'b612GlLostAt'; // sessionStorage:短时间内反复丢失时,主推「流畅画质」
 
 export function showGlLost(reason) {
   const kind = reason === 'unsupported' ? 'unsupported' : 'lost';
   if (typeof document === 'undefined' || document.getElementById('glLost')) return;
+  const blocked = kind === 'lost' && saveBlocked(); // 「已保存」这句话能不能说,看真实写入结果
   let repeated = false;
   try {
     const prev = Number(sessionStorage.getItem(RECENT_KEY) || 0);
@@ -61,7 +83,8 @@ export function showGlLost(reason) {
   t.textContent = tt(TEXT[kind].title);
   const s = document.createElement('p');
   s.style.cssText = 'font-size:15px;line-height:1.9;max-width:480px;margin:0;opacity:.85';
-  s.textContent = tt(TEXT[kind].body);
+  // 按事实呈现:写成功才说「已经保存」,失败说「没能保存(浏览器限制),这一小段可能要重走」
+  s.textContent = tt(blocked ? TEXT.lost.bodyUnsaved : TEXT[kind].body);
   d.append(star, t, s);
   if (kind === 'lost') {
     const row = document.createElement('div');
@@ -80,10 +103,11 @@ export function showGlLost(reason) {
       return b;
     };
     const lighter = () => {
-      try {
-        ctx.store.setJson('lowQuality', true);
-      } catch (e) {
-        console.warn('[gl-lost] 流畅画质写入失败,刷新后可能仍是原画质', e);
+      // 2026-10-11 DG-STATE-002:旧写法把 setJson 包在 try/catch 里 console.warn——由于 rawSet
+      // 自吞异常,那条留痕**永不触发(死代码)**。改按真实返回值判定。
+      const ok = ctx.store && ctx.store.setJson('lowQuality', true);
+      if (ok === false) {
+        console.warn('[gl-lost] 流畅画质未能持久化(浏览器限制),刷新后可能仍是原画质');
       }
       location.reload();
     };
@@ -96,7 +120,8 @@ export function showGlLost(reason) {
     d.appendChild(row);
     const note = document.createElement('small');
     note.style.cssText = 'font-size:12px;opacity:.6';
-    note.textContent = tt(TEXT.saved);
+    // 同样是「自动保存」的承诺,按事实换字
+    note.textContent = tt(blocked ? TEXT.savedFailed : TEXT.saved);
     d.appendChild(note);
     setTimeout(() => first.focus(), 50);
   }

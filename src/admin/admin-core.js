@@ -1,8 +1,31 @@
 // admin-core.js — 后台共享工具(2026-10-09 审查 P2 自 admin.js 切出,逐字迁移不改逻辑)
 // 无状态纯工具。可变状态(DATA/RANGE/CAL_DATE)仍留 admin.js——横跨 8 个分区,第一阶段不动。
 
-export const TOKEN = new URLSearchParams(location.search).get('token') || '';
-// 2026-09-18 审计 P1#2:API 一律走 x-token 请求头;URL query 仅用于首次打开后台页
+// 凭据取值顺序(2026-10-11 凭据治理):显式存储(CI/无 Cookie 环境手工塞的 x-token)→ 本次引导用的
+// 页面 query(服务端验完即 302 掉,这里只兜住"直接开带 token 的页"这一拍)→ 空(此后全靠 HttpOnly
+// admin_session cookie 鉴权,主 TOKEN 不再留在地址栏/历史/日志里)。
+const STORE_KEY = 'admin_x_token'; // 仅调试/CI 后门:控制台 localStorage.setItem('admin_x_token','…') 可强制回头像鉴权
+const storedToken = (() => {
+  try {
+    return localStorage.getItem(STORE_KEY) || sessionStorage.getItem(STORE_KEY) || '';
+  } catch {
+    return '';
+  }
+})();
+const queryToken = new URLSearchParams(location.search).get('token') || '';
+export const TOKEN = storedToken || queryToken;
+// 地址栏清理:引导令牌用完即抹掉(history.replaceState 不新增历史项)
+if (queryToken && !storedToken) {
+  try {
+    const sp = new URLSearchParams(location.search);
+    sp.delete('token');
+    const qs = sp.toString();
+    history.replaceState(null, '', location.pathname + (qs ? '?' + qs : '') + location.hash);
+  } catch {
+    /* 隐私模式等极端环境:忽略 */
+  }
+}
+// 2026-09-18 审计 P1#2:API 一律走 x-token 请求头;2026-10-11 起后台正常登录态是 cookie(无 TOKEN 即不发头)
 export const authH = () => (TOKEN ? { 'x-token': TOKEN } : {});
 export const tk = () => ''; // 兼容旧调用拼接位,token 已在 header
 export const tk2 = () => '';

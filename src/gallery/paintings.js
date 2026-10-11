@@ -9,6 +9,7 @@ import { P, V, AI_DESC, LINKS, VIDEO_WALL_SOURCES } from '../../data.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
 import { withMemoryPrefix } from '../shared/memory-prefix.mjs'; // 配文前缀单一源(2026-09-24 抽出)
 import { avAllowed } from '../core/av-switch.js'; // 全站音视频总闸(2026-09-26)
+import { disposeObject3D } from '../shared/dispose-object3d.mjs'; // 统一资源释放(2026-10-11 DG-GPU-001/003)
 const {
   s,
   cam,
@@ -266,7 +267,11 @@ function takeoverEmpty(mU, caption, aura) {
   const target = (want && candidates.find((g) => frameDirOf(g) === want)) || candidates[0];
   const cm = target.children[3]; // 内容面(hangOn 固定子序)
   const tex = loadTexCapped(mU, undefined, { x: target.userData.ox, z: target.userData.oz });
+  // 2026-10-11 DG-GPU-003:换芯必须先释放旧图。旧 map 是这幅画独占的 loadTexCapped CanvasTexture
+  // (scene.js 每次调用新建 canvas + 新纹理,已核实非共享),不换=每换芯一次漏一张 1024² 显存。
+  const old = cm.material.map;
   cm.material.map = tex;
+  if (old && old !== tex) old.dispose();
   cm.material.needsUpdate = true;
   cm.visible = true;
   target.userData.src = mU;
@@ -404,21 +409,10 @@ function removePaintByUrl(url) {
       vE.splice(ev, 1);
     }
   }
-  g.traverse(function (obj) {
-    if (obj.material) {
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      for (const m of mats) {
-        // 2026-08-31 审计 M7:跳过画框/内衬共享材质(fW/mM),否则删一张画全场景材质失效闪黑
-        if (m === fW || m === mM) continue;
-        if (m.map) {
-          m.map.dispose();
-          m.map = null;
-        }
-        m.dispose();
-      }
-    }
-    if (obj.geometry) obj.geometry.dispose();
-  });
+  // 资源释放收敛到统一实现(2026-10-11 DG-GPU-001),口径与旧的手写 traverse 逐字一致:
+  //   · 跳过画框/内衬**共享**材质 fW/mM(2026-08-31 审计 M7 血泪:否则删一张画全场景材质失效闪黑)
+  //   · 释放材质上的贴图并清引用(map=null),再释放 geometry/material,同一资源只一次
+  disposeObject3D(g, { shared: [fW, mM], clearTextureRefs: true });
   s.remove(g);
   const ii = iG.indexOf(g);
   if (ii >= 0) iG.splice(ii, 1);

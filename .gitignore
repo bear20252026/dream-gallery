@@ -59,3 +59,7 @@ photos/thumbs/
 
 # 发布脚本暂存区(release/ship 的消息与日志,tgz/log 已被上面规则覆盖,这里兜底整目录)
 .tmp/
+
+# sw.min.js 是 vite minifySw 构建时生成的产物(2026-10-08 已让 sw.js 单一真相退出 git);
+# 不加这条,release.sh 的 `git add public` 会把构建产物重新收进仓库,变成双源真相。
+public/sw.min.js

@@ -170,16 +170,26 @@ let sequenceTriggered = false;
  */
 function playVideo(el, src) {
   return new Promise(function (resolve) {
+    // generation:同一段等待的身份证。超时/跳过路径摘掉全部句柄,迟到的旧句柄
+    // 触发时因号不符直接返回 —— 否则慢网反复超时后同一 <video> 上会堆 canplaythrough,
+    // 网络恢复时"已经跳过去的旧视频"突然重播(2026-10-11 DG-MEDIA-001)。
+    var gen = (el._vGen || 0) + 1;
+    el._vGen = gen;
     el.pause();
     el.muted = true;
     el.src = src;
     el.load();
     var started = false;
     var dead = Date.now() + 20000;
+    var done = false;
 
     if (el._vEndedFn) {
       el.removeEventListener('ended', el._vEndedFn);
       el._vEndedFn = null;
+    }
+    if (el._vCanPlayFn) {
+      el.removeEventListener('canplaythrough', el._vCanPlayFn);
+      el._vCanPlayFn = null;
     }
     if (el._vPollId) {
       clearInterval(el._vPollId);
@@ -187,13 +197,18 @@ function playVideo(el, src) {
     }
 
     function onEnd() {
+      if (done) return;
+      done = true;
       if (el._vPollId) {
         clearInterval(el._vPollId);
         el._vPollId = null;
       }
       el.pause();
-      el.removeEventListener('ended', el._vEndedFn);
-      el._vEndedFn = null;
+      el.removeEventListener('ended', onEnd);
+      if (el._vEndedFn === onEnd) el._vEndedFn = null;
+      // 跳过/超时同样要摘掉 canplaythrough(旧实现漏这一步 → 迟到回调把旧视频播起来)
+      el.removeEventListener('canplaythrough', onCanPlay);
+      if (el._vCanPlayFn === onCanPlay) el._vCanPlayFn = null;
       ctx.events.emit('video:ended', { src: src.substring(src.lastIndexOf('/') + 1) });
       resolve(); // ← 视频播完，Promise resolve
     }
@@ -201,21 +216,22 @@ function playVideo(el, src) {
     el._vEndedFn = onEnd;
     el.addEventListener('ended', onEnd);
 
-    var canPlayFn = function () {
-      el.removeEventListener('canplaythrough', canPlayFn);
+    function onCanPlay() {
+      el.removeEventListener('canplaythrough', onCanPlay);
+      if (el._vCanPlayFn === onCanPlay) el._vCanPlayFn = null;
+      if (el._vGen !== gen || done) return; // 这次等待已经结束/被顶掉:不播
       el.play().catch(function (e) {
         console.warn('[video] play():', e.name);
         el.muted = true;
         el.play().catch(function () {});
       });
-    };
-    el.addEventListener('canplaythrough', canPlayFn);
+    }
+    el._vCanPlayFn = onCanPlay;
+    el.addEventListener('canplaythrough', onCanPlay);
 
     el._vPollId = setInterval(function () {
       if (el.currentTime > 0.1) started = true;
       if (Date.now() > dead && !started && el.paused) {
-        clearInterval(el._vPollId);
-        el._vPollId = null;
         console.warn('[video] 超时跳过:', el.src);
         onEnd();
       }
@@ -252,8 +268,9 @@ async function playV45Slots() {
 }
 async function startSequence() {
   if (sequenceStarted) return;
-  sequenceStarted = true;
   if (!avAllowed()) return; // 总闸关闭:大屏串行序列(视频+音频轨)整体不起,屏面静止
+  // 置位在闸门之后:AV 关时不把"同会话内后来才开 AV"这一支永久锁死(行为等价,triggerSequence 只调一次)
+  sequenceStarted = true;
   await reloadBigscreen();
 
   // 阶段1协议配乐停掉 + 背景音乐暂停(进入串行序列,同一时刻只播一个)

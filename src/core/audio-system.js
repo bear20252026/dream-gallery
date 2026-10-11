@@ -14,7 +14,7 @@ export function getAudioSystem() {
 
 export function createAudioSystem(deps = {}) {
   const { eventBus } = deps;
-  const getCamera = deps.getCamera || (() => (deps.camera || null));
+  const getCamera = deps.getCamera || (() => deps.camera || null);
 
   /** @type {THREE.AudioListener|null} */
   let listener = null;
@@ -129,8 +129,13 @@ export function createAudioSystem(deps = {}) {
     panner.coneOuterGain = 0;
     panner.connect(ac.destination);
 
+    // webNodes 里存的就是交给调用方的那个对象:dispose 闭包必须按同一引用出栈。
+    // 此前 push 的是另一个对象字面量,indexOf 恒为 -1 → 条目永不出栈 →
+    // update() 每帧继续对已 disconnect 的死节点 setValueAtTime(2026-10-11 DG-AUDIO-002)。
     const node = {
+      parent,
       panner,
+      ac,
       context: ac,
       connect(nodeToConnect) {
         nodeToConnect.connect(panner);
@@ -141,7 +146,7 @@ export function createAudioSystem(deps = {}) {
         panner.disconnect();
       },
     };
-    webNodes.push({ parent, panner, ac, dispose: node.dispose });
+    webNodes.push(node);
     return node;
   }
 
@@ -178,8 +183,12 @@ export function createAudioSystem(deps = {}) {
   }
 
   function dispose() {
-    for (const n of webNodes) n.dispose && n.dispose();
+    // 快照后遍历:node.dispose() 会自摘 webNodes 条目,不能边遍历边改原数组
+    for (const n of [...webNodes]) n.dispose && n.dispose();
     webNodes.length = 0;
+    // 与 removeSource 同一条完整清理路径(stop → 脱离父节点 → disconnect);
+    // 此前只 sources.clear(),死掉的 PositionalAudio 仍挂在场景与音频图上。
+    for (const id of [...sources.keys()]) removeSource(id);
     sources.clear();
     listener = null;
     _api = null;

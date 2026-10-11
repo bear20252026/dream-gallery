@@ -154,6 +154,9 @@ export interface ModeNamespace {
   applyPaintMode: () => void;
   applyMode: () => void;
   refreshMode: () => void;
+  /** 链接实体按 id 增量对齐(2026-10-11 DG-GPU-001:未变保留/移除才 dispose/新增才 spawn) */
+  renderCustomLinks: () => void;
+  applyTexGate: () => void;
   texAllowed: ((url: string) => boolean) | null;
   linkGuard: () => void;
   spawnLinkModel: (type: string, url: string) => Object3D;
@@ -185,10 +188,33 @@ export interface KunlunNamespace {
   rebuildEternalPicks: () => void;
 }
 
+export interface OverlayRegisterOpts {
+  display?: string;
+  escapable?: boolean;
+  closeOnOutside?: boolean;
+  touchOnly?: boolean;
+  canClose?: (reason: 'esc' | 'outside' | 'x' | 'api') => boolean;
+  onOpen?: () => void;
+  onClose?: (reason: string) => void;
+  x?: string | null;
+}
+
+export interface OverlayHandle {
+  open(): void;
+  close(): void;
+  isOpen(): boolean;
+  unregister(): void;
+}
+
 export interface OverlayAPI {
-  register: (id: string, el: HTMLElement, opts?: { esc?: boolean; backdrop?: boolean }) => void;
+  /** 注册即得弹层三铁律(✕ 事件委托 + 点外圈 + Esc 栈);冷核心 src/ui/overlay.js */
+  register: (el: HTMLElement, opts?: OverlayRegisterOpts) => OverlayHandle;
   anyOpen: () => boolean;
-  isUiTouch: (e: TouchEvent) => boolean;
+  isUiTouch: (t: EventTarget | null) => boolean;
+  /** 关闭全部已开弹层(保留注册表与 Esc 监听)——core/ui-system.js dispose 调用 */
+  closeAll: () => void;
+  /** 彻底销毁:清空注册表并放开常驻持有(Esc 监听随注册表归零才摘;此后 register 会重新挂回) */
+  destroy: () => void;
 }
 
 export interface StoreAPI {
@@ -196,8 +222,27 @@ export interface StoreAPI {
   str: (key: string, fallback?: string) => string;
   json: <T>(key: string, fallback?: T) => T;
   flag: (key: string, fallback?: boolean) => boolean;
+  /** 写入是否真的落盘(2026-10-11 DG-STATE-002:隐私模式/配额满必须可被调用方感知) */
+  setNum: (key: string, value: number) => boolean;
+  setStr: (key: string, value: string) => boolean;
+  setJson: (key: string, value: unknown) => boolean;
+  mark: (key: string) => boolean;
+  unmark: (key: string) => boolean;
+  /** 本会话是否发生过 localStorage 写/删失败(粘性旗;gl-lost 的「已保存」文案据此换字) */
+  hasWriteFailure: () => boolean;
+  /** 关键剧情 checkpoint 写失败的提示出口(装配方注入,main.js 走 ctx.ui.modeToast) */
+  setCriticalWriteNotifier: (fn: ((name: string) => void) | null) => void;
+  resetCriticalNotified: () => void;
+  storyCheckpointKeys: () => string[];
+  /** 灵蕴库存:key 白名单 + 幂等添加 + 读时清洗旧档重复/非法项 */
+  getSpirits: () => string[];
+  addSpirit: (key: string) => string[];
+  houseColor: (group: string) => string;
+  setHouseColor: (group: string, hex: string) => boolean;
+  clearHouseColor: (group: string) => boolean;
   set: (key: string, value: unknown) => void;
-  getSpirits: () => unknown;
+  /** 测试钩:vitest 的 localStorage mock 直写 backing store 时手动失效内存缓存(业务代码勿用) */
+  _dropCache: () => void;
 }
 
 export interface UINamespace {

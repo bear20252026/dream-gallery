@@ -116,6 +116,39 @@ if (typeof window !== 'undefined')
   for (const ev of ['pointerdown', 'keydown', 'touchstart'])
     window.addEventListener(ev, startStoryMusic, { capture: true, passive: true, once: true });
 
+/** 右下「音乐」钮点一次:翻 musicOff 并立刻按新状态起/停(手势内,浏览器放行) */
+function onMusicBtnClick(e) {
+  e.stopImmediatePropagation();
+  if (ctx.store.flag('musicOff')) ctx.store.unmark('musicOff');
+  else ctx.store.mark('musicOff');
+  labelButton();
+  startStoryMusic();
+}
+
+// 监听器挂卸登记(2026-10-11 监听器族整改):此前 dispose 只停定时器/停音,不摘 click 与
+// script:lang —— 二次 init 后一次点击跑多份 handler,mark/unmark 互抵,表现为「音乐按钮失灵」。
+let clickHost = null; // 挂了 click 的元素
+let langBound = false; // window 'script:lang' → labelButton 是否在挂状态
+function wireButton(el) {
+  unwireButton(); // 先摘上一轮:重复 init 也只剩一份 handler
+  if (!el) return;
+  el.addEventListener('click', onMusicBtnClick, { capture: true });
+  clickHost = el;
+  if (typeof window !== 'undefined') {
+    window.addEventListener('script:lang', labelButton);
+    langBound = true;
+  }
+}
+function unwireButton() {
+  if (clickHost) {
+    clickHost.removeEventListener('click', onMusicBtnClick, true); // 与 add 的 capture 口径一致
+    clickHost = null;
+  }
+  if (langBound && typeof window !== 'undefined') {
+    window.removeEventListener('script:lang', labelButton);
+    langBound = false;
+  }
+}
 /** 组合根装配:接管右下「音乐」钮(开/关剧情音乐;旧的随机轮播已退役) + 探针钩子 */
 export function createStoryMusic() {
   return defineSystem({
@@ -126,19 +159,8 @@ export function createStoryMusic() {
     init() {
       btn = document.getElementById('ab');
       if (btn) {
-        btn.addEventListener(
-          'click',
-          (e) => {
-            e.stopImmediatePropagation();
-            if (ctx.store.flag('musicOff')) ctx.store.unmark('musicOff');
-            else ctx.store.mark('musicOff');
-            labelButton();
-            startStoryMusic();
-          },
-          { capture: true }
-        );
+        wireButton(btn); // 可重复 init:旧 handler 先摘,只生效一份
         labelButton();
-        window.addEventListener('script:lang', labelButton);
       }
       ctx.ui.storyMusic = {
         now: () => (current ? current.id : null),
@@ -155,6 +177,7 @@ export function createStoryMusic() {
       };
     },
     dispose() {
+      unwireButton(); // click / script:lang 随 dispose 一起摘(2026-10-11)
       if (timer) clearInterval(timer);
       timer = null;
       if (current) current.el.pause();

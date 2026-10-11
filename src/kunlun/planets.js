@@ -29,34 +29,45 @@ import { legacyOn } from '../shared/legacy.mjs';
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
+// 非主世界 scene 的资源登记(2026-10-11 第 6 节)。hotBegin 的捕获补丁只挂在 ctx.scene.s.add 上,
+// 而本模块大量对象走 world.scene.add(...)(b612/kingXXX 各自独立 Scene ≠ ctx.scene.s)→ 开发期热更
+// 会把灯光/星空/岛组重复堆在同一个 world.scene 里。这里显式登记「从所属 scene 移除 + 统一释放」,
+// 复用 shared/dispose-object3d.mjs 的唯一实现(含 Sprite 共享几何保护)。
+// 只做「不再新增泄漏」的最小登记,不动 worldManager/portal 的剧情核心链(主代理判定:保守优先)。
+function addWorldObj(scene, obj) {
+  scene.add(obj);
+  bag.register(obj, { scene });
+  return obj;
+}
+
 // 独立世界灯光工厂:超强力灯光让 GLB 内嵌 PBR 贴图颜色全部展开
 // lite=true:B612 storybook 专用——材质已离线转换、天幕自发光,低照度防过曝(灯数不变,守手机账)
 function addWorldLights(scene, lite) {
   if (lite) {
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0));
+    addWorldObj(scene, new THREE.AmbientLight(0xffffff, 1.0));
     const keyL = new THREE.DirectionalLight(0xfff4e0, 3.2);
     keyL.position.set(5, 8, 5);
-    scene.add(keyL);
+    addWorldObj(scene, keyL);
     const fillL = new THREE.DirectionalLight(0x6b8fc8, 1.3);
     fillL.position.set(-4, 2, -3);
-    scene.add(fillL);
+    addWorldObj(scene, fillL);
     const rimL = new THREE.DirectionalLight(0xffd9a0, 1.0);
     rimL.position.set(0, 3, -6);
-    scene.add(rimL);
-    scene.add(new THREE.HemisphereLight(0x8fb0d8, 0x3a5a2a, 1.0));
+    addWorldObj(scene, rimL);
+    addWorldObj(scene, new THREE.HemisphereLight(0x8fb0d8, 0x3a5a2a, 1.0));
     return;
   }
-  scene.add(new THREE.AmbientLight(0xffffff, 2.5));
+  addWorldObj(scene, new THREE.AmbientLight(0xffffff, 2.5));
   const key = new THREE.DirectionalLight(0xfff8f0, 5.0);
   key.position.set(10, 20, 15);
-  scene.add(key);
+  addWorldObj(scene, key);
   const warm = new THREE.DirectionalLight(0xffe0b0, 2.0);
   warm.position.set(-8, 6, -10);
-  scene.add(warm);
+  addWorldObj(scene, warm);
   const cool = new THREE.DirectionalLight(0x8fb0ff, 1.2);
   cool.position.set(0, -5, 8);
-  scene.add(cool);
-  scene.add(new THREE.HemisphereLight(0xa8c8ff, 0x4a3820, 1.5));
+  addWorldObj(scene, cool);
+  addWorldObj(scene, new THREE.HemisphereLight(0xa8c8ff, 0x4a3820, 1.5));
 }
 // 星空粒子背景(每个世界独立实例;2026-09-07 定种子——随机星位让截图回归每次差 20%+)
 function addStarfield(scene) {
@@ -77,7 +88,7 @@ function addStarfield(scene) {
     geo,
     new THREE.PointsMaterial({ color: 0xffffff, size: 0.8, transparent: true, opacity: 0.9 })
   );
-  scene.add(stars);
+  addWorldObj(scene, stars);
   return stars;
 }
 
@@ -175,7 +186,7 @@ function loadWorldAsset(url, world, opts = {}) {
         (opts.z || 0) - center.z * scale
       );
       if (opts.rotationY) model.rotation.y = opts.rotationY;
-      world.scene.add(model);
+      addWorldObj(world.scene, model); // 异步回调里创建:登记进本轮 bag(2026-10-11 第 6 节)
       if (opts.onLoad) opts.onLoad(model, gltf);
     },
     undefined,
@@ -315,7 +326,7 @@ function buildIsland(cfg, idx) {
   addWorldLights(planetWorld.scene);
   addStarfield(planetWorld.scene);
   grp.position.set(0, 0, 0);
-  planetWorld.scene.add(grp);
+  addWorldObj(planetWorld.scene, grp);
   const isl = {
     cfg,
     grp,
@@ -422,7 +433,7 @@ loadWorldAsset('models/hall/b612-world/king-scene.glb', worldManager.getWorld('k
         const p = new THREE.Box3().setFromObject(lightMesh).getCenter(new THREE.Vector3());
         glow.position.copy(p);
       } else glow.position.set(0, isl.topY + 3.6, 0);
-      worldManager.getWorld('king329').scene.add(glow);
+      addWorldObj(worldManager.getWorld('king329').scene, glow); // 异步 GLB 回调:登记进本轮 bag
       const head = isl.props.userData.lampHead;
       head.userData.setLit = function (on) {
         glow.visible = on;
@@ -512,7 +523,7 @@ function loadPortalPad(world, position, targetWorld) {
       undefined,
       (e) => console.warn('[planets] portal platform load failed', e.message)
     );
-  world.scene.add(root);
+  addWorldObj(world.scene, root); // 含稍后 GLB 回调里 root.add(m) 的子树(登记=整棵释放)
   pads[targetWorld] = root;
   return root;
 }

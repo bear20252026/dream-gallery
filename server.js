@@ -16,23 +16,47 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 
-// 进程级异常兜底(2026-08-31 审计 H1):单个请求的异常不得打崩整个服务。
-// 记录后保持存活;pm2 异常重启计数仍在,连续崩溃仍会被 pm2 拉起
+// 进程级异常兜底(2026-08-31 审计 H1;2026-10-11 审计十九节改写):
+//  - uncaughtException:记录后**收束退出**交 pm2 拉起(继续裸奔会让全局对象处于未知状态,
+//    比崩一次更危险);收束期间仍来异常只计数不再重复触发。
+//  - unhandledRejection:保持不退出(多为 fetch/定时器的一次性失败),但必须留痕可定位。
+let server = null;
+let uncaughtCount = 0;
+let rejectionCount = 0;
+let fatalDraining = false;
 process.on('uncaughtException', (e) => {
-  console.error('[uncaughtException]', e && (e.stack || e.message || e));
+  uncaughtCount++;
+  console.error(`[uncaughtException #${uncaughtCount}] uptime=${Math.round(process.uptime())}s`, e && (e.stack || e.message || e));
+  if (fatalDraining || !server) return;
+  fatalDraining = true;
+  console.error('[uncaughtException] 收束在途请求后退出,交给 pm2 重启…');
+  beginShutdown(() => process.exit(1));
 });
 process.on('unhandledRejection', (e) => {
-  console.error('[unhandledRejection]', e && ((e.stack || e.message) || e));
+  rejectionCount++;
+  console.error(`[unhandledRejection #${rejectionCount}] uptime=${Math.round(process.uptime())}s`, (e && (e.stack || e.message)) || e);
 });
 
-const { ROOT, PORT, TOKEN, CORS_ORIGIN } = require('./lib/config');
+const { ROOT, PORT, TOKEN, IS_PROD } = require('./lib/config');
 const { sendJson, safeJoin } = require('./lib/util');
 const { recordVisit } = require('./lib/store');
 const { entryGate } = require('./lib/gate');
 const { serveStatic } = require('./lib/files');
 const { dispatch } = require('./lib/routes');
 const { canServeMedia } = require('./lib/siteconfig');
-const { staticDenied, applySecurityHeaders, mediaGate, serveEntryHtml } = require('./lib/security');
+const { staticDenied, applySecurityHeaders, mediaGate, serveEntryHtml, corsOriginFor } = require('./lib/security');
+const { flushTrack } = require('./lib/track');
+const { closeMediaSse } = require('./lib/media-push');
+
+// 生产 fail-fast(2026-10-11 DG-AUTH-001):没有 TOKEN 的生产实例是「后台洞开 + 写接口只靠本地判定」
+// 的半瘫状态,必须拒绝启动而不是静默运行。
+// ⚠️ 只在 NODE_ENV==='production' 时退出:线上 pm2 目前并未设置 NODE_ENV,
+// 无条件退出会把正在服务的环境直接打崩 —— 这是刻意保留的宽松边界,不是漏判。
+if (IS_PROD && !TOKEN) {
+  console.error('[启动失败] NODE_ENV=production 但未配置 TOKEN:后台与写接口将失去保护,拒绝启动。');
+  console.error('[启动失败] 请在 /opt/gallery/.env 设置 TOKEN 后重新 pm2 restart gallery --update-env。');
+  process.exit(1);
+}
 
 const handler = (req, res) => {
   // 畸形请求行/Host 头(实测 '//?noopening' 打崩过进程:2026-09-26 pm2 error log
@@ -54,15 +78,17 @@ const handler = (req, res) => {
 
   applySecurityHeaders(req, res); // CSP/CORS/nosniff 等(2026-09-18 下沉 lib/security)
 
-  // CORS 预检(2026-09-18 审计 P2#7):与 applySecurityHeaders 同轨——本地 *;生产用 CORS_ORIGIN
+  // CORS 预检(2026-09-18 审计 P2#7;2026-10-11 DG-CORS-001):与 applySecurityHeaders 共用
+  // security.corsOriginFor —— 两处必须同一裁决,否则「预检放行 A 域、真请求回 B 域」自相矛盾
   if (req.method === 'OPTIONS') {
-    const hostOpt = String(req.headers.host || '');
-    const isLocalOpt = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(hostOpt);
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': isLocalOpt ? '*' : CORS_ORIGIN,
+    const cors = corsOriginFor(req);
+    const headers = {
+      'Vary': 'Origin',
       'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, x-token',
-    });
+    };
+    if (cors) headers['Access-Control-Allow-Origin'] = cors.origin;
+    res.writeHead(204, headers);
     res.end();
     return;
   }
@@ -108,24 +134,40 @@ const handler = (req, res) => {
   serveStatic(req, res, filePath);
 };
 
-const server = http.createServer(handler);
+server = http.createServer(handler);
 
-// 优雅关闭(2026-10-07 审查#9):pm2 restart/reload 与 Ctrl+C 都走 SIGTERM/SIGINT ——
-// 停止接收新连接,让在途请求(最长 6 分钟的 AI 阅卷/大上传流)跑完再退;
-// 8 秒兜底硬退(pm2 侧把 kill_timeout 提到 9000,见 deploy.sh/backend-sync.sh)
+// 优雅关闭(2026-10-07 审查#9;2026-10-11 审计二十节校正数值与注释):
+// pm2 restart/reload 与 Ctrl+C 都走 SIGTERM/SIGINT —— 停止接收新连接,给在途请求一个
+// **有上限**的排空窗口后退出。原注释写「让最长 6 分钟的 AI 阅卷/大上传跑完」是失实的:
+// 真实兜底只有 8 秒,>8s 的长请求照样被腰斩。现把窗口做成具名常量,与注释、pm2 kill-timeout
+// 三者对齐:DRAIN=15000ms ⇒ deploy.sh/backend-sync.sh 的 --kill-timeout 必须 > 本值(建议 25000)。
+// 为什么是 15s 不是 30s:游戏页常驻 SSE(/api/media/sse、/api/entry/watch)是长连接,
+// server.close() 的回调在长连接断开前不会到来 ⇒ 每次发布都会**等满**整个窗口,
+// 30s 等于给每次 pm2 restart 加半分钟;这里靠关闭 SSE 主动收束 + 15s 上限折中。
+const SHUTDOWN_DRAIN_MS = 15000;
 let shuttingDown = false;
+function beginShutdown(exit) {
+  try { flushTrack(); } catch (e) { console.error('[shutdown] 埋点批量落盘失败:', e && (e.message || e)); }
+  try { closeMediaSse(); } catch (e) { console.error('[shutdown] SSE 收束失败:', e && (e.message || e)); }
+  try {
+    const filesUpload = require('./lib/files-upload');
+    if (typeof filesUpload.stopChunkGc === 'function') filesUpload.stopChunkGc(); // 分片 GC 定时器
+  } catch (e) { console.error('[shutdown] 分片 GC 清理失败:', e && (e.message || e)); }
+  if (!server) { exit(); return; }
+  server.close(() => {
+    console.log('[shutdown] 在途请求已收束,退出');
+    exit();
+  });
+  setTimeout(() => {
+    console.log(`[shutdown] ${SHUTDOWN_DRAIN_MS / 1000}s 兜底到点,强制退出`);
+    exit();
+  }, SHUTDOWN_DRAIN_MS);
+}
 function gracefulShutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
-  console.log(`[shutdown] 收到 ${signal}:停止接收新请求,等待在途请求收束…`);
-  server.close(() => {
-    console.log('[shutdown] 在途请求已收束,退出');
-    process.exit(0);
-  });
-  setTimeout(() => {
-    console.log('[shutdown] 8s 兜底到点,强制退出');
-    process.exit(0);
-  }, 8000).unref();
+  console.log(`[shutdown] 收到 ${signal}:停止接收新请求,最多等待 ${SHUTDOWN_DRAIN_MS / 1000}s 让在途请求收束…`);
+  beginShutdown(() => process.exit(0));
 }
 process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.on('SIGINT', () => gracefulShutdown('SIGINT'));
@@ -135,7 +177,7 @@ server.listen(PORT, () => {
   console.log(`服务器已启动: http://localhost:${PORT}`);
   console.log(TOKEN ? `API 鉴权已启用(TOKEN),请求需带 ?token= 或 x-token 头` : `API 未启用鉴权(设置环境变量 TOKEN 可开启)`);
   console.log(`入口守卫已启用:自由进画廊;仅拦截被踢出设备(重进需申请)与拉黑 IP。后台: /admin?token=<TOKEN>`);
-  if (!TOKEN) console.log('警告:未设置 TOKEN,后台与写接口不受保护,请设置 TOKEN');
+  if (!TOKEN) console.error('[安全告警] TOKEN 未设置:后台 /admin 不可用(fail-closed),auth:write 档的上传/大屏/删除接口仅本地可达。生产请在 .env 设置 TOKEN 后 pm2 restart gallery --update-env');
   console.log(`路由: ${ROUTES.length} 个端点已注册(明细见 lib/routes.js)`);
 });
 

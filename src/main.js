@@ -18,6 +18,7 @@ import { compositionRoot } from './core/composition-root.js'; // 组合根(阶�
 import { setLoop, createLoopSystem, register } from './core/loop.js'; // 单一主循环 facade(阶段1)
 import { LoopManager } from './loop-manager.js'; // 循环管理器(构造轻量:仅存 ctx/event-bus/常量)
 import { expose } from './debug-hooks.js';
+import { storeApi } from './state/store-api.js'; // 写失败提示出口(2026-10-11 DG-STATE-002;ctx.store 是同一对象)
 import './visitor-fp.js'; // 访客身份采集+踢出通知(轻量 IIFE,含 SSE 踢出监听,不依赖 3D)
 import { createToastSystem } from './core/toast-system.js'; // 示范积木:事件驱动 toast
 import { createGameShellSystem } from './core/gameshell-system.js'; // 游戏外壳:手绘对话框+任务栏+系统菜单(2026-08-29)
@@ -63,6 +64,21 @@ import { runBootCheck } from './core/boot-check.js'; // 启动自检(2026-09-24 
 const loopManager = new LoopManager(ctx); // 构造轻量,引导期即可;start() 在 startWorld 才调
 ctx.scene.loopManager = loopManager; // 2026-09-18 收编登记册(scene 内核)
 setLoop(loopManager); // 注入唯一主循环 facade(新积木经 deps.loop 获取)
+
+// ===================== 存档写失败必须可见(2026-10-11 DG-STATE-002) =====================
+// 关键剧情 checkpoint(page1/endingStep/planetsChapter… 见 store-api 的 STORY_CHECKPOINT_KEYS)
+// 写不进 localStorage(隐私模式/配额满)时给用户一句实话——走既有 ctx.ui.modeToast,不新造组件。
+// 普通 UI 偏好类键(uiFold/musicOff/lang…)失败继续静默,只有 console.warn(store-api 内对称留痕)。
+// 出口注入在 main.js 是因为 store-api 刻意零 ctx 依赖(lobby.html 复用同层)。
+storeApi.setCriticalWriteNotifier(() => {
+  ctx.ui.modeToast &&
+    ctx.ui.modeToast(
+      tt({
+        en: 'This part of the story could not be saved — your browser is blocking local storage.',
+        zh: '本段进度没能保存(浏览器限制了本地存储),这一段可能需要重走一次。',
+      })
+    );
+});
 
 // 早按存档载入剧情语言(双语可切换)
 const _sl = applySavedLang();
@@ -129,6 +145,40 @@ let worldStarted = false;
 let worldBooting = null;
 let worldBooted = false;
 let preloadPromise = null; // 预加载记忆化:并发调用(onEnter 与 startWorld)共享同一次加载
+
+// ===================== 世界期两条全局接线的卸除出口(2026-10-11 第 6 节) =====================
+// 此前两处都没有卸除口:①register((dt)=>compositionRoot.update(dt)) 把 loop.js 返回的 unregister
+// 丢掉了 → compositionRoot.dispose() 之后这个每帧回调还挂在 ctx.tickers 上,二次 init 出两套 update;
+// ②resize 是匿名箭头且无从移除。现收拢成 teardownWorldWiring()(探针/HMR 的显式出口,
+// 不自造新生命周期:生产是整页刷新式应用,这条路径只服务可重装配的正确性)。
+let _unregisterRootTick = null;
+let _resizeBound = false;
+function onWindowResize() {
+  const { cam, rnd } = ctx.scene;
+  if (!rnd || !cam) return;
+  const w = innerWidth,
+    h = innerHeight;
+  rnd.setSize(w, h);
+  cam.aspect = w / h;
+  cam.updateProjectionMatrix();
+  if (ctx.scene.resizePostProcessing) ctx.scene.resizePostProcessing(w, h);
+}
+function teardownWorldWiring() {
+  if (_unregisterRootTick) {
+    _unregisterRootTick();
+    _unregisterRootTick = null;
+  }
+  if (_resizeBound) {
+    window.removeEventListener('resize', onWindowResize);
+    _resizeBound = false;
+  }
+}
+expose('teardownWorldWiring', teardownWorldWiring); // 显式出口:window.__teardownWorldWiring()
+expose('worldWiringState', () => ({
+  rootTick: !!_unregisterRootTick,
+  resize: _resizeBound,
+  disposed: compositionRoot.isDisposed(),
+})); // 自检用:两套接线是否在挂 + 组合根是否已 dispose
 async function preloadWorld() {
   if (preloadPromise) return preloadPromise; // 2026-09-07 修复:重复调用曾让组合根 init 多跑,系统全量重复装配
   preloadPromise = (async () => {
@@ -180,14 +230,12 @@ async function preloadWorld() {
       createStateSystem({ eventBus: ctx.events, gameState: getGameState(), ctx })
     );
     compositionRoot.register(createUiSystem({ ctx }));
-    window.addEventListener('resize', () => {
-      const w = innerWidth,
-        h = innerHeight;
-      rnd.setSize(w, h);
-      cam.aspect = w / h;
-      cam.updateProjectionMatrix();
-      pp.resizePostProcessing(w, h);
-    });
+    // resize 处理器改为**具名 + 可卸**(2026-10-11 第 6 节):此前是匿名箭头且无清理出口。
+    // 后处理尺寸回调从 ctx 现取(热模块契约:不在模块顶层一次性解构)。
+    if (!_resizeBound) {
+      window.addEventListener('resize', onWindowResize);
+      _resizeBound = true;
+    }
 
     // ===================== 动画(统一循环管理器,构造在引导期/startWorld 只启动) =====================
     const lowQuality = !!ctx.store.json('lowQuality', false);
@@ -220,7 +268,8 @@ async function preloadWorld() {
     expose('compositionRoot', compositionRoot);
     expose('gameState', getGameState());
     expose('bootState', bootState.default); // 可观测:开场链路状态(gatePassed/worldStarted/introFired)
-    register((dt) => compositionRoot.update(dt));
+    if (_unregisterRootTick) _unregisterRootTick(); // 二次装配防护:旧的每帧驱动先摘,绝不双份
+    _unregisterRootTick = register((dt) => compositionRoot.update(dt)); // 保留 unregister(2026-10-11 第 6 节)
 
     // 玩家状态机:世界就绪后初始化为空闲状态
     const { IdleState } = await import('./player/states/PlayerStates.js');

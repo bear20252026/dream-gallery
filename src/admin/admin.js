@@ -33,6 +33,7 @@ import {
   pv,
   pvUrl,
   delFile,
+  rotateMtAsk,
   upload,
   loadDisplay,
   uploadBigscreen,
@@ -85,7 +86,10 @@ async function load() {
   try {
     r = await adminFetch('/api/admin/list' + tk());
     if (r.status === 401) {
-      document.querySelector('.wrap').innerHTML = '<h1>401 未授权：网址后请加 ?token=你的密码</h1>';
+      // 2026-10-11:凭据不再驻留 URL —— /admin?token=<TOKEN> 只是「一次性引导」,验过即 302 到干净
+      // /admin 并落 8 小时 HttpOnly 会话。会话过期/清了 Cookie 就重新引导一次,别把密码写进书签。
+      document.querySelector('.wrap').innerHTML =
+        '<h1>401 未授权</h1><p>后台会话已失效。请用 <code>/admin?token=你的密码</code> 重新打开一次即可(验完会自动跳到不带密码的地址)。</p>';
       return;
     }
     if (!r.ok) throw new Error('服务返回 ' + r.status);
@@ -177,13 +181,16 @@ async function kickAsk(id, name) {
   if (reason === null) return;
   decide(id, 'kick', reason);
 }
-// 吊销会话:该设备 Cookie 立即失效,下次访问重新识别身份并自动换发(不等于踢出)
+// 吊销会话:永久失效,不会自动恢复(2026-10-10 DG-AUTH-002 后端语义:authVersion+1,旧会话永不匹配)
 async function revokeSessAsk(id, name) {
   if (
     !confirm(
       '吊销「' +
         name +
-        '」的会话 Token?\n其 Cookie 立即失效,下次访问将自动重新识别身份(不会被挡在门外,区别于踢出)。'
+        '」的会话 Token?\n' +
+        '现有通行证立即且永久失效,不会自动恢复:该设备将看不到自己上传的私有媒体,重新验证或换设备也不换发。' +
+        '只有你在后台重新「批准放行」才会恢复。\n' +
+        '不等于踢出:不写踢出历史,也不会把人弹回申请页。'
     )
   )
     return;
@@ -196,11 +203,14 @@ async function decide(id, action, reason) {
     body: JSON.stringify({ id, action, reason: reason || '' }),
   });
   if (r.ok) {
+    const d = await r.json().catch(() => ({}));
     toast(
       action === 'kick'
         ? '已踢出,该设备将立即弹回申请页'
         : action === 'revoke-session'
-          ? '已吊销会话,该设备下次访问将重新识别'
+          ? d.revoked_permanently
+            ? '已永久吊销:该会话不会自动恢复,需重新批准放行'
+            : '已吊销会话'
           : '操作成功'
     );
     load();
@@ -208,6 +218,27 @@ async function decide(id, action, reason) {
     const d = await r.json().catch(() => ({}));
     toast(d.error || '操作失败', 1);
   }
+}
+// 清理 IP 归属地缓存(/api/admin/bulk action=clear-geo):geo 是发给第三方 ip-api.com 换回的
+// 访客 IP 定位结果,属对外披露过的个人数据残留,定期清是隐私动作,不是运维装饰
+async function clearGeoAsk() {
+  if (
+    !(await confirmAsync(
+      '清空 IP→归属地 缓存?\n后台各页的「📍定位」列将回到「定位中…/未知」并按访问逐步重查;' +
+        '踢出记录与档案本身不受影响。(第三方 ip-api.com 查回的访客数据,建议定期清)'
+    ))
+  )
+    return;
+  const r = await adminFetch('/api/admin/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'clear-geo' }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (r.ok && d.ok) {
+    toast('已清空 IP 归属地缓存');
+    load();
+  } else toast(d.error || '清理失败', 1);
 }
 // ---------- 访客管理页 ----------
 function renderApprove() {
@@ -277,6 +308,11 @@ function renderApproved(pre) {
   if (list.length > 60)
     $('approved').innerHTML +=
       `<div class="empty">仅显示最近活跃的 60 台（共 ${list.length} 台${q ? '命中' : ''}，可用搜索缩小范围）</div>`;
+  // 隐私运维条:IP 归属地是发给第三方 ip-api.com 换回的访客数据,这里给一个清理入口
+  const geoCount = (DATA.applicants || []).filter((a) => a.geo).length;
+  $('approved').innerHTML += `<div class="file-row" style="margin-top:10px">
+    <span class="fsize">📍 归属地缓存 ${geoCount} 台(第三方 ip-api.com 查回,存在服务端)</span>
+    <button class="btn-revoke" onclick="clearGeoAsk()">清空 IP 定位缓存</button></div>`;
 }
 // ---------- 反刷存储预警 ----------
 const ALERT_TYPE = {
@@ -453,6 +489,7 @@ Object.assign(window, {
   calReset,
   clearAlerts,
   clearClicks,
+  clearGeoAsk,
   copyTxt,
   decide,
   delBigscreen,
@@ -470,6 +507,7 @@ Object.assign(window, {
   pvUrl,
   renderApproved,
   revokeSessAsk,
+  rotateMtAsk,
   setRange,
   switchTab,
   toggleDemo,

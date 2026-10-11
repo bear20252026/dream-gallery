@@ -5,6 +5,7 @@ import {
   speakLine,
   stopSpeaking,
   installMuteBtn,
+  disposeMuteBtn,
   prefetchLine,
   isVoiceOff,
   isVoicePlaying,
@@ -315,8 +316,27 @@ export function createDialogSystem({ getWorld = () => 'main', isStoryBusy = () =
     lockQueue = lockQueue.filter((entry) => entry.world !== world);
     if (dlg?.world === world) closeDialog(true);
   }
+  // 生命周期收口(2026-10-11 监听器族整改):此前 API 没有任何 dispose ——
+  // attach 注册的 window 'script:lang' 与静音钮的换字监听都留在窗外,重复装配时
+  // 旧对话框的 handler 与新的一起跑(同一句被 relang/render 两次,排队台词被重复换语言)。
+  // 由 core/gameshell-system.js 的 dispose 调用;再 init 时重新 attach 会自动重新注册。
+  function dispose() {
+    window.removeEventListener('script:lang', onLangChange);
+    disposeMuteBtn(dialogEl); // 静音钮的 script:lang 监听随对话一起摘
+    stopSpeaking(); // 朗读不随对话框活着(HMR/二次装配不该留声)
+    if (dlg) {
+      clearTimeout(dlg.typeTimer);
+      clearTimeout(dlg.hideTimer);
+    }
+    dlg = null;
+    lockQueue = [];
+    scopeVersions.clear();
+    worldVersions.clear();
+    dialogEl = null; // 下一次 attach 重新注入
+  }
   return {
     attach,
+    dispose,
     open: openDialog,
     close: closeDialog,
     advance,

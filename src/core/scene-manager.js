@@ -39,6 +39,18 @@ function restoreCamera(cam, snap) {
   if (snap.far !== undefined) cam.far = snap.far;
   cam.updateProjectionMatrix();
 }
+/** 把第三人称角色迁回它切换前的父节点(切换半途失败时用;home 为空则摘干净) */
+function reparentAvatar(avatar, home) {
+  if (!avatar) return false;
+  if (home) {
+    if (avatar.parent === home) return false;
+    home.add(avatar);
+    return true;
+  }
+  if (!avatar.parent) return false;
+  avatar.parent.remove(avatar);
+  return true;
+}
 
 export class SceneManager {
   constructor({ renderer, camera, mainScene, player }) {
@@ -199,7 +211,9 @@ export class SceneManager {
     if (ctx.kunlun.flightLock) return false;
     this.transitioning = true;
     const sourceSnapshot = this.capture();
+    const avatarHome = ctx.scene.avatar ? ctx.scene.avatar.parent : null;
     this.worldStack.push({ id: source.id, snapshot: sourceSnapshot });
+    let enteredTarget = false;
     const commit = async () => {
       if (source.leave) await source.leave({ from: source, to: target, options });
       source.camera = sourceSnapshot.camera;
@@ -209,6 +223,7 @@ export class SceneManager {
       this.activeWorld = id;
       this.syncCtx();
       if (target.enter) await target.enter({ from: source, to: target, options });
+      enteredTarget = true;
       if (options.snapshot) this.restore(options.snapshot);
       else if (options.player) this.restore({ player: options.player, camera: options.camera });
       eventBus.emit('world:changed', { from: source.id, to: target.id });
@@ -225,18 +240,64 @@ export class SceneManager {
       this.transitioning = false;
       if (commitError) {
         console.error('[scene-manager] world enter failed:', source.id, '→', id, commitError);
-        this.worldStack.pop();
-        this.activeWorld = source.id;
-        this.syncCtx();
+        await this.rollbackEnter({
+          source,
+          target,
+          snapshot: sourceSnapshot,
+          avatarHome,
+          enteredTarget,
+          dropStackEntry: true,
+        });
         return false;
       }
       return true;
     } catch (e) {
       this.transitioning = false;
-      this.activeWorld = source.id;
-      this.syncCtx();
+      console.error('[scene-manager] world enter failed(过场):', source.id, '→', id, e);
+      await this.rollbackEnter({
+        source,
+        target,
+        snapshot: sourceSnapshot,
+        avatarHome,
+        enteredTarget,
+        dropStackEntry: true,
+      });
       return false;
     }
+  }
+
+  /**
+   * 切换半途失败的回滚(2026-10-11 DG-WORLD-001)。
+   * 旧实现只 pop 栈 + 改世界指针:角色可能仍挂在别的 Scene 的 root 上、进场前的快照也没还原,
+   * 于是出现「activeWorld=main 但 avatar 在 B612」的半回滚态。
+   * 现:撤销本次压栈 → 指针与 syncCtx → 角色迁回切换前的父节点 → 恢复切换前快照;
+   * target.enter 已跑完时才对称调 target.leave 撤它的进场副作用。
+   * 刻意不新造半套生命周期:enter 未跑完(钩子缺失或自身抛错)就不碰 target,
+   * 也不替 source 补调 enter —— 当前所有世界都没注册 enter/leave 钩子,补了反而无账可核。
+   */
+  async rollbackEnter({
+    source,
+    target,
+    snapshot = null,
+    avatarHome = null,
+    enteredTarget = false,
+    dropStackEntry = false,
+    options = {},
+  }) {
+    if (!source) return;
+    if (dropStackEntry && this.worldStack.length) this.worldStack.pop();
+    this.activeWorld = source.id;
+    // 优先回到切换前的确切父节点;切换前没父节点则按"角色住在活动世界 root"的约定挂回 source.root
+    reparentAvatar(ctx.scene.avatar, avatarHome || source.root);
+    this.syncCtx();
+    if (enteredTarget && target && target.leave) {
+      try {
+        await target.leave({ from: target, to: source, options });
+      } catch (e) {
+        console.warn('[scene-manager] 回滚时 target.leave 失败:', target.id, e);
+      }
+    }
+    this.restore(snapshot);
   }
 
   async back(options = {}) {
@@ -250,10 +311,12 @@ export class SceneManager {
   async toMain(options = {}) {
     const idx = this.worldStack.map((x) => x.id).lastIndexOf('main');
     if (idx < 0) return false;
-    const entry = this.worldStack[idx];
-    this.worldStack.splice(idx);
+    // 成功时把"回主世界之后的历史"压平(丢掉 idx 及以上)是有意设计;失败必须整段还原,
+    // 否则中间历史(如 [B612, king])被 splice 掉就永久丢了(2026-10-11 DG-WORLD-001)。
+    const removed = this.worldStack.splice(idx);
+    const entry = removed[0];
     const ok = await this.enterWithoutPush('main', entry.snapshot, options);
-    if (!ok) this.worldStack.push(entry);
+    if (!ok) this.worldStack.splice(idx, 0, ...removed);
     return ok;
   }
 
@@ -263,6 +326,9 @@ export class SceneManager {
     const source = this.getWorld();
     if (!target || !target.loaded || ctx.kunlun.flightLock) return false;
     this.transitioning = true;
+    const sourceSnapshot = this.capture();
+    const avatarHome = ctx.scene.avatar ? ctx.scene.avatar.parent : null;
+    let enteredTarget = false;
     const commit = async () => {
       if (source.leave) await source.leave({ from: source, to: target, options });
       // 第三人称角色随世界走:enter() 有这段,enterWithoutPush(返回主世界走此路)此前漏了,
@@ -272,20 +338,27 @@ export class SceneManager {
       this.activeWorld = id;
       this.syncCtx();
       if (target.enter) await target.enter({ from: source, to: target, options });
+      enteredTarget = true;
       this.restore(snapshot);
       eventBus.emit('world:changed', { from: source.id, to: target.id });
     };
     // 提交半程失败(leave/enter/restore 抛错)原被 .catch(() => {}) 吞掉:指针可能停在
-    // 半装配状态且调用方(back/toMain)拿到 true 以为成功。现回滚世界指针并按 false 返回,
+    // 半装配状态且调用方(back/toMain)拿到 true 以为成功。现回滚并按 false 返回,
     // 调用方的"未成"恢复路径(重武装门/信标)才接得到信号(2026-10-09 空 catch 治理)
     let commitOk = true;
     await runWarp(
       () =>
-        commit().catch((e) => {
+        commit().catch(async (e) => {
           commitOk = false;
-          this.activeWorld = source.id;
-          this.syncCtx();
           console.warn('[scene-manager] 世界切换提交失败:', source.id, '→', id, e);
+          await this.rollbackEnter({
+            source,
+            target,
+            snapshot: sourceSnapshot,
+            avatarHome,
+            enteredTarget,
+            options,
+          });
         }),
       warpOpts(id)
     );
@@ -297,6 +370,11 @@ export class SceneManager {
     for (const world of this.worlds.values())
       if (world.id !== 'main' && world.dispose) world.dispose(world);
     this.worlds.clear();
+    this.worldStack.length = 0;
+    this.transitioning = false;
+    // 模块级单例必须随之归零:否则再次 initSceneManager() 拿到的是连 main 都清空的旧 manager
+    // (2026-10-11 DG-WORLD-001)。worldStack 就地清空,ctx.scene.worldStack 的引用仍然有效。
+    if (manager === this) manager = null;
   }
 }
 
@@ -306,9 +384,9 @@ export function initSceneManager(options) {
   ctx.scene.worldManager = manager;
   ctx.scene.activeWorld = 'main';
   ctx.scene.worldStack = manager.worldStack;
-  ctx.scene.enterWorld = (id, opts) => manager.enter(id, opts);
-  ctx.scene.leaveWorld = (opts) => manager.back(opts);
-  ctx.scene.toMainWorld = (opts) => manager.toMain(opts);
+  ctx.scene.enterWorld = (id, opts) => (manager ? manager.enter(id, opts) : false);
+  ctx.scene.leaveWorld = (opts) => (manager ? manager.back(opts) : false);
+  ctx.scene.toMainWorld = (opts) => (manager ? manager.toMain(opts) : false);
   ctx.scene.worldChanged = (fn) => eventBus.on('world:changed', fn);
   return manager;
 }

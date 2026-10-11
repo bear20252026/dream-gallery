@@ -5,6 +5,7 @@ import { avAllowed } from '../../core/av-switch.js'; // 全站音视频总闸(20
 import { ttsUrl, warmBlob } from '../../core/dialog-voice.mjs'; // 台词音频缓存键三级路径(2026-09-28)
 import { i18nText } from '../../ui/i18n-dom.js'; // 界面文字中英切换(2026-10-03 英文为默认)
 import { legacyOn } from '../../shared/legacy.mjs'; // 旧随机背景乐只在 legacy 下绑定
+import { createHintQueue } from '../../shared/hint-queue.mjs'; // 提示音队列调度纯逻辑(2026-10-11 DG-AUDIO-001)
 const MUSIC_ON = { en: 'Music playing', zh: '音乐播放中' };
 // 惰性读取 aB:scene.js 在 main.js 第 6 行已执行,vault['aB'] 已填充;
 // 不做顶层解构,直接在事件回调里读 ctx.scene.aB,防御打包器重排。
@@ -202,11 +203,18 @@ window.__vidEl = ctx.media.vidEl;
 window.__v45El = ctx.media.v45El;
 
 // ===================== 统一音频管理器 =====================
+// 队列语义在 shared/hint-queue.mjs(纯逻辑,单测钉死);这里只管"怎么播一条"。
+const hintQueueCtl = createHintQueue({
+  onError: (e) => console.warn('[audio] 挤出旧提示音,其 onEnd 回调失败', e),
+});
 const audioManager = {
   videoSound: null,
   hintSound: null,
-  hintQueue: [],
   isHintPlaying: false,
+  // 只读视图:探针/外部读 .length 判断"还有几句在排";写入请走 playOne
+  get hintQueue() {
+    return hintQueueCtl.pending();
+  },
 };
 audioManager.registerVideo = function (el) {
   if (el) audioManager.videoSound = el;
@@ -214,68 +222,65 @@ audioManager.registerVideo = function (el) {
 audioManager.unregisterVideo = function (el) {
   if (audioManager.videoSound === el) audioManager.videoSound = null;
 };
-audioManager.playHint = function (audio, onEnd, bypassSwitch) {
+/** 播一条提示音:播完(或失败/超时)由队列交回下一条,onEnd 恰好回调一次 */
+function playOneHint(item) {
+  const audio = item.audio;
+  audioManager.hintSound = audio;
+  audioManager.isHintPlaying = true;
+  let finished = false;
+  let started = false;
+  let watchdog = 0;
+  const onPlaying = () => {
+    started = true;
+  };
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    if (watchdog) clearTimeout(watchdog); // watchdog 与 ended/error 谁先到都只清一次
+    audio.removeEventListener('playing', onPlaying);
+    audio.removeEventListener('ended', finish);
+    audio.removeEventListener('error', finish);
+    audioManager.hintSound = null;
+    audioManager.isHintPlaying = false;
+    const next = hintQueueCtl.finish(item); // item.onEnd 由队列在这里回调
+    if (next) playOneHint(next);
+  };
+  // 2026-09-25 主人报「没有语音且卡」:audio.play() 在网络慢/服务端排队时会长时间
+  // pending,而 isHintPlaying 已置真 → 后续台词全部压进 hintQueue 饿死。
+  // 防线:① play 兑现或 'playing' 事件视为已开播;② 9s 内未能开播则放弃本条放行下一条。
+  // once:true + finish 内显式移除:同一 Audio 反复播放不叠加监听(2026-10-11 DG-AUDIO-001)。
+  audio.addEventListener('playing', onPlaying, { once: true });
+  audio.addEventListener('ended', finish, { once: true });
+  audio.addEventListener('error', finish, { once: true });
+  audio
+    .play()
+    .then(() => {
+      started = true;
+    })
+    .catch(finish);
+  watchdog = setTimeout(() => {
+    if (!started && !finished) {
+      try {
+        audio.pause();
+      } catch (e) {
+        /* 已中止 */
+      }
+      finish();
+    }
+  }, 9000);
+}
+audioManager.playOne = function ({ audio, onEnd, bypassSwitch } = {}) {
   if (!avAllowed() && !bypassSwitch) {
     if (onEnd) onEnd(); // 总闸关闭(且非对白豁免):不播,回调照发(上传/TTS 流程不受阻)
-    return;
+    return 'skipped';
   }
-  const doPlay = () => {
-    audioManager.hintSound = audio;
-    audioManager.isHintPlaying = true;
-    let finished = false;
-    let started = false;
-    const finish = () => {
-      if (finished) return;
-      finished = true;
-      audioManager.hintSound = null;
-      audioManager.isHintPlaying = false;
-      if (onEnd) onEnd();
-      if (audioManager.hintQueue.length > 0) {
-        const next = audioManager.hintQueue.shift();
-        doPlay();
-      }
-    };
-    // 2026-09-25 主人报「没有语音且卡」:audio.play() 在网络慢/服务端排队时会长时间
-    // pending,而 isHintPlaying 已置真 → 后续台词全部压进 hintQueue 饿死。
-    // 防线:① play 兑现或 'playing' 事件视为已开播;② 9s 内未能开播则放弃本条放行下一条。
-    audio.addEventListener('playing', () => {
-      started = true;
-    });
-    audio.addEventListener('ended', finish);
-    audio.addEventListener('error', finish);
-    audio
-      .play()
-      .then(() => {
-        started = true;
-      })
-      .catch(finish);
-    setTimeout(() => {
-      if (!started && !finished) {
-        try {
-          audio.pause();
-        } catch (e) {
-          /* 已中止 */
-        }
-        finish();
-      }
-    }, 9000);
-  };
-  if (audioManager.isHintPlaying) {
-    // 队列上限:压 3 条以上时丢最旧(其 onEnd 照常回调,对话推进不受阻)
-    while (audioManager.hintQueue.length >= 3) {
-      const stale = audioManager.hintQueue.shift();
-      if (stale && stale.onEnd) {
-        try {
-          stale.onEnd();
-        } catch (e) {
-          console.warn('[audio] 挤出旧提示音,其 onEnd 回调失败', e); // onEnd 驱动对话推进,吞掉=对话停滞无痕
-        }
-      }
-    }
-    audioManager.hintQueue.push({ audio, onEnd });
-  } else {
-    doPlay();
-  }
+  const item = { audio, onEnd };
+  if (hintQueueCtl.submit(item) !== 'play') return 'queued';
+  playOneHint(item);
+  return 'play';
+};
+audioManager.playHint = function (audio, onEnd, bypassSwitch) {
+  return audioManager.playOne({ audio, onEnd, bypassSwitch });
 };
 audioManager.pauseAll = function () {
   if (audioManager.videoSound && !audioManager.videoSound.paused) audioManager.videoSound.pause();

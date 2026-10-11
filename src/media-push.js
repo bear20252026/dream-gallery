@@ -6,9 +6,26 @@
 const listeners = new Set();
 let es = null;
 
+/**
+ * 注册媒体变更回调。
+ * @param {(d:{type?:string,dir?:string})=>void} cb
+ * @returns {() => boolean} 取消订阅(返回是否真的摘掉了);调用方 teardown 时用,不接返回值照常工作
+ */
 export function onMediaChanged(cb) {
   listeners.add(cb);
   ensure();
+  return () => listeners.delete(cb);
+}
+
+/** 真正的 teardown:断开 SSE 并清空所有订阅(之后再有注册会重建连接) */
+export function closeMediaPush() {
+  try {
+    if (es) es.close();
+  } catch (e) {
+    console.warn('[media-push] 关闭 EventSource 失败', e);
+  }
+  es = null;
+  listeners.clear();
 }
 
 function ensure() {
