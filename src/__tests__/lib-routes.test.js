@@ -3,11 +3,20 @@
 //      ②安全契约 —— 所有 /api/admin/* 与写操作(auth=token/write)不允许标注为 public;
 //      ③行为抽测 —— dispatch 对 token/write 路由的 401、upload guard 分流、未命中回落。
 import { describe, it, expect, beforeAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
 // 必须在动态 import lib 模块之前设置(ESM import 提升规避,同 store.test.js 模式)
 process.env.TOKEN = 'vitest-token-abc';
 process.env.MULTI = 'off';
 process.env.PORT = '0';
+// 经 routes.js 会连带加载 lib/siteconfig.js,其启动期 mt 补发调 saveGateData ——
+// 不重定向就把开发者本机真实的 gate_data.json 改了,全量并发时还互相抢锁。
+process.env.GATE_DATA_FILE = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'dg-lib-routes-')),
+  'gate_data.json'
+);
 
 const { ROUTES, dispatch } = await import('../../lib/routes.js');
 const { TOKEN } = await import('../../lib/config.js');

@@ -2,6 +2,15 @@
 // 锁行为:分数线单源 60、文理/神话卷出 9 题、选项恰为 A-D 四键、非法 track 400。
 // 判分(submit/judge)依赖 AI 通道异步,不在本轮(需 mock aichannels,留待需要时)。
 import { describe, it, expect } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// 同 lib-routes.test.js:连带加载 lib/siteconfig.js 的启动期补发会写真实 gate_data.json,先重定向。
+process.env.GATE_DATA_FILE = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'dg-lib-quiz-')),
+  'gate_data.json'
+);
 import { createRequire } from 'node:module';
 
 process.env.TOKEN = process.env.TOKEN || 'vitest-token-abc';

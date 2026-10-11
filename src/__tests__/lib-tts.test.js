@@ -4,6 +4,7 @@
 // key = sha256('tts1|voice|text') 前 20 位,客户端 dialog-voice.mjs 复算同一算法直拼 URL。
 import { describe, it, expect, afterAll, vi } from 'vitest';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Writable, Readable } from 'node:stream';
@@ -12,6 +13,12 @@ import { createRequire } from 'node:module';
 // r2Put 隔离(自愈测试不真推 R2):lib/* 是 CJS,require('./r2sync') 走 node require 链,
 // vi.mock 拦不到(实测 0 次调用)。按后端测试惯例 createRequire 加载,并在 tts.js
 // 加载之前打 require.cache 补丁 —— tts.js 顶部解构 r2Put 时拿到的就是 mock。
+// 数据落到系统临时目录:此前这几套后端测试直接写仓库真实的 gate_data.json,
+// 全量 vitest 并发时互相抢同一个文件 → rename EPERM/ENOENT 与 hook 超时(2026-10-11 CI 实锤)。
+process.env.GATE_DATA_FILE = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'dg-lib-tts-')),
+  'gate_data.json'
+);
 const nodeRequire = createRequire(import.meta.url);
 const r2syncId = nodeRequire.resolve('../../lib/r2sync.js');
 const r2PutMock = vi.fn(() => Promise.resolve(true));

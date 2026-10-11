@@ -13,6 +13,11 @@ import { Readable, Writable } from 'node:stream';
 import { createRequire } from 'node:module';
 
 const nodeRequire = createRequire(import.meta.url);
+// 同 CHUNK_DIR 的道理:数据也要出仓库(全量并发时抢真实 gate_data.json 的锁会 EPERM 假红)
+process.env.GATE_DATA_FILE = path.join(
+  os.tmpdir(),
+  'dg-chunk-gate-' + Date.now().toString(36) + '.json'
+);
 const CHUNK_TEST_DIR = path.join(os.tmpdir(), 'dg-chunk-test-' + Date.now().toString(36));
 fs.mkdirSync(CHUNK_TEST_DIR, { recursive: true });
 process.env.CHUNK_DIR = CHUNK_TEST_DIR; // 必须在 require files-upload 之前
@@ -31,6 +36,13 @@ nodeRequire.cache[r2syncId] = {
 
 const { ROOT } = nodeRequire('../../lib/config.js');
 const { gateData, saveGateData } = nodeRequire('../../lib/store.js');
+// 空库(全新检出/CI)时 gateData 只有 {secret,applicants,stats};生产由 lib/siteconfig.js 在加载时
+// 把 uploads/photoCaptions 建出来。本文件把 siteconfig 打桩或直接不加载它,所以必须自己播种,
+// 否则断言会依赖"恰好被别的模块顺手建了容器"这种隐式前置(2026-10-11 CI 假红的根因)。
+gateData.uploads = gateData.uploads || {};
+gateData.photoCaptions = gateData.photoCaptions || {};
+gateData.alerts = gateData.alerts || [];
+gateData.applicants = gateData.applicants || {};
 const fu = nodeRequire('../../lib/files-upload.js');
 const {
   handleUploadChunk,

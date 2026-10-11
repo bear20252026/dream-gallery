@@ -10,12 +10,19 @@
 //   ⇒ 零真网络、零真 AI 调用;isMineUpload 用本地替身(授权语义正由另一条整改线改,本文件不钉它)。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { createRequire } from 'node:module';
 
 const nodeRequire = createRequire(import.meta.url);
+// 必须在 require lib/store 之前重定向:photoCaptions 走 saveGateData,写仓库真实 gate_data.json
+// 会与其他套件在全量并发时抢同一个文件的锁(Windows EPERM rename → hook 超时假红)。
+process.env.GATE_DATA_FILE = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'dg-vision-')),
+  'gate_data.json'
+);
 const chatVisionMock = vi.fn();
 const stubModule = (rel, exports) => {
   const id = nodeRequire.resolve(rel);
@@ -45,6 +52,13 @@ stubModule('../../lib/siteconfig.js', {
 
 const { ROOT } = nodeRequire('../../lib/config.js');
 const { gateData, saveGateData } = nodeRequire('../../lib/store.js');
+// 空库(全新检出/CI)时 gateData 只有 {secret,applicants,stats};生产由 lib/siteconfig.js 在加载时
+// 把 uploads/photoCaptions 建出来。本文件把 siteconfig 打桩或直接不加载它,所以必须自己播种,
+// 否则断言会依赖"恰好被别的模块顺手建了容器"这种隐式前置(2026-10-11 CI 假红的根因)。
+gateData.uploads = gateData.uploads || {};
+gateData.photoCaptions = gateData.photoCaptions || {};
+gateData.alerts = gateData.alerts || [];
+gateData.applicants = gateData.applicants || {};
 const vision = nodeRequire('../../lib/vision.js');
 const fu = nodeRequire('../../lib/files-upload.js');
 const ratelimit = nodeRequire('../../lib/ratelimit.js');

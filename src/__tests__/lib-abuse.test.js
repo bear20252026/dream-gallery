@@ -3,7 +3,16 @@
 //        正常小上传不误报。预警会写 gate_data + saveGateData,测试后快照恢复并回写。
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
+// 数据落到系统临时目录:此前这几套后端测试直接写仓库真实的 gate_data.json,
+// 全量 vitest 并发时互相抢同一个文件 → rename EPERM/ENOENT 与 hook 超时(2026-10-11 CI 实锤)。
+process.env.GATE_DATA_FILE = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'dg-lib-abuse-')),
+  'gate_data.json'
+);
 const require = createRequire(import.meta.url);
 const { gateData, saveGateData } = require('../../lib/store.js');
 const { abuseCheck } = require('../../lib/abuse.js');

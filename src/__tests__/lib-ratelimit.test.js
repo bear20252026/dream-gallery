@@ -3,7 +3,16 @@
 // ①超限拒、②不同 IP/桶互不影响、③窗口滚动后重置、④直连伪造 CF 头无效(回退 socket 地址)。
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 
+// 数据落到系统临时目录:此前这几套后端测试直接写仓库真实的 gate_data.json,
+// 全量 vitest 并发时互相抢同一个文件 → rename EPERM/ENOENT 与 hook 超时(2026-10-11 CI 实锤)。
+process.env.GATE_DATA_FILE = path.join(
+  fs.mkdtempSync(path.join(os.tmpdir(), 'dg-lib-ratelimit-')),
+  'gate_data.json'
+);
 const nodeRequire = createRequire(import.meta.url);
 const { hit, _reset } = nodeRequire('../../lib/ratelimit.js');
 const { realIP } = nodeRequire('../../lib/store.js');

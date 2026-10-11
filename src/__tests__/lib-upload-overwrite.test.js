@@ -10,12 +10,17 @@
 // r2sync 在 files-upload 加载前打 require.cache 补丁 ⇒ 断言零真网络请求。
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { Readable, Writable } from 'node:stream';
 import { createRequire } from 'node:module';
 
 const nodeRequire = createRequire(import.meta.url);
+// 必须在 require 任何 lib/*.js 之前重定向:否则本套件会写仓库真实的 gate_data.json,
+// 全量 vitest 并发时与其他套件抢同一个文件的锁 → Windows 下 EPERM rename 失败、hook 超时假红。
+const dgTmpData = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dg-updata-')), 'gate_data.json');
+process.env.GATE_DATA_FILE = dgTmpData;
 const r2syncId = nodeRequire.resolve('../../lib/r2sync.js');
 const r2PutMock = vi.fn(() => Promise.resolve(true));
 nodeRequire.cache[r2syncId] = {
@@ -28,6 +33,13 @@ nodeRequire.cache[r2syncId] = {
 
 const { ROOT, TOKEN } = nodeRequire('../../lib/config.js');
 const { gateData, deviceKey, saveGateData } = nodeRequire('../../lib/store.js');
+// 空库(全新检出/CI)时 gateData 只有 {secret,applicants,stats};生产由 lib/siteconfig.js 在加载时
+// 把 uploads/photoCaptions 建出来。本文件把 siteconfig 打桩或直接不加载它,所以必须自己播种,
+// 否则断言会依赖"恰好被别的模块顺手建了容器"这种隐式前置(2026-10-11 CI 假红的根因)。
+gateData.uploads = gateData.uploads || {};
+gateData.photoCaptions = gateData.photoCaptions || {};
+gateData.alerts = gateData.alerts || [];
+gateData.applicants = gateData.applicants || {};
 const { handleUpload, _resetChunkState } = nodeRequire('../../lib/files-upload.js');
 const { handleBigscreenUpload, BIGSCREEN_MAX_BYTES } = nodeRequire('../../lib/bigscreen.js');
 
