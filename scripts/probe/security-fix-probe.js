@@ -1,7 +1,7 @@
 // security-fix-probe.js — OWASP 审计修复项复验(2026-07-28)
 // 断言(2026-08-29 更新):①SVG 上传被拒 + 白名单无 .svg + 存量 SVG 仍有 CSP script-src 'none' 兜底
 //   ②媒体/HTML 的 nosniff 与 XFO ③vid 归属 aid 正确、伪造 UA 拿不到 myUploads 且直读 403
-//   ④token 错误 401/正确 200 ⑤vision 无设备日限且同图复用缓存 ⑥linkClicks 上限逻辑存在
+//   ④token 错误 401/正确 200 ⑤vision 无设备**日**限、但每 IP 每分钟 6 次洪水防护生效、缓存命中免检 ⑥linkClicks 上限 CLICK_CAP=5000 在源码里
 // 变更说明:原「SVG 仍可上传 + 响应带 CSP」已过时(2026-07-31 起白名单直接移除 svg,姿态更强);
 //   上传归属/越权类断言改用普通图片做载体(该逻辑与文件类型无关)。
 const { spawn } = require('child_process');
@@ -125,10 +125,16 @@ const seedDbFiles = () => {
   const goodQ = await fetch(B + '/api/admin/list?token=audit-t0ken');
   ok(bad.status === 401 && good.status === 200 && goodQ.status === 200, 'token 错误 401 / 正确 200(header+query)');
 
-  // [5] 设备日限已按主人要求移除：21张本人照片都可分析，同图结果缓存。
+  // [5] 设备**日**限已按主人要求移除;2026-10-11 DG-AI-001 补的是另一维度——每 IP **每分钟**洪水防护
+  //     (VISION_RATE_PER_MIN=6)。两条都要钉住,否则"移除日限"退化成"没有任何防护"。
+  //     ⚠️ 同批还改了"失败不落缓存"(一次瞬时故障不再把照片永久锁成回退句)⇒ 旧断言
+  //     "重复分析复用缓存"在没有真 AI key 的探针环境里必然假失败:回退句是 retryable、不进缓存。
+  //     现在缓存命中用**预置 caption** 来钉,并顺带钉住"缓存命中免检"(超限之后仍能读缓存)。
   seedDbFiles();
   const gd2 = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-  for (let i = 0; i < 21; i++) gd2.uploads['vq' + i + '.jpg'] = { dk: 'dk-uploader', aid: 'vidAAA', ts: Date.now(), mt: 'x' + i };
+  const VQ_N = 9;
+  for (let i = 0; i < VQ_N; i++) gd2.uploads['vq' + i + '.jpg'] = { dk: 'dk-uploader', aid: 'vidAAA', ts: Date.now(), mt: 'x' + i };
+  gd2.photoCaptions = Object.assign({}, gd2.photoCaptions, { 'vq0.jpg': '预置配文:缓存命中不走 AI' });
   fs.writeFileSync(DATA_FILE, JSON.stringify(gd2, null, 1));
   s2.kill();
   const s3 = spawn(process.execPath, ['server.js'], {
@@ -136,23 +142,31 @@ const seedDbFiles = () => {
   });
   await new Promise(r => s3.stdout.on('data', d => d.toString().includes('服务器已启动') && r()));
   // 文件要真实存在(vision 读盘)，独立临时访客档案，不使用线上数据。
-  for (let i = 0; i < 21; i++) fs.writeFileSync(path.join(ROOT, 'photos', 'vq' + i + '.jpg'), 'x');
-  let lastStatus = 0;
-  let everyAllowed = true;
-  for (let i = 0; i < 21; i++) {
-    const r = await fetch(B + '/api/vision/analyze', { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'RealUser/1.0', 'cookie': 'vid=vidAAA' }, body: JSON.stringify({ file: 'vq' + i + '.jpg' }) });
-    lastStatus = r.status;
-    everyAllowed = everyAllowed && r.status === 200;
-  }
-  ok(everyAllowed && lastStatus === 200, 'vision 本人照片第21次仍可分析（日限已移除）');
-  const cached = await fetch(B + '/api/vision/analyze', { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'RealUser/1.0', 'cookie': 'vid=vidAAA' }, body: JSON.stringify({ file: 'vq20.jpg' }) });
-  const cachedBody = await cached.json();
-  ok(cached.status === 200 && cachedBody.cached === true && typeof cachedBody.caption === 'string', 'vision 同图重复分析复用缓存');
-  for (let i = 0; i < 21; i++) fs.unlinkSync(path.join(ROOT, 'photos', 'vq' + i + '.jpg'));
+  for (let i = 0; i < VQ_N; i++) fs.writeFileSync(path.join(ROOT, 'photos', 'vq' + i + '.jpg'), 'x');
+  const vq = (i) => fetch(B + '/api/vision/analyze', { method: 'POST', headers: { 'content-type': 'application/json', 'user-agent': 'RealUser/1.0', 'cookie': 'vid=vidAAA' }, body: JSON.stringify({ file: 'vq' + i + '.jpg' }) });
+  // ① 缓存命中:200 + cached:true(且它不占配额,见③)
+  const hit0 = await vq(0);
+  const hit0Body = await hit0.json();
+  ok(hit0.status === 200 && hit0Body.cached === true && typeof hit0Body.caption === 'string',
+    'vision 同图重复分析复用缓存(预置 caption 命中,cached:true)');
+  // ② 一分钟内 6 次真分析全部放行 ⇒ 按设备的"日限"确实不存在了
+  let everyAllowed = true, lastStatus = 0;
+  for (let i = 1; i <= 6; i++) { const r = await vq(i); lastStatus = r.status; everyAllowed = everyAllowed && r.status === 200; }
+  ok(everyAllowed && lastStatus === 200, 'vision 本人照片连 6 次都可分析(设备日限已移除)');
+  // ③ 第 7 次被每 IP 每分钟桶挡住(429 而不是静默放行——这才是"公开 AI 接口不再是无上限成本攻击面")
+  const seventh = await vq(7);
+  ok(seventh.status === 429, 'vision 第 7 次/分钟被洪水防护挡住(429)');
+  // ④ 超限之后缓存命中照旧放行:限流只针对真要花钱的分析
+  const hit1 = await vq(0);
+  const hit1Body = await hit1.json();
+  ok(hit1.status === 200 && hit1Body.cached === true, 'vision 超限后缓存命中仍免检(200,不是 429)');
+  for (let i = 0; i < VQ_N; i++) fs.unlinkSync(path.join(ROOT, 'photos', 'vq' + i + '.jpg'));
 
   // [6] linkClicks 上限:源码断言(打 5001 次太慢)
+  //     2026-10-11 起裁剪逻辑与"内存攒批落库"同住 lib/track.js,常量名为 CLICK_CAP(= 旧 5000 口径)
   const src = fs.readFileSync(path.join(ROOT, 'lib', 'track.js'), 'utf8');
-  ok(/linkClicks\.length > 5000/.test(src), 'linkClicks 5000 上限已写入源码');
+  ok(/CLICK_CAP\s*=\s*5000/.test(src) && /arr\.splice\(0,\s*arr\.length - CLICK_CAP\)/.test(src),
+    'linkClicks 5000 上限(CLICK_CAP + 超限裁旧)已写入源码');
 
   // 清理(逐个 try:清理失败不应让整个探针崩掉、吞掉已得出的结论)
   for (const f of [path.join(ROOT, 'photos', 'sec-test.png'), path.join(ROOT, '.audit-tmp.svg')]) {
