@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# backend-files.sh — 「哪些文件算后端」的唯一出处(被 source,不单独执行)
+# 调用方:scripts/backend-sync.sh(算差集 + 上传)、scripts/verify-drift.sh(部署后逐文件复核)
+#
+# ⚠️ 为什么不能写成 `lib/*.js`(2026-10-12 查出,发布阻断级):
+#   R1/R2 把后端拆出了子目录 —— lib/repo/*.js、lib/upload/*.js、lib/migrations/*.sql。
+#   glob 不递归 ⇒ 这些模块【一个都不会被传】。线上 server.js require('./lib/store')
+#   → require('./shadow') → require('./repo/chat') 直接 Cannot find module,pm2 反复重启 = 全站 502。
+#   老写法只在「lib 下永远只有一层 .js」这个前提下成立,而那个前提已被本轮重构废掉。
+#
+# 为什么扩展名写死而不用 `find lib -type f`:
+#   将来 lib/ 里落出 .db / .json / .env / 备份之类**不该进 web root**的文件时,默认不跟着传。
+#   传错一次就是源码或数据外泄的起点(本仓库有 .bak 被公网回传的前科)。
+#   公网侧整个 lib/ 目录段由 lib/security.js 的 staticDenied() 按首段挡成 404,子目录同样在射程内。
+backend_files() {
+  printf '%s\n' server.js src/shared/mediarules.mjs
+  find lib -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.sql' \) 2>/dev/null | sort
+}

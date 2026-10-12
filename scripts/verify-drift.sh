@@ -2,7 +2,7 @@
 # verify-drift.sh — 发布后复核"服务器上的文件"与"本地这次要发的文件"是否逐字节一致(漂移检查)
 #
 # 用法:
-#   bash scripts/verify-drift.sh              比对 后端(server.js/lib/*.js/mediarules.mjs) + 前端(dist/ 全量)
+#   bash scripts/verify-drift.sh              比对 后端(清单 = scripts/backend-files.sh)+ 前端(dist/ 全量)
 #   bash scripts/verify-drift.sh --backend-only  只比后端(release.sh 收尾用的独立二次确认)
 #   bash scripts/verify-drift.sh --dist-only     只比前端
 #   bash scripts/verify-drift.sh --pin-hostkey    转交 deploy.sh 抓主机密钥(只生成信任锚,不比对)
@@ -94,9 +94,18 @@ trap cleanup EXIT
 PAIRS="$TMP/pairs.list"
 : > "$PAIRS"
 if [ "$CHECK_BACKEND" = "1" ]; then
-  for f in server.js lib/*.js src/shared/mediarules.mjs; do
+  # 清单与 backend-sync.sh 同一份出处(scripts/backend-files.sh)。
+  # 这里曾写死 `lib/*.js` ⇒ R1/R2 拆出的 lib/repo、lib/upload、lib/migrations 既没被同步、
+  # 也没被复核,漂移检查会对"线上根本没有这些模块"报一致 —— 比而不见等于没比。
+  . scripts/backend-files.sh
+  # 先确认这份清单覆盖真实依赖,再去比 md5:清单漏了目录时"一致"是假的(见该文件头注)。
+  if ! node scripts/admin/check-backend-manifest.cjs; then
+    echo "❌ 后端清单自检未通过(或无法判定)—— 没有一份可信的清单,漂移复核无从谈起"
+    exit 2
+  fi
+  while IFS= read -r f; do
     [ -f "$f" ] && printf '%s\t%s\n' "$f" "$f" >> "$PAIRS"
-  done
+  done < <(backend_files)
 fi
 if [ "$CHECK_DIST" = "1" ]; then
   if [ ! -d dist ]; then

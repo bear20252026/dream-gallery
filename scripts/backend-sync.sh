@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# backend-sync.sh — 把后端代码(server.js / lib/*.js / 后端 require 的共享模块)同步到服务器
+# backend-sync.sh — 把后端代码同步到服务器(清单唯一出处 = scripts/backend-files.sh:server.js、
+#                  lib 下全部源码(含 lib/repo、lib/upload、lib/migrations)、后端 require 的共享模块)
 # 用法:
 #   bash scripts/backend-sync.sh --dry   只列出与服务器不同的文件和改动行数,什么都不改(退出码 0)
 #   bash scripts/backend-sync.sh         列出差异 → 问 y/N → 备份 → 上传 → md5 复核 → 重启
@@ -90,9 +91,20 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# 后端文件清单:server.js、lib/ 下全部 js、以及后端 require 的共享模块(决策表)
+# 后端文件清单:唯一出处在 scripts/backend-files.sh(与 verify-drift.sh 共用同一份,不许两处各写各的)
 # 必须是一行、空格分隔:清单会拼进 ssh 命令,换行会被远端 shell 当成多条命令
-FILES=$(echo server.js lib/*.js src/shared/mediarules.mjs)
+. scripts/backend-files.sh
+FILES=$(backend_files | tr '\n' ' ')
+
+# 清单自检(2026-10-12 查出,发布阻断级):清单原先写死 `lib/*.js`,而 glob 不递归 —— R1/R2 拆出的
+# lib/repo、lib/upload、lib/migrations 会【一个都不传】,线上 require 不到模块就反复重启(全站 502),
+# 而 md5 差集/上传/复核全部照常绿灯,因为清单压根没往那些目录看一眼。这里在碰服务器之前先比对
+# "真实依赖 ⊆ 清单"(判据 = dependency-cruiser 解析出的依赖图)。
+# 检查器拿不到结论时自己退 2;这里把 1 和 2 一视同仁地中止 —— **判不了不等于没问题**。
+if ! node scripts/admin/check-backend-manifest.cjs; then
+  echo "❌ 后端清单自检未通过(或无法判定)—— 本次什么都没上传,服务器仍是原样(退出码 1)"
+  exit 1
+fi
 
 # md5sum 分隔符跨平台不一致(Git Bash `<md5> *<路径>`,Linux 两个空格)→ 统一成单空格
 norm() { awk '{ p=$2; sub(/^\*/,"",p); print $1" "p }'; }
@@ -123,7 +135,7 @@ fi
 awk '{print $2}' "$TMP/diff.raw" > "$TMP/diff.list"
 LOC_LINES=$(wc -l < "$TMP/local.md5" | tr -d ' ')
 if [ "$LOC_LINES" = "0" ]; then
-  echo "❌ 本地后端清单为空(server.js / lib/*.js 一个都没读到)——无法判断差异,拒绝继续"
+  echo "❌ 本地后端清单为空(scripts/backend-files.sh 一个文件都没吐)——无法判断差异,拒绝继续"
   exit 1
 fi
 if [ ! -s "$TMP/srv.md5" ]; then
