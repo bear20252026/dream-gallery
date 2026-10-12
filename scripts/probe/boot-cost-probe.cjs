@@ -51,7 +51,18 @@ function cp(from, to) {
 let server = null;
 function cleanup() {
   try { if (server) server.kill('SIGTERM'); } catch (e) {}
-  if (!process.env.KEEP) { try { fs.rmSync(SANDBOX, { recursive: true, force: true }); } catch (e) {} }
+  if (process.env.KEEP) { console.log('KEEP=1:沙箱留在 ' + SANDBOX); return; }
+  // Windows 上刚关浏览器/服务器就删常失败(文件句柄未放),静默泄漏等于每次跑完留 39MB。
+  // 所以重试若干次,最后实在删不掉就**把路径打出来**,别让临时目录无声地堆在 %TEMP% 里。
+  for (let i = 0; i < 12; i++) {
+    try {
+      fs.rmSync(SANDBOX, { recursive: true, force: true });
+      if (!fs.existsSync(SANDBOX)) return;
+    } catch (e) {}
+    const until = Date.now() + 250;
+    while (Date.now() < until) { /* 让句柄释放,别空转 CPU */ }
+  }
+  console.log('⚠️ 沙箱临时目录没能删掉,请手工清理:' + SANDBOX);
 }
 process.on('SIGINT', () => { cleanup(); process.exit(130); });
 
