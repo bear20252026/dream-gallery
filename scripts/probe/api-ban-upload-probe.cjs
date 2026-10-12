@@ -75,6 +75,10 @@ function cleanup() {
   try { fs.unlinkSync(path.join(PHOTO_DIR, WB_NAME)); } catch (e) {}
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) {}
 }
+// ⚠️ 探针被 timeout/kill 打断时 finally 根本不执行 —— 实测就这么在 photos/ 里留过一个
+// 120 字节的白板测试文件(服务端签发名,不在按名字匹配的清理范围内)。信号兜底必留。
+process.on('SIGTERM', () => { cleanup(); process.exit(143); });
+process.on('SIGINT', () => { cleanup(); process.exit(130); });
 
 async function req(method, p, { ip = GOOD_IP, ua = UA_C, vid = null, token = null, body = null, headers = {}, stream = false } = {}) {
   const h = { 'user-agent': ua, 'cf-connecting-ip': ip, ...headers };
