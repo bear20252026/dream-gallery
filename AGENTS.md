@@ -56,6 +56,13 @@
       新的"恒开告警 = 没有告警";挪到 try/catch **外面**后实测:删掉 `crossorigin` → `npm run build` exit 1。
       两类失败性质不同,别一并降级:解析不到 manifest/模块清单 = 环境性可继续;自己模板写错 = 必红。
     ⚠️ 这两处都是**纯前端/构建期**改动,不发 deploy 就不上线;本地 `test-mobile` 6/6 零未捕获异常。
+    守门探针:**`node scripts/probe/boot-cost-probe.cjs`**(需先 `npm run build`)。它把 `dist/` 铺进临时
+    沙箱、用**本仓自己的** `server.js`+`lib/files-static.js` 起服(只有这条路径会发 `Vary: Origin`,
+    `vite preview` 不发 ⇒ 用它测等于没测),用 CDP `Network.loadingFinished.encodedDataLength` 判"真重复下载",
+    并屏蔽 SW(否则缓存命中会把重复洗成 0 字节)。阈值:`prefetch` 必须 100% 带 crossorigin、GET 资源
+    重复字节容差 **0**、首屏总入网 ≤2600KB、单资源 ≤900KB、零 pageerror。**正反都验过**:修复后 697KB/0 重复
+    通过;手工把产物里的 `crossorigin` 抹掉 ⇒ 当场报"6 个真重复、浪费 369KB"退出 1(与线上实测 378KB 同量级)。
+    ⚠️ 只数 GET:同一 URL 的多次 POST 是常态(台词预煮切 batch 打 `/api/tts/batch`),混进来天天假红。
     仍**未做**:CSP nonce(R7)、视频审核(R4)、以及"到底还该预取哪些 chunk"的进一步收紧(43 条预取
     在移动晚高峰会与模型/台词抢同一条 CDN 连接池,是当初为"电影期不挡首屏"才选 prefetch 的取舍)。
 
@@ -479,6 +486,8 @@ npx vitest run --coverage         # 覆盖率基线(2026-09-24 建):已测纯逻
 npm run lint / npm run typecheck / npm run deps   # 三项都必须 0 错;lint 已忽略 .tmp/**(本机一次性脚本,别让假红骗人)
 npx tsc -p tsconfig.checkjs.json  # 类型债基线=scripts/checkjs-baseline.txt(单一真相,CI 超基线即 fail,不是 warning)
 npm run test:scene                # 场景截图回归 4 检查点(主世界/B612/国王星球/返回;见「场景自动化测试」节)
+npm run build && node scripts/probe/boot-cost-probe.cjs   # 首屏真实入网字节闸:prefetch 必带 crossorigin、GET 零重复下载、总入网 ≤2600KB(2026-10-12 建,起因见顶部「资产性能」条)
+node scripts/probe/api-ban-upload-probe.cjs   # 拉黑/封禁 + 白板归属 + 目录钉死 + mylinks 会话闸的端到端验收 22 项(自起本地服、数据文件指临时目录)
 ```
 ⚠️ `cmd | tail` 的 `$?` 属于 tail——判成败要**单独取退出码**或读结构化字段(2026-10-11 实测踩到:lint 报 1 error 但 `| tail` 后显示 EXIT=0)。
 
