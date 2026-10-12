@@ -62,16 +62,40 @@ const corePreloadInject = () => ({
       rels.forEach((k) => walk(k));
       if (!files.size) return console.warn('[core-preload] manifest 无匹配 chunk,跳过注入');
       const links = [...files]
-        .map((f) => '<link rel="prefetch" as="script" href="/' + f + '">')
+        // ⚠️ 必须带 crossorigin:这些 chunk 稍后是被 `import()` 取的,模块请求走 CORS 模式;
+        //   而 `<link rel=prefetch as=script>` **不带 crossorigin 时走 no-cors**。两种模式在浏览器缓存里
+        //   是**两个不同的键**,加上本站静态响应带 `Vary: Origin`(ACAO 随 Origin 变),预取与真实导入
+        //   永远互不命中 ⇒ 同一份 chunk 下两遍。本地用"像线上一样发 Vary: Origin"的静态服实测复现:
+        //   43 条 prefetch 全部无 crossorigin 时,5 个 chunk 二次入网(three 874KB×2、main 343KB×2,
+        //   首访多下 1224KB;线上 gzip 后实测 three 231KB×2、main 126KB×2)。带上就命中同一键。
+        .map((f) => '<link rel="prefetch" as="script" crossorigin href="/' + f + '">')
         .join('');
       const htmlPath = resolve(__dirname, 'dist/index.html');
       let html = fs.readFileSync(htmlPath, 'utf8');
-      if (html.includes('core-preload-injected')) return;
-      html = html.replace('</head>', links + '<!-- core-preload-injected --></head>');
-      fs.writeFileSync(htmlPath, html);
+      if (!html.includes('core-preload-injected')) {
+        html = html.replace('</head>', links + '<!-- core-preload-injected --></head>');
+        fs.writeFileSync(htmlPath, html);
+      }
       console.log('[core-preload] 已注入 ' + files.size + ' 个 prefetch');
     } catch (e) {
+      // 环境性失败(读不到 world-loader / manifest)可以降级继续:串行 import 链本身照样工作。
       console.warn('[core-preload] 注入失败(不影响产物可用性,串行链照常工作):', e.message);
+    }
+    // ⚠️ 这条自检**必须写在 try/catch 外面**:第一版写在 try 里,被上面那句"注入失败不阻断"的 catch
+    //   吞成一行 WARN ⇒ 构建照绿,等于又造了一个"恒开的告警 = 没有告警"(本仓库同类事故已记好几次:
+    //   `cmd | tail` 的 $? 属于 tail、空远端清单被差集判成"一致")。两类失败性质不同:
+    //   解析不到 manifest = 可降级;我们自己模板里丢了 crossorigin = 编程错误,必须打断构建。
+    //   计数直接读**产物文件**,所以"本次没注入(已含标记)"的历史产物也会被一并核到。
+    const out = fs.readFileSync(resolve(__dirname, 'dist/index.html'), 'utf8');
+    const injected = (out.match(/<link rel="prefetch"/g) || []).length;
+    const withCors = (out.match(/<link rel="prefetch"[^>]*crossorigin/g) || []).length;
+    if (injected && withCors !== injected) {
+      throw new Error(
+        '[core-preload] ' + injected + ' 条 prefetch 里只有 ' + withCors + ' 条带 crossorigin:' +
+        ' 模块请求走 CORS 模式,预取不带 crossorigin 就是另一个缓存键 ⇒ 同一份 chunk 下载两遍' +
+        '(本地带 Vary: Origin 的静态服实测:three 874KB×2、main 343KB×2,首访多下 1224KB)。' +
+        ' 要改注入模板请连这条自检一起改。'
+      );
     }
   },
 });

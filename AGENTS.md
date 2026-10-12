@@ -35,7 +35,29 @@
 - ⚠️**清单第 12 项里的"CSP 收紧 / 内容审核 / 资产性能"本轮没有动**(2026-10-12 如实登记,别让 `[x]` 看起来已做完):
   ①**CSP** 线上实测仍是 `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob: https://static.cloudflareinsights.com`(`lib/security.js` 的 `scriptSrc` 组装)—— 收 nonce/hash 要先拆掉全站内联脚本(前后端契约同改),挂 **R7**。
   ②**视频审核**零进展(需新依赖,ffmpeg 抽帧 + 视觉模型的成本要先拍板),挂 **R4**;现在仍是"图片过 NSFW、视频不过"。
-  ③**资产性能**只做到一条副作用:私有照片的缩略图不再被 CDN 当公开对象缓存(DG-SEC-003 把 `req._mediaPublic` 判对)。首屏体积/预链接/懒加载那套没碰 —— 但注意 **构建不可复现** 让"比对产物"这件事天生没基准,见上一条。
+  ③**资产性能:2026-10-12 实测后修掉两处真浪费(首访约 2MB)**,并且**纠正了一次自己的误读**:
+    先用 Resource-Timing 得出"9 个 URL 重复、浪费 385KB",拿 CDP 的 `Network.loadingFinished.encodedDataLength`
+    复核才发现**这条判据不可信**——① `initiatorType:'link'` 同时覆盖 Vite 自己发的 `modulepreload` 与我们注入的
+    `prefetch`,分不清是谁;② 同一 URL 出两条 entry 是正常的(先被 `import()` 触发、后被 preload 声明命中缓存),
+    命中缓存那条 `transferSize=0`。⇒ **判"是否真重复下载"只能看实际入网字节(CDP),不能看条数**。
+    重测之后线上仍然确有 7 个 URL 二次入网(合计浪费 2016KB),两个根因各自独立:
+    - **`00001.m4a` 白下 1.6MB**:协议面板配乐 2026-10-03 就被剧情音乐取代,但 `src/ui/agreement-music.js`
+      顶层仍 `new Audio(cdn…/00001.m4a)`,而本模块被 `main.js` 顶层 import ⇒ 首访立刻下载,全仓又**零个**
+      `startAgreementMusic()` 调用点,于是每次都是下一半再被浏览器 abort(debug-browser 里那条
+      `REQ_FAIL … ERR_ABORTED` 就是它)。现改**惰性创建**(不起播就一个字节都不下),实测该 URL 请求数 0。
+    - **prefetch 与模块请求缓存键分裂**:`vite.config.js` 注入的 43 条 `<link rel="prefetch" as="script">`
+      没带 `crossorigin` ⇒ 预取走 no-cors,而 chunk 稍后是被 `import()` 以 CORS 模式取的;本站静态响应又带
+      `Vary: Origin`,两者永远互不命中 ⇒ **同一份 chunk 下两遍**(线上 gzip 后 three 231KB×2、main 126KB×2)。
+      本地起一台"像线上一样发 `Vary: Origin`"的静态服(`.tmp/vary-serve.mjs` 手法)复现并 A/B:
+      改前 5 个 chunk 二次入网、首访总入网 2855KB(未压缩)、浪费 1224KB;加 `crossorigin` 后
+      **0 个重复、总入网 1632KB**(-43%)。
+    - **防回退**:该不变量写成**构建期硬失败**(计数直接读产物 `dist/index.html`)。⚠️ 第一版把 `throw`
+      写在插件的 try 里,被它自己"注入失败不阻断构建"的 catch 吞成一行 WARN ⇒ 构建照绿,等于造了个
+      新的"恒开告警 = 没有告警";挪到 try/catch **外面**后实测:删掉 `crossorigin` → `npm run build` exit 1。
+      两类失败性质不同,别一并降级:解析不到 manifest/模块清单 = 环境性可继续;自己模板写错 = 必红。
+    ⚠️ 这两处都是**纯前端/构建期**改动,不发 deploy 就不上线;本地 `test-mobile` 6/6 零未捕获异常。
+    仍**未做**:CSP nonce(R7)、视频审核(R4)、以及"到底还该预取哪些 chunk"的进一步收紧(43 条预取
+    在移动晚高峰会与模型/台词抢同一条 CDN 连接池,是当初为"电影期不挡首屏"才选 prefetch 的取舍)。
 
 ### 顺带修的两个真缺陷(不在审计清单里,做上一项时撞出来的)
 - **循环依赖不能用"函数内延迟 require"解**:depcruise 静态扫所有 `require`,写在哪都算一条边。`lib/admin.js` 顶层 `require('./security')` 打出 `admin → security → siteconfig → admin` 的环 ⇒ 纯谓词 `isLocalRequest` 连同 `LOCAL_HOST_RE` 一起下沉到叶子模块 **`lib/local-request.js`(新)**,`lib/security.js` 原样 re-export(对外口径不变、`lib-local-request.test.js` 一字不改),后端要用它的人 require 叶子。**⚠️踩过的坑**:`security.isAllowedOrigin` 内部也在用那两个正则,下沉时只搬不引用 ⇒ `ReferenceError` 被它自己的 `try/catch` 吞成 `false` ⇒ 回环请求的 Origin 判定全线失败、`lib-ws-guard`/`lib-api-ban-guard` 联手报 8 条 `'origin'` 假绿反转 —— **搬常量记得回头查所有引用点**(`npx vitest run` 同跑两个相关套件才能暴露,单跑是绿的)。
