@@ -198,6 +198,27 @@ server.listen(PORT, () => {
   // 保留期清扫(lib/retention.js)与 R2 待发台账(lib/r2outbox.js)的启动点都在入口这一层:
   // 两者都反向依赖 store/client-errors,接进底座会造出循环依赖(《npm run deps》是硬门禁)。
   // RETENTION_DISABLED=1 由 retention 自己守;两个 start 都幂等且定时器 unref。
+  //
+  // 影子双写(R1 第 2 步)的启动点同样放在入口这一层:迁移建表 + 一次性历史回填。
+  // 必须先于 startRetention —— 回填把老数据灌进表,紧接着保留期按同一批 cutoff 裁一遍,
+  // 于是"搬表"不会把已经过保留期的历史又留在库里(隐私承诺 DG-PRIV-001 不打折)。
+  // shadow.start 内部全程 try/catch:表建不起来/回填炸了都只是影子层停用,服务照常。
+  try {
+    const shadow = require('./lib/shadow');
+    const report = shadow.start(require('./lib/store').gateData);
+    if (!report.enabled) {
+      console.log(`[shadow] 影子双写未启用(${report.reason}):四个热集合仍只走 gateData 老路径`);
+    } else {
+      const s = shadow.shadowStats();
+      const bf = Object.entries(report.backfill).filter(([, n]) => n > 0).map(([k, n]) => `${k}=${n}`);
+      console.log(
+        `[shadow] 影子双写已启用:库结构 v${report.schema && report.schema.to}` +
+        `,回填 ${bf.length ? bf.join(' ') : '无(表里已有行或源数组为空)'}` +
+        `,当前表行数 ${JSON.stringify(s.tables)}`
+      );
+      console.log('[shadow] 读路径未改动:切读判据 = node scripts/admin/table-parity.cjs 退出码 0');
+    }
+  } catch (e) { console.error('[startup] 影子双写启动失败(不影响服务):', e && (e.message || e)); }
   try { require('./lib/retention').startRetention(); } catch (e) { console.error('[startup] 保留期清扫启动失败(不影响服务):', e && (e.message || e)); }
   try { require('./lib/r2outbox').startOutbox(); } catch (e) { console.error('[startup] R2 待发台账启动失败(不影响服务):', e && (e.message || e)); }
   console.log(`路由: ${ROUTES.length} 个端点已注册(明细见 lib/routes.js)`);
