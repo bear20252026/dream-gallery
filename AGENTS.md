@@ -87,6 +87,12 @@
   - 验收:测试文件加 ⑧ 段 4 条,**按线上真实形状写**(数字 viewMode 落 TEXT 列、`'0.0'` 遗留行、对象 brand 与字符串 brand 并存、clicks 的 brand/pos/fp 回环)。**教训:本地 34 条全绿不代表影子写保真 —— 测这类"镜像"必须把畸形形状放进去(数字进 TEXT 列、同一列两种类型、对象字段),只用最顺的那一种数据写测试,等于没测。**
 
 
+### 已上线并复验(2026-10-13 00:40,commit `78644ae`)
+- 本地门禁:`npm test` **4/108/46/20/6 全过** / `npx vitest run` **924 项 81 文件** / `eslint` 0 / `depcruise` 0(374 模块) / `tsc --noEmit` 0 / checkJs **422 = 基线** / `npm run build` 通过 / 后端清单自检 0。
+- 发布:`DEPLOY_OK 9e15820`(后端第 3 步 37 个文件 md5 一致 → 前端 → 重启读 `pm2 status` 的 `gallery … online` → 8b 逐文件 **OK 188 DRIFT 0**)。R1 对账修好后只补发后端:`✅ 4 个后端文件已上传,md5 一致` + `✅ gallery 已重启,pm2 报告 online`,`verify-drift --backend-only` **OK 52 DRIFT 0 TOTAL 52**。两次之间前端源码只差一个测试文件(`git diff --name-only 9e15820 78644ae -- src public *.html vite.config.js` 只列出 `src/__tests__/…`,不进构建),所以线上 dist 与 `78644ae` 等价。
+- 线上复验:`/healthz` ok、首页与两个 main chunk 全 200、`admin-credential-hygiene-probe` **24/24**、`sw-admin-bypass-probe` **14/14**、`boot-cost-probe` 首屏入网 **697KB / 43 条预取 43 条带 crossorigin / 零重复入网**,线上 `index.html` 实测同样是 **43/43**。
+- **R1 在真数据上跑通**:启动日志 `[shadow] 迁移完成 0 -> 1(001_hot_tables)` + `影子双写已启用:库结构 v1,回填 chat_messages=3 click_events=73 client_errors_gate=129 visits=1000`;`table-parity` 第一次红(177 行形状差)→ 修读写边界与判据 → **结果: 一致(退出码 0)**,其中 `visits 源 1000 / 表 1003 (表多 3 行,不判失败)` 正是"表只受保留期约束"那条设计的实测样本。**切读还没发生**:按纪律要连续跑绿一周。
+
 ### 顺带修的两个真缺陷(不在审计清单里,做上一项时撞出来的)
 - **循环依赖不能用"函数内延迟 require"解**:depcruise 静态扫所有 `require`,写在哪都算一条边。`lib/admin.js` 顶层 `require('./security')` 打出 `admin → security → siteconfig → admin` 的环 ⇒ 纯谓词 `isLocalRequest` 连同 `LOCAL_HOST_RE` 一起下沉到叶子模块 **`lib/local-request.js`(新)**,`lib/security.js` 原样 re-export(对外口径不变、`lib-local-request.test.js` 一字不改),后端要用它的人 require 叶子。**⚠️踩过的坑**:`security.isAllowedOrigin` 内部也在用那两个正则,下沉时只搬不引用 ⇒ `ReferenceError` 被它自己的 `try/catch` 吞成 `false` ⇒ 回环请求的 Origin 判定全线失败、`lib-ws-guard`/`lib-api-ban-guard` 联手报 8 条 `'origin'` 假绿反转 —— **搬常量记得回头查所有引用点**(`npx vitest run` 同跑两个相关套件才能暴露,单跑是绿的)。
 - **空远端清单会让差集判成"一致"**:`awk 'NR==FNR{seen[$0]=1;next} !seen[$0]'` 在第一份文件为空时把空集合当"全都见过" ⇒ `N=0` ⇒ 打印"✅ 后端与服务器一致"还返回 0(**又一类静默假绿**,与 `cmd | tail` 的 `$?` 同型)。backend-sync 改 `grep -vxF -f`(无匹配模式=一份都不差,失败方向正确),并用它的**退出码**当结论(0 有差异 / 1 完全一致 / >1 出错),`set -e` 用 `set +e … set -e` 局部包住。**写"比清单"的代码时,空输入必须自己想清楚算一致还是算失败**。
