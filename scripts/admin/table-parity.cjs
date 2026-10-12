@@ -109,6 +109,25 @@ function normObj(v) {
   return null;
 }
 
+/**
+ * 「源里既可能是字符串、也可能是对象」的列(brand)用的归一。
+ * ⚠️ 这里绝不能用 normText:String({brand:'Mac'}) 永远是 '[object Object]',
+ *    于是**两个完全不同的品牌会互相吻合**,这样的对账等于没比
+ *    (2026-10-13 线上第一次跑真数据就撞上:表侧存的是 JSON 文本、源侧是对象)。
+ *    对象按"键排序后的 JSON"参与签名;文本里如果本来就是一段 JSON 也解析后同样处理,
+ *    两侧因此落在同一个域里,又不会把差异抹平。
+ */
+function normAny(v) {
+  if (v === undefined || v === null) return '';
+  if (typeof v === 'object') return stableKey(v);
+  const s = String(v);
+  const t = s.trim();
+  if (t[0] === '{' || t[0] === '[') {
+    try { return stableKey(JSON.parse(t)); } catch (e) { return s; }
+  }
+  return s;
+}
+
 /** 时间戳字段单独取出来做 ±1ms 匹配,签名里只放内容 */
 function splitTime(row, timeKey) {
   const t = row[timeKey];
@@ -239,7 +258,7 @@ function srcClicks(g) {
     ip: normText(c.ip),
     geo: normText(c.geo),
     ua: normText(c.ua),
-    brand: normText(c.brand),
+    brand: normAny(c.brand),
     dev: normObj(c.dev) || {},
     fp: normObj(c.fp) || {},
     link: normText(c.link),
@@ -257,7 +276,7 @@ function tableClicks(rows) {
       ip: normText(c.ip),
       geo: normText(c.geo),
       ua: normText(c.ua),
-      brand: normText(c.brand),
+      brand: normAny(c.brand),
       dev: normObj(c.dev) || {},
       fp: normObj(c.fp) || {},
       link: normText(c.link),
@@ -277,7 +296,7 @@ function srcGateErrors(g) {
     dk: normText(e.dk),
     name: normText(e.name),
     ip: normText(e.ip),
-    brand: normText(e.brand),
+    brand: normAny(e.brand),
     msg: normText(e.msg),
     src: normText(e.src),
     line: normNum(e.line),
@@ -292,7 +311,7 @@ function tableGateErrors(rows) {
       dk: normText(e.dk),
       name: normText(e.name),
       ip: normText(e.ip),
-      brand: normText(e.brand),
+      brand: normAny(e.brand),
       msg: normText(e.msg),
       src: normText(e.src),
       line: normNum(e.line),

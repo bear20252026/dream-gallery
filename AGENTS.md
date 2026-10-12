@@ -80,6 +80,13 @@
   - 离线演练(不碰生产)已做实:`SRV` 指到临时目录、`git archive HEAD` 铺一份"线上现在的样子"、`SSH_BIN/SCP_BIN` 指到 stub。结论:`--yes` ⇒ `✅ 37 个后端文件已上传,md5 一致` exit 0,临时目录里 `lib/repo`(5)+`lib/upload`(8)+`lib/migrations/001_hot_tables.sql` 与 `scripts/admin/table-parity.cjs` 全部到位;再跑 `--check` ⇒ exit 0 一致;往 `lib/repo/chat.js` 注入一行 ⇒ `--check` **exit 5**、`verify-drift --backend-only` **exit 1**(OK 51 DRIFT 1 TOTAL 52),还原后 **OK 52 DRIFT 0 TOTAL 52** exit 0。
 
 
+- ⚠️**R1 上线后第一次用真数据对账就是红的(2026-10-13,线上 177 行),而且不是"行丢了"**:`click_events` 73/73、`client_errors(gate)` 129/129、`client_errors(file)` 237/237 —— **两侧行数完全相等**,差的是"同一行的两种写法":
+  - `view_mode TEXT` 列收到 JS number:better-sqlite3 不开 safeIntegers 时把 JS number 按 **double** 绑定,SQLite 的 TEXT 亲和把 REAL 渲染成 **`'0.0'`** 而不是 `'0'`(file 信道 158 行全部撞上,源里 `viewMode` 是 `|| 0` 出来的数字)。
+  - `brand` 这一列**源里既可能是字符串也可能是 UA 解析出的对象**:写入 `textCol(对象)` 存成 JSON 文本,读回是裸字符串 ⇒ 对账不等(gate 8 / clicks 11)。更要命的是判据自己也有窟窿:脚本当时用 `normText` 归一,而 `String(对象)` 恒等于 `'[object Object]'` ⇒ **两个完全不同的品牌会被判成相等**。这类"看起来在比、其实没比"比报错更危险。
+  - 修法三条,都写在边界上,不碰数据也不碰 DDL:① 写入侧 `view_mode: textCol(...)`(新行直接存 `'0'`);② 读回侧新增 `lib/repo/_db.js` 的 `maybeParseJson`(文本看着像 JSON 对象/数组就 parse 回对象,解析失败原样给字符串)与 `numText`(`'0.0'` → 0),**历史行一条不删、列类型一字不改**(001 迁移已在线上应用过,改它一个字就会被校验和闸门拒绝 —— 纪律③),归一放在"写出去 / 读回来"这对映射上,将来切读时调用点拿到的类型也和老数组一致;③ 对账脚本对对象域改用 `normAny`(键排序后的 JSON 签名),不再 `String()`。
+  - 验收:测试文件加 ⑧ 段 4 条,**按线上真实形状写**(数字 viewMode 落 TEXT 列、`'0.0'` 遗留行、对象 brand 与字符串 brand 并存、clicks 的 brand/pos/fp 回环)。**教训:本地 34 条全绿不代表影子写保真 —— 测这类"镜像"必须把畸形形状放进去(数字进 TEXT 列、同一列两种类型、对象字段),只用最顺的那一种数据写测试,等于没测。**
+
+
 ### 顺带修的两个真缺陷(不在审计清单里,做上一项时撞出来的)
 - **循环依赖不能用"函数内延迟 require"解**:depcruise 静态扫所有 `require`,写在哪都算一条边。`lib/admin.js` 顶层 `require('./security')` 打出 `admin → security → siteconfig → admin` 的环 ⇒ 纯谓词 `isLocalRequest` 连同 `LOCAL_HOST_RE` 一起下沉到叶子模块 **`lib/local-request.js`(新)**,`lib/security.js` 原样 re-export(对外口径不变、`lib-local-request.test.js` 一字不改),后端要用它的人 require 叶子。**⚠️踩过的坑**:`security.isAllowedOrigin` 内部也在用那两个正则,下沉时只搬不引用 ⇒ `ReferenceError` 被它自己的 `try/catch` 吞成 `false` ⇒ 回环请求的 Origin 判定全线失败、`lib-ws-guard`/`lib-api-ban-guard` 联手报 8 条 `'origin'` 假绿反转 —— **搬常量记得回头查所有引用点**(`npx vitest run` 同跑两个相关套件才能暴露,单跑是绿的)。
 - **空远端清单会让差集判成"一致"**:`awk 'NR==FNR{seen[$0]=1;next} !seen[$0]'` 在第一份文件为空时把空集合当"全都见过" ⇒ `N=0` ⇒ 打印"✅ 后端与服务器一致"还返回 0(**又一类静默假绿**,与 `cmd | tail` 的 `$?` 同型)。backend-sync 改 `grep -vxF -f`(无匹配模式=一份都不差,失败方向正确),并用它的**退出码**当结论(0 有差异 / 1 完全一致 / >1 出错),`set -e` 用 `set +e … set -e` 局部包住。**写"比清单"的代码时,空输入必须自己想清楚算一致还是算失败**。

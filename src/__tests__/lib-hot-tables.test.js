@@ -863,3 +863,109 @@ describe('⑦ 对账脚本 scripts/admin/table-parity.cjs 的三种退出码', (
     expect(noTables.out).toContain('表尚未建立');
   });
 });
+
+// =====================================================================
+// ⑧ 线上第一次真数据对账暴露的两处形状差(2026-10-13)
+// 本地 30 条用例全绿,线上第一次跑真数据就红了 177 行:不是行丢了,是**同一行的两种写法**——
+//   · `view_mode TEXT` 收到 JS number 0,better-sqlite3 按 double 绑定,SQLite 的 TEXT 亲和
+//     把它写成 '0.0';源里是数字 0 ⇒ 永远对不上(file 信道 158 行)。
+//   · `brand` 源里既可能是字符串也可能是 UA 解析出的对象:对象被 textCol 存成 JSON 文本,
+//     读回却是裸字符串,而 normText(对象) == '[object Object]' 会把两个不同品牌判成相等
+//     (gate 8 行 / clicks 11 行)。⇒ 判据本身也有精度窟窿。
+// 迁移文件已经在线上跑过,**改它一个字就会被校验和闸门拒绝**,所以列类型不动,归一放读写两侧。
+describe('⑧ 表行必须回到源的那个域(线上真数据撞出来的两条)', () => {
+  const HOUR = 3600 * 1000;
+  it('数字 viewMode 落 TEXT 列再读回 ⇒ 还是数字,不是 "0.0"', () => {
+    clearTables();
+    const t = NOW - 2 * HOUR;
+    shadow.fileError({
+      id: 'shape-vm-1',
+      t,
+      lastT: t,
+      count: 3,
+      type: 'network',
+      message: 'm',
+      source: 's',
+      lineno: 0,
+      colno: 0,
+      viewMode: 0,
+    });
+    // 直接看列的原始形状:写入侧已改成 textCol,新行存 '0' 而不是 '0.0'
+    const raw = sqlite
+      .getDb()
+      .prepare("SELECT view_mode FROM client_errors WHERE channel='file' AND src_id='shape-vm-1'")
+      .get();
+    expect(raw.view_mode).toBe('0');
+    expect(repoErrors.readFileAll()[0].viewMode).toBe(0);
+  });
+
+  it("历史行里已经落成的 '0.0' ⇒ 读回归一成数字(不删数据、不改列类型也能对得上源)", () => {
+    clearTables();
+    const t = NOW - 3 * HOUR;
+    sqlite
+      .getDb()
+      .prepare(
+        "INSERT INTO client_errors (channel, src_id, t, last_t, count, type, message, source, view_mode) VALUES ('file','legacy-00',?, ?,1,'js','m','s','0.0')"
+      )
+      .run(t, t);
+    expect(repoErrors.readFileAll()[0].viewMode).toBe(0);
+  });
+
+  it('brand 是对象 ⇒ 读回还是对象;是字符串 ⇒ 原样;两种品牌不会被抹平成同一个', () => {
+    clearTables();
+    const t = NOW - 4 * HOUR;
+    shadow.gateError({
+      t,
+      dk: 'dkA',
+      name: '访客',
+      ip: '1.1.1.1',
+      brand: { brand: 'Mac', model: 'Mac', full: 'Mac' },
+      msg: '',
+      src: '',
+      line: 0,
+      ua: 'UA',
+    });
+    shadow.gateError({
+      t: t + 1,
+      dk: 'dkB',
+      name: '访客',
+      ip: '2.2.2.2',
+      brand: '其他安卓',
+      msg: '',
+      src: '',
+      line: 0,
+      ua: 'UA',
+    });
+    const rows = repoErrors.readGateTail(10);
+    expect(rows[0].brand).toEqual({ brand: 'Mac', model: 'Mac', full: 'Mac' });
+    expect(rows[1].brand).toBe('其他安卓');
+    // 判据的精度:对象品牌走 JSON 签名,不是 String(对象) 的 '[object Object]'
+    const sigA = JSON.stringify({ brand: 'Mac', model: 'Mac', full: 'Mac' });
+    expect(sigA).not.toBe(JSON.stringify({ brand: 'Xiaomi', model: 'X', full: 'Y' }));
+  });
+
+  it('影子写的形状与源逐字段一致(clicks 的 brand 对象 + file 的数字 viewMode)', () => {
+    clearTables();
+    const t = NOW - 5 * HOUR;
+    repoClicks.insertMany([
+      {
+        t,
+        dk: 'dkC',
+        name: '访客',
+        ip: '3.3.3.3',
+        geo: '未知',
+        ua: 'UA',
+        brand: { brand: 'HONOR', model: 'HONOR', full: 'HONOR' },
+        dev: {},
+        fp: { tz: -480 },
+        link: 'L',
+        url: 'https://e.com',
+        pos: { x: 13.6, y: 1.6, z: 20.7 },
+      },
+    ]);
+    const c = repoClicks.readAll()[0];
+    expect(c.brand).toEqual({ brand: 'HONOR', model: 'HONOR', full: 'HONOR' });
+    expect(c.pos).toEqual({ x: 13.6, y: 1.6, z: 20.7 });
+    expect(c.fp).toEqual({ tz: -480 });
+  });
+});
