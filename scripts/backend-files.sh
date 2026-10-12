@@ -12,7 +12,12 @@
 #   将来 lib/ 里落出 .db / .json / .env / 备份之类**不该进 web root**的文件时,默认不跟着传。
 #   传错一次就是源码或数据外泄的起点(本仓库有 .bak 被公网回传的前科)。
 #   公网侧整个 lib/ 目录段由 lib/security.js 的 staticDenied() 按首段挡成 404,子目录同样在射程内。
+#
+# scripts/admin/table-parity.cjs 是唯一被点名带上服务器的脚本(R1"切读"的判据工具):
+#   它按 __dirname/../.. 解析仓库根,只有放在 <根>/scripts/admin/ 才跑得起来,而线上读的是
+#   服务器上的 gate_data.db —— 不在盒子上就没法判"能不能切读"。它只读(readonly + fileMustExist),
+#   不写不锁;公网侧 `scripts` 首段与 `*.cjs` 后缀被 staticDenied() 各挡一次,双重。
 backend_files() {
-  printf '%s\n' server.js src/shared/mediarules.mjs
+  printf '%s\n' server.js src/shared/mediarules.mjs scripts/admin/table-parity.cjs
   find lib -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.sql' \) 2>/dev/null | sort
 }
