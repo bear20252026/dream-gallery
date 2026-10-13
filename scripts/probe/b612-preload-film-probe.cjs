@@ -63,16 +63,42 @@ function startServer() {
   ok('预加载在电影期间完成(≤75s)', preDoneAt > 0, '完成于开播后 ' + preDoneAt + 'ms');
   ok('预加载期间零渲染(FPS=0 且画布隐藏)', zeroRender, '采样 ' + samples + ' 次');
 
-  // ③ skip 电影 → 世界应秒启
+  // ③ skip 电影 → 世界**接棒**(worldStarted + 主画布显形)。FPS>0 只计时报告、不做断言:
+  //    headless 没有 GPU,`rnd.compileAsync()` 在 SwiftShader 上要编全站着色器,首帧 20-40s 是
+  //    常态 ⇒ 拿"第一帧"当闸门等于测显卡,不测代码。2026-10-14 A/B 实测(three 移出入口前/后各跑
+  //    一次):20785ms vs 21029ms,差值在噪声内 —— 旧断言 `bootMs < 15000` 因此在**改动前后都假红**,
+  //    既守不住回归也报不了警。(真正兜住"动态 import 失败"的是上面②:preloadWorld 里那 7 个
+  //    模块的 Promise.all 一 reject 就永远到不了 'done'。)
+  //    ⚠️ waitForFunction 默认按 rAF 轮询 ⇒ 这两个数都是**上界**(headless 帧率低会把读数抬高);
+  //    12s 预算判的是"接棒有没有卡住",不是精确耗时。
   await page.click('#b612film #fSkip').catch(() => {});
   const skipAt = Date.now();
-  await page.waitForFunction(
-    () => window.__ctx && window.__ctx.loopManager && window.__ctx.loopManager.getFPS && window.__ctx.loopManager.getFPS() > 0,
-    null, { timeout: 60000 }
-  );
-  const bootMs = Date.now() - skipAt;
+  let handoffMs = -1;
+  try {
+    await page.waitForFunction(
+      () =>
+        window.__bootState &&
+        window.__bootState.worldStarted &&
+        (document.getElementById('c') || { style: {} }).style.visibility === 'visible',
+      null,
+      { timeout: 15000 }
+    );
+    handoffMs = Date.now() - skipAt;
+  } catch (e) {}
+  let fpsMs = -1;
+  try {
+    await page.waitForFunction(
+      () => window.__ctx && window.__ctx.loopManager && window.__ctx.loopManager.getFPS && window.__ctx.loopManager.getFPS() > 0,
+      null,
+      { timeout: 90000 }
+    );
+    fpsMs = Date.now() - skipAt;
+  } catch (e) {}
   const world = await page.evaluate(() => window.__ctx.scene.activeWorld);
-  ok('skip 后世界启动(' + bootMs + 'ms,activeWorld=' + world + ')', bootMs < 15000 && world === 'main');
+  ok(
+    'skip 后世界接棒(' + handoffMs + 'ms,activeWorld=' + world + ')' + (fpsMs >= 0 ? ',首帧 ' + fpsMs + 'ms 仅参考' : ',首帧未在 90s 内出像素'),
+    handoffMs >= 0 && handoffMs < 12000 && world === 'main'
+  );
 
   ok('无未捕获页面异常', errs.length === 0);
   if (errs.length) console.log('页面异常:\n' + errs.slice(0, 6).join('\n'));
