@@ -78,6 +78,8 @@ write_state() {
 # 任何一步栽在 set -e 上都要留下"到哪一步为止"的快照,否则失败即失忆
 on_exit() {
   rc=$?
+  # 部署锁只释放自己拿到的那一把(见下面 acquire_lock 的注释)
+  if [ -n "$LOCK_MINE" ] && [ -d "$LOCK_DIR" ]; then rm -rf "$LOCK_DIR"; fi
   write_state
   if [ "$rc" != "0" ]; then
     echo ""
@@ -197,9 +199,44 @@ if [ "$DO_PIN" = "1" ]; then
   exit 0
 fi
 
+# trap 必须**先于拿锁**装上:否则"拿到锁之后、真正开跑之前"的任何失败(私钥找不到、
+# 构建挂了)都会把锁留在盘上,让下一次部署白等 20 分钟 —— 防并发的闸门自己不能成为新的堵点。
+trap on_exit EXIT   # 单一 EXIT trap:释放部署锁 + 删临时兜底私钥 + 落状态快照 + 失败时点名发到哪一步
+
+# ---- 同一时刻只允许一次部署(2026-10-14 实战:两次部署并发把线上打挂过)----
+# 事故经过:一次 deploy 在后台跑,我以为它"停在第 3 步"就又起了第二次。两次都在做第 4/5 步
+# (上传 dist.tar.gz → 在 /opt/gallery 解包 → 差集清理残留),彼此把对方刚解包的文件当成
+# "该删的残留":线上 index.html 直接消失、assets 只剩 6 个文件,首页 404。
+# ⚠️为什么按**锁的年龄**而不是 PID 判活:Git Bash 里 kill -0 对另一个终端的 Windows PID 不可靠,
+#   而"误判成已经死了"正是这次事故的方向;"还活着"最多多等 20 分钟,且提示会写清怎么确认。
+# 单靠"我自己注意别并发"不成立:脚本被中断、终端被关掉、后台任务被判成完成,都会让人真心以为
+# 上一次已经结束了。所以锁落在文件系统上,由 mkdir 的原子性保证。
+LOCK_DIR="$ROOT_DIR/.tmp/deploy.lock"
+LOCK_STALE_AFTER=${LOCK_STALE_AFTER:-1200} # 20 分钟(整次部署实测 3-6 分钟,留 3 倍余量)
+mkdir -p "$ROOT_DIR/.tmp"
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  NOW=$(date +%s)
+  INFO="$(cat "$LOCK_DIR/who" 2>/dev/null || echo '')"
+  STAMP="${INFO%% *}"
+  HPID="${INFO##* }"
+  AGE=$(( NOW - ${STAMP:-0} ))
+  if [ "$AGE" -lt "$LOCK_STALE_AFTER" ]; then
+    echo "❌ 已经有一次部署在跑(PID=${HPID:-未知},已 ${AGE}s)。两次部署会并发写 /opt/gallery,"
+    echo "   彼此的\"差集清理\"会把对方刚解包的文件当残留删掉 —— 2026-10-14 就是这么把首页弄成 404 的。"
+    echo "   先等那一次跑完;若确认它的进程【已经死了】,删掉这把锁再发:  rm -rf $LOCK_DIR"
+    echo "   (超过 ${LOCK_STALE_AFTER}s 的锁会被自动接管,那时基本可以断定是残留。)"
+    exit 1
+  fi
+  echo "⚠️  锁存在 ${AGE}s > ${LOCK_STALE_AFTER}s,按残留接管(原 PID=${HPID:-未知})"
+  rm -rf "$LOCK_DIR"
+  mkdir "$LOCK_DIR" || { echo "❌ 接管部署锁失败"; exit 1; }
+fi
+echo "$(date +%s) $$" > "$LOCK_DIR/who"
+LOCK_MINE=1
+export DEPLOY_LOCK_HELD=1 # backend-sync.sh 认这个标记:被本次部署调用时不必再看锁
+
 pick_key
 build_ssh_args
-trap on_exit EXIT   # 单一 EXIT trap:删本脚本临时抽取的兜底私钥 + 落状态快照 + 失败时点名发到哪一步
 
 echo "=== 版本戳(仅本地 echo,便于线上核对;真正的线上校验姿势见 AGENTS:取 index.html 实际引用的 chunk 去 grep 哈希) ==="
 COMMIT_SHORT="$(git rev-parse --short HEAD 2>/dev/null || echo 'unknown')"

@@ -55,6 +55,21 @@ KNOWN_HOSTS="${KNOWN_HOSTS:-$ROOT_DIR/scripts/known_hosts}"
 BACKUP_ROOT="${BACKUP_ROOT:-/opt/gallery-backups/backend}"
 KEEP_BACKUP="${KEEP_BACKUP:-10}"
 
+# ---- 别在一次 deploy 进行中另开一次后端同步(2026-10-14 首页 404 事故的连带防线)----
+# deploy.sh 拿锁后会 export DEPLOY_LOCK_HELD=1,被它调用时直接放行;独立运行(手工运维、探针脚本)
+# 若撞上"有一次部署正在跑",必须停手 —— 两次同时写 /opt/gallery 的教训已经吃过一次。
+if [ -z "${DEPLOY_LOCK_HELD:-}" ] && [ -d "$ROOT_DIR/.tmp/deploy.lock" ]; then
+  INFO="$(cat "$ROOT_DIR/.tmp/deploy.lock/who" 2>/dev/null || echo '')"
+  HPID="${INFO##* }"
+  AGE=$(( $(date +%s) - ${INFO%% *} ))
+  if [ "${AGE:-0}" -lt "${LOCK_STALE_AFTER:-1200}" ]; then
+    echo "❌ 有一次 deploy 正在跑(PID=${HPID:-未知},已 ${AGE}s)。后端同步请等它结束再做;"
+    echo "   并发同步的代价见 AGENTS 的 2026-10-14 事故条目(线上首页被差集清理删掉过)。"
+    echo "   确认那次进程已经死了:rm -rf $ROOT_DIR/.tmp/deploy.lock"
+    exit 1
+  fi
+fi
+
 # 密钥:deploy.sh 传入则直接用;独立运行按优先级解析。
 # ⚠️2026-10-12:删除"从桌面交接笔记 markdown 里 awk 出明文私钥写到 /tmp"的兜底(审计第二批
 #   「清理部署私钥的明文回退路径」)。那个临时文件一旦脚本崩溃就留在世界可读目录里,而源头

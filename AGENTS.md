@@ -14,6 +14,14 @@
 | G 存档码缺校验 | **误报** | `chapter-map-logic.mjs:123-142` 有前缀白名单 + `SAVE_FIELDS` 14 键白名单 + 逐类型强转钳位,`applySave` 只遍历白名单 ⇒ 注不进任意键;`store-api.js:230` 的 `entry(name)` 未登记即抛 = 第二道。**真缺口审计没说中**:无输入长度上限、导入前不备份当前进度 |
 | H CSP `unsafe-inline` | 事实成立 | 全站 20 页 69 个内联事件属性 + 30 个内联块(≈95KB);`lib/security.js` 是**全局单一 CSP**,零路径分支、零 nonce。⚠️审计说"分阶段先去内联"方向对,但它的前提有误:**CSP3 规定 `script-src` 一旦出现 nonce/hash,支持它的浏览器就忽略 `unsafe-inline`** ⇒ 上 nonce 本身就是一次真收紧,不必等内联清完 |
 
+### 2026-10-14 线上事故(我自己造成的,已恢复 + 已上闸门):两次 deploy 并发把首页打成 404
+
+- **现象**:第 2 次 `deploy.sh` 跑到 8/8 报 `首页 HTTP:404`;服务器上 `/opt/gallery/index.html` **不存在**、`assets/` 只剩 6 个文件(应有 88),`/healthz` 正常 ⇒ 后端活着,前端被删空。中断时长约 **4 分钟**(从第二次启动到第三次单线程发完并复验 200)。
+- **根因**:前一次 deploy 在后台任务里"看起来结束了"(外层报 completed exit 0,日志只写到第 3 步),我据此认为它已经停了,于是又起一次。**两次都在做第 4/5 步**:上传 `dist.tar.gz` → 在 `/opt/gallery` 解包 → 按差集清理残留。彼此把对方刚解包出来的文件当成"该删的残留",`index.html` 与 assets 就在交叉删除里没了。这不是 prune 逻辑的 bug(它算的差集是对的),是**并发执行**让它拿着半套清单去清理。
+- **修复(闸门,不是承诺)**:`deploy.sh` 开局用 `mkdir .tmp/deploy.lock` 的原子性拿锁,锁内写 `epoch pid`;`on_exit` 释放;**`trap` 装在拿锁之前**,否则"拿到锁之后才失败"会把锁留在盘上变成新的堵点。判活**按锁的年龄而不是 PID**:`kill -0` 在 Git Bash 里对另一个终端的 Windows PID 不可靠,而"误判成已死"正是这次的方向;"误判成还活着"最多多等 20 分钟,提示里写清怎么手工确认与解锁(`rm -rf .tmp/deploy.lock`)。`backend-sync.sh` 独立运行时也看这把锁,被 deploy 调用则认 `DEPLOY_LOCK_HELD=1` 放行(否则自锁死)。四条路径都测过:年轻锁 ⇒ deploy `exit 1` 且**没碰服务器**、`DEPLOY_LOCK_HELD=1` ⇒ 放行、5000s 的残留锁 ⇒ 接管、接管后私钥不可用 ⇒ 失败并**已释放锁**。
+- **登记为纪律的判据**:"外层命令的 exit code / 后台任务通知" 不等于 "脚本自己的结论"。deploy 的结论只有两个来源 —— stdout 里的 **`DEPLOY_OK <sha>` / `DEPLOY_FAILED exit=N`** 与 **`.tmp/deploy-state.env`** 的字段(这次若早看快照,`FRONTEND=not-run` 就会告诉我上一次根本没跑完,而不是"跑完了")。发布后一律再 `curl -o /dev/null -w %{http_code} https://cloudbear.cloud/` 亲自读一次首页。
+
+
 ### 本轮已落地(2026-10-14)
 
 - **F 归属地(已上线复验)**:`2739e3b` 删掉 `admin.geoLookup` 与那条 ip-api 外呼,新增 `lib/geoip.js` 只读 Cloudflare `cf-ipcountry`(零出网、零新依赖),`store.trustedProxy(req)` 从 `realIP` 内部抽出成导出以复用同一信任判定。线上实测 `GET /api/admin/list` 带 `geo={header,noHeader,noProxy,local,overwritten,entries:710,source:"cloudflare-cf-ipcountry",outbound:false}`,漂移复核 53/53、卫生探针 24/24、SW 探针 14/14。**读数语义要说全**:国家标签只会随**回访者**逐条补上(现在 entries 里仍是 http 时代的历史值 + 「未知」),不是我上线当天就有 710 条国家标签;旧的「未知」占位要等后台 `clear-geo` 或 geo 90 天保留期才走。**新增纪律**:列表接口不许再顺手写库/发外呼(`handleAdminList` 现为纯读)。
