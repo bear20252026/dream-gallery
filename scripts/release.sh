@@ -215,14 +215,21 @@ git push -u origin "$CUR"
 
 PR_TITLE=$(head -n 1 "$MSG")
 PR_BODY=$(sed -n '2,$p' "$MSG" | head -n 60)
-PR_JSON=$("$GH_BIN" pr create --base main --head "$CUR" --title "$PR_TITLE" --body "$PR_BODY" --json number,url 2>&1) || {
-  echo "❌ 开 PR 失败(gh 未登录/离线/网络?):"; printf '%s\n' "$PR_JSON" | head -6
+# ⚠️不要用 `gh pr create --json ...`:本机这版 gh 的 pr create **没有 --json**(2026-10-14 真实运行
+#   实锤 "unknown flag: --json")。它默认就把 PR 的 URL 打到 stdout,编号从 URL 尾巴上取;
+#   取不到编号就 fail-closed 停手(绝不猜一个编号去合并 —— 那可能合掉别人的 PR)。
+PR_OUT=$("$GH_BIN" pr create --base main --head "$CUR" --title "$PR_TITLE" --body "$PR_BODY" 2>&1) || {
+  echo "❌ 开 PR 失败(gh 未登录/离线/网络?):"; printf '%s\n' "$PR_OUT" | head -6
   echo "   分支已推送($CUR),没有合并、没有部署。可以在 GitHub 上手工开 PR 再合。"
   echo "RELEASE_FAILED(未合并、未部署)"; exit 1; }
-PR_NUM=$(printf '%s' "$PR_JSON" | sed -n 's/.*"number":[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
-PR_URL=$(printf '%s' "$PR_JSON" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p' | head -1)
-[ -n "$PR_NUM" ] || { echo "❌ 从 gh 的输出里没读出 PR 编号,停手(不猜测编号去合并)"; echo "RELEASE_FAILED"; exit 1; }
-echo "→ PR #$PR_NUM ${PR_URL:-} (head=$HEAD_SHA)"
+PR_URL=$(printf '%s' "$PR_OUT" | grep -oE 'https?://[^[:space:]]+/pull/[0-9]+' | head -1)
+PR_NUM=${PR_URL##*/}
+case "$PR_NUM" in
+  ''|*[!0-9]*)
+    echo "❌ 从 gh 的输出里没解析出 PR 编号,停手(不猜编号去合并)。原始输出:"; printf '%s\n' "$PR_OUT" | head -6
+    echo "RELEASE_FAILED(未合并、未部署)"; exit 1 ;;
+esac
+echo "→ PR #$PR_NUM $PR_URL (head=$HEAD_SHA)"
 
 echo "=== 7/9 闸门:required checks 绿了才合并(闸门挪到 GitHub 那边,不再靠我自觉) ==="
 if [ "$CI_GATE" = "0" ]; then
