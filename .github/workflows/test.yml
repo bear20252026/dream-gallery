@@ -65,6 +65,16 @@ jobs:
       - name: Dependency-cruiser boundary check (config existed since 2026-09; wired into CI 2026-10-08)
         run: npm run depcruise
 
+      - name: Backend deploy manifest guard (BLOCKING — 部署清单必须覆盖真实依赖)
+        # 2026-10-12 查出并被修掉的发布阻断级缺陷:backend-sync.sh 的清单原本写死 `lib/*.js`,而 glob
+        # 不递归 ⇒ R1/R2 拆出的 lib/repo、lib/upload、lib/migrations 一个都不会被上传。照那份清单发布,
+        # 线上 server.js → lib/store → lib/shadow → lib/repo/chat 直接 Cannot find module,pm2 反复重启
+        # = 全站 502,而 md5 差集、上传、漂移复核会全部绿灯(清单本身从没往那些子目录看一眼)。
+        # 守卫已接进 backend-sync.sh / verify-drift.sh,但那两条**只有人手工跑部署时才会执行**;
+        # CI 这一条把同一个判定提前到 PR 上,漏传在合并前就变红,而不是等到发布那天。
+        # 判据取 dependency-cruiser 解析的真实依赖图(与上面那道 no-circular 同一解析器,不是人记的目录名)。
+        run: node scripts/admin/check-backend-manifest.cjs
+
       - name: Vitest unit tests
         run: npm run test:unit
 

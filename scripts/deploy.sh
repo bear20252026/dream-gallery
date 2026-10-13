@@ -307,7 +307,11 @@ rm -f /tmp/dist.tar.gz
 # 安全垫:main-*.js 按 mtime 最新 3 个
 ls -t assets/main-*.js 2>/dev/null | head -n 3 | xargs -n1 basename 2>/dev/null | sort > /tmp/_keepmain.$SUF || true
 # assets 差集:在服务器上但不在本次清单里的
-ls -1 assets 2>/dev/null | sort > /tmp/_srv_assets.$SUF
+# 只收**文件**:assets/ 下本来就允许有子目录(icons/ textures/ wise_zzz/ 这类手工放的资源目录),
+# 它们天然不在本次 tar 清单里 ⇒ 老写法 `ls -1 assets` 会把目录名也当成残留送去 rm -f,
+# 于是每次部署都刷一串 "rm: cannot remove 'icons': Is a directory"(2026-10-13 实测)——
+# 既不删也不中止,纯噪音;而噪音的真正代价是"真残留被埋在噪音里没人看"。目录一律不参与清理。
+find assets -maxdepth 1 -type f -printf '%f\n' 2>/dev/null | sort > /tmp/_srv_assets.$SUF
 comm -23 /tmp/_srv_assets.$SUF "$RA" > /tmp/_assets_cand.$SUF
 # 从候选里扣掉"最新 3 个 main 安全垫"(keepmain 为空则一条都不扣;|| true 防 grep 无输出时误退回整份候选)
 grep -vxF -f /tmp/_keepmain.$SUF /tmp/_assets_cand.$SUF > /tmp/_assets_del.$SUF || true
