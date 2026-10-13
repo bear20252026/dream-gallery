@@ -373,3 +373,18 @@ describe('测试隔离', () => {
     expect(fs.existsSync(process.env.GATE_DATA_FILE)).toBe(true);
   });
 });
+
+describe('三道闸常量的唯一出处(2026-10-13 搬到 lib/config.js 之后)', () => {
+  const config = require('../../lib/config.js');
+  const siteconfig = require('../../lib/siteconfig.js');
+  // 搬到叶子层是因为后台要显示"已用 n / 上限"的读数,而 admin → siteconfig 会成环。
+  // 搬完之后只允许有一份值:这条断言防的是"后来人又在 siteconfig 里写回一个字面量"
+  // —— 那样面板显示的上限与真实判定会悄悄分叉(而且两边看着都对)。
+  // 判定本身(铺满 USER_LINKS_MAX ⇒ 503 且不落盘)由上面第 ③ 组用例钉着,不在此重复。
+  it('siteconfig re-export 的就是 config.js 里那几个数,不是各写一份字面量', () => {
+    expect(siteconfig.USER_LINKS_PER_PERSON).toBe(config.USER_LINKS_PER_PERSON);
+    expect(siteconfig.USER_LINKS_MAX).toBe(config.USER_LINKS_MAX);
+    expect(siteconfig.MYLINKS_RATE).toBe(config.MYLINKS_RATE);
+    expect(config.USER_LINKS_MAX).toBe(300); // 量级主人未拍板改动;要改连文档一起改(AGENTS/ADMIN_GUIDE 各一处)
+  });
+});

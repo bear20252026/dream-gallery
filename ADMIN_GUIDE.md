@@ -13,7 +13,7 @@
   ② 43 条"提前预热"链接少写了一个属性(`crossorigin`),导致预热的文件和随后真正使用它的请求**不是同一个缓存键**,永远互不命中 ⇒ 最大的两个 JS(three 231KB、main 126KB)各下两遍。补上后本地同条件复测:重复下载 0 次、首屏入网 2855KB → 1632KB。
   ⚠️ 这条修正在**前端与构建配置**里,要等下一次发布才到访客手上;新增的 `boot-cost-probe` 会把"又有人把 `crossorigin` 删了 / 又多了个白下的大文件"直接判成失败。
 - **紧急开关汇总(环境变量)**:`TOKEN_QUERY=0`(公网禁 query 传 token,生产已启用)、`DISK_MIN_FREE_BYTES`(默认 2GB,低于它就拒匿名上传)、`UPLOAD_MAX_INFLIGHT`(默认 4)、`RETENTION_DISABLED=1`、`RETENTION_DELETE_APPLICANTS=1`(默认关,只打标记)、`R2_OUTBOX_DISABLE=1`、`NSFW_MODERATE=1`。⚠️ 开着 `TOKEN_QUERY=0` 时,白板页请从画廊内正常进馆后打开(吃访客 Cookie);旧的"甩一个 `whiteboard.html?token=<TOKEN>` 链接"仍然可用(走后台权限),但**别把带 token 的 URL 发进聊天/群**——它会留在浏览器历史与访问日志里。
-- **不是环境变量、写死在代码里的数**:`USER_LINKS_PER_PERSON=10` / `USER_LINKS_MAX=300` / `MYLINKS_RATE=20`(都在 `lib/siteconfig.js:187-189`)。要调这几个口径得改代码再发布——告诉我数字即可,别自己在服务器上改。
+- **不是环境变量、写死在代码里的数**:`USER_LINKS_PER_PERSON=10` / `USER_LINKS_MAX=300` / `MYLINKS_RATE=20`(2026-10-13 起定义在 `lib/config.js`,`lib/siteconfig.js` 只是 re-export ⇒ 全仓只有一份值)。要调这几个口径得改代码再发布——告诉我数字即可,别自己在服务器上改。
 
 ## 2026-10-03 发布版本
 
@@ -140,7 +140,7 @@
 | `NSFW_MODERATE` | 关 | 设 `1` 开启上传图片 AI 审核(有调用成本)。**2026-10-11 语义变更**:审核已开却**拿不到结论**(AI 全通道失败/超时/取样失败)时,匿名公开展品(白板)改为 **fail-closed**——文件保留但挂 `pending`、不上墙也不下发,复核通过后自动回归;私人上传仍按"自己看自己"放行。默认关这一成本策略不变 |
 | `DISK_MIN_FREE_BYTES` | 2GB | **2026-10-12 新增**:目标盘(photo/video 所在目录)剩余低于此 ⇒ 匿名上传一律 503 + `Retry-After`,**此时一个字节都没写**;`DISK_MAX`(旧的水位线)从"只预警"升为真拦截。**你的后台 token 上传豁免**(归档批量是正当负载)。`statfs` 读不到时(某些容器/特殊挂载)只保留并发闸并告警一次,不阻断服务 |
 | `UPLOAD_MAX_INFLIGHT` | 4 | **2026-10-12 新增**:进程内同时写盘的请求数上限(2 核小机的实测口径)。超出的匿名上传直接被拒并记一条预警。没带 `Content-Length` 的匿名请求按 8MB 预约额度——**没声明就不给匿名体积开空头**;漏还的槽位由 5 分钟兜底闸自动回收 |
-| 访客链接三上限 | 10 / 300 / 20 | ⚠️**不是环境变量**,是 `lib/siteconfig.js` 里的常量 `USER_LINKS_PER_PERSON` / `USER_LINKS_MAX` / `MYLINKS_RATE`(2026-10-12 起生效:每人 10 条按归属身份计、全站 300 条在写库之前拒、每 IP 每分钟 20 次)。要调口径改代码并发布 |
+| 访客链接三上限 | 10 / 300 / 20 | ⚠️**不是环境变量**,是 `lib/config.js` 里的常量 `USER_LINKS_PER_PERSON` / `USER_LINKS_MAX` / `MYLINKS_RATE`(2026-10-12 起生效:每人 10 条按归属身份计、全站 300 条在写库之前拒、每 IP 每分钟 20 次)。要调口径改代码并发布。**后台「展示区 → 访客链接」现在带读数**:面板顶部「已用 n / 全局硬上限 300」,用到八成提示「留意」,满了红字「访客再添加会收到 503,需在这里删几条」。 |
 | 分片视频补转 | 3 / 每小时 | `VID_NORMALIZE_MAX`(每轮最多捡几个)与 `VID_NORMALIZE_SCAN_MS`(间隔)是环境变量;**参与补转的文件名清单不是环境变量,是代码里的常量 `lib/upload/transcode.js` 的 `NORMALIZE_EXT`**(现含 mov/m4v/mkv/avi/flv/wmv/ts/m2ts/3gp/mpg/mpeg,**不含 mp4 与 webm**——它们本来就能播)。要加或减格式改这一处 |
 
 ## 服务器与部署纪律

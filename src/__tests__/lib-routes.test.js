@@ -19,7 +19,9 @@ process.env.GATE_DATA_FILE = path.join(
 );
 
 const { ROUTES, dispatch } = await import('../../lib/routes.js');
-const { TOKEN } = await import('../../lib/config.js');
+// config.js 是这三道闸常量的唯一出处(2026-10-13);siteconfig 只是 re-export
+const { TOKEN, USER_LINKS_MAX, USER_LINKS_PER_PERSON, MYLINKS_RATE } =
+  await import('../../lib/config.js');
 
 function mockRes() {
   const res = {
@@ -133,6 +135,18 @@ describe('dispatch 鉴权行为', () => {
   it('token 路由:正确 token(x-token 头)→ 放行', () => {
     const { res } = hit('GET', '/api/admin/list', { 'x-token': 'vitest-token-abc' });
     expect(res.code).not.toBe(401);
+  });
+
+  it('后台列表带出访客链接三道闸的读数(linkCaps),数字与 lib/config.js 那一份常量一致', () => {
+    const { res } = hit('GET', '/api/admin/list', { 'x-token': 'vitest-token-abc' });
+    const body = JSON.parse(res.body || '{}');
+    // 面板只显示"已用 n / 上限",上限这个数**不由前端抄**:两边都从 config.js 那一处来
+    expect(body.linkCaps).toBeTruthy();
+    expect(Array.isArray(body.userLinks)).toBe(true);
+    expect(body.linkCaps.used).toBe(body.userLinks.length);
+    expect(body.linkCaps.max).toBe(USER_LINKS_MAX);
+    expect(body.linkCaps.perPerson).toBe(USER_LINKS_PER_PERSON);
+    expect(body.linkCaps.ratePerMin).toBe(MYLINKS_RATE);
   });
 
   it('write 路由:TOKEN 已配置时无 token → 401(删除接口)', () => {

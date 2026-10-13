@@ -248,20 +248,41 @@ export function loadDisplay() {
     '<br><span style="opacity:.6;font-size:12px">在「文件管理」里对每张照片点「设为/取消演示」即可调整</span>';
   // 访客链接
   const ul = DATA.userLinks || [];
+  // 三道闸读数(值由服务端算好下发:上限常量只有一份,在 lib/config.js,前端不再抄一遍数字)
+  const caps = DATA.linkCaps || {};
+  // 全部按数字处理再拼进 HTML:面板这一段不插任何用户文本,数字化既是类型防御也是 XSS 的兜底
+  const capN = Number(caps.max) || 0;
+  const usedN = Number(caps.used) || 0;
+  const perN = Number(caps.perPerson) || 0;
+  const rateN = Number(caps.ratePerMin) || 0;
+  const capHint =
+    '<div class="empty" style="opacity:.75">' +
+    '访客链接已用 ' +
+    usedN +
+    (capN ? ' / 全局硬上限 ' + capN : '') +
+    (capN && usedN >= capN
+      ? ' —— <b style="color:#e69b9b">已满:访客再添加会收到 503</b>,需在这里删几条'
+      : capN && usedN >= capN * 0.8
+        ? ' —— 已用到八成,留意'
+        : '') +
+    (perN ? '<br>每人最多 ' + perN + ' 条(按登录身份计)' : '') +
+    (rateN ? ' · 每 IP 每分钟 ' + rateN + ' 次请求' : '') +
+    '</div>';
   const nameOf = (dk) => {
     const r = (DATA.applicants || []).find((a) => a.dk === dk);
     return r ? r.answer || r.brand || '访客' : '访客';
   };
   $('userLinks').innerHTML =
-    ul
-      .map(
-        (l) => `<div class="file-row">
+    capHint +
+      ul
+        .map(
+          (l) => `<div class="file-row">
     <span class="fname">[${esc(nameOf(l.dk))}] ${esc(l.name)} → <a href="${j(l.url)}" target="_blank" style="color:#8cf">${esc(l.url.slice(0, 42))}</a>
     <span class="fsize">${LINK_MODELS[l.model] || l.model || ''} · ${fmt(l.ts)}</span></span>
     <button class="btn-day" onclick="copyTxt('${j(l.url)}')">复制</button>
     <button class="btn-del" onclick="delUserLink('${l.id}')">删除</button></div>`
-      )
-      .join('') || '<div class="empty">暂无</div>';
+        )
+        .join('') || '<div class="empty">暂无</div>';
   // 链接点击记录(仅后台可见)
   const clicks = DATA.linkClicks || [];
   $('clickList').innerHTML =
