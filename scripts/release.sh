@@ -219,11 +219,24 @@ PR_BODY=$(sed -n '2,$p' "$MSG" | head -n 60)
 #   实锤 "unknown flag: --json")。它默认就把 PR 的 URL 打到 stdout,编号从 URL 尾巴上取;
 #   取不到编号就 fail-closed 停手(绝不猜一个编号去合并 —— 那可能合掉别人的 PR)。
 PR_OUT=$("$GH_BIN" pr create --base main --head "$CUR" --title "$PR_TITLE" --body "$PR_BODY" 2>&1) || {
-  echo "❌ 开 PR 失败(gh 未登录/离线/网络?):"; printf '%s\n' "$PR_OUT" | head -6
-  echo "   分支已推送($CUR),没有合并、没有部署。可以在 GitHub 上手工开 PR 再合。"
-  echo "RELEASE_FAILED(未合并、未部署)"; exit 1; }
-PR_URL=$(printf '%s' "$PR_OUT" | grep -oE 'https?://[^[:space:]]+/pull/[0-9]+' | head -1)
-PR_NUM=${PR_URL##*/}
+  # 分支上已经有 PR(上一次发布中途失败 ⇒ 本次在同一个 rel 分支上接着跑)⇒ 复用它,不算失败。
+  EXIST=$("$GH_BIN" pr view --json number,url 2>/dev/null || true)
+  case "$EXIST" in
+    *'"number"'*)
+      PR_URL=$(printf '%s' "$EXIST" | sed -n 's/.*"url":"\([^"]*\)".*/\1/p' | head -1)
+      PR_NUM=$(printf '%s' "$EXIST" | sed -n 's/.*"number":[[:space:]]*\([0-9][0-9]*\).*/\1/p' | head -1)
+      echo "ℹ️  分支 $CUR 上已有 PR #$PR_NUM(${PR_URL:-无 URL}),本次复用它"
+      ;;
+    *)
+      echo "❌ 开 PR 失败(gh 未登录/离线/网络?),而且这个分支上也没有可复用的 PR:"; printf '%s\n' "$PR_OUT" | head -6
+      echo "   分支已推送($CUR),没有合并、没有部署。可以在 GitHub 上手工开 PR 再合。"
+      echo "RELEASE_FAILED(未合并、未部署)"; exit 1 ;;
+  esac
+}
+if [ -z "${PR_NUM:-}" ]; then
+  PR_URL=$(printf '%s' "$PR_OUT" | grep -oE 'https?://[^[:space:]]+/pull/[0-9]+' | head -1)
+  PR_NUM=${PR_URL##*/}
+fi
 case "$PR_NUM" in
   ''|*[!0-9]*)
     echo "❌ 从 gh 的输出里没解析出 PR 编号,停手(不猜编号去合并)。原始输出:"; printf '%s\n' "$PR_OUT" | head -6
@@ -237,11 +250,28 @@ if [ "$CI_GATE" = "0" ]; then
   tail -n 1 .tmp/no-ci-audit.log 2>/dev/null || true
   "$GH_BIN" pr merge "$PR_NUM" --merge --admin || { echo "❌ 强制合并失败"; echo "RELEASE_FAILED(未部署)"; exit 1; }
 else
-  # --auto:GitHub 自己在 required checks 全绿的那一刻执行合并;不绿就一直挂着。
-  # ⚠️成败只读 `state` / `mergeCommit` 这些**字段** —— 绝不信 `gh pr checks --watch` 的退出码
-  #   (它断网也返回 0,AGENTS 里同型事故记过好几次于"cmd | tail 的 $? 属于 tail")。
-  "$GH_BIN" pr merge "$PR_NUM" --merge --auto --delete-branch || { echo "❌ 登记自动合并失败"; echo "RELEASE_FAILED(未部署)"; exit 1; }
-  echo "→ 已登记自动合并,等 GitHub 跑 build-and-test / smoke…"
+  # 不用 `--auto`:它是仓库级开关,本仓默认关着 ⇒ `GraphQL: Auto merge is not allowed for this
+  # repository`(2026-10-14 真实运行撞到)。改成自己按**字段**轮询 required checks,绿了才 merge。
+  # ⚠️required contexts 从分支保护**动态读**,不写死在脚本里 —— 写死就会在保护改了之后悄悄失配。
+  REPO_SLUG=$("$GH_BIN" repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)
+  [ -n "$REPO_SLUG" ] || { echo "❌ 取不到 owner/repo,无法读分支保护 ⇒ 闸门没有依据,不合并"; echo "RELEASE_FAILED(未部署)"; exit 1; }
+  REQ_CTX=$("$GH_BIN" api "repos/$REPO_SLUG/branches/main/protection" --jq '.required_status_checks.contexts[]' 2>/dev/null || true)
+  [ -n "$REQ_CTX" ] || { echo "❌ 读不到 required contexts(保护被改了/离线?)⇒ 判不了就不合,不部署"; echo "RELEASE_FAILED(未部署)"; exit 1; }
+  echo "→ required checks:$(printf '%s' "$REQ_CTX" | tr '\n' ' ')"
+  VERDICT=""
+  for i in $(seq 1 80); do
+    ROLL=$("$GH_BIN" pr view "$PR_NUM" --json statusCheckRollup 2>/dev/null || echo '')
+    VERDICT=$(printf '%s' "$ROLL" | node scripts/admin/checks-verdict.cjs "$REQ_CTX" 2>/dev/null || echo "ERROR 判定器跑不起来")
+    case "$VERDICT" in
+      PASS) break ;;
+      FAIL*) echo "❌ required checks 有红:$VERDICT"; echo "   看日志:gh pr view $PR_NUM --json statusCheckRollup | node scripts/admin/checks-verdict.cjs '<contexts>'  或  $PR_URL/checks"; echo "   结论:**不合并、不部署**(红了的项目根本进不了 main)。"; echo "   修好再跑本脚本;确实要强行上线:$0 --yes --no-ci=\"为什么\"(会署名进台账)"; echo "RELEASE_FAILED(未合并、未部署)"; exit 1 ;;
+      ERROR*) echo "❌ 判定器没有依据($VERDICT)⇒ 判不了不等于过,停手"; echo "RELEASE_FAILED(未部署)"; exit 1 ;;
+      *) echo "  CI 未完:$VERDICT (${i}/80)"; sleep 15 ;;
+    esac
+  done
+  [ "$VERDICT" = "PASS" ] || { echo "❌ 超时 20 分钟 required checks 仍未全绿($VERDICT);不合并、不部署"; echo "RELEASE_FAILED(未部署)"; exit 1; }
+  echo "✅ required checks 全绿 ⇒ 可以合并"
+  "$GH_BIN" pr merge "$PR_NUM" --merge --delete-branch || { echo "❌ 合并失败(即便绿了,GitHub 也可能因新 push 把结论判旧)"; echo "RELEASE_FAILED(未部署)"; exit 1; }
 fi
 STATE=""; MERGE_SHA=""
 for i in $(seq 1 80); do
@@ -250,7 +280,7 @@ for i in $(seq 1 80); do
   MERGE_SHA=$(printf '%s' "$VIEW" | sed -n 's/.*"oid":"\([0-9a-fA-F]\{40\}\)".*/\1/p' | head -1)
   if [ "$STATE" = "MERGED" ] && [ -n "$MERGE_SHA" ]; then break; fi
   if [ "$STATE" = "CLOSED" ]; then
-    echo "❌ PR 被关闭(自动合并会在 required checks 红时取消)⇒ 不部署。"
+    echo "❌ PR #$PR_NUM 是**关闭且未合并**的(有人在检查红之后关掉了它?)⇒ 不部署。"
     echo "   看是哪一步红:  gh pr checks $PR_NUM    或    ${PR_URL:-}/checks"
     echo "RELEASE_FAILED(未合并、未部署)"; exit 1
   fi
