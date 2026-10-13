@@ -22,9 +22,9 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const CDP_URL_TOTAL_MAX_KB = Number(process.env.MAX_TOTAL_KB || 2600); // 压缩后首屏总入网上限(今天实测 ~1.6MB 达标值 + 余量)
+const CDP_URL_TOTAL_MAX_KB = Number(process.env.MAX_TOTAL_KB || 1000); // 压缩后首屏总入网上限(2026-10-14 收紧;旧值 2600 是"three 还在入口静态图"时代定的,等于纵容回归)
 const DUP_KB_TOLERANCE = Number(process.env.MAX_DUP_KB || 0); // 允许的重复字节总量:0 = 一个字节都不许重复下
-const SINGLE_FILE_MAX_KB = Number(process.env.MAX_ONE_KB || 900); // 单个资源入网大小上限(gzip 后)
+const SINGLE_FILE_MAX_KB = Number(process.env.MAX_ONE_KB || 300); // 单个资源入网上限, gzip 后(2026-10-14 从 900 收到 300:旧值刚好"放行"three 那种 231KB 整包)
 const PORT = Number(process.env.PROBE_PORT || 3231);
 const ROOT = path.join(__dirname, '..', '..');
 

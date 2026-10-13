@@ -97,6 +97,39 @@ const corePreloadInject = () => ({
         ' 要改注入模板请连这条自检一起改。'
       );
     }
+    // —— 入口 chunk 里不许有 three(2026-10-14 第五轮审计 A 的构建期断言)——
+    // 断的是**静态**边:入口的 imports 图是浏览器解析 index.html 时就要取的模块,
+    // 里面出现 three(gzip 231KB)意味着闸门/电影这条不需要 3D 的路径也得先付这笔字节。
+    // 原来 main.js 有 7 条静态边直引 three(plane-flight / sheep-companion / scene10-fox / earth-day /
+    // ending-journey / audio-system / effects-system),已改到 preloadWorld() 里动态取。
+    // 只走 e.imports,不走 e.dynamicImports —— 后者本来就是允许的(世界阶段按需取)。
+    try {
+      const mf = JSON.parse(fs.readFileSync(resolve(__dirname, 'dist/.vite/manifest.json'), 'utf8'));
+      const seen = new Set();
+      const walkStatic = (key) => {
+        const e = mf[key];
+        if (!e) return;
+        const file = String(e.file || key);
+        if (seen.has(file)) return;
+        seen.add(file);
+        (e.imports || []).forEach(walkStatic);
+      };
+      walkStatic('index.html');
+      const heavy = [...seen].filter((f) => /(^|\/)(three|gltf-loader)-[^/]*\.js$/.test(f));
+      if (heavy.length) {
+        throw new Error(
+          '[entry-weight] 入口静态图里出现了 ' + heavy.join(', ') +
+          ' —— three 被静态边拖进了首屏(表现:index.html 的 imports 含 three-*;首屏多 ~231KB gzip)。' +
+          ' 修法:把引 three 的模块从 src/main.js 顶部的 import 挪进 preloadWorld() 的动态 import' +
+          '(第七个之前的教训:只搬玩法模块不够,core/audio-system 与 core/effects-system 也直引)。'
+        );
+      }
+      console.log('[entry-weight] 入口静态图 ' + seen.size + ' 个 chunk,不含 three ✓');
+    } catch (e) {
+      // 读不到 manifest 是环境问题(可降级);名字判出的"真在入口图里"是编程错误,必须打断构建。
+      if (e && String(e.message).startsWith('[entry-weight]')) throw e;
+      console.warn('[entry-weight] 跳过(读不到 manifest):' + e.message);
+    }
   },
 });
 

@@ -29,15 +29,11 @@ import { createChapterMap } from './ui/chapter-map.js'; // 章节地图 + 存档
 import { createStarMap } from './ui/star-map.js'; // 星图:点星飞过去(2026-10-04)
 import { createVoyage } from './ui/voyage.js'; // 旅途卡:一夜接一夜(2026-10-04)
 import { createJourneySystem } from './core/journey-system.js'; // 原著旅途交互与观察手札，组合根统一装配
-import { createPlaneFlight } from './scene/plane-flight.js'; // 可驾驶 Piper PA-18(2026-10-03)
-import { createSheepCompanion } from './scene/sheep-companion.js';
-import { createFoxScene } from './kunlun/scene10-fox.js'; // 站五·狐狸(2026-10-03)
-import { createEarthDay } from './kunlun/earth-day.js'; // 第 10 场 · 地球之日(2026-10-04)
-import { createEndingJourney } from './kunlun/ending-journey.js'; // 结局线:画册页→找井→告别→六年后(2026-10-03)
+// ↓ 这 7 个模块原先是**静态** import(原 32-36、38、40 行),是入口 chunk 里 three(895KB / gzip 231KB)
+//   的唯一来源:静态边 ⇒ 它们进了 index.html 的模块图 ⇒ 闸门/电影那条根本不需要 3D 的路径也得先付
+//   这笔字节(第五轮审计 A)。现在全部在 preloadWorld() 里动态取,顺序仍保持"先这 7 个、再核心链"。
 import { createInputSystem } from './core/input.js'; // 统一输入 facade(阶段1·P1-3)
-import { createAudioSystem } from './core/audio-system.js'; // 阶段2 垂直切片:空间音频积木(依赖注入,取代冻结 ctx 写)
 import { createPerfMonitorSystem } from './core/perf-monitor-system.js'; // 阶段3 切片:性能监控积木(单循环驱动,删死 ctx import)
-import { createEffectsSystem } from './core/effects-system.js'; // 阶段3 切片:粒子/烟花积木(从 LoopManager 上帝渲染器抽出,经 deps 注入)
 import { createMediaSystem } from './core/media-system.js'; // 阶段3 切片:媒体逐帧积木(音乐画布+视频纹理,从 LoopManager 上帝渲染器抽出,经 deps 注入)
 import { createStateSystem } from './core/state-system.js'; // 阶段3 切片:单向状态库(订阅事件总线,镜像命名空间状态进 game-state)
 import { createUiSystem } from './core/ui-system.js'; // 阶段3 切片:UI 域生命周期收口(组合根拥有 overlay 关闭/销毁出口)
@@ -182,6 +178,29 @@ expose('worldWiringState', () => ({
 async function preloadWorld() {
   if (preloadPromise) return preloadPromise; // 2026-09-07 修复:重复调用曾让组合根 init 多跑,系统全量重复装配
   preloadPromise = (async () => {
+    // —— 重模块动态取(2026-10-14 第五轮审计 A)——
+    // 这 7 个是入口 chunk 里 three 的全部来源(直引 three 的 7 条静态边;其余 gltf-loader /
+    // sheep-model / guide-arrow / ending-prince 都挂在它们下面)。放在**核心链之前** await,
+    // 是为了保住原有的相对顺序:原先它们在页面解析期就完成顶层副作用,一定早于任何世界模块。
+    // 并行 Promise.all 比原来更省事(以前是打进入口 chunk 的一个大文件,闸门期就得付完)。
+    const [
+      { createAudioSystem },
+      { createEffectsSystem },
+      { createPlaneFlight },
+      { createSheepCompanion },
+      { createFoxScene },
+      { createEarthDay },
+      { createEndingJourney },
+    ] = await Promise.all([
+      import('./core/audio-system.js'),
+      import('./core/effects-system.js'),
+      import('./scene/plane-flight.js'),
+      import('./scene/sheep-companion.js'),
+      import('./kunlun/scene10-fox.js'),
+      import('./kunlun/earth-day.js'),
+      import('./kunlun/ending-journey.js'),
+    ]);
+
     // —— 世界模块按原 import 顺序加载(2026-09-24 下沉 core/world-loader.js) ——
     await loadWorldModules();
 
