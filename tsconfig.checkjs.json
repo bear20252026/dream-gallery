@@ -8,7 +8,12 @@
     "emitDeclarationOnly": false,
     "noImplicitAny": false,
     "strictNullChecks": false,
-    "useUnknownInCatchVariables": false
+    "useUnknownInCatchVariables": false,
+    // 项目本身是 Vite 构建的,代码里 44 处 `import.meta.hot`(HMR 可重装配那批用例)之前全在
+    // 报 "Property 'hot' does not exist on type 'ImportMeta'" —— 那不是类型债,是**配置缺了一行**:
+    // vite/client 就是这些全局声明的出处(山丘子项目 hill-src/tsconfig.json 一直有,主项目没有)。
+    // 补上它,基线才能剩下真正的债。
+    "types": ["vite/client"]
   },
   "include": ["src/core/**/*.js", "src/player/**/*.js", "src/kunlun/avatar.js"],
   "exclude": ["node_modules", "dist", "vendor", "scripts"]
