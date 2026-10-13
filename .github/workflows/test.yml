@@ -51,6 +51,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Set up pnpm (for the hill-src sub-project)
+        # 2026-10-14 第五轮审计 D:远方山丘是**第二套游戏**(独立 three + TypeScript + Rapier + pnpm + 自带
+        # 6 个 Vitest 用例),而根项目三处配置主动把它排除在门禁之外(vitest.config.js 只收 src/__tests__、
+        # tsconfig.json 只收 src/types、eslint.config.mjs:14 忽略 hill-src/**)⇒ 它在 main 上可以悄悄坏掉。
+        # 刻意**不跑 pnpm build**:它的 vite 配置 emptyOutDir 会覆写已入库的 ../public/hill,而本项目构建
+        # 本就不可复现(见 AGENTS),在 CI 里重建只会制造假漂移;产物新鲜度按 AGENTS 的说法本地核对。
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
+      - name: Hill type check + unit tests (BLOCKING)
+        working-directory: hill-src
+        run: pnpm install --frozen-lockfile && pnpm run typecheck && pnpm run test
+
       - name: Dependency audit (npm, report-only — not blocking)
         # 供应链体检:先只报告不阻断(npm audit 会因上游新公告频繁变红,硬闸会让单人开发者被第三方公告卡死发布)。
         # 想升级就照输出开 PR;真要变闸门时,去掉下面的 `|| true` 即可(需主人拍板)。
