@@ -452,3 +452,169 @@ describe('lib/upload/stream.js — 四件套与"每条结束路径都还位"', (
     expect(fs.existsSync(p0)).toBe(false);
   });
 });
+
+// =====================================================================
+// ⑤ 分片视频"空闲补转"(2026-10-13,主人拍板的第三条路)
+// 分片通道有意不进实时压缩队列 ⇒ 走它的 .mov/.mkv 永远不容器归一,而直传会。补法是"启动 + 每小时
+// 扫一轮投进同一个单工位队列",判据必须窄到不会误伤主人手工 scp 的归档文件:
+//   ① 只吃 gateData.uploads 里有归属记录的名字(改名 = 搬归属 + PUT 新 R2 对象,不可逆对外动作);
+//   ② 盘余低于水位、或**水位取不到** ⇒ 整批不捡;
+//   ③ 每轮限量;④ 只碰 videos/ 根(户外大屏/ 与 hls/ 切片是另一套资产),点开头与 .bak 不参与。
+describe('lib/upload/transcode.js — 分片视频补转的判据与三道闸', () => {
+  const transcode = nodeRequire('../../lib/upload/transcode.js');
+  const filesUpload = nodeRequire('../../lib/files-upload.js');
+  const MB = 1024 * 1024,
+    GB = 1024 * MB;
+
+  it('needsNormalize:只认"浏览器可能放不出来"的容器,mp4/webm/图片都不算', () => {
+    expect(transcode.needsNormalize('a.mov')).toBe(true);
+    expect(transcode.needsNormalize('a.MKV')).toBe(true); // 大小写混来的名字也要认
+    expect(transcode.needsNormalize('a.m4v')).toBe(true);
+    expect(transcode.needsNormalize('a.mp4')).toBe(false); // 已是目标格式
+    expect(transcode.needsNormalize('a.webm')).toBe(false); // 能播,补转它只省磁盘不修可用性
+    expect(transcode.needsNormalize('a.jpg')).toBe(false);
+    expect(transcode.needsNormalize('noext')).toBe(false);
+    expect(transcode.needsNormalize('')).toBe(false);
+    expect(transcode.needsNormalize(null)).toBe(false);
+  });
+
+  it('pickPending:只挑"访客上传 + videos 根 + 非点开头 + 非 .bak"的那批,并按名字稳定排序', () => {
+    const uploads = { 'z-a.mov': { aid: 'v1' }, 'b.mkv': { aid: 'v2' } };
+    const dir = [
+      'z-a.mov', // ✓ 有归属
+      'b.mkv', // ✓ 有归属
+      'owner-archive.avi', // ✗ 主人手工 scp 的归档(无归属记录)—— 绝不能在别人脚下改名
+      'c.mp4', // ✗ 已是 mp4
+      '.compressing.d.mov', // ✗ 压缩临时文件
+      'e.mov.bak-20261013', // ✗ 备份文件
+      '户外大屏/f.mkv', // ✗ 带路径(大屏轮播片是另一套资产)
+      'whiteboard-1.png', // ✗ 不是视频
+    ];
+    expect(transcode.pickPending(dir, uploads)).toEqual(['b.mkv', 'z-a.mov']);
+    expect(transcode.pickPending(dir, {})).toEqual([]); // 一条归属都没有 ⇒ 一个都不捡
+    expect(transcode.pickPending(null, uploads)).toEqual([]); // 目录读不出来不能抛
+  });
+
+  it('queuePending:每轮限量,且把 dir/名字/mirror 原样交给压缩队列', () => {
+    const seen = [];
+    const spy = (dir, name, mirror) => seen.push([dir, name, typeof mirror]);
+    const list = ['1.mov', '2.mov', '3.mov', '4.mov', '5.mov'];
+    const r = transcode.queuePending({
+      list,
+      mirror: () => {},
+      freeBytes: 10 * GB,
+      minFree: 2 * GB,
+      max: 3,
+      enqueue: spy,
+    });
+    expect(r.skipped).toBe(null);
+    expect(r.enqueued).toEqual(['1.mov', '2.mov', '3.mov']);
+    expect(seen).toEqual([
+      ['videos', '1.mov', 'function'],
+      ['videos', '2.mov', 'function'],
+      ['videos', '3.mov', 'function'],
+    ]);
+  });
+
+  it('queuePending:盘余低于水位 ⇒ 整批不捡;水位取不到(null/NaN)⇒ 同样不捡(判不了就停手)', () => {
+    const spy = () => {
+      throw new Error('被调用即错:被拒的批次不该碰到队列');
+    };
+    const list = ['a.mov'];
+    expect(
+      transcode.queuePending({ list, freeBytes: 1 * GB, minFree: 2 * GB, enqueue: spy })
+    ).toMatchObject({ enqueued: [], skipped: 'lowdisk' });
+    expect(
+      transcode.queuePending({ list, freeBytes: null, minFree: 2 * GB, enqueue: spy })
+    ).toMatchObject({ enqueued: [], skipped: 'nostats' });
+    expect(
+      transcode.queuePending({ list, freeBytes: NaN, minFree: 2 * GB, enqueue: spy })
+    ).toMatchObject({ enqueued: [], skipped: 'nostats' });
+    expect(
+      transcode.queuePending({ list: [], freeBytes: 10 * GB, minFree: 2 * GB, enqueue: spy })
+    ).toMatchObject({ enqueued: [], skipped: null }); // 本来就没活,不算跳过
+  });
+
+  it('sweepVideoNormalize:读目录 + 归属判定串起来,三道闸各挡一次', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-norm-'));
+    for (const n of ['x.mov', 'y.mp4', 'z.mkv']) fs.writeFileSync(path.join(dir, n), 'x');
+    const saved = gateData.uploads;
+    gateData.uploads = { 'x.mov': { aid: 'v' }, 'z.mkv': { aid: 'v' } }; // y.mp4 有归属但不该被捡
+    try {
+      const seen = [];
+      const r = filesUpload.sweepVideoNormalize({
+        dirPath: dir,
+        freeBytes: 50 * GB,
+        minFree: 2 * GB,
+        max: 5,
+        enqueue: (d, n) => seen.push(d + '/' + n),
+      });
+      expect(r.enqueued).toEqual(['x.mov', 'z.mkv']);
+      expect(seen).toEqual(['videos/x.mov', 'videos/z.mkv']);
+      // 水位不足:一个都不捡
+      expect(
+        filesUpload.sweepVideoNormalize({
+          dirPath: dir,
+          freeBytes: MB,
+          minFree: 2 * GB,
+          enqueue: () => {
+            throw new Error('不该入队');
+          },
+        }).skipped
+      ).toBe('lowdisk');
+      // 目录不存在 = 判不了,不是"没活"
+      expect(
+        filesUpload.sweepVideoNormalize({ dirPath: path.join(dir, 'nope'), freeBytes: 50 * GB })
+          .skipped
+      ).toBe('nodir');
+    } finally {
+      gateData.uploads = saved;
+      try {
+        fs.rmSync(dir, { recursive: true, force: true });
+      } catch {
+        /* Windows 句柄未放时清不掉就算了,不影响断言 */
+      }
+    }
+  });
+
+  it('start/stop 幂等,定时器不重复挂(与分片 GC 同一套句柄纪律)', () => {
+    const saved = gateData.uploads;
+    gateData.uploads = {}; // 真 videos/ 目录 + 空归属 ⇒ 本轮零候选,不会 spawn ffmpeg
+    try {
+      expect(filesUpload.stopVideoNormalize()).toBe(false); // 没起过 ⇒ 停不出东西,也不报错
+      expect(filesUpload.startVideoNormalize()).toBe(true);
+      expect(filesUpload.videoNormalizeOn()).toBe(true);
+      expect(filesUpload.startVideoNormalize()).toBe(false); // 二次启动不叠定时器
+      expect(filesUpload.stopVideoNormalize()).toBe(true);
+      expect(filesUpload.videoNormalizeOn()).toBe(false);
+      expect(filesUpload.stopVideoNormalize()).toBe(false);
+    } finally {
+      gateData.uploads = saved;
+    }
+  });
+});
+
+describe('lib/upload/transcode.js — 补转投进队列后炸不出异常(名字对应的文件不在盘上也要安静)', () => {
+  const transcode = nodeRequire('../../lib/upload/transcode.js');
+  it('compressJob 收到一个磁盘上不存在的名字 ⇒ 不抛、不外泄,队列自己清空', async () => {
+    const bogus = 'dg-normalize-does-not-exist-' + Date.now() + '.mov';
+    expect(() => transcode.compressJob('videos', bogus, () => {})).not.toThrow();
+    // 队列是单工位 + 每步 1s 间隔;这里只需要它不炸,不需要真转码完成
+    await new Promise((r) => setTimeout(r, 1100));
+  });
+});
+
+describe('lib/upload/transcode.js — queuePending 只报"真的排进去了"的', () => {
+  const transcode = nodeRequire('../../lib/upload/transcode.js');
+  it('enqueue 返回 false(同名已在飞或已排队)就不计进 enqueued,日志不虚报捡了几个', () => {
+    const r = transcode.queuePending({
+      list: ['a.mov', 'b.mov', 'c.mov'],
+      freeBytes: 10 * 1024 * 1024 * 1024,
+      minFree: 2 * 1024 * 1024 * 1024,
+      max: 5,
+      enqueue: (d, n) => n !== 'b.mov', // 模拟 b 这件已在队列里被去重
+    });
+    expect(r.enqueued).toEqual(['a.mov', 'c.mov']);
+    expect(r.skipped).toBe(null);
+  });
+});

@@ -169,6 +169,7 @@ function beginShutdown(exit) {
   try {
     const filesUpload = require('./lib/files-upload');
     if (typeof filesUpload.stopChunkGc === 'function') filesUpload.stopChunkGc(); // 分片 GC 定时器
+    if (typeof filesUpload.stopVideoNormalize === 'function') filesUpload.stopVideoNormalize(); // 分片视频补转定时器
   } catch (e) { console.error('[shutdown] 分片 GC 清理失败:', e && (e.message || e)); }
   if (!server) { exit(); return; }
   server.close(() => {
@@ -221,6 +222,11 @@ server.listen(PORT, () => {
   } catch (e) { console.error('[startup] 影子双写启动失败(不影响服务):', e && (e.message || e)); }
   try { require('./lib/retention').startRetention(); } catch (e) { console.error('[startup] 保留期清扫启动失败(不影响服务):', e && (e.message || e)); }
   try { require('./lib/r2outbox').startOutbox(); } catch (e) { console.error('[startup] R2 待发台账启动失败(不影响服务):', e && (e.message || e)); }
+  // 分片视频"空闲补转"(2026-10-13):启动扫一次 + 每小时一次,把走分片上传、直传通道本来会给它
+  // 规范化成 mp4 却没有的视频补上(队列单工位 + nice -n 19,盘余低于水位或取不到就整批不捡,
+  // 且只吃 gateData.uploads 有归属记录的名字 —— 主人手工 scp 的归档绝不会被改名)。
+  // 刻意**不在模块加载时自启**(与分片 GC 不同):否则每个单测 require 到 files-upload 就会起 ffmpeg。
+  try { require('./lib/files-upload').startVideoNormalize(); } catch (e) { console.error('[startup] 分片视频补转启动失败(不影响服务):', e && (e.message || e)); }
   console.log(`路由: ${ROUTES.length} 个端点已注册(明细见 lib/routes.js)`);
 });
 

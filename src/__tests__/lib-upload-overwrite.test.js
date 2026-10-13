@@ -435,3 +435,36 @@ describe('三十一 大屏上传上限(auth:write=管理员入口 2GB)', () => {
     expect(res.code).toBe(400);
   });
 });
+
+describe('压缩队列的入队去重(2026-10-13,分片视频"空闲补转"的配套)', () => {
+  const transcode = nodeRequire('../../lib/upload/transcode.js');
+
+  // 判据只用 compressJob 的返回值,不去数 spawnCalls:队列是单工位 + 每件之间 1s 冷却,
+  // 冷却期内 compressing 仍为真,新任务只入队不 spawn ⇒ spawn 计数与时机有关,而"同名该不该被吞"与时机无关。
+  it('同名在飞/已排队时返回 false;换名字、换目录算另一件', async () => {
+    const base = uniq();
+    const movPath = path.join(VIDEOS, base + '.mov');
+    fs.writeFileSync(movPath, Buffer.alloc(2000, 0x42)); // 真存在 ⇒ 这件会真的跑到 spawn(被桩住,不收工)
+    let release = null;
+    stubSpawn((child) => {
+      release = () => child.emit('close', 1);
+    });
+    try {
+      expect(transcode.compressJob('videos', base + '.mov', () => {})).toBe(true);
+      expect(transcode.compressJob('videos', base + '.mov', () => {})).toBe(false); // 在飞或已排队 ⇒ 不再多烧一次
+      const other = base + '.second.mov'; // 文件不在盘上:轮到它时 statSync 失败即安静收工,不会 spawn
+      expect(transcode.compressJob('videos', other, () => {})).toBe(true);
+      expect(transcode.compressJob('videos', other, () => {})).toBe(false); // 这次是"已在队列里"
+      expect(transcode.compressJob('photos', base + '.mov', () => {})).toBe(true); // 换目录算另一件
+      expect(transcode.compressJob('photos', base + '.mov', () => {})).toBe(false);
+    } finally {
+      // 必须让这件收工:否则后面每条用例都排在一件永不结束的活儿后面。
+      // 它可能还在前一件的 1s 冷却里没起来,所以先等到真的 spawn 过再 emit close。
+      await waitUntil(() => !!release);
+      release();
+      await new Promise((r) => setTimeout(r, 2600)); // 队列里剩下那两件各自安静收工,不留活口给下个用例
+    }
+    // "收工后同名可以再投"这一半由上面那条既有的「同 basename 两轮压缩」用例钉着:
+    // 它第二轮重传同名 .mov 并**要求第二件真的跑起来** —— 若 done() 不清 current,那条会直接超时。
+  });
+});
