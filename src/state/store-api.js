@@ -37,6 +37,12 @@ const SCHEMA = {
   nick: { key: 'galleryNick', type: 'str' }, // 访客昵称
   prefix: { key: 'kunlunPrefix', type: 'str' }, // 昵称前缀(六合藏梦人·)
   roomName: { key: 'roomName', type: 'str' }, // 大厅:上次使用的房间昵称(lobby.html 独立入口预填用)
+  // 载入存档码**之前**的进度快照(2026-10-14 第五轮审计 G):导错一份码就等于覆盖当前进度,
+  // 而玩家手上往往只有那份"几个月前复制的"存档码,回不去。章节地图在 applySave 前写这里,
+  // 并在存档区给出一次性「撤销上一次载入」(带时间,免得把"撤销"和"回到很久以前"搞混)。
+  // ⚠️ 存的是**字段值本身**(collectSave 的结果),不是存档码:①存档码里套存档码会每导一次翻倍长;
+  //    ②decodeSave 有钳位(str 截 40 字符、num 夹 0-99),拿它当"撤销"路径会悄悄改写玩家的原值。
+  saveBackup: { key: 'b612SaveBackup', type: 'json' },
   scene2: { key: 'b612Scene2', type: 'flag' }, // 画羊四笔完成标记(B612 剧本第2场)
   page1: { key: 'b612Page1', type: 'flag' }, // 书页一完成(第3场 B612 回忆夜)
   // 书页二(玫瑰相见)完成标记,2026-10-03 新增。此前书页一/二/三共用一个 page1,

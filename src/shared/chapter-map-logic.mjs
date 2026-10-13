@@ -98,6 +98,14 @@ export const SAVE_FIELDS = {
 };
 const PREFIX = 'B612-1-';
 
+// 存档码长度上限(2026-10-14 第五轮审计 G 的真缺口之一)。
+// 真实存档码 = 14 个字段 base64 后约 300~900 字符,4096 已经留了 4 倍余量。
+// 为什么必须钳:decodeSave 是 try/catch 包住的"坏码返回 null",看起来安全,但
+// `atob()` + `JSON.parse()` 对一个几 MB 的粘贴串是**在主线程上**做的活(解析器还有回退路径),
+// 玩家从网页里随手复制一大段贴进来就能把游戏卡住 —— 而这不是攻击,是会用到的日常误操作。
+// 判超长一律**在解码之前**:先长度后内容,顺序本身就是这道闸的意义。
+export const MAX_CODE_CHARS = 4096;
+
 function b64encode(s) {
   if (typeof btoa === 'function') return btoa(unescape(encodeURIComponent(s)));
   return Buffer.from(s, 'utf8').toString('base64');
@@ -107,8 +115,8 @@ function b64decode(s) {
   return Buffer.from(s, 'base64').toString('utf8');
 }
 
-/** 从 store 读出剧情存档 → 存档码字符串 */
-export function encodeSave(store) {
+/** 读出当前剧情存档的字段值(存档码与"载入前快照"共用这一份采集逻辑,不各写一遍) */
+export function collectSave(store) {
   const data = {};
   for (const [k, type] of Object.entries(SAVE_FIELDS)) {
     if (type === 'flag') data[k] = store.flag(k) ? 1 : 0;
@@ -116,13 +124,19 @@ export function encodeSave(store) {
     else if (type === 'str') data[k] = store.str(k) || '';
     else data[k] = store.json(k, null);
   }
-  return PREFIX + b64encode(JSON.stringify(data));
+  return data;
+}
+
+/** 从 store 读出剧情存档 → 存档码字符串 */
+export function encodeSave(store) {
+  return PREFIX + b64encode(JSON.stringify(collectSave(store)));
 }
 
 /** 解析存档码;坏码返回 null(不抛) */
 export function decodeSave(code) {
   try {
     const s = String(code || '').trim();
+    if (s.length > MAX_CODE_CHARS) return null; // 钳在解码之前(见 MAX_CODE_CHARS 注释)
     if (!s.startsWith(PREFIX)) return null;
     const data = JSON.parse(b64decode(s.slice(PREFIX.length)));
     if (!data || typeof data !== 'object') return null;

@@ -15,6 +15,7 @@ import {
   encodeSave,
   decodeSave,
   applySave,
+  collectSave,
 } from '../shared/chapter-map-logic.mjs';
 
 const TEXT = {
@@ -49,6 +50,12 @@ const TEXT = {
     en: 'Loading replaces your current progress and reopens the game. Tap again to confirm.',
   },
   applySure: { zh: '确定,载入', en: 'Yes, load it' },
+  undo: { zh: '撤销上一次载入', en: 'Undo last load' },
+  undoConfirm: {
+    zh: '把进度退回载入那份存档码**之前**的样子并重新打开。确定的话再点一次。',
+    en: 'Returns your progress to what it was **before** that save code, then reopens the game. Tap again to confirm.',
+  },
+  undoSure: { zh: '确定,撤销', en: 'Yes, undo' },
   close: { zh: '合上', en: 'Close' },
   busy: {
     zh: '先把眼前这段对话或动作完成,再出发。',
@@ -169,6 +176,32 @@ export function createChapterMap() {
     const load = el('button', 'ghost', tt(TEXT.load), row);
     load.type = 'button';
     load.dataset.save = 'load';
+    // 载入前快照(2026-10-14 第五轮审计 G):导错码就等于覆盖当前进度,而玩家手上常常只有那份
+    // 几个月前复制的码 ⇒ 回不去。有备份才多这颗按钮(没备份时不摆一个点了没东西可撤的空位)。
+    const rawBackup = ctx.store.json('saveBackup', null);
+    const backup =
+      rawBackup && rawBackup.data && typeof rawBackup.data === 'object' ? rawBackup : null;
+    let undo = null;
+    if (backup) {
+      const when = new Date(Number(backup.at) || 0).toLocaleDateString(
+        scriptLang() === 'en' ? 'en' : 'zh-CN'
+      );
+      undo = el('button', 'ghost', tt(TEXT.undo) + ' · ' + when, row);
+      undo.type = 'button';
+      undo.dataset.save = 'undo';
+      undo.onclick = () => {
+        if (undo.dataset.armed !== '1') {
+          undo.dataset.armed = '1';
+          msg.textContent = tt(TEXT.undoConfirm);
+          undo.textContent = tt(TEXT.undoSure);
+          return;
+        }
+        // 快照存的是**字段值本身**,不经 decodeSave ⇒ 不会被它的钳位(str 截 40、num 夹 0-99)改写
+        applySave(ctx.store, backup.data);
+        ctx.store.setJson('saveBackup', null); // 一次性:撤完就清,防连点把刚恢复的进度又换掉
+        location.reload();
+      };
+    }
     const msg = el('div', 'cm-msg', '', book);
     const box = el('textarea', '', null, book);
     box.style.display = 'none';
@@ -208,6 +241,9 @@ export function createChapterMap() {
         apply.textContent = tt(TEXT.applySure);
         return;
       }
+      // 落盘前先给当前进度拍一份快照:这一句是"撤销上一次载入"唯一的数据来源。
+      // 顺序不能反 —— applySave 会把旧值覆盖掉,之后再 collectSave 拿到的就是新存档了。
+      ctx.store.setJson('saveBackup', { at: Date.now(), data: collectSave(ctx.store) });
       applySave(ctx.store, data);
       location.reload();
     };
