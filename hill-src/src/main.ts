@@ -6,7 +6,10 @@ import { Input } from './engine/input'
 import { GameLoop } from './engine/loop'
 import { SAVE_KEY, SaveStore, type Quality, type SaveData } from './engine/save'
 import type { Game } from './game/game'
-import { fetchMyNote, fetchNote, noteErrorKey, saveMyNote, type Note } from './net/notes'
+// `Note` 只是类型(编译后不存在),可以留在这里;真正引到网络代码的是下面那四个函数,
+// 它们的全部调用点都被 __SOLO__ 折掉了 ⇒ 单人包里 net/notes.ts 整块不进产物。
+import type { Note } from './net/notes'
+import { fetchMyNote, fetchNote, noteErrorKey, saveMyNote } from './net/notes'
 import { Room } from './net/room'
 import { Notepad } from './ui/notepad'
 import { TouchControls } from './ui/touch'
@@ -23,7 +26,10 @@ async function boot(): Promise<void> {
   if (lang === 'en' || lang === 'zh' || lang === 'zh-CN') save.update({ locale: lang === 'en' ? 'en' : 'zh-CN' })
   const i18n = new I18n(resolveLocale(save.data.locale, navigator.languages))
   // Inside Dream Gallery the hill is a quiet place to stay alone: no sign-in, room or left drawings.
-  document.body.dataset.solo = ''
+  // 2026-10-14 审计 E:这个标记以前**只遮 UI**,登录/涂鸦上传的代码照样打进包里;现在它由构建期
+  // 常量 __SOLO__ 决定,并且下面每一处**会发请求**的调用点都在 `if (!__SOLO__)` 里 ⇒ 单人构建里
+  // 那些分支被折成死代码删掉,不是"玩家看不见"而是"包里没这张网络路径"。
+  if (__SOLO__) document.body.dataset.solo = ''
   const input = new Input(canvas)
   const audio = new Audio()
   let game: Game | undefined
@@ -75,6 +81,7 @@ async function boot(): Promise<void> {
   const toAccount = (s: ManusSession | null): Account =>
     !s ? { status: 'loading' } : s.status === 'authenticated' ? { status: 'authenticated', name: s.user.name ?? '' } : { status: s.status }
   const login = () => {
+    if (__SOLO__) return // 单人版没有账号可登(按钮也被 CSS 藏着,这里再保证一次"不会发请求")
     ui.setAccount({ status: 'pending' })
     // Called synchronously inside the click so the embedded Preview may open the standalone game.
     ManusAuth.login()
@@ -82,6 +89,7 @@ async function boot(): Promise<void> {
       .finally(() => window.setTimeout(() => ui.setAccount(toAccount(ManusAuth.get_session())), 1200))
   }
   const logout = () => {
+    if (__SOLO__) return
     ManusAuth.logout()
       .then(s => ui.setAccount(toAccount(s)))
       .catch(err => console.warn('Manus logout failed:', err))
@@ -112,9 +120,10 @@ async function boot(): Promise<void> {
   })
   ui.show('boot')
   applySettings(save.data)
-  ManusAuth.prepare()
-    .then(s => ui.setAccount(toAccount(s)))
-    .catch(() => ui.setAccount({ status: 'offline' }))
+  if (!__SOLO__)
+    ManusAuth.prepare()
+      .then(s => ui.setAccount(toAccount(s)))
+      .catch(() => ui.setAccount({ status: 'offline' }))
 
   // Boot: three.js, Rapier (WASM) and the scene load as a separate chunk behind the progress bar.
   let loaded = 0
@@ -164,7 +173,7 @@ async function boot(): Promise<void> {
   // always show, ahead of the random handful.
   let live: Note[] = []
   const showNotes = () => social.setNotes([...live, ...others.filter(n => !live.some(l => l.id === n.id))], myNote)
-  const signedIn = () => ManusAuth.get_session()?.status === 'authenticated'
+  const signedIn = () => !__SOLO__ && ManusAuth.get_session()?.status === 'authenticated'
   room.onStatus = status => ui.setPresence(status, room.count)
   // Where a traveller stands as seen from here: angle from the view (0 = ahead, + = right) and a word.
   const bearing = (id: number): { angle: number; side: LikeSide } | null => {
@@ -193,25 +202,27 @@ async function boot(): Promise<void> {
     else if (r.reason === 'far' || r.reason === 'facing') ui.note(i18n.t('like.far'))
   }
   const fetching = new Set<number>()
-  room.onNote = (id, from) => {
-    // The welcome's backlog skips what is already shown; a live note may be a redrawing, so it is
-    // fetched again. Only ids travel through the room: the drawing comes from the game's server.
-    if (id === myNote?.id || fetching.has(id)) return
-    if (from === null && (live.some(n => n.id === id) || others.some(n => n.id === id))) return
-    fetching.add(id)
-    void fetchNote(id).then(note => {
-      fetching.delete(id)
-      if (!note || note.id === myNote?.id) return
-      live = [note, ...live.filter(n => n.id !== note.id)].slice(0, 12)
-      showNotes()
-      if (from !== null && g.mode === 'playing') {
-        social.bloom(note.id)
-        social.pulse(from)
-        audio.play('pickup')
-        ui.note(i18n.t('note.arrived'))
-      }
-    })
-  }
+  if (!__SOLO__)
+    // 别人留下的画是从**游戏服务器**取的 ⇒ 整段挂在 __SOLO__ 上;`fetchNote` 在这里是唯一引用点。
+    room.onNote = (id, from) => {
+      // The welcome's backlog skips what is already shown; a live note may be a redrawing, so it is
+      // fetched again. Only ids travel through the room: the drawing comes from the game's server.
+      if (id === myNote?.id || fetching.has(id)) return
+      if (from === null && (live.some(n => n.id === id) || others.some(n => n.id === id))) return
+      fetching.add(id)
+      void fetchNote(id).then(note => {
+        fetching.delete(id)
+        if (!note || note.id === myNote?.id) return
+        live = [note, ...live.filter(n => n.id !== note.id)].slice(0, 12)
+        showNotes()
+        if (from !== null && g.mode === 'playing') {
+          social.bloom(note.id)
+          social.pulse(from)
+          audio.play('pickup')
+          ui.note(i18n.t('note.arrived'))
+        }
+      })
+    }
   // A note is left a step ahead of the traveller's feet, inside the walkable hill.
   let noteSpot = { x: 0, z: 0 }
   const spotAhead = () => {
@@ -228,6 +239,12 @@ async function boot(): Promise<void> {
   }
   const pad = new Notepad(document.getElementById('ui')!, i18n, {
     save: strokes => {
+      if (__SOLO__) {
+        // 单人版没有"留在山上的画":笔袋入口本身被 CSS 藏着,这里只是再兜一层 ——
+        // 不上传、不发消息,把面板收回去就完事(saveMyNote/room.sendNote 的唯一引用点也在这里)。
+        pad.close(false)
+        return
+      }
       pad.setBusy(true)
       saveMyNote(noteSpot.x, noteSpot.z, strokes)
         .then(note => {
@@ -266,23 +283,25 @@ async function boot(): Promise<void> {
     }
     input.unlockPointer()
   }
-  window.addEventListener('manus-auth-change', e => {
-    if (e.detail?.status === 'authenticated') {
-      fetchMyNote()
-        .then(note => {
-          myNote = note
-          showNotes()
-          if (pad.mode === 'login') {
-            noteSpot = spotAhead()
-            pad.openDraw(myNote?.strokes ?? null)
-          }
-        })
-        .catch(() => {})
-    } else if (e.detail?.status === 'logged_out') {
-      myNote = null
-      showNotes()
-    }
-  })
+  if (!__SOLO__)
+    // 登录态一变就去服务器取"我留在山上的那张画" ⇒ fetchMyNote 的唯一引用点,单人构建整段折掉。
+    window.addEventListener('manus-auth-change', e => {
+      if (e.detail?.status === 'authenticated') {
+        fetchMyNote()
+          .then(note => {
+            myNote = note
+            showNotes()
+            if (pad.mode === 'login') {
+              noteSpot = spotAhead()
+              pad.openDraw(myNote?.strokes ?? null)
+            }
+          })
+          .catch(() => {})
+      } else if (e.detail?.status === 'logged_out') {
+        myNote = null
+        showNotes()
+      }
+    })
   const socialPrompt = () => {
     const f = social.focus
     return !f ? null : f.kind === 'ghost' ? 'ghost' : f.own ? 'ownNote' : 'note'

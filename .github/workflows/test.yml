@@ -65,6 +65,14 @@ jobs:
         working-directory: hill-src
         run: pnpm install --frozen-lockfile && pnpm run typecheck && pnpm run test
 
+      - name: Hill solo bundle guard (BLOCKING)
+        # 判定"入库的山丘单人产物里没有可用的网络路径":①产物不得含 api/notes,②源码不得有人调
+        # room.start()/room.peek()(剩下那段房间代码因此不可达),③__SOLO__ 的折叠来源还在。
+        # 读的是**已入库的 public/hill**,所以这一步不需要也不该去 pnpm build(构建不可复现,
+        # 在 CI 里重建只会制造假漂移 —— 同上面不跑 build 的理由)。反向验证过:拿 HILL_SOLO=0 的
+        # 联机产物跑它,①立刻变红 exit 1 ⇒ 这条闸门不是恒绿的。
+        run: node scripts/hill-solo-guard.cjs
+
       - name: Dependency audit (npm, report-only — not blocking)
         # 供应链体检:先只报告不阻断(npm audit 会因上游新公告频繁变红,硬闸会让单人开发者被第三方公告卡死发布)。
         # 想升级就照输出开 PR;真要变闸门时,去掉下面的 `|| true` 即可(需主人拍板)。
