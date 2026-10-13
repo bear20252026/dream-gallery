@@ -157,17 +157,33 @@ echo "=== 5/9 Stage changes and check them ==="
 git add -u
 for d in src lib scripts types public; do [ -d "$d" ] && git add "$d"; done
 STAGED=$(git diff --cached --name-only)
-[ -n "$STAGED" ] || { echo "❌ Nothing to commit; stopping"; exit 1; }
-echo "$STAGED"
-# Allowlist: the leak-prevention unit test itself (its file name contains "secret"; it was blocked by mistake on 2026-10-04),
-# and .env.example (a values-free template — every assignment in it is intentionally empty; blocked by mistake on 2026-10-11
-# because the guard's `(^|/)\.env` also matches the sample file that documents those very variables).
-if echo "$STAGED" | grep -vE '^(src/__tests__/no-secrets\.test\.js|\.env\.example)$' | grep -Eiq '(^|/)\.env|\.pem$|\.key$|\.p12$|\.pfx$|\.ppk$|私钥|secret'; then
-  echo "❌ Staged files look like secrets; stopping (public repo!)"; git reset -q; exit 1
+# 工作树干净(改动已经全部是 HEAD 上的提交)≠ 没东西可发布。
+# 旧版在这里 `exit 1`,于是"先分层提交、再跑 release.sh"这条最规范的路径必然失败,只能退回手搓
+# `deploy.sh --yes` —— 而 deploy.sh 不经过第 7 步的 CI 闸门:**越规范的提交习惯反而越没有闸门**,
+# 2026-10-12 的发布就是这样被迫绕过闸门的(我当时手工读了两个 required check 的 conclusion 补上)。
+# 现在:跳过 commit,push 照做(把已提交的 HEAD 推上去),CI 闸门与部署一律照常,一个安全面都不减。
+# .tmp/release-msg.txt 的前置要求刻意**保留**:它是这次发布的说明书,不是"必须有东西可提交"的条件。
+if [ -z "$STAGED" ]; then
+  echo "ℹ️  工作区无待提交改动 ⇒ 跳过 git commit;本次发布内容 = 当前 HEAD $(git rev-parse --short HEAD)"
+  echo "    (仍照常 push、仍等本次 HEAD 的 CI 绿、仍走 deploy —— 闸门不因'没东西可提交'而消失)"
+else
+  echo "$STAGED"
+  # Allowlist: the leak-prevention unit test itself (its file name contains "secret"; it was blocked by mistake on 2026-10-04),
+  # and .env.example (a values-free template — every assignment in it is intentionally empty; blocked by mistake on 2026-10-11
+  # because the guard's `(^|/)\.env` also matches the sample file that documents those very variables).
+  if echo "$STAGED" | grep -vE '^(src/__tests__/no-secrets\.test\.js|\.env\.example)$' | grep -Eiq '(^|/)\.env|\.pem$|\.key$|\.p12$|\.pfx$|\.ppk$|私钥|secret'; then
+    echo "❌ Staged files look like secrets; stopping (public repo!)"; git reset -q; exit 1
+  fi
 fi
 
 echo "=== 6/9 Commit and push to GitHub ==="
-git commit -F "$MSG"
+# 写成 if/else 而不是 `[ -n "$STAGED" ] && git commit || echo`:后者在 `set -e` 下会把 commit 的失败
+# 吞成一句"未新建 commit"然后继续发布 —— commit 失败必须响亮停下,不能让远端少一个提交而线上照发。
+if [ -n "$STAGED" ]; then
+  git commit -F "$MSG"
+else
+  echo "(无改动可提交,未新建 commit)"
+fi
 git push origin main
 
 echo "=== 7/9 CI gate: only deploy after this commit's CI goes green ==="
