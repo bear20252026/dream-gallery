@@ -29,9 +29,9 @@
     "optimize:images": "node scripts/optimize/optimize-textures.js",
     "optimize:images:dry": "node scripts/optimize/optimize-textures.js --dry-run",
     "optimize:models": "node scripts/optimize/optimize-models.js",
-    "deps": "npx depcruise src --config .dependency-cruiser.cjs --output-type err",
+    "deps": "npx depcruise src server.js lib --config .dependency-cruiser.cjs --output-type err",
     "prepare": "husky",
-    "depcruise": "depcruise src --validate .dependency-cruiser.cjs"
+    "depcruise": "depcruise src server.js lib --validate .dependency-cruiser.cjs"
   },
   "lint-staged": {
     "src/**/*.js": [

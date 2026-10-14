@@ -454,6 +454,110 @@ describe('lib/upload/stream.js — 四件套与"每条结束路径都还位"', (
 });
 
 // =====================================================================
+// M-18(2026-10-14)——"每条结束路径只还一次位"原先是**调用方**的义务(quota.js 里那块 freed 牌),
+// 不是 stream.guard 自己的契约。本组把它钉成本模块的契约。
+// ⚠️ 判据必须用朴素非幂等计数器:上面那些用例传的是 slot.release,它调 2 次也只减 1 次,
+//    拿它来断言"只还一次"等于什么都没测 —— 这正是审计里"今天没有现役漏洞"与"保证放错了地方"的分界。
+describe('lib/upload/stream.js — release() 自我幂等:各结束路径合计只调一次', () => {
+  const dirPath = path.join(tmpDir, 'stream-once');
+  fs.mkdirSync(dirPath, { recursive: true });
+
+  function naiveGuard(body, opts = {}) {
+    const filePath = path.join(dirPath, 'n-' + Math.random().toString(36).slice(2) + '.jpg');
+    const ws = fs.createWriteStream(filePath, { fd: fs.openSync(filePath, 'wx') });
+    const req = bodyReq(body, opts.reqOpts || {});
+    const res = fakeRes();
+    const box = { calls: 0, finish: 0, error: 0, aborts: 0, responded: [] };
+    stream.guard(req, ws, {
+      maxBytes: opts.maxBytes === undefined ? 100 : opts.maxBytes,
+      filePath,
+      overflow: { code: 413, message: '图片不能超过 50MB' },
+      release: () => {
+        box.calls += 1; // 朴素计数:后面每多一次就是真多还了一次位
+      },
+      disconnect: opts.disconnect !== false,
+      respond: (code, message) => {
+        box.responded.push([code, message]);
+        res.writeHead(code, {});
+        res.end(JSON.stringify({ error: message }));
+      },
+      onAbort: () => {
+        box.aborts += 1;
+      },
+      onFinish: () => {
+        box.finish += 1;
+        res.writeHead(201, {});
+        res.end('{}');
+      },
+      onError: () => {
+        box.error += 1;
+      },
+    });
+    return { req, res, box, filePath };
+  }
+  const settle = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  it('正常成功:finish 之后 req 的 close 也 fire,但还位只调一次', async () => {
+    const t = naiveGuard('hello', { maxBytes: 100 });
+    await waitRes(t.res);
+    await settle(40); // 等 req 的 close 赶上来(它比 res 结束晚)
+    expect(t.box.finish).toBe(1);
+    expect(t.box.calls).toBe(1);
+    expect(fs.readFileSync(t.filePath, 'utf8')).toBe('hello');
+  });
+
+  it('越限中止:abort 内一次 + ws error + req close 也会各来一次,合计仍是一次', async () => {
+    const t = naiveGuard('A'.repeat(40), { maxBytes: 10, reqOpts: { cl: 40 } });
+    await waitRes(t.res);
+    await settle(60);
+    expect(t.box.aborts).toBe(1);
+    expect(t.box.responded).toEqual([[413, '图片不能超过 50MB']]);
+    expect(t.box.calls).toBe(1);
+  });
+
+  it('客户端断连:线上是 aborted 然后 close 两个事件,合计仍只还一次', async () => {
+    const t = naiveGuard(null, { maxBytes: 1024, reqOpts: { cl: 64 } });
+    t.req.push(Buffer.alloc(16, 0x41));
+    await new Promise((r) => setImmediate(r));
+    expect(t.box.calls).toBe(0); // 还在写,一个字节都没还
+    // 真实 IncomingMessage 被客户端掐断时先 aborted 再 close;手工 Readable 只给 close,
+    // 所以按线上形态补这一次 aborted —— 不补的话这个用例退化成"只走一条路",断不了幂等。
+    t.req.emit('aborted');
+    t.req.destroy();
+    await settle(60);
+    expect(t.box.calls).toBe(1);
+    try {
+      fs.unlinkSync(t.filePath);
+    } catch {
+      /* Windows 句柄未放时清不掉就算了,不影响断言 */
+    }
+  });
+
+  it('调用方没给 release(分片/大屏那两条不占槽位的既有口径)时,一律安静跳过不抛', async () => {
+    const filePath = path.join(dirPath, 'no-rel-' + Math.random().toString(36).slice(2) + '.jpg');
+    const ws = fs.createWriteStream(filePath, { fd: fs.openSync(filePath, 'wx') });
+    const req = bodyReq('abc', { cl: 3 });
+    const res = fakeRes();
+    let finished = 0;
+    stream.guard(req, ws, {
+      maxBytes: 100,
+      filePath,
+      disconnect: true,
+      respond: () => {},
+      onFinish: () => {
+        finished += 1;
+        res.writeHead(201, {});
+        res.end('{}');
+      },
+      onError: () => {},
+    });
+    await waitRes(res);
+    await settle(40);
+    expect(finished).toBe(1);
+  });
+});
+
+// =====================================================================
 // ⑤ 分片视频"空闲补转"(2026-10-13,主人拍板的第三条路)
 // 分片通道有意不进实时压缩队列 ⇒ 走它的 .mov/.mkv 永远不容器归一,而直传会。补法是"启动 + 每小时
 // 扫一轮投进同一个单工位队列",判据必须窄到不会误伤主人手工 scp 的归档文件:
