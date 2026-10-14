@@ -12,7 +12,8 @@
 // 漏载后果是静默的(2026-09-06「石门消失」= 漏载 planets.js),启动自检见 core/boot-check.js;
 // 后台链完成状态挂 window.__deferredWorldReady 供探针/诊断读取。
 
-import { activeModules } from '../shared/legacy.mjs';
+import { isShelved as isShelvedLegacy } from '../shared/legacy.mjs';
+import { runChain } from './world-chain.mjs';
 
 /** 核心链:进图前必须就绪(串行,阻塞揭幕) @type {Array<[string, () => Promise<unknown>]>} */
 export const WORLD_MODULES = [
@@ -61,27 +62,49 @@ export const WORLD_MODULES_DEFERRED = [
   ['终章', () => import('../kunlun/finale.js')],
 ];
 
+// 链的执行与结论都在 core/world-chain.mjs(可单测的纯逻辑);本文件只负责"用什么加载、结论挂到哪儿"。
+// 三条对外契约:
+//   window.__worldPhase        字符串,给探针/调试看进度(M-13 之前它是唯一读数,现在仍是,但不再是结论)
+//   window.__worldStatus       **结构化**结论 {tag,status,loaded[],failed[],skipped[]}(2026-10-14 新增)
+//   window.__deferredWorldReady 后台链的 Promise,**resolve 值就是这个结构化结论**(以前 resolve 的是 undefined)
+function setPhase(text) {
+  try {
+    window.__worldPhase = text;
+  } catch (e) {
+    /* node 下单测跑到这里没有 window */
+  }
+}
+function setStatus(res) {
+  try {
+    window.__worldStatus = res;
+  } catch (e) {
+    /* 同上 */
+  }
+}
+
 async function loadChain(list, tag, fatal) {
-  // 旧玩法(昆仑/永恒展厅/答题/塔楼)默认搁置不加载(2026-10-03),?legacy=1 恢复。见 shared/legacy.mjs
-  for (const [label, load] of activeModules(list)) {
-    try {
-      window.__worldPhase = tag + ':' + label;
-      await load();
-    } catch (e) {
-      window.__worldPhase = tag + ':失败:' + label;
+  setStatus({ tag, status: 'running', loaded: [], failed: [], skipped: [] });
+  return runChain(list, {
+    tag,
+    fatal,
+    load: (label, thunk) => thunk(),
+    isShelved: isShelvedLegacy,
+    onPhase: setPhase,
+    onFail: (label, e) => {
       console.error('[startWorld] ' + tag + ' ' + label + ' 加载失败:', e.message);
       if (window.__reportError)
         window.__reportError('boot', 'startWorld 模块失败: ' + label + ' ' + e.message);
-      if (fatal) throw e; // 核心链失败:由 startWorld 兜底重试
-      // 后台链失败:世界已进图,记日志后继续加载剩余模块
-    }
-  }
+    },
+  });
 }
 
 /** 串行加载核心链(阻塞揭幕) → 返回前把后台链挂到 window.__deferredWorldReady 不阻塞地跑 */
 export async function loadWorldModules() {
   await loadChain(WORLD_MODULES, '核心', true);
-  window.__deferredWorldReady = loadChain(WORLD_MODULES_DEFERRED, '后台', false).then(() => {
-    window.__worldPhase = '后台:完成';
+  window.__deferredWorldReady = loadChain(WORLD_MODULES_DEFERRED, '后台', false).then((res) => {
+    setStatus(res);
+    // 「完成」这个词以后只在真的没有失败时说;有失败就点名失败项,不再让链尾把失败洗掉。
+    setPhase(res.failed.length ? '后台:降级:' + res.failed.join(',') : '后台:完成');
+    return res;
   });
 }

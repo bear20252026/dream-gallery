@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.js",
     "check": "npm run deps && npm run build && node scripts/test/test.js",
-    "test": "node scripts/test/test-store.js && node scripts/test/test.js && node scripts/test/test-session.js && node scripts/test/test-upload-security.js && node scripts/test/test-mobile.js",
+    "test": "node scripts/test/test-store.js && node scripts/test/test-store-sqlite.js && node scripts/test/test.js && node scripts/test/test-session.js && node scripts/test/test-upload-security.js && node scripts/test/test-mobile.js",
     "debug": "node scripts/probe/debug-browser.js",
     "test:smoke": "node scripts/probe/smoke-gate.js",
     "test:scene": "node scripts/probe/scene-visual-regression.cjs",

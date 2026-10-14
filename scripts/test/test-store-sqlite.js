@@ -56,12 +56,21 @@ flush().then(() => {
   ok(fs.existsSync(path.join(dir1, 'gate_data.json')), 'JSON 镜像保留');
 
   // ---- 场景 2:删掉 JSON,只留 DB → 重启后从 SQLite 完整恢复(证明 DB 是权威源) ----
+  // ⚠️这一条以前是**假通过**(2026-10-14 第六轮审计 M-16):`fs.unlinkSync(json1)` 写在场景 3 里,
+  //   于是场景 2 跑的时候 JSON 还在 ⇒ "从 SQLite 完整恢复"这句话从没被前置条件支撑过。
+  //   现在:先删,再**断言此刻真的只剩 DB**,然后才起子进程。
+  //   (子进程里的 snippet 每次都会 saveGateData(),所以镜像 JSON 会被重新写出来——
+  //    因此前置断言必须放在起进程**之前**,放在之后就晚了。)
+  const db1 = path.join(dir1, 'gate_data.db');
+  fs.unlinkSync(json1); // 移除 JSON,强迫走 DB
+  ok(!fs.existsSync(json1) && fs.existsSync(db1),
+    '场景 2 前置条件成立:此刻 JSON 不存在而 gate_data.db 存在');
   const r2 = runInChild({ GATE_DATA_FILE: json1 }, STORE_SNIPPET);
   ok(r2.secret === 's1' && r2.applicants.v1 && r2.applicants.v1.status === 'approved',
     '删除 JSON 后从 SQLite 完整恢复');
+  ok(fs.existsSync(json1), '恢复后 JSON 镜像被重新写出(兜底仍在,不是只剩 DB)');
 
   // ---- 场景 3:子进程写入新档案 → 第三个进程能读到(跨进程持久) ----
-  fs.unlinkSync(json1); // 移除 JSON,强迫走 DB
   const r3 = runInChild({ GATE_DATA_FILE: json1, SEED: JSON.stringify({ applicants: { v2: { status: 'pending' } } }) }, STORE_SNIPPET);
   ok(r3.applicants.v1 && r3.applicants.v2, '增量写入保留旧档案 + 新档案(v1+v2)');
   const r4 = runInChild({ GATE_DATA_FILE: json1 }, STORE_SNIPPET);
@@ -86,7 +95,7 @@ flush().then(() => {
   ok(!fs.existsSync(db5p(dir5)), 'USE_SQLITE=0 时不生成 .db');
   ok(fs.existsSync(json5), 'USE_SQLITE=0 时 JSON 正常写入');
 
-  console.log(`\\n结果: ${passed} 通过, ${failed} 失败`);
+  console.log(`\n结果: ${passed} 通过, ${failed} 失败`);
   process.exit(failed ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });
 

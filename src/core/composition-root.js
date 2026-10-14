@@ -3,7 +3,7 @@
 // 每个积木只经此入口装配,绝不在 main.js 散点 import 副作用。
 // 阶段2 起由 DI 容器取代本单例;此处仍作为装配的"唯一真相入口"。
 import { eventBus } from './event-bus.js';
-import { systemRank } from './system.js';
+import { compareSystems } from './system.js';
 
 export function createCompositionRoot() {
   const systems = [];
@@ -19,7 +19,7 @@ export function createCompositionRoot() {
   const ordered = () => {
     if (!orderedCache) {
       // 每次重排保证"后注册的系统"也能落到正确位置(确定性不依赖注册顺序)
-      orderedCache = systems.slice().sort((a, b) => systemRank(a) - systemRank(b));
+      orderedCache = systems.slice().sort(compareSystems);
     }
     return orderedCache;
   };
