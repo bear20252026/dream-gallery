@@ -78,6 +78,35 @@ export interface SceneNamespace {
   aB: HTMLElement;
   avatar: Group;
   kintsugiOn: boolean;
+  // ↓ 2026-10-14 补齐(同 KunlunNamespace:声明落后于 src/ctx-scene.js 的 properties 数组)。
+  /** 画廊布局常量表 —— 建造几何/碰撞边界/探针坐标共用的单一源,挂的是 scene/layout.mjs 的 LAYOUT ← scene/scene.js:183 */
+  layout: {
+    outerWest: number;
+    outerEast: number;
+    outerNorth: number;
+    outerSouthEx: number;
+    outerSouth: number;
+    ceilingHeight: number;
+    innerWest: number;
+    innerEast: number;
+    innerNorth: number;
+    innerSouth: number;
+  };
+  /** 碰撞盒加入门面(外部模块不再直接 push 内部数组)← scene.js:192 */
+  addBounds: (list: Array<{ mnX: number; mxX: number; mnZ: number; mxZ: number }>) => void;
+  /** 碰撞盒移除门面(B4 整改)← scene.js:186 */
+  removeBounds: (list: Array<{ mnX: number; mxX: number; mnZ: number; mxZ: number }>) => void;
+  /** 这四条是"探针/调试门面"槽位:由各自系统在装配时挂上、卸载时置 null
+   *  (plane-flight.js:545 / scene10-fox.js:494 / earth-day.js:407 / ending-journey.js:713)。
+   *  **刻意不临摹对象形状**:今天没有被 checkJs 覆盖的读取方,而临摹错了比不写更坏(它会开始给
+   *  消费方一个假的保证)。真要上类型,请顺手把消费方一起加进 tsconfig.checkjs.json 的 include。 */
+  planeApi: unknown;
+  foxApi: unknown;
+  earthDayApi: unknown;
+  endingApi: unknown;
+  /** properties 数组里列着,但 2026-10-14 全仓实查**既无赋值点也无读取点**的槽位。
+   *  记在这里是为了"数组与声明不许漂"那条测试能过 —— 这不是"死代码可删"的结论。 */
+  getActiveAtmosphere: unknown;
 }
 
 export interface PlayerState {
@@ -99,7 +128,13 @@ export interface PlayerNamespace {
   jD: { x: number; z: number };
   ks: Record<string, boolean>;
   mv: (dx: number, dz: number, dt: number) => void;
-  drM: () => void;
+  // (原 `drM: () => void;` 已删,2026-10-14:properties 数组里没有 drM ⇒ 代理上没这个成员。
+  //   它是旧别名时代(scripts/gen/ctx-alias-codemod.js)留下的过期声明,真名是下面的 drawMap;
+  //   全仓除了那条 codemod 清单与一句探针注释之外没有任何读写点。)
+  /** 小地图每帧重画 ← src/scene/minimap.js:500(Object.assign 挂点在同文件末尾) */
+  drawMap: () => void;
+  /** 跳跃/滑翔/重力物理的每帧步进 ← src/scene/player.js:145,由 loop-manager.js:318 取用 */
+  tickPhysics: (dt: number) => void;
   viewMode: number;
   quizPassed: boolean;
   quizPassScore: number;
@@ -121,20 +156,32 @@ export interface MediaNamespace {
   pC: number;
   signMesh: Mesh;
   signMat: Material;
-  wb: Mesh;
+  // ⚠️这里原先还有 `wb: Mesh;` 与 `ytHeart: Mesh;` 两条,2026-10-14 删掉:`src/ctx-media.js` 的
+  //   properties 数组里没有这两个名字 ⇒ 代理上根本没有这对 getter/setter,写了就是 undefined
+  //   (对象还是 Object.freeze 过的,赋值更会直接 TypeError)。它们只是旧 codemod
+  //   (scripts/gen/ctx-alias-codemod.js)时代留下的**过期声明**,全仓没有任何读写点。
+  //   现在由 src/__tests__/types-ctx-drift.test.js 双向钉死:接口成员 ≡ 运行时数组,不多也不少。
   mpMesh: Mesh;
   mpMat: Material;
   guideMesh: Mesh;
-  ytHeart: Mesh;
   scrollLink: unknown;
   mA: Material[];
   audioManager: unknown;
+  // ↓ 2026-10-14 补齐(同 KunlunNamespace:声明落后于 properties 数组),形状取自真实赋值点。
+  /** 启动音视频序列(需用户手势)← src/scene/media/video-wall.js:339 挂 triggerSequence */
+  startVidSeq: () => void;
+  /** 播放第 i 条画廊音轨 ← src/scene/media/gallery-audio.js:83 */
+  playGalleryAudio: (i: number) => Promise<void>;
+  /** 当前(或补间中)的日照小时 ← src/scene/time-shift.js:32,38 */
+  dayTimeSource: () => number;
 }
 
 export interface GalleryNamespace {
   paintGroups: Group[];
   onC3D: (intersection: Intersection) => void;
   zoomOut: () => void;
+  /** 画框飞入放大 ← src/gallery/painting-zoom.js:20(挂点 paintings.js:657) */
+  zoomIn: (cg: Group) => void;
   zG: Group | null;
   hangOne: (url: string) => void;
   houseMats: Material[];
@@ -186,6 +233,27 @@ export interface KunlunNamespace {
   checkSkyMs: () => void;
   fadeTeleport: (target: Vector3, yaw: number) => void;
   rebuildEternalPicks: () => void;
+  // ↓ 2026-10-14 补齐:下面这些名字一直在 `src/ctx-kunlun.js` 的 properties 数组里(运行时有效),
+  //   是这个**手工维护**的声明文件落后于运行时 ⇒ 那 36 条 TS2339 是"声明缺口",不是代码有病。
+  //   形状取自真实赋值点(文件:行都标出来了),不是猜的。漂移由 src/__tests__/types-ctx-drift.test.js 拦。
+  /** 章节推进(只前进不回退,封顶 6)← src/kunlun/planets.js:606 */
+  setChapter: (n: number) => void;
+  /** 藏起"新芽"星屑 ← planets.js:616 */
+  hideSproutMote: () => void;
+  /** 通用藏星屑(key 与 PLANETS 同序)← planets.js:621 */
+  hidePlanetMote: (key: string) => void;
+  /** 星门现身,只进不出 ← planets.js:627 */
+  revealStarGate: () => void;
+  /** 星门是否已现身(portal.js 凭它决定按钮与自动传送)← planets.js:632 */
+  isStarGateOut: () => boolean;
+  /** 小地图当前目标(星门或当前岛),没有目标时 null ← planets.js:866 */
+  planetsMark: () => { x: number; z: number; name: string; color: string } | null;
+  /** 星球岛模式:沙漠光柱系统休眠、questActive 恒真 ← planets.js:198 */
+  planetsMode: boolean;
+  /** 星球岛拾星屑入口,复用 spirits 的反馈/库存/终章 ← src/kunlun/spirits.js:500(Object.assign) */
+  spiritsCollectExternal: (extKey?: string, extLine?: string) => void;
+  /** 当前未收集星屑 key ← spirits.js:501 */
+  spiritsNextKey: () => string | null;
 }
 
 export interface OverlayRegisterOpts {

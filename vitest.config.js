@@ -10,6 +10,11 @@ export default defineConfig({
     // 2026-10-14 实测:同一份代码单跑 3 个文件全绿,和 npm test 串在一条电池里跑就飘 2 条超时。
     // 真挂死的用例照样在 20s 后红,只是不再拿"机器忙"当"代码坏"。
     testTimeout: 20000,
+    // 同一个坑的第二半:2026-10-14 早上我只修了 testTimeout,于是发布脚本第 3 步当场红在
+    // `Hook timed out in 10000ms`(scene-manager-rollback.test.js:105 的 beforeAll 里 dynamic import
+    // 整条场景图)。⇒ 钩子有**自己**的超时,默认 10s,与 testTimeout 互不相干;84 个文件并发 transform
+    // 时那 10s 根本不够。真挂死的 setup 照样会红,只是晚 10s。
+    hookTimeout: 20000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary'],
