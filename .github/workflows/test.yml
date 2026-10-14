@@ -73,6 +73,13 @@ jobs:
         # 联机产物跑它,①立刻变红 exit 1 ⇒ 这条闸门不是恒绿的。
         run: node scripts/hill-solo-guard.cjs
 
+      - name: CSP page registry guard (BLOCKING)
+        # 分阶段 CSP 的登记表(lib/security.js CSP_INLINE_FREE_PAGES)承诺"这些页面零内联脚本/零事件属性",
+        # 服务器才敢对它们摘掉 script-src 的 'unsafe-inline'。日后谁往 lobby.html 加一句 onclick=,
+        # 线上表现是"按钮点了没反应"而极难归因 —— 这一步把那句承诺变成每个 PR 都重查的硬闸。
+        # 判不了(exit 2:取不到 lib/security.js、登记表空)同样不算绿。
+        run: node scripts/admin/csp-page-registry-guard.cjs
+
       - name: Dependency audit (npm, report-only — not blocking)
         # 供应链体检:先只报告不阻断(npm audit 会因上游新公告频繁变红,硬闸会让单人开发者被第三方公告卡死发布)。
         # 想升级就照输出开 PR;真要变闸门时,去掉下面的 `|| true` 即可(需主人拍板)。
