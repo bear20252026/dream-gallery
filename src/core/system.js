@@ -27,12 +27,14 @@ export function defineSystem(def) {
     throw new Error('[system] 缺少 name');
   }
   // 层/相位既可传字符串键('engine'/'animate'),也可传数值(PHASES.animate),统一归一为字符串键
-  const layerKey = typeof def.layer === 'string'
-    ? def.layer
-    : (Object.keys(LAYERS).find((k) => LAYERS[k] === def.layer) || 'engine');
-  const phaseKey = typeof def.phase === 'string'
-    ? def.phase
-    : (Object.keys(PHASES).find((k) => PHASES[k] === def.phase) || 'simulate');
+  const layerKey =
+    typeof def.layer === 'string'
+      ? def.layer
+      : Object.keys(LAYERS).find((k) => LAYERS[k] === def.layer) || 'engine';
+  const phaseKey =
+    typeof def.phase === 'string'
+      ? def.phase
+      : Object.keys(PHASES).find((k) => PHASES[k] === def.phase) || 'simulate';
   return {
     name: def.name,
     layer: layerKey,
@@ -45,10 +47,23 @@ export function defineSystem(def) {
   };
 }
 
-// 计算系统排序权重:层优先,其次相位,最后同相位内次序。
-// 组合根据此确定性地 init/update/dispose,不再受注册顺序影响。
-export function systemRank(s) {
-  const l = LAYERS[s.layer] != null ? LAYERS[s.layer] : 1;
-  const p = PHASES[s.phase] != null ? PHASES[s.phase] : 2;
-  return l * 1000 + p * 10 + (Number.isFinite(s.order) ? s.order : 0);
+// 系统排序:**字典序比较**(层 → 相位 → 同相位内次序),组合根据此确定性 init/update/dispose。
+// ⚠️这里以前是"把三个数加权成一个数"(`l*1000 + p*10 + order`),那个写法**默认 order 落在 (-10,10) 之内**,
+// 而实际注册并不满足:2026-10-14 实扫 `src/` 得到 |order|≥10 的系统 **9 条**(10/11/12/13/14 都有)、
+// `core/loop.js` 还是 **order:-1000**。于是同一层内"phase=input, order=14"会算得比"phase=simulate, order=0"
+// 更大 ⇒ 相位次序被 order 悄悄推翻;-1000 更能把一个系统直接搬进别的层。
+// 本次改动**不改变今天的实际顺序**(我把 21 条真实注册按旧权重与新字典序各排一遍,**换位 0 条** ——
+// 量过这张表才敢动装配最底层),它防的是"下次有人再加一个 order=15,排序就静默跨相位"。
+// 同层同相同 order 时交给 Array.sort 的稳定性 ⇒ 按注册先后,仍然确定。
+const layerOf = (s) => (LAYERS[s.layer] != null ? LAYERS[s.layer] : 1);
+const phaseOf = (s) => (PHASES[s.phase] != null ? PHASES[s.phase] : 2);
+const orderOf = (s) => (Number.isFinite(s.order) ? s.order : 0);
+
+export function compareSystems(a, b) {
+  return layerOf(a) - layerOf(b) || phaseOf(a) - phaseOf(b) || orderOf(a) - orderOf(b);
+}
+
+// 排序位置的可读串(调试用;顺序的唯一判据是上面那个比较器,别再在这里造第二个)
+export function systemKey(s) {
+  return layerOf(s) + '/' + phaseOf(s) + '/' + orderOf(s);
 }

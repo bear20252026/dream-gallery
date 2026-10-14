@@ -1,5 +1,43 @@
 # 梦幻画廊 — 项目工程档案
 
+## 2026-10-14 第六轮外部审计(两份:M-01…M-10 可维护性 + M-11…M-19 底层工程)——先核实再动手
+
+主人令「按专家意见改」,照旧**逐条回读代码后才动**,并且按专家自己的排序开工:先证明"测试到底能不能证明失败",再动生命周期。
+
+### 本批核实过的断言(5/5 属实,无误报)
+
+| 断言 | 结论 | 关键证据 |
+|---|---|---|
+| M-12 `system.js` 加权排序不保证层级 | **属实,但今天没有真排错** | 权重式 `l*1000+p*10+order` 隐含假设 order∈(-10,10);实扫 src/ 得 \|order\|≥10 共 **9 条**(10/11/12/13/14),`core/loop.js` 还是 **-1000**。⚠️量化:把 21 条真实注册按旧权重与新字典序各排一遍 ⇒ **换位 0 条**。正因为有这张表才敢动装配最底层;它防的是"下次再加一个 order=15 就静默跨相位",不是修当前的火 |
+| M-13 后台链部分失败仍报"完成" | **属实** | 失败只把 `__worldPhase` 临时写成「后台:失败:x」,`loadWorldModules` 链尾**无条件**覆盖成「后台:完成」⇒ 探针/调试界面/未来健康检查分不出"全成功"与"少了一批" |
+| M-16A test-store.js 恒真断言 | **属实** | 第 54 行是 `ok(true, …)`,消息里还印着算好的 stray 大小 ⇒ 看着像在判,实际永不失败 |
+| M-16B SQLite 恢复测试顺序与声明不符 | **属实,本轮最典型** | 场景 2(58-61 行)声称"删掉 JSON、只留 DB,从 DB 完整恢复",而 `fs.unlinkSync(json1)` 写在**第 64 行的场景 3 里** ⇒ 前置条件从未成立 |
+| M-16C 该专项测试没进 npm test 与 CI | **属实** | 全仓只有 `scripts/probe/README.md` 提过它;`package.json` 的 test 链与 test.yml 都没有 —— 而 SQLite 正在做 R1 迁移 |
+
+### PR1 已落地(测试可信度 + M-12 + M-13)
+
+- **M-12**:删掉 `systemRank`(加权成一个数),改 `compareSystems(a,b)` 字典序 + `systemKey()` 调试串;唯一消费点 `composition-root.js:22` 改成 `sort(compareSystems)`。新增 `src/__tests__/system-order.test.js`(7 条):审计给的三条反例(input+order=20 不得越过 simulate、order=-1000 不得跨层、完整序列等于层→相→序且与注册先后无关)、数值/字符串层相归一、非法层相归默认档不产生 NaN 序、缺 order 当 0、同键稳定、**全序传递性**(60 个层×相组合两两判定与排出顺序一致)。
+- **M-13**:链逻辑拆成纯模块 **`src/core/world-chain.mjs`**(`runChain` + `chainHealthy`),`world-loader.js` 只做接线。结论结构化:`{tag, status: ready|degraded|failed, loaded[], failed[], skipped[]}`;**「后台:完成」从此只在真的没有失败时说**,否则打「后台:降级:点名」。三条对外契约:`__worldPhase`(字符串,6 个探针还在读,**一字未改**)、`__worldStatus`(新增)、`__deferredWorldReady`(以前 resolve undefined,现在 resolve 结构化结果)。**搁置规则收成单一源**:`legacy.mjs` 新增 `isShelved()`,`activeModules()` 与加载链共用(原来是两处各写一遍 Set 判断 —— 正是 M-10 那类"同一规则两份实现")。新增 `src/__tests__/world-chain.test.js`(7 条)。
+- **M-16 三件**:①test-store.js 那条恒真换成三条真断言(正式文件存在且可解析 / 内容完整 / 不留 `.tmp`),并且**由测试自己先埋一个 `.tmp` 残留** —— 不埋的话"没有残留"是空话,哪天有人改成直写正式文件也照样绿;②test-store-sqlite.js 场景 2 改成"先删档 → **断言此刻真的只剩 DB** → 再起子进程"(并写明子进程自己会把镜像 JSON 写回来,所以前置断言必须放在起进程之前);③该脚本进 `npm test`(5→**6 条,198 项**)与 CI 的 `build-and-test` **step**(纪律不变:required context 名是 job id,新增 job 会把保护打成永远 pending)。
+- **每条都做了反向验证**(专家的验收原话:"人为破坏被验证条件时,相关测试确实失败"):
+  · `compareSystems` 换回旧加权 ⇒ 7 条里恰好**那两条反例红**;
+  · world-chain 去掉 `status='degraded'` ⇒ degraded 那条红;
+  · store 改成直写正式文件(不产生也不搬走 tmp)⇒ 残留那条红(6 通过 1 失败);
+  · **test-store-sqlite 去掉 unlink ⇒ 只有"前置条件成立"那条红,旧的"从 SQLite 完整恢复"照样绿** —— 这一条把"假通过"的本质演示得最清楚:断言文案没错,错的是它前面的世界状态。
+  全部还原后复绿。
+- 门禁:npm test 6 条脚本 198 项 / vitest **978 项**(964+14)/ eslint 0 / tsc --noEmit 0 / `npm run build` 0 且 `[entry-weight]`、`[no-importmap]`、`[core-preload] 45 条` 三条构建断言照旧 / checkJs **308 = 基线**(新增 0 条)。
+- ⚠️**要记住的三条纪律**:①**"断言写对了"不等于"测到了"** —— 凡是"从 X 状态恢复"这类测试,必须先断言 X 状态此刻成立;②**否定式断言要自己造反例**(说"没有残留"就先把残留埋进去),否则它永远绿;③改**加权排序**这类最底层之前,先把"当前真实影响"量成一张表(换位几条),否则说不清这次是"修 bug"还是"改行为"。
+
+### 第六轮还没动的部分(已排期)
+
+PR2 = M-14(`hot.js` 用**销毁时**的 `ctx.scene.s` 去摘**创建时**所属场景的资源 ⇒ 跨世界残留 + GPU 已释放)/ `bag.async()` 执行前不校验代次 / M-15 未退订监听;
+PR3 = M-11(`saveGateData()` 链尾 `.catch` 吞错 ⇒ 调用方 `await` 也判不出落盘成败;且 `_savedAt` 先于写入被改、任务读的是共享活对象)+ M-17(`stopOutbox()→flush()→writeNow()` 把布尔结果丢了);
+PR4 = M-19(`depcruise` 只扫 src,lib/ 不在入口)/ M-18(`stream.guard()` 的 `release()` 不自我幂等 —— **审计自己注明今天调用方恰好幂等,所以不是现役漏洞**);
+稳定性包 A = M-01(组合根 `initialized=true` 写在循环前、某系统 init 抛错仍继续装后面的、运行后注册只告警)、M-05(`enter()`/`enterWithoutPush()` 两套重复实现且后者缺 finally ⇒ `transitioning` 可能永久为真把切换锁死);
+包 B = M-02(GameState 先 notify 后写回 ctx)、M-03(326/327 多层裸 `setTimeout`,离开章节无统一票据 ⇒ 旧对白在新场景弹、剧情被旧回调改写)、M-04(`applySave` 逐字段写而不汇总失败,失败也照样 reload);
+结构包 C(P2)= M-06 显式生命周期试点、M-07 抽 `story-session`/`stardust`/`beacon-manager`、M-08 类型渐进(明确**不要**整仓 .js→.ts)、M-09 剧情文本按语句 ID 取(`tt()` 现在带全局注册副作用)、M-10 legacy 过滤改用稳定 ID 而非中文标签、山丘产物溯源。
+⚠️其中 **M-02 动手前先读 `src/__tests__/game-state.test.js` 原文**:审计指出该测试把"写回失败 GameState 仍保留新值"钉成了**已确认契约** —— 别把有意的兼容行为当 bug 改掉。
+
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
 
 审计方只读源码、未跑测试,并明确「不把此前已修复的问题重复计为缺陷」。6 条工程断言逐条回读后:**4 条成立(其中 1 条比审计说得更严重)、2 条部分成立、1 条误报**;素材版权与译本授权两条按主人指示不处理。
@@ -606,8 +644,9 @@
 
 ```bash
 export PATH="/c/Program Files/nodejs:$PATH"
-npm test                          # = 下面五条(test-store + test.js + test-session + test-upload-security + test-mobile)
-node scripts/test/test-store.js   # 存档原子写 4 项(并发保存/截断恢复/tmp 残留)
+npm test                          # = 下面六条(test-store + test-store-sqlite + test.js + test-session + test-upload-security + test-mobile)
+node scripts/test/test-store.js   # 存档原子写 7 项(并发保存/截断恢复/tmp 残留;**2026-10-14 起先埋残留再断言它被搬走**)
+node scripts/test/test-store-sqlite.js # SQLite 持久层 11 项(迁移/DB 权威恢复/**前置条件断言**/_savedAt 仲裁/USE_SQLITE=0 回退;2026-10-14 起才进 npm test 与 CI)
 node scripts/test/test.js         # 后端 108 项(数据校验/API/安全边界/审批门/上传限制/邀请/协商缓存/健康检查)
 node scripts/test/test-session.js # 会话机制 46 项(吊销永久 + 过期自愈 + 兼容护栏 + dk 归并收紧;2026-10-11 起进 npm test)
 node scripts/test/test-upload-security.js # 上传归属 20 项(同 UA 陌生人互不可见 + 存量迁移 + 吊销即断)

@@ -39,6 +39,14 @@ export const LEGACY_MODULE_LABELS = new Set([
   '终章',
 ]);
 
+/** 这一条模块是不是"被搁置"的旧玩法。规则只在这里定义一次:
+ *  activeModules 用它过滤,加载链(core/world-chain.js)也用它统计"跳过名单"——
+ *  两边各写一遍 `LEGACY_MODULE_LABELS.has(...)` 早晚会对不上(第六轮审计 M-10 说的就是这个)。 */
+export function isShelved(entry, on) {
+  const keep = on === undefined ? legacyOn() : on;
+  return !keep && LEGACY_MODULE_LABELS.has(entry[0]);
+}
+
 /** 过滤加载链:旧玩法关闭时去掉 LEGACY_MODULE_LABELS 里的模块 */
 export function activeModules(list, on) {
   const keep = on === undefined ? legacyOn() : on;

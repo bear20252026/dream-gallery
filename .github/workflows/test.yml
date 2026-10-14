@@ -113,6 +113,15 @@ jobs:
       - name: Backend atomic-write regression (no media assets needed)
         run: node scripts/test/test-store.js
 
+      - name: SQLite persistence regression (迁移/DB 权威恢复/_savedAt 仲裁/USE_SQLITE 回退)
+        # 2026-10-14 第六轮审计 M-16C:这脚本一直存在,但 `npm test` 与 CI 都没调用它 ⇒
+        # SQLite 正在做架构迁移(R1),而它的回归从未在主线上跑过。现在补进来(只加 step,
+        # 不加 job —— 分支保护的 required context 是 job id,加 job 会让保护永远 pending)。
+        # 同批还修了它自己的"假通过":场景 2 声称"删掉 JSON 从 DB 恢复",而 unlink 实际写在场景 3,
+        # 前置条件从未成立;现在先删再断言"此刻真的只剩 DB"。反向验证:把 unlink 去掉 ⇒ 只有那条
+        # 前置断言红、旧的那句"从 SQLite 完整恢复"照样绿(正是审计说的"看起来在判,其实没判")。
+        run: node scripts/test/test-store-sqlite.js
+
       - name: Backend API regression (127 assertions - data validation / security boundaries / quiz gate / approval gate)
         run: node scripts/test/test.js
 
