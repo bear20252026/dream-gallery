@@ -5,6 +5,7 @@
 // 本模块在 main.js 加载链中排其之后),不与 kunlun 域建立 import 依赖。
 import { ctx } from '../ctx.js';
 import { eventBus } from '../event-bus.js';
+import { hotBegin, hotEnd } from '../hot.js';
 import { Z } from '../shared/z-layers.mjs';
 import { tt } from '../shared/story-text.mjs';
 import {
@@ -15,15 +16,24 @@ import {
   exitGateNudge,
 } from '../shared/planet-logic.mjs';
 
+// 本模块此前完全在 HMR 生命周期之外(2026-10-14 第六轮审计 M-15 的唯一实例):
+// 顶层一条 `eventBus.on('world:changed', …)` 把退订函数直接丢弃,外加 window 监听、head 里的
+// style、ctx.onTick 各一份 —— 热替换重跑本模块就是双份(两个 tick 都算落点 nudge、按钮被
+// appendChild 两遍)。站内 26 个模块都用 hotBegin/hotEnd 这套约定,这里照做;捕获管不到的三件
+// (eventBus / window 监听 / head style)用 bag.custom 显式登记。
+const bag = hotBegin('portal');
+
 let gateArmed = true; // 见 planet-logic.gateStep:触发即解除,走出半径重新武装(防返回回弹)
 
 const padBtn = document.createElement('button');
 padBtn.id = 'gateBtn'; // 布局样式(ui/hud-layout.js)按 id 定位
 const padLabel = () => tt({ zh: '✦ 进入 B612', en: '✦ Enter B612' });
 padBtn.textContent = padLabel();
-window.addEventListener('script:lang', () => {
+function onLang() {
   padBtn.textContent = padLabel();
-});
+}
+window.addEventListener('script:lang', onLang);
+bag.custom.push(() => window.removeEventListener('script:lang', onLang));
 // 按钮亮着时它就是唯一的下一步:罗盘条(「转身 · 15m」)让位,免得两条指令打架
 function showPad(on) {
   padBtn.style.display = on ? 'block' : 'none';
@@ -33,6 +43,7 @@ function showPad(on) {
 const padStyle = document.createElement('style');
 padStyle.textContent = 'body[data-gate-ready] #storyCompass{display:none!important}';
 document.head.appendChild(padStyle);
+bag.custom.push(() => padStyle.remove()); // 捕获只包 body 的 appendChild,head 里这条得自己摘
 padBtn.style.cssText =
   'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:' +
   Z.navBtn +
@@ -61,7 +72,7 @@ document.body.appendChild(padBtn);
 
 // 从 B612/星球返回主世界:解除武装(落点就在石门旁,不解除下一帧又弹回——
 // 2026-09-06「返回主世界黑屏」根因)+ 把落点推出石门半径,回身即见「✦ 进入 B612」
-eventBus.on('world:changed', function (e) {
+const offWorldChanged = eventBus.on('world:changed', function (e) {
   if (!e || e.to !== 'main') return;
   gateArmed = false;
   const pl = ctx.player.pl;

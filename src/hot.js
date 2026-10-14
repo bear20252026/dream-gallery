@@ -21,7 +21,30 @@ const REG = (window.__HMR__ = window.__HMR__ || {});
 
 // —— 捕获补丁的安装/卸载(2026-10-11 抽成函数:hotEnd 与 bag.async 共用一套口径) ——
 // 逐件记录"装之前是什么",卸载时原样交还,嵌套包装也交还正确(内层还原到外层版本)。
+//
+// ★ 代次守卫(2026-10-14 第六轮审计 M-14 的那一半):`bag.register` 早就有 `REG[name] !== bag` 的
+//   晚到检查,但**捕获路径没有** ⇒ 模块被热替换后,迟到的 `bag.async` 回调仍会把这个已 dispose 的
+//   旧 bag 的补丁重新装到 s.add / appendChild / onTick 上,回调期间创建的对象全落进
+//   `bag.objs`(dispose 时已 `length = 0`,之后再没人读它)= 对象留在场景里、GPU 资源永不释放。
+//   现在的口径:不在任就**不装**——这些对象于是由当前世代自己的捕获接管(它包着就归它释放),
+//   没有任何世代包着(生产不热替换)时就和改动前一样只是正常加入场景。
+//   不装也就不卸:否则 finally 里的 uninstall 会把 `_prevAdd`(记下的是**现任**的包装)再赋回去,
+//   看着像还原,实际把现任的捕获悄悄摘掉了 —— 那比漏释放更难查。
+function isLiveBag(bag) {
+  return !bag.name || REG[bag.name] === bag;
+}
+
+// ★ 安装是**一层栈**,不是四个 `bag._prevX` 单槽(2026-10-14 第六轮审计 M-14 顺带抓到的真缺陷):
+//   原实现把"装之前是什么"记在 bag._prevAdd / _prevAppend / _prevSetInterval / _prevOnTick 四个单槽里,
+//   而 `bag.async()` 回调进出会再装/再卸一层 ⇒ 内层 install 覆盖单槽、内层 uninstall 又把单槽**置 null**
+//   ⇒ 轮到最后 `hotEnd()`/`dispose()` 时 `if (bag._prevAdd)` 已经是假的,**外层那层补丁永远卸不掉**:
+//   每次热更都在 s.add / appendChild / onTick 上留一层壳,而且被卸干净的那轮之后新加的对象还会落进
+//   已经 dispose 完的旧 bag。热更次数越多壳越厚(只有 dev/HMR 路径受影响,线上不二次装配)。
+//   现在:每次 install 把这一层的 prev 组压栈,uninstall 弹栈还原,栈空才真的没有补丁。
 function installCaptures(bag) {
+  if (!isLiveBag(bag)) return false;
+  if (!bag._captureStack) bag._captureStack = [];
+  const saved = {};
   const s = ctx.scene && ctx.scene.s;
   if (s && typeof s.add === 'function') {
     const prev = s.add.bind(s);
@@ -29,7 +52,7 @@ function installCaptures(bag) {
       bag.objs.push(...a);
       return prev(...a);
     };
-    bag._prevAdd = prev;
+    saved.prevAdd = prev;
   }
   if (typeof document !== 'undefined' && document.body) {
     const prev = document.body.appendChild.bind(document.body);
@@ -37,7 +60,7 @@ function installCaptures(bag) {
       bag.doms.push(el);
       return prev(el);
     };
-    bag._prevAppend = prev;
+    saved.prevAppend = prev;
   }
   if (typeof window !== 'undefined' && window.setInterval) {
     const prev = window.setInterval.bind(window);
@@ -46,7 +69,7 @@ function installCaptures(bag) {
       bag.intervals.push(id);
       return id;
     };
-    bag._prevSetInterval = prev;
+    saved.prevSetInterval = prev;
   }
   if (typeof ctx.onTick === 'function') {
     const prev = ctx.onTick;
@@ -54,29 +77,35 @@ function installCaptures(bag) {
       bag.tickers.push(fn);
       return prev(fn);
     };
-    bag._prevOnTick = prev;
+    saved.prevOnTick = prev;
   }
+  bag._captureStack.push(saved);
+  return true;
 }
 
 function uninstallCaptures(bag) {
+  const stack = bag._captureStack;
+  if (!stack || !stack.length) return; // 没装过(或代次守卫拦了)⇒ 什么都不还原
+  const saved = stack.pop();
   const s = ctx.scene && ctx.scene.s;
-  if (bag._prevAdd) {
-    if (s) s.add = bag._prevAdd;
-    bag._prevAdd = null;
+  if (saved.prevAdd) {
+    if (s) s.add = saved.prevAdd;
   }
-  if (bag._prevAppend) {
+  if (saved.prevAppend) {
     if (typeof document !== 'undefined' && document.body)
-      document.body.appendChild = bag._prevAppend;
-    bag._prevAppend = null;
+      document.body.appendChild = saved.prevAppend;
   }
-  if (bag._prevSetInterval) {
-    if (typeof window !== 'undefined') window.setInterval = bag._prevSetInterval;
-    bag._prevSetInterval = null;
+  if (saved.prevSetInterval) {
+    if (typeof window !== 'undefined') window.setInterval = saved.prevSetInterval;
   }
-  if (bag._prevOnTick) {
-    ctx.onTick = bag._prevOnTick;
-    bag._prevOnTick = null;
+  if (saved.prevOnTick) {
+    ctx.onTick = saved.prevOnTick;
   }
+}
+
+// 把这轮 bag 还压着的补丁全部吐干净(dispose 用;正常情况下栈里只剩 hotBegin 那一层或空)
+function drainCaptures(bag) {
+  while (bag._captureStack && bag._captureStack.length) uninstallCaptures(bag);
 }
 
 export function hotBegin(name) {
@@ -89,10 +118,19 @@ export function hotBegin(name) {
     }
     delete REG[name];
   }
-  const bag = { objs: [], doms: [], intervals: [], tickers: [], custom: [], tracked: [] };
+  const bag = {
+    name,
+    objs: [],
+    doms: [],
+    intervals: [],
+    tickers: [],
+    custom: [],
+    tracked: [],
+    _captureStack: [], // 捕获补丁的安装栈(见 installCaptures 上方那段)
+  };
   REG[name] = bag;
   bag.dispose = () => {
-    uninstallCaptures(bag);
+    drainCaptures(bag);
     // 统一释放走 shared/dispose-object3d.mjs(站内唯一实现,与 mode.js/paintings.js 同口径):
     // 内置"three 的 Sprite 共享几何不释放"保护——早先内联 traverse 会对 Sprite 几何调 dispose,
     // 一旦命中就是全站 Sprite 一起消失的事故面。
@@ -146,7 +184,7 @@ export function hotBegin(name) {
     const mainScene = ctx.scene && ctx.scene.s;
     // 主场景对象在捕获窗口里已被 s.add 收进 bag.objs —— 不重复登记(避免同一棵树 dispose 两遍)
     if ((!scene || scene === mainScene) && bag.objs.includes(obj)) return obj;
-    if (REG[name] !== bag) {
+    if (REG[bag.name] !== bag) {
       // 本轮已被热替换:晚到的资源当场摘除并释放,绝不留给下个世代(照 sheep-companion 的口径)
       try {
         (scene || mainScene)?.remove(obj);
@@ -172,11 +210,14 @@ export function hotBegin(name) {
   bag.async = (fn) => {
     if (typeof fn !== 'function') return fn;
     return function (...args) {
-      installCaptures(bag);
+      // 代次守卫:不在任就什么都不装(见文件头 installCaptures 上方那段)。
+      // 关键是**不装就不卸** —— 卸载会把 _prevAdd(此刻记的是现任 bag 的包装)赋回去,
+      // 等于把现任的捕获悄悄摘掉,那比这次泄漏更难查。
+      const installed = installCaptures(bag);
       try {
         return fn.apply(this, args);
       } finally {
-        uninstallCaptures(bag);
+        if (installed) uninstallCaptures(bag);
       }
     };
   };
