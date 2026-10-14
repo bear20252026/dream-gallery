@@ -133,6 +133,41 @@ const corePreloadInject = () => ({
   },
 });
 
+// 生产构建里摘掉 <script type="importmap">(2026-10-14,CSP 第三阶段的第一步)。依据是三条实测,不是推测:
+//   ① 构建产物里**一个裸 specifier 都没有** —— vite 已把 `three` 改写成 `./three-<hash>.js` 相对路径
+//      (dist/assets/*.js 里 `from"three"` 计数 0),所以这张 map 在线上不解析任何东西;
+//   ② 它指向的 /vendor/* 在线上**根本不存在**(curl /vendor/three.module.js ⇒ 404;vendor/ 没进部署清单);
+//   ③ 严格 CSP 下它是**真的被拦**:沙箱里对 '/' 起 `CSP_STRICT_MODE=enforce`,页面内 `import('three')`
+//      报 "Failed to resolve module specifier",而 report-only 档能解析到 vendor URL
+//      ⇒ "留着它"在线上等于声明了一个并不存在的能力,还额外占一个内联 <script>(挡着 / 进 CSP 登记表)。
+// 源码 index.html 里的 map **保留**:未构建直接跑仓库根那套服务(vite dev / 本地按 /src/** 原样取模块)
+// 仍然靠它解析 bare specifier。⇒ 只在 build 里摘,摘完断言产物确实没有,并断言产物确实不需要它。
+const noImportMapInBuild = () => ({
+  name: 'no-importmap-in-build',
+  apply: 'build',
+  enforce: 'post',
+  transformIndexHtml(html) {
+    if (!/type=["']importmap["']/.test(html)) return html; // 只有 index.html 带这张 map,其余页面原样过
+    return html.replace(/<script\s+type=["']importmap["'][^>]*>[\s\S]*?<\/script>\s*/i, '');
+  },
+  closeBundle() {
+    const dir = resolve(__dirname, 'dist');
+    const htmlFile = resolve(dir, 'index.html');
+    let html;
+    try { html = fs.readFileSync(htmlFile, 'utf8'); } catch (e) { return console.warn('[no-importmap] 读不到 dist/index.html,跳过断言:' + e.message); }
+    if (/type=["']importmap["']/.test(html)) throw new Error('[no-importmap] dist/index.html 里仍有 importmap ⇒ 摘除没生效(标签写法变了?),别让它带着"线上不成立的能力"发布');
+    // 断言②的那半边:产物里若还出现裸 specifier,摘掉 map 就是打断功能 ⇒ 当场红,不做"大概没事"
+    const files = fs.readdirSync(resolve(dir, 'assets')).filter((f) => f.endsWith('.js'));
+    const offenders = [];
+    for (const f of files) {
+      const s = fs.readFileSync(resolve(dir, 'assets', f), 'utf8');
+      if (/(?:from|import)\s*\(?\s*["'](three|hls\.js|three\/)/.test(s)) offenders.push(f);
+    }
+    if (offenders.length) throw new Error('[no-importmap] 产物里还有裸 specifier 的代码:' + offenders.slice(0, 5).join(', ') + ' ⇒ 摘掉 importmap 会打断它们,先别摘');
+    console.log('[no-importmap] dist/index.html 已无 importmap,' + files.length + ' 个 chunk 里没有裸 specifier 依赖它 ✓(源码 index.html 仍保留,供未构建模式解析)');
+  },
+});
+
 export default defineConfig({
   root: '.',
   define: { __B612_BUILD__: JSON.stringify(buildStamp()) },
@@ -149,6 +184,7 @@ export default defineConfig({
     corePreloadInject(),
     // HTML 压缩保护:去除注释、空白、多余换行
     createHtmlPlugin({ minify: true }),
+    noImportMapInBuild(),
   ],
   build: {
     outDir: 'dist',
