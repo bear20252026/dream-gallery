@@ -253,11 +253,39 @@ else
   # 不用 `--auto`:它是仓库级开关,本仓默认关着 ⇒ `GraphQL: Auto merge is not allowed for this
   # repository`(2026-10-14 真实运行撞到)。改成自己按**字段**轮询 required checks,绿了才 merge。
   # ⚠️required contexts 从分支保护**动态读**,不写死在脚本里 —— 写死就会在保护改了之后悄悄失配。
+  # 而且**legacy 与 ruleset 两个来源都要读**:2026-10-14 实查本仓 main 归 ruleset 管,legacy 的写
+  # 接口在有 ruleset 的仓库里一律 404(只剩读,是派生视图)。只认 legacy 就会在"以后只改 ruleset"时
+  # 拿着旧名单绿着放行 —— 判"该跑哪些 check"必须 fail-closed,读不到依据就不合并不部署。
   REPO_SLUG=$("$GH_BIN" repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)
   [ -n "$REPO_SLUG" ] || { echo "❌ 取不到 owner/repo,无法读分支保护 ⇒ 闸门没有依据,不合并"; echo "RELEASE_FAILED(未部署)"; exit 1; }
-  REQ_CTX=$("$GH_BIN" api "repos/$REPO_SLUG/branches/main/protection" --jq '.required_status_checks.contexts[]' 2>/dev/null || true)
-  [ -n "$REQ_CTX" ] || { echo "❌ 读不到 required contexts(保护被改了/离线?)⇒ 判不了就不合,不部署"; echo "RELEASE_FAILED(未部署)"; exit 1; }
+  CTX_DIR=".tmp/reqctx-$$"
+  mkdir -p "$CTX_DIR" || { echo "❌ 建不了 $CTX_DIR ⇒ 无法保存读到的保护配置,不合并"; echo "RELEASE_FAILED(未部署)"; exit 1; }
+  if ! "$GH_BIN" api "repos/$REPO_SLUG/branches/main/protection" > "$CTX_DIR/legacy.json" 2>"$CTX_DIR/legacy.err"; then
+    # 404 是合法的"legacy 规则不存在"(本仓写了 404,但读口还在);把响应体留给判定器区分"没有"与"读挂了"
+    echo "ℹ️ legacy 保护接口非 0 退出($(head -c 120 "$CTX_DIR/legacy.err" 2>/dev/null))⇒ 以响应体为准交给判定器"
+  fi
+  if ! "$GH_BIN" api "repos/$REPO_SLUG/rulesets" > "$CTX_DIR/rulesets.json" 2>"$CTX_DIR/rulesets.err"; then
+    echo "❌ 读不到 rulesets($(head -c 160 "$CTX_DIR/rulesets.err" 2>/dev/null))⇒ 无法确认闸门现状,不合并"; echo "RELEASE_FAILED(未部署)"; exit 1;
+  fi
+  RS_FILES=""
+  # 列表已经在 legacy.json 旁边存好了,再从**文件**里取 id:让 gh 读 stdin 会被当成请求体(GET 带 body),
+  # 这里宁可显式解析 —— 文件不是合法 JSON 就当场失败,不会"悄悄少读到一个 ruleset"。
+  RS_IDS=$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));if(!Array.isArray(j))throw new Error("rulesets 不是数组");console.log(j.map(r=>r.id).join(" "))' "$CTX_DIR/rulesets.json") || { echo "❌ 解析 rulesets 列表失败 ⇒ 闸门没有依据,不合并"; echo "RELEASE_FAILED(未部署)"; exit 1; }
+  for RS_ID in $RS_IDS; do
+    [ -n "$RS_ID" ] || continue
+    if ! "$GH_BIN" api "repos/$REPO_SLUG/rulesets/$RS_ID" > "$CTX_DIR/rs-$RS_ID.json" 2>"$CTX_DIR/rs-$RS_ID.err"; then
+      echo "❌ 读不到 ruleset #$RS_ID 的详情($(head -c 120 "$CTX_DIR/rs-$RS_ID.err" 2>/dev/null))⇒ 判不了它管不管 main,不合并"; echo "RELEASE_FAILED(未部署)"; exit 1
+    fi
+    RS_FILES="$RS_FILES $CTX_DIR/rs-$RS_ID.json"
+  done
+  # set -e 下 `VAR=$(cmd)` 失败会直接终止脚本、连退出码都读不到 ⇒ 用 if 包住,把"判不了"变成一条明确结论
+  if REQ_CTX=$(node scripts/admin/required-contexts.cjs "$CTX_DIR/legacy.json" $RS_FILES); then :; else
+    echo "❌ required contexts 判定器没有依据 ⇒ 不合并(判不了 ≠ 可以合)"
+    echo "RELEASE_FAILED(未部署)"; exit 1
+  fi
   echo "→ required checks:$(printf '%s' "$REQ_CTX" | tr '\n' ' ')"
+  # 判成功了就把原始响应丢掉(它是每次运行的临时依据,不是台账);失败路径**故意不清**,留着查
+  rm -rf "$CTX_DIR"
   VERDICT=""
   for i in $(seq 1 80); do
     ROLL=$("$GH_BIN" pr view "$PR_NUM" --json statusCheckRollup 2>/dev/null || echo '')
