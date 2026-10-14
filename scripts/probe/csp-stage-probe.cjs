@@ -178,6 +178,10 @@ function inlineScripts(html) {
     await ctx.close();
     say('  ' + entry.path.padEnd(14) + ' | ' + row.http + ' | ' + row.inline + ' | 违规 ' + ((viols || []).length) + ' | ' + row.verdict
       + (row.perr ? ' | ' + row.perr : '') + (row.boot ? ' | ' + row.boot : ''));
+    // 违规明细只在有违规时另起一行打全:一行表格里塞不下 4 条 directive+行号,
+    // 而"谁被拦了"恰恰是这项测量唯一有用的部分(2026-10-14 第一次判 '/' 时就是因为没打这个,
+    // 只能看到"违规 4"而分不清那条 importmap 算不算被拦)。
+    if ((viols || []).length) say('        ↳ ' + row.viol);
   }
   await browser.close();
   cleanup();
