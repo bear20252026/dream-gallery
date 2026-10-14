@@ -314,18 +314,60 @@ describe('②b 定时器与有界(假定时器,钉死无残留)', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('flush()/stop() 之后无残留定时器;stop 会收尾落盘', () => {
+  it('flush()/stop() 之后无残留定时器;stop 走**同步**落盘并给出结论', () => {
+    // 2026-10-14 M-11/M-17:stop() 改走 saveGateDataSync()。关闭路径上"入队"等于赌进程还活着,
+    // 而 pm2 grace 到点就 SIGKILL;所以这里必须断言**调的是同步那个**,异步那个一次都不许多。
     const spy = vi.spyOn(store, 'saveGateData').mockImplementation(() => {});
+    const spySync = vi
+      .spyOn(store, 'saveGateDataSync')
+      .mockImplementation(() => ({ ok: true, jsonOk: true, sqliteOk: true, errors: [] }));
     aiusage.record({ capability: 'tts', channel: 'edge-tts', ok: true });
     expect(vi.getTimerCount()).toBe(1);
     expect(aiusage.flush()).toBe(1);
     expect(vi.getTimerCount()).toBe(0);
     aiusage.record({ capability: 'tts', channel: 'edge-tts', ok: true });
     expect(vi.getTimerCount()).toBe(1);
-    aiusage.stop();
+    const st = aiusage.stop();
     expect(vi.getTimerCount()).toBe(0);
-    expect(spy).toHaveBeenCalledTimes(2); // flush 一次 + stop 收尾一次
+    expect(spySync).toHaveBeenCalledTimes(1); // stop 收尾那一次 = 同步写
+    expect(spy).toHaveBeenCalledTimes(1); // flush 仍是异步入队(运行期不动延迟)
+    expect(st.ok).toBe(true);
     expect(aiusage.summary().pending).toBe(0);
+  });
+
+  it('注入:落盘没成 ⇒ 条数退回 pending,台账不静默丢(M-11 的真实效果)', async () => {
+    // 旧实现这里"看起来"有保护(try/catch + 注释写着写失败不清 dirty),但 saveGateData() 的同步段
+    // 只是入队,磁盘错误在链的另一头被吞 ⇒ catch 永远不触发。现在按结果对象判定,所以要能测出退回。
+    vi.spyOn(store, 'saveGateData').mockImplementation(() =>
+      Promise.resolve({
+        ok: false,
+        jsonOk: false,
+        sqliteOk: true,
+        errors: ['JSON 镜像落盘失败: ENOSPC'],
+      })
+    );
+    aiusage.record({ capability: 'vision', channel: 'mimo-tp', ok: true });
+    expect(aiusage.summary().pending).toBe(1);
+    expect(aiusage.flush()).toBe(1); // 交出去
+    expect(aiusage.summary().pending).toBe(0); // 在途(尚未定论)
+    await Promise.resolve();
+    await Promise.resolve(); // 等那次 .then 的微任务跑完
+    expect(aiusage.summary().pending).toBe(1); // 失败 ⇒ 退回,下次 record/flush 还会再试
+  });
+
+  it('注入:stop() 同步写坏 ⇒ 返回 ok:false 且 pending 还在', () => {
+    vi.spyOn(store, 'saveGateDataSync').mockImplementation(() => ({
+      ok: false,
+      jsonOk: false,
+      sqliteOk: true,
+      errors: ['JSON 镜像落盘失败: EACCES'],
+    }));
+    aiusage.record({ capability: 'quiz-ai', channel: 'moonshot', ok: true });
+    const st = aiusage.stop();
+    expect(st.ok).toBe(false);
+    expect(st.pending).toBeGreaterThan(0);
+    expect(/EACCES/.test(st.error)).toBe(true);
+    expect(aiusage.summary().pending).toBeGreaterThan(0); // 没落成就不许报"已落盘"
   });
 
   it('days 有界:跨 20 天记账只留最近 14 天(裁掉的是最旧那天)', () => {
