@@ -104,6 +104,15 @@ jobs:
         # 判据取 dependency-cruiser 解析的真实依赖图(与上面那道 no-circular 同一解析器,不是人记的目录名)。
         run: node scripts/admin/check-backend-manifest.cjs
 
+      - name: Probe data-root isolation guard (BLOCKING — 自起 server.js 的脚本必须隔离数据根)
+        # 2026-10-15 实测:任何 `spawn('server.js')` 只要不打 GATE_DATA_FILE,就按 lib/store.js:9/19 的
+        # 默认值把仓库根 gate_data.json/.db 当数据根;server.js:239 起 lib/retention.js:457 的"启动先跑一次"
+        # 清扫会立刻落一份全库快照 —— 约 1 秒、零请求。探针超时或断言失效时(已退役的 media-rules-probe
+        # 就是这个形状),坏数据已经落在真实数据根上了。这一条把判定钉在 PR 上:新违例报红,
+        # 例外必须写进 scripts/probe-isolation-allowlist.txt 并附理由;清单里已不需要豁免的条目同样报红
+        # (清单只许缩短)。两个方向都用临时探针/临时条目做过反证。
+        run: node scripts/admin/probe-isolation-guard.cjs
+
       - name: Vitest unit tests
         run: npm run test:unit
 

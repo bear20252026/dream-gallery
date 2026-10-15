@@ -147,24 +147,31 @@ Cloudflare(cloudbear.cloud 域名 + HTTPS 证书 + 边缘缓存)
 ### 步骤 4:测试门禁(全绿才能往下走)
 - **如何**(2026-08-29 校准):
   ```bash
-  npm test                                # = 下面三条
-  node scripts/test/test-store.js         # 存档原子写 4 项
-  node scripts/test/test.js               # 后端 125 项:数据校验/API/安全/审批门/上传/邀请
+  npm test                                # = 六条子门禁,不是三条(2026-10-15 按 package.json 核对)
+  node scripts/test/test-store.js         # 存档原子写
+  node scripts/test/test-store-sqlite.js  # SQLite 持久层(2026-10-14 起才进 npm test 与 CI)
+  node scripts/test/test.js               # 后端 108 项:数据校验/API/安全/审批门/上传/邀请
+  node scripts/test/test-session.js       # 会话机制
+  node scripts/test/test-upload-security.js # 上传归属
   node scripts/test/test-mobile.js        # 手机渲染 6 项:着色器/JS异常/空屏
-  npx vitest run                          # 前端单测 82 项
+  npx vitest run                          # 前端单测 1088 项 / 97 文件(2026-10-15 15:00 实测)
+  node scripts/admin/probe-isolation-guard.cjs # 数据根隔离闸:自起 server.js 的脚本必须指临时数据根
   ```
+  各项**条数只写在 AGENTS.md「上线前必跑」一处**(这里原来抄过 4/125/82 这些旧数,已改成不重复记账)。
 - 专项探针(改动涉及对应领域时跑):
   ```bash
   node scripts/probe/overlay-probe.js       # 12 项 弹层三铁律
   node scripts/probe/store-probe.js         # 11 项 存档单一出口
-  node scripts/probe/media-rules-probe.js   #  8 项 媒体可见性
+  # (媒体可见性专项 media-rules-probe.js 已于 2026-10-15 退役:夹具随「照片全库退役」没了 + 特殊模式已删,
+  #  且 spawn 不打 GATE_DATA_FILE/SQLITE_PATH ⇒ 现在默认拒绝运行并 exit 2。改可见性跑:
+  #  src/__tests__/mediarules.test.js 12 + lib-thumb-gate.test.js 14 + 本文件 test.js 媒体门禁段 12 + api-ban-upload-probe.cjs 22)
   node scripts/probe/ctx-bus-probe.js       #  8 项 ctx 命名空间契约
   node scripts/probe/spirit-hud-probe.js    #  5 项 灵蕴指引
   node scripts/probe/ark-free-probe.js      # 13 项 飞舟自由飞(含撞地钳制/疆域回推)
   node scripts/probe/security-fix-probe.js  # 13 项 安全基线
   ```
 - 大版本加跑:`node scripts/test/verify-all.js`(门禁→模式→邀请函→特殊访问→彩蛋全链路)
-- **产出**:全绿记录(九套专项合计 201 项 + vitest 82 项)。**任何一项红,回到步骤 2,不准部署。**
+- **产出**:全绿记录(专项探针与 vitest 的条数以 AGENTS.md「上线前必跑」为准,本文件不再重复记账——原句"201 项 + vitest 82 项"是 2026-08-29 的旧数,已作废)。**任何一项红,回到步骤 2,不准部署。**
 - **探针跑不起来先查开发入口**:本地门禁探针走的是仓库根 `index.html` 的**原生 ESM + importmap**
   路径。若全部卡在 `waitForFunction` 超时,多半是 `vendor/` 缺文件——跑
   `node scripts/gen/sync-vendor.js` 重建;新增 `three/examples/jsm/**` 依赖时须同时登记

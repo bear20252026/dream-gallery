@@ -1,9 +1,23 @@
 // media-rules-probe.js — 媒体可见性决策表(src/shared/mediarules.mjs)实机验收(2026-07-28 架构深化④)
-// 断言:普通模式=演示上墙/图库框留内容拿掉/他人整框隐藏;切特殊模式=演示下墙/图库全展示;全程无 pageerror
-// 用法: node scripts/probe/media-rules-probe.js
+// ⚠️已退役(2026-10-15;定性过程见 AGENTS.md「媒体可见性规矩」):断言的对象已经不存在,不是"环境跑不通"——
+//   ① 夹具没了:2026-09-06「照片全库退役」删光 data.js 里 69 张图库照片,只剩 5 张演示(201~205),
+//      它抽查的 photos/1000000850.jpg 也不存在 ⇒ `libContentOff > 0` 这类断言永无可能成立;
+//   ② 特殊模式已删(lib/siteconfig.js:68 起 mode 恒为 'normal')⇒ 下面 [2][3] 两段验的东西没了;
+//   ③ 数据根没隔离:本文件 spawn 只改 PORT,不打 GATE_DATA_FILE/SQLITE_PATH,会按 lib/store.js:9/19 的默认值
+//      拿仓库根的 gate_data.json / gate_data.db 起服 —— 在一个注定红的验收上写真实数据根。
+// 现在真正覆盖这张决策表的是:src/__tests__/mediarules.test.js(12)+ src/__tests__/lib-thumb-gate.test.js(14)
+//   + scripts/test/test.js 媒体门禁段(12 项,户外大屏那项按本地文件存在才跑)+ api-ban-upload-probe.cjs(22 项)。
+// 要恢复实机验收:先按今天的数据集重写夹具、补上临时目录隔离,再用 MEDIA_RULES_PROBE_FORCE=1 显式解除本闸。
 const { spawn } = require('child_process');
 const path = require('path');
 const { chromium } = require('playwright-core');
+
+// 拒绝运行 ≠ 通过:退出码 2,和"跑绿"必须能从出口区分开
+if (process.env.MEDIA_RULES_PROBE_FORCE !== '1') {
+  console.error('media-rules-probe.js 已退役(夹具与特殊模式都已不在,且缺 GATE_DATA_FILE/SQLITE_PATH 隔离)。'
+    + '原因与现有覆盖见文件头注释;确要运行:先重写夹具,再 MEDIA_RULES_PROBE_FORCE=1 node scripts/probe/media-rules-probe.js');
+  process.exit(2);
+}
 
 const ROOT = path.join(__dirname, '..', '..');
 let pass = 0, fail = 0;

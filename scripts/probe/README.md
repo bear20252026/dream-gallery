@@ -7,7 +7,7 @@
 
 - **入口统一**:仓库根执行 `node scripts/probe/xxx.cjs`。绝大多数探针退出码 0=全绿、非 0=失败,头注释即说明书。
 - **浏览器**:共用 `browser.js` —— 默认调本机 Edge(playwright-core);CI/无 Edge 机器设 `PW_BROWSER=chromium` 用注册表浏览器。少数取证探针硬编码 Edge 路径(`PW_EDGE` 可覆盖)且有头运行。
-- **目标二选一**:① **自起临时服**——探针内部 spawn `server.js`,`GATE_DATA_FILE` 落系统临时目录(访客数据隔离),端口可用各自的 `XXX_PORT` 环境变量改(默认 32xx;少数固定端口);② **打已有服**——`BASE_URL=https://cloudbear.cloud`(线上)或 `http://127.0.0.1:3311`(本地已起服)。注意:2026-09 早期一批探针用 `PROBE_URL`(缺省 `http://localhost:5173`,dev server);大堂战役一批硬编码 `:3282`/`:3283`。
+- **目标二选一**:① **自起临时服**——探针内部 spawn `server.js`,`GATE_DATA_FILE` 落系统临时目录(访客数据隔离),端口可用各自的 `XXX_PORT` 环境变量改(默认 32xx;少数固定端口);② **打已有服**——`BASE_URL=https://cloudbear.cloud`(线上)或 `http://127.0.0.1:3311`(本地已起服)。注意:2026-09 早期一批探针用 `PROBE_URL`(缺省 `http://localhost:5173`,dev server);大堂战役一批硬编码 `:3282`/`:3283`。⚠️**①那条以前只是文字,2026-10-15 起有机检**:`node scripts/admin/probe-isolation-guard.cjs`(已进 CI BLOCKING)扫本目录,自起 `server.js` 却没打 `GATE_DATA_FILE` 的直接报红;例外只能写进 `scripts/probe-isolation-allowlist.txt` 并附理由,清单只许缩短。为什么值得钉:不打隔离 = 按 `lib/store.js:9/19` 拿**仓库根** `gate_data.json`/`.db` 当数据根,而 `server.js:239 → lib/retention.js:457` 的"启动先跑一次"清扫实测约 1 秒(零请求)就覆写整份。另见 AGENTS.md「自起 server.js 的脚本一律要隔离数据根」——那里还记了第二个坑:**父进程只要 require 过 `lib/*`,就必须在那行 require 之前先设 `process.env.GATE_DATA_FILE`**,光改 spawn 的 env 不管用。
 - **本地跑前置**:`vendor/` 同步(postinstall 自动)与模型/剧情资产齐全;本机模型不全时重剧情探针跑不动,只能打线上(见文末已知债)。
 - **线上直测**:跨域模型下载慢,加大 `PROBE_WAIT_MS`(默认多为 60s)。
 - **浏览器串行**:探针占真实 Edge/GPU,不要并行跑;自起服探针测完自动清理,固定端口者勿与常驻服同跑。
@@ -170,7 +170,7 @@ GLB/资源离线体检(不进浏览器或仅本地静态服):
 
 灵蕴/昆仑系统验收(2026-07 底,均自起临时服):ark-free-probe(:3217,需 arkFlew=1)/ spirit-hud-probe(:3216)/ spirit-terrain-probe(:3215)/ flame-spot-probe(一次性选址)/ kintsugi-probe(:3224)/ titlecard-probe(多端口)。
 
-架构深化验收(2026-07-28 系列,均自起):store-probe(:3219,键名唯一出口断言)/ overlay-probe(:3218,弹层三铁律)/ media-rules-probe(:3221)/ ctx-bus-probe(:3222)/ security-fix-probe(部分断言与 test.js 重叠)。
+架构深化验收(2026-07-28 系列,均自起):store-probe(:3219,键名唯一出口断言)/ overlay-probe(:3218,弹层三铁律)/ media-rules-probe(:3221,**2026-10-15 已退役:图库夹具随「照片全库退役」消失、特殊模式已删,现默认拒绝运行并 exit 2,别再当验收项**)/ ctx-bus-probe(:3222)/ security-fix-probe(部分断言与 test.js 重叠)。⚠️ 这一族原先 `spawn('server.js')` 只改 `PORT`,会按 `lib/store.js:9/19` 默认值拿仓库根 `gate_data.json`/`.db` 起服;2026-10-15 起 store/overlay/ctx-bus 三个都补了 `GATE_DATA_FILE` 临时目录隔离(与 security-fix-probe 的 H1 修复同规矩),**新增自起服务器的探针必须照这一条抄**。
 
 上传/修复一次性验证:probe-fix4(:3214)/ probe-hint(:3216)/ chunk-upload-probe(:3228)/ probe-hmr(会临时改源文件)/ probe-covenant-dom / dbg-portal / dbg-portal2(:3241)/ pos-deep / b612-full-opening-probe / b612-opening-sample-probe / b612-map-dive-probe(file:// 打 dev 小样)/ rapier-spike(:5210)/ rapier-hf-test(:5211)/ oneoff-tts-warm.sh(服务器上跑,非 node)。
 
