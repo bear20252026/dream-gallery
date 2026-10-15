@@ -220,8 +220,10 @@ CI 无任何 prettier 步骤),package.json 那 90 个 CR 是本地签出的 CRLF
 - **M-09**:只做"看得见"的三件事 —— ①登记已知 8 组(连两处出处),②拦住新增(新撞键即红,**修好一组不会变红**),③用合成用例钉住"后写覆盖"这个机制本身(不依赖具体译文,改译文不误红)。**没有擅自改写任何译本文案**:8 组里有 5 组看着"该统一"(书页八标题、狐狸标题、地理学家大小写…),但统一成哪个是主人的文学决定。真修法只有一个:行 ID 化,让 `_shown` 的键从译文文本换成 ID —— 全仓 `tt(` **336 处 / 46 个文件**,是独立一批。
 - **M-10**:`legacy.mjs` 的 `LEGACY_MODULE_LABELS` → `LEGACY_MODULE_IDS`(12 条,ASCII、与所加载文件同名)+ `isShelved(entry)` 成为**唯一判定**;`world-chain.mjs` / `world-loader.js` 只接线,不在别处再写第二遍判定。`label` 退回纯显示文字与 `__worldPhase` 读数(6 个探针在读,措辞是对外契约,由测试钉住)。
 - **山丘产物溯源**:`scripts/hill-artifacts.cjs`(`record` / `check`)+ 生成物 `scripts/hill-artifacts.json` —— 14 个产物的 sha256 与字节数、`built.command = 'cd hill-src && pnpm build'`、`ciRebuilds: false`、`artifactCommit == hillSrcCommit == 29822c073d71…`、`worktreeClean: true`。清单**住在 `public/hill` 之外**,因为 `hill-src/vite.config.ts` 是 `outDir: '../public/hill', emptyOutDir: true`,放进产物目录会被下一次构建删掉。
+  - ⚠️**这条闸门第一版在 CI 上红、本地绿,而 CI 是对的**:摘要原本按**本机检出的字节**算,Windows 把多行文本检出成 CRLF(Linux 是 LF)⇒ 三个 `fonts/*-OFL.txt` 加 `index.html` 被打成"内容变了但清单没更新";压缩过的单行产物没有换行所以不受影响 —— 正因为只红四处、且红的是 license 文本,它看起来更像"CI 上的产物被谁改过"。现文本类先 `\r\n → \n` 归一再算摘要(woff2/png 等二进制不参与),清单重新 record(只有那 4 条 bytes/sha 变,其余 10 条一字未动)。
+  - 不变量做成**与平台无关的可测命题**(第 6 条测试):借 `HILL_ARTIFACTS_DIR` / `HILL_ARTIFACTS_MANIFEST` 在临时目录造一份 CRLF 检出的产物集 `record`,再把同一份内容换成 LF 检出 `check` ⇒ 必须 `✓`;反向随手一条:真加一字节必须红(否则"归一"就是放宽)。摘掉归一 ⇒ **2 红**(这条 + 真目录那条),还原后 6 绿。这条在两台形状上都会红,不会再靠某一台机器的行尾风格蒙过去。
 
-**新增测试**(7 个文件 / **57 项**):composition-root-lifecycle(7)、world-loader-shelving(12)、beacon-manager(16)、planet-radius-single-source(4)、types-ctx-writer-agreement(7)、story-text-collision(6)、hill-artifacts-provenance(5)。vitest 90 文件 1028 项 → **97 文件 / 1085 项**。
+**新增测试**(7 个文件 / **58 项**):composition-root-lifecycle(7)、world-loader-shelving(12)、beacon-manager(16)、planet-radius-single-source(4)、types-ctx-writer-agreement(7)、story-text-collision(6)、hill-artifacts-provenance(**6**,含 CI 抓到的行尾那条)。vitest 90 文件 1028 项 → **97 文件 / 1086 项**。
 
 **反向验证 36 条**(每条都是"改坏 → 跑 → 还原 → md5 逐字节复核"):
 
@@ -435,6 +437,7 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   |---|---|---|
   | 2026-10-13 | 0 | 形状回环修好后的第一次;`visits 源 1003 / 表 1034`(表只受保留期约束,判 0 不判错) |
   | 2026-10-14 | 0 | 第二次(在 `2739e3b` 后端上线后跑)+ **同日第三次(`e39e480` 的 CSP 发布之后再跑,仍 0)**;若干条"表多出行"仍是保留期内的历史行,按设计不判失败。**同日重跑不加天数** —— 这张表按"每天一次"计,明天(10-15)那次才算第 3 天 |
+  | 2026-10-15 | 0 | **第 3 天**。`结果: 一致(退出码 0)`,末尾仍有一批"表多出行"(vid 与时间戳都是保留期内的历史行 / 读到的那一瞬在途写入),按设计不判失败。距"连续 7 天"还差 4 天 |
   往后每跑一天就在此表加一行;**中间出现 1 或 2 则天数归零重计**(那说明影子写又漏了形状或有新写入点没接线)。
 - 🔴**发布阻断级缺陷(本轮自己造出来的,已修 + 已上守卫)**:`backend-sync.sh` 的后端清单原本是 `FILES=$(echo server.js lib/*.js …)`,而 **glob 不递归** —— R1/R2 拆出的 `lib/repo/*`(5)、`lib/upload/*`(8)、`lib/migrations/*.sql`(1)共 **14 个文件一个都不会被上传**。照那份清单发布:线上 `server.js → lib/store → lib/shadow → lib/repo/chat` 直接 `Cannot find module`,pm2 反复重启 = **全站 502**;而 md5 差集、上传、复核会**全部绿灯**,因为清单从没往那些子目录看一眼。这是"静默的成功比响亮的失败危险得多"的第 N 个实例,且这次由重构本身引入。
   - 修法:清单收成唯一出处 **`scripts/backend-files.sh`**(`backend_files()` = server.js + `find lib -type f \( -name '*.js' -o -mjs -o -cjs -o -sql \)` + `src/shared/mediarules.mjs`),`backend-sync.sh` 与 `verify-drift.sh` **共用**它(以前后者也写死 `lib/*.js`,于是"线上根本没有这些模块"会被复核报成一致)。清单条目 **37 → 52**(51 个后端源码 + 唯一被点名带上服务器的只读对账脚本 `scripts/admin/table-parity.cjs` —— 它按 `__dirname/../..` 解析仓库根,不在 `<根>/scripts/admin/` 就跑不起来,而"能不能切读"必须在有那块盘的盒子上判定)。扩展名是**写死的白名单**而不用 `find lib -type f`:将来 `lib/` 里落出 `.db`/`.json`/`.env` 之类不该进 web root 的文件时,默认不跟着传。公网侧 `lib/security.js` 的 `staticDenied()` 按**首个路径段**放行/拒绝(`lib` 与 `scripts` 都在拒绝集里,`*.cjs` 后缀再挡一次),所以新建子目录不构成新暴露。
@@ -868,7 +871,11 @@ node scripts/test/test-store-sqlite.js # SQLite 持久层 11 项(迁移/DB 权�
 node scripts/test/test.js         # 后端 108 项(数据校验/API/安全边界/审批门/上传限制/邀请/协商缓存/健康检查)
 node scripts/test/test-session.js # 会话机制 46 项(吊销永久 + 过期自愈 + 兼容护栏 + dk 归并收紧;2026-10-11 起进 npm test)
 node scripts/test/test-upload-security.js # 上传归属 20 项(同 UA 陌生人互不可见 + 存量迁移 + 吊销即断)
-node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色器错误/JS异常/空屏)
+node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色器错误/JS异常/空屏;**2026-10-15 起等的是"世界接棒"
+                                  #   = 电影收束 ∧ __bootState.worldStarted ∧ #c 显形,不再把 getFPS()>0 关进 90s 闸门 ——
+                                  #   headless 无 GPU,SwiftShader 编全站着色器实测 35-45s,机器一忙就冲破预算,
+                                  #   这条当天连挡两次发布;FPS 仍量仍打印,循环存活由 posD 逐帧读数 + 截图非纯色兜住。
+                                  #   同一个坑与同一次改法见 b612-preload-film-probe 那条**)
 npx vitest run                    # 前端单测 978 项 / 86 文件(物理/碰撞/状态机/游戏状态/存档/路由契约/配额/灯光预算/剧情纯逻辑/
                                   #   身份与授权/上传覆盖与分片GC/WS守卫/SSE限流/资源释放/队列/循环生命周期/
                                   #   保留期清扫/AI用量台账/R2待发台账/缩略图同权/mylinks配额/白板归属/磁盘并发闸/公开API封禁闸)

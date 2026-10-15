@@ -13,7 +13,7 @@
     "hillSrcCommit": "29822c073d7171373bbfc754c43598539fc0ebde",
     "hillSrcDate": "2026-10-14T03:07:34+08:00",
     "worktreeClean": true,
-    "recordedAt": "2026-10-14T17:17:08Z"
+    "recordedAt": "2026-10-15T02:45:48Z"
   },
   "files": [
     {
@@ -53,8 +53,8 @@
     },
     {
       "file": "fonts/Figtree-OFL.txt",
-      "bytes": 4481,
-      "sha256": "3b2cf414f05f46c29e551980d3b99bdf13a0eb00622976ff9ad59e81c8ff988a"
+      "bytes": 4388,
+      "sha256": "140d37233e7f3ce7313798befa9600893bcceaf41a55fa0fa5ad52f7f657a268"
     },
     {
       "file": "fonts/Figtree-VF.subset.woff2",
@@ -63,8 +63,8 @@
     },
     {
       "file": "fonts/NotoSansSC-OFL.txt",
-      "bytes": 4481,
-      "sha256": "e35ffdebb2225b49814c31889cbb3ce69cb3509e6a9f431edaba5e1a6de8cd15"
+      "bytes": 4388,
+      "sha256": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9"
     },
     {
       "file": "fonts/NotoSansSC-VF.subset.woff2",
@@ -73,8 +73,8 @@
     },
     {
       "file": "fonts/Sora-OFL.txt",
-      "bytes": 4478,
-      "sha256": "fdd8dfd9b77fc1b71917ba0b8c6f86152f8daa96f4b51a5f41391b4ebf5dc322"
+      "bytes": 4385,
+      "sha256": "ba0b9729c9428ba79a0459ab8ec575791b51509dbec213e383d0316d37fec299"
     },
     {
       "file": "fonts/Sora-VF.subset.woff2",
@@ -83,8 +83,8 @@
     },
     {
       "file": "index.html",
-      "bytes": 1355,
-      "sha256": "39d7b1c74d4be3d6eef8479dc1b075bf155545c0238af113cd549cf0274bcf9e"
+      "bytes": 1338,
+      "sha256": "89ff21e008011b718e4a84ab8db08eacf74ac67f1532c7427621dd9aa0a3905e"
     }
   ]
 }

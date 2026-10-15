@@ -79,7 +79,25 @@ function startServer(port) {
     if (s) s.click();
   });
   // 入口已有canvas；等待电影收束和真实世界启动，避免把入口误认为渲染成功。
-  await page.waitForFunction(() => !document.getElementById('b612film') && window.__bootState?.worldStarted && window.__ctx?.loopManager?.getFPS() > 0, null, { timeout: 90000 });
+  // ⚠️2026-10-15 改:等的是**世界接棒**(电影收束 ∧ `__bootState.worldStarted` ∧ 主画布显形),
+  //   不再把 `getFPS() > 0` 关在这条 90s 闸门里。理由与本仓 b612-preload-film-probe 那条一模一样:
+  //   headless 没有 GPU,`compileAsync()` 在 SwiftShader 上编全站着色器实测 35-45s,机器一忙就冲破预算
+  //   ⇒ 这条曾经**测不出任何回归,只会随机把发布打断**(今天就是被它挡了两次)。
+  //   "渲染循环真的在跑"仍由下面两条正面判据负责:posD 的逐帧读数(主循环写它)+ 截图非纯色。
+  //   FPS 仍然量,只打印当参考。
+  await page.waitForFunction(
+    () =>
+      !document.getElementById('b612film') &&
+      !!window.__bootState?.worldStarted &&
+      (document.getElementById('c') || { style: {} }).style.visibility === 'visible',
+    null,
+    { timeout: 90000 }
+  );
+  const fpsAt = await page
+    .waitForFunction(() => window.__ctx?.loopManager?.getFPS() > 0, null, { timeout: 60000 })
+    .then(() => '首帧 FPS 已出(仅参考)')
+    .catch(() => '首帧 FPS 60s 内未出(SwiftShader 仍在编着色器,不判失败)');
+  console.log('  · ' + fpsAt);
   const canvases = await page.evaluate(() => document.querySelectorAll('canvas').length);
   ok(canvases > 0, `3D 画布已创建 (${canvases} 个 canvas)`);
 

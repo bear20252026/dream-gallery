@@ -17,11 +17,27 @@ const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
-const DIR = path.join(ROOT, 'public', 'hill');
-const MANIFEST = path.join(ROOT, 'scripts', 'hill-artifacts.json');
+// 目录/清单可用环境变量指到临时位置 —— 只为让"摘要与行尾无关"这条不变量能跨平台被测出来
+// (Windows 检出是多行文本 CRLF、Linux CI 是 LF,拿真产物目录测出来的绿只证明了一台机器)。
+const DIR = process.env.HILL_ARTIFACTS_DIR
+  ? path.resolve(process.env.HILL_ARTIFACTS_DIR)
+  : path.join(ROOT, 'public', 'hill');
+const MANIFEST = process.env.HILL_ARTIFACTS_MANIFEST
+  ? path.resolve(process.env.HILL_ARTIFACTS_MANIFEST)
+  : path.join(ROOT, 'scripts', 'hill-artifacts.json');
 
-function sha256(file) {
-  return crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+// 文本类产物的摘要必须**与行尾无关**。
+// ⚠️2026-10-15 CI 实锤的假红:清单原本按文件字节算 sha256,而 Windows 的 git 检出会把**多行文本**
+// 转成 CRLF(压缩后的单行 js/css/html 没有换行所以不受影响)⇒ 同一份内容在两台机器算出两个哈希,
+// CI 把三个 `fonts/*-OFL.txt` 判成"内容变了但清单没更新",本地却是绿的。清单要回答的是
+// "内容与记录比有没有漂",不是"这份检出是什么行尾风格"。二进制(woff2/png)不参与归一。
+const TEXT_EXT_RE = /\.(txt|md|json|html?|css|js|mjs|cjs|svg|map)$/i;
+function digest(file) {
+  const raw = fs.readFileSync(file);
+  const buf = TEXT_EXT_RE.test(file)
+    ? Buffer.from(raw.toString('latin1').replace(/\r\n/g, '\n'), 'latin1')
+    : raw;
+  return { bytes: buf.length, sha256: crypto.createHash('sha256').update(buf).digest('hex') };
 }
 function listFiles(dir, prefix = '') {
   const out = [];
@@ -64,8 +80,8 @@ const BUILD = {
 
 function snapshot() {
   return listFiles(DIR).map((rel) => {
-    const st = fs.statSync(path.join(DIR, rel));
-    return { file: rel, bytes: st.size, sha256: sha256(path.join(DIR, rel)) };
+    const d = digest(path.join(DIR, rel));
+    return { file: rel, bytes: d.bytes, sha256: d.sha256 };
   });
 }
 
