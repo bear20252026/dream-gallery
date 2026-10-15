@@ -38,9 +38,17 @@ export function tone({ freq, gain, delay = 0, decay = 1.4, dest, audioCtx }) {
 }
 
 /**
+ * `chime` 的选项包。键表由两处共同裁决(2026-10-15 第六刀):实现真正读的就是这五个,
+ * 而三处调用传的是「不传包」(ark.js:411)/`{peak,decay,delay2}`(eternal.js:635)/
+ * `{peak,decay}`(spirits.js:277)。`dest`/`audioCtx` 今天没有 chime 的调用方用,但本函数
+ * 确实把它们转发给 tone,所以留成可选而不是删掉。判据见 types-param-bag-shapes.test.js。
+ * @typedef {{peak?:number, decay?:number, delay2?:number, dest?:AudioNode|null, audioCtx?:AudioContext|null}} ChimeOpts
+ */
+
+/**
  * 双音叮:基音 + 高八度(delay2 后到达)。ark/spirits/eternal 的 chime 皆此形。
  * @param {number} base 基音频率 Hz
- * @param {object} [o] { peak=0.2 增益峰值, decay=1.4 衰减, delay2=0.12 高八度延迟, dest, audioCtx }
+ * @param {ChimeOpts} [o] peak=0.2 增益峰值, decay=1.4 衰减, delay2=0.12 高八度延迟, dest/audioCtx=空间音频旁路
  */
 export function chime(base, o = {}) {
   const decay = o.decay || 1.4;

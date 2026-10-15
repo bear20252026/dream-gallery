@@ -451,6 +451,93 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
 
 
 
+## 2026-10-15 checkJs 第六刀:再收 36 条(165 → 129),这一族的病名是「整包声明成裸 object」
+
+第五刀末尾留了两条路:DOM 那一族(现在数出来 56 条,要动 `el()`/`querySelector` 的返回类型,是重构)与
+`{object}` 那一族(一个 `@typedef` 收一条)。这一刀走第二条,理由是**它每条错都有编译器当场背书**,
+而"背书"这件事本身在这一刀里出过一次水货(见下面第 3 条核实)。
+
+纯函数把状态包/输入包/选项包写成 `@param {object}`,TS 只知道"它是个对象",于是函数体里每一个
+`state.y` / `input.pitch` / `o.peak` 都是一条 TS2339;读错误的人会以为"这字段不存在 = 代码写错了",
+跑去改本来正确的那行。旧注释里 `{ y, vy, onGround }` 那一句是**散文不是类型** ⇒ 这一族的谎不是
+"形状写错",是"形状压根没写"。
+
+- **归因(逐族相加 = 36 = 165−129,四族全换回精确 165、还原后精确 129)**:
+  `player-physics.js` **19**(本文件 14 + `player.js` 5,那 5 条全在 `stepVertical` 的返回值上,治 `@returns` 就没了)/
+  `freeflight-physics.js` **7**(FlightState/FlightInput/FlightFlags)/ `audio-blip.js` **9**(chime 的选项包)/
+  `hot.js` **1**(`bag.register` 的 opts)。
+- ⚠️**归因方法换过一次,因为第一版数出来是假的**:先用 perl 把 JSDoc **局部**退回旧写法,`freeflight` 那族
+  数出 **150** 而不是 136、四族全退 **179** 而不是 165 —— 我除了给 `stepFlight` 加类型,还给 `stepFlightInto`
+  **补上了 HEAD 根本没有的 `@param`**,局部退回于是留下"半新半旧的第三种形状",数到的不是这一族的账。
+  改成**整文件换回 `git show HEAD:<path>`**(每步先 md5 备份、换前 grep 验"HEAD 版里确实还有 `{object}`",
+  防的是取错版本而不是改错内容)才对上。⇒ 记这条:**退回的对象必须是"改动前那一份整体",不是"我以为的那几行"**。
+- **三条注释与现实的矛盾**(逐条回读才动手,没有照抄旧注释):
+  1. `autoNavTarget` 旧注释写 `Vector3|null`,而唯一生产写入方 `ark.js:563` 传的是 `DOCK` ——
+     `ark.js:266` 的字面量 `{x:804.2, y:401.8, z:593}`,不是 Vector3。本模块只把它交给 `Vector3.copy()`,
+     而那个 API 收的正是 `{x,y,z}` 结构 ⇒ **照旧注释写,生产调用点会冒出一条假错**。声明按写入方写成
+     `{x:number, y:number, z:number}|null`。
+  2. `hot.js` 的 `bag.register` 旧注释只写 `shared?:Set|Array`,而它转交的 `disposeObject3D` 自己写明白认
+     **四种**(Set / WeakSet / Array / 谓词;`src/__tests__/dispose-object3d.test.js:100` 就在用谓词形)。
+     ⚠️第一次修我图省事把谓词写成裸 `Function`,**当场新增一条 TS2345**(就是那次 129→130)——
+     "放宽声明去迁就"在这一族里同样会造新债,照**契约原文**写才是修。
+  3. `src/core/input.js` 那条 `{object}` **一条错都不产**:那个函数上叠了**两个** JSDoc 块
+     (`@param {object} input` 在上、`@param {InputManager} input` 在下),TS 只认紧邻声明的那一块,
+     上面那块是惰的。并成一块(散文描述保留)。
+     ⚠️**这条是自我纠正**:我给新测试写的注释把它归类成"不在 checkJs 可见图里",实测 `tsc -p tsconfig.checkjs.json
+     --listFiles` 后**是我错** —— input.js 在图内,而 `src/gate/quizgate.js` 这种 include 列表里没有的文件**也在**
+     程序集里(被 import 拉进来,797 个文件)。⇒ **include 列表只说起点,不说集合;"这文件归编译器管吗"要用
+     `--listFiles` 实测,不许按目录前缀推。** 删那块前后各跑一次全集 `comm`(先去行列号)⇒ **双向 0 条漂移**,
+     这才是"它确实惰"的证据,而不是我的推断。
+- **新增闸门:`src/__tests__/types-param-bag-shapes.test.js`(新文件,13 项)**。判据一律**两边都由源码或运行期裁决**
+  —— 单向 `toContain` 挡不住"注释里多写一个摆设字段"这种漂移:
+  · 三条「声明键集合 ≡ 实现真正读的键集合」用 **Proxy get 陷阱做运行期记名普查**(单场景会把 `jumpPressed/jumpHold`
+  藏在短路后面 ⇒ 跑两个分支场景取并集);
+  · 三条「≡ 写入方那行字面量的键集合」用自写的顶层键扫描器 `scanObject`(深度 >1 不算键、JSDoc 续行的 `*` 要剥、
+  锚点找不到**抛错**而不静默返回空)。锚点必须定在**代码行**上(`const ns = stepVertical(` / `const flags = stepFlightInto(` /
+  `const freeFlight = {`);定在函数名上会命中注释里的同名散文,第一次就栽在这儿;
+  · 一条类级别闸:本刀四个文件 `bareBags(t) === []` **且**零"包里成员写成 `object`"(`/[{,]\s*[\w$]+\??\s*:\s*object\b/`)。
+  **这条是补出来的**——注射 `scene?:object` 时整包级闸门照样绿(它只认 `@param {object}` 那种写法),
+  而"包有形状、成员没形状"编译器**不报错**,只能加静态闸;第一版这条又误伤了我自己写的合法谓词
+  `(res:object, kind:string)` ⇒ 改成要求名字必须出现在 `{` 或 `,` 之后;
+  · 一条全仓账本:剩下的裸包声明必须**恰好等于**记名两处 `{plane-physics.mjs:3, chapter-map-logic.mjs:1}`,
+  多一条红、**少一条也红**;登记的理由是那两处经 `--listFiles` 实测不在程序集里,没有编译器背书时手写形状就是第二条谎;
+  · 一条 `tone` 的点号子声明 ≡ 解构形参(六键):合法的 `{object}` + `@param {T} o.field` 写法要能**被证明合法**,
+  否则闸门只会逼人把类型抄两遍。
+- **反向验证 12 条注入 / 17 条红 / 0 条锚点未命中 / 0 次还原不一致**(`.tmp/rv6-a.sh`,日志 `.tmp/rv6-a-log2.txt`):
+  每条注入先 grep 验"旧文本确实消失了"再跑(第五刀的教训:锚点没命中 ≠ 没违反,两种失败要分开打印);
+  恢复走 `.tmp/orig6-*` 备份 + md5 逐字节比对。**改过 `input.js` 与账本期望之后整批重跑过一遍**,不是"应该没影响"。
+  ⚠️两条环境坑:①账本那条单独跑 3.3s,在整套并发里抢不到 CPU 会飘过默认 20s 超时 ⇒ 先做
+  `text.includes('{object}')` 便宜筛 + 给它 60_000;②`grep -rn … .` 这种递归 shell grep 会超 Bash 工具超时
+  (本会话栽过一次,被后台化),扫全仓用 Grep 工具。
+- ⚠️**"这文件 HEAD 本来就合排"这类话之前是一次没测成的结论**:prettier 3 的默认 `--ignore-path` **同时读 `.gitignore`**,
+  而 `.gitignore` 第 61 行就是 `.tmp/` ⇒ 把 HEAD 版拷进 `.tmp` 再 `prettier --check` 会得到一句
+  "All matched files use Prettier code style!" —— **那是跳过,不是通过**。把故意打坏的探针一起放进去测,它 exit 1,
+  才证明检测器在那个工作目录里根本没运行。换到未被忽略的临时目录后实测:本次五个文件(hot / input / player-physics /
+  freeflight-physics / audio-blip)的 **HEAD 版全部合排** ⇒ 不合排的是我自己的编辑,所以这刀**该排的都排了**
+  (`--write` 后 `--check` 绿)。上一刀那种"HEAD 本来就不合排所以不顺手重排"的口径在这批不成立,别照抄。
+  另:本文件的 AGENTS.md 在 HEAD **也不合排**,但它不在 `lint-staged` 的 glob 里(`src/**/*.js`、`src/**/*.css`、
+  `*.html`、`lib/**/*.js`、`server.js`、`scripts/**/*.{js,mjs,cjs}`)⇒ pre-commit 不会重排它,文档 diff 是干净的。
+- 门禁(**六项全部在这棵含 `input.js` 修改之后的同一棵树上重跑**):eslint 0 / `tsc --noEmit` 0 /
+  depcruise 0 违规(397 modules, 1362 dependencies)/ **checkJs 129 = 新基线**(`scripts/checkjs-baseline.txt` 165→129)/
+  vitest **1120 项 / 98 文件**(1107 + 本刀 13)/ `npm test` exit 0 且 209 项照旧(7/22/108/46/20/6)/
+  `npm run build` 0 且三条构建断言照旧(46 prefetch 全 crossorigin / 入口不含 three / 产物无 importmap)/
+  四条 CI 守卫全 exit 0(hill-solo 判定通过、`CSP_REGISTRY_OK` 4 条、后端清单 51 可达 / 清单 53、探针隔离扫 147 脚本豁免 8)。
+- ⚠️**本刀纯注释 + 一个新测试文件**:`git diff -U0` 把注释行与空行滤掉之后**零残留**(四个源文件都是),
+  `input.js` 那处是删掉一个惰 JSDoc 块(comm 双向 0 漂移)⇒ **没有动任何运行期语句,不需要重新构建或部署**。
+  基线那行只影响 CI 的 checkJs 步骤;下次有真实运行期改动再一起发。
+- **剩下的簇(129,重数过)**:按码 `TS2339 113 / TS2322 7 / TS2810 3 / TS2740 2 / TS2345 2 / TS2769 1 / TS2683 1`
+  (TS2554 / TS1345 / TS2349 / TS2365 仍为 0)。按文件 `quizgate.js` 16 / `minimap.js` 10 / `ark-freeflight-hud.js` 10 /
+  `scene7-tippler.js` 8 / `dialog-voice.mjs` 8 / `housecolor.js` 6 / `crash-site.js` 6 / `audio-manager.js` 5 /
+  `planets.js` 5 / `finale.js` 5 / `spirit-page.js` 5 / `mode.js` 5。按类:**DOM 族 56**(`value` on HTMLElement 10+4、
+  `style` on Element 9、`onclick` on Element 8、`width` on HTMLElement 6、`dataset` on Element 5、`height` 3、
+  `disabled` 3、`checked` on GlobalEventHandlers 3)、**`unknown` 族 18**(`message` 9 = catch 变量,`to/userData/redraw/playHint` 各 2)、
+  **Object3D 族 12**(`material` 9)、`{}` 3。
+  ⇒ 下一刀就是那 56 条 DOM 族:把 `el()` / `querySelector` / `getElementById` 的结果收成**带类型的助手**
+  (一次小重构,收益按消费点计),而不是逐点写 `(el as HTMLInputElement)` —— 那只是把谎换成 cast。
+  另:`hot.js:218` 的 TS2683(`bag.async` 回调里的 `this`)、把 `plane-physics.mjs` / `chapter-map-logic.mjs` **纳进检查图**、
+  `audioManager` 那条"声明 ≡ 写入方"的钉子,各自单独一批。
+
+
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
 
 审计方只读源码、未跑测试,并明确「不把此前已修复的问题重复计为缺陷」。6 条工程断言逐条回读后:**4 条成立(其中 1 条比审计说得更严重)、2 条部分成立、1 条误报**;素材版权与译本授权两条按主人指示不处理。

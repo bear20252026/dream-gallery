@@ -22,11 +22,25 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const STEP_DOWN = 0.45;
 
 /**
+ * 垂直运动的**状态包**。字段表由两处共同裁决(2026-10-15 第六刀回读核实):
+ * 唯一生产写入方 `player.js:181` 现建的 `{y,vy,onGround,glideEnergy}`,与单测的 `mkState` 同形。
+ * @typedef {{ y:number, vy:number, onGround:boolean, glideEnergy:number }} VerticalState
+ */
+/**
+ * 输入包。`updraft` 是可选:函数体按 `input.updraft || 0` 兜底(今天生产与单测都传,但允许省略是代码写明的语义)。
+ * @typedef {{ jumpPressed:boolean, jumpHold:boolean, pitch:number, updraft?:number, gy:number }} VerticalInput
+ */
+/**
+ * 单步结果 = 状态包 + 本帧新判出的 `gliding`。
+ * @typedef {{ y:number, vy:number, onGround:boolean, glideEnergy:number, gliding:boolean }} VerticalStep
+ */
+
+/**
  * 垂直运动单步积分(纯函数)。
- * @param {object} state { y, vy, onGround, glideEnergy }
- * @param {object} input { jumpPressed(本帧消耗), jumpHold, pitch(俯仰,滑翔气动), updraft(上升气流强度), gy(地表+眼高) }
+ * @param {VerticalState} state { y, vy, onGround, glideEnergy }
+ * @param {VerticalInput} input { jumpPressed(本帧消耗), jumpHold, pitch(俯仰,滑翔气动), updraft(上升气流强度), gy(地表+眼高) }
  * @param {number} dt 秒
- * @returns {object} 新状态 { y, vy, onGround, glideEnergy, gliding }
+ * @returns {VerticalStep} 新状态 { y, vy, onGround, glideEnergy, gliding }
  */
 export function stepVertical(state, input, dt) {
   const P = VERTICAL_PARAMS;
