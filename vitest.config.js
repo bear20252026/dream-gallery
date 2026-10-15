@@ -15,6 +15,10 @@ export default defineConfig({
     // 整条场景图)。⇒ 钩子有**自己**的超时,默认 10s,与 testTimeout 互不相干;84 个文件并发 transform
     // 时那 10s 根本不够。真挂死的 setup 照样会红,只是晚 10s。
     hookTimeout: 20000,
+    // 开跑前收走**自己**留在 %TEMP% 的旧 `dg-*` 数据根(按 mtime 只收 6 小时前的,免得抢掉并发跑的目录)。
+    // 起因:Windows 上 afterAll 的 rmSync 删得掉文件删不掉目录(SQLite 句柄要等 process.on('exit') 才放),
+    // 本机实测攒了 2063 个空目录。细节与判据见 src/__tests__/global-setup.mjs。
+    globalSetup: ['./src/__tests__/global-setup.mjs'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'text-summary'],

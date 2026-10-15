@@ -355,6 +355,31 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   而且 DOM 那一族(`Element`/`HTMLElement`)真正要的是"把 `el()` / `querySelector` 的结果收成带类型的助手",
   属于小而实的重构 —— 不要靠 `/** @type {any} */` 把数字压下去(那是把谎言从运行期搬进注释)。
 
+## 2026-10-15 checkJs 第四刀:再收 26 条(236 → 210),三处声明在说谎 + DOM 那一族第一次真的收了
+
+先按上一刀留下的话**重数**(实测 236 = 基线;按文件 `upload.js` 21 / `quizgate.js` 16 / `player-physics.js` 14 / `player.js` 11 / `mode.js` 13 / `minimap.js` 10),再动手。没有用一条 `@type {any}` 换数字。
+
+- **`ModeNamespace.myLinks` / `customLinks` 声明成 `string[]`** —— 这两个数组的**唯一写入方是服务端裁剪**:`lib/siteconfig.js:89` 下发 `{id,name,url,model,pos}`、`:96` 下发 `{id,name,url,icon,model}`。报错的从来不是取法:`mode.js:106/313` 读 `l.icon`、`:325` 读 `l.pos.x`、`upload.js:508` 读 `l.name`、`:523` 读 `l.id`。新增 `MyLinkItem` / `CustomLinkItem`,**字段与可空性逐项对着服务端抄**(`pos` 的形状来自同文件 `:209`,是 `{x,y,z}|null`,不是数组)。
+- **`GalleryNamespace.hangOne` 声明成 `(url: string) => void`** —— 唯一写入方 `src/gallery/paintings.js:309` 是**三个参数**且 `return g`(一个画框 `Group`)。于是 `upload.js:395` 报 TS2554"期望 1 个参数却给了 3",紧接着 `:399` 读 `g.userData.ox/oy/oz`(金色路标的起点)报 3 条"userData 不在 void 上"。这条最讽刺:**用 `void` 收尾等于宣布"这函数没有可读数"**,而上传成功那段代码正拿它指路。
+- **`KunlunNamespace.flyAudio: unknown`** —— 唯一写入方 `src/kunlun/peaks.js:49-50`(`const flyAudio = new Audio('music/登飞来峰.m4a')` → `ctx.kunlun.flyAudio = flyAudio`,那行注释就写着"上传提示音需要暂停它")。它与 `mA` 是同一形状的两条路:`mA` 早钉成 `HTMLAudioElement` 而 `flyAudio` 还挂 unknown ⇒ `upload.js` 把五个媒体元素塞进同一个 Set 时,那条 `unknown` 让 `add` 整个判成"unknown 不能赋给 Element",连带 `.paused`/`.pause()` 一起错。留 `| null`(peaks.js 属后台链,上传面板可能先于它装配,消费点本来就是 `if (m)` 守卫)。
+- **`upload.js` 的 DOM 读数点(9 条)**:`$('file').files` + 6 处 `$('lkName'/'lkUrl').value` + 删除钮的 `onclick/dataset/disabled`。面板 markup 是本文件自己写的(`:60/:65/:66`),所以在 `$()` 旁取**一次**带类型的 `fileInput/lkNameInput/lkUrlInput`(7 个读数点各写一遍内联 cast 更容易漂);两处集合走 `/** @type {NodeListOf<HTML…>} */`。运行期引用对象完全没变(同一个 DOM 节点,只是名字)。
+
+**归因是量出来的,不是"看起来少了几条"**(`.tmp/rv-cut4.cjs`,每次只退一处,注入前先断言内容真的变了,还原后 md5 逐项复核):
+`myLinks` **+5** / `customLinks` **+3** / `hangOne` **+4** / `flyAudio` **+3** / 三个输入框引用 **+6** / 媒体 Set cast **+1** / 删除钮集合 **+4** ⇒ **逐处相加 26 = 实测总降幅 26(零重叠,零连带)**。
+
+**五条新钉子全部落在既有出处** `src/__tests__/types-ctx-writer-agreement.test.js`(**9 → 14 条**,全量 vitest 1088 → **1093**,加的正好是这 5 条),方向仍是"声明 ≡ 写入方":
+①② 拿**服务端那两行 `.map(l => ({…}))` 的键集合**去比 interface 成员集合(服务端改裁剪字段,测试立刻红,不会等下一个人读到 `undefined` 才发现);
+③ 比 `function hangOne(...)` 的**形参个数**与声明的**参数个数**,并钉返回类型必须是 `Group`(不是 `void`);④ 比 `peaks.js` 的 `new Audio` 赋值点;⑤ 是下面那条写法闸门。
+逐条说谎的证伪(`.tmp/rv-cut4-tests.cjs`):**五条各自恰好 1 红**,全部还原后 14 绿。
+- **顺手挖出一条本机长期积累的脏(已治)**:量 `%TEMP%` 时发现 **2063 个 `dg-*` 空目录**,最新的一批时间戳就是本次 `npx vitest run` —— 也就是说这不是我这次改动带出来的,是**四十多个后端类单测各自 `mkdtempSync` + `afterAll` 里 `rmSync` 的老写法**在 Windows 上的必然结果:`rmSync` 删得掉目录里的文件,删不掉目录本身(父进程还握着 `gate_data.db`,而 `store.js:20` 的 `close` 挂在 `process.on('exit')`,晚于 `rmSync`)。Linux/CI 上 `rmSync` 会成功 ⇒ 这条只在本地显形,所以一直没人看见,而且**每跑一次套件就再攒几十个**。
+  做法:`src/__tests__/global-setup.mjs`(挂在 `vitest.config.js` 的 `globalSetup`)开跑前收走**超过 6 小时**的 `dg-*` 残留。两个刻意的边界:①只认 `dg-` 前缀(本仓测试自己的命名);②**按 mtime 而非一律删** —— 同机并发跑两套(vitest 与 npm test、或两个终端)时,新鲜目录可能正被另一个进程使用,删别人的活动数据根会造出无法复现的飘红,宁可少收不可错收;清理失败永远不计入测试红。
+  正反都验:临时埋一个 `mtime=7 小时前` 的 canary 目录 + 一个新鲜的 ⇒ 旧的被搬走、新的被保留,套件仍 12/12 绿;首趟实测**搬走 1851 个、留下 214 个、失败 0**,第二次跑报"搬走 0 个"(已是稳态,不是没跑)。
+- ⚠️**本刀没做的事**:`delBtns` 那三行(删除钮的 `dataset/onclick/disabled`)在真浏览器里**没有**被走到 —— 本地"自由进画廊"建出来的档案带着 `sess` 却从未 `issueSession`,于是 `authVid` 为空、`POST /api/mylinks` 如实回 **401**(这是 DG-SEC-004 的正确行为,不是缺陷),面板拿不到"自己的链接"就渲染不出删除钮。已验的是 `fileInput.files`、`lkNameInput/lkUrlInput` 的六处 `.value`(预设钮实测写进了「百度 / https://www.baidu.com」)与**入世后零 pageerror**;那三行的其余保障只有 eslint 的 `no-undef` 与构建,属于**未测**而不是"已通过"。
+- ⚠️**那个证伪脚本第一版报"五条全部 0 红",是假的**:实际是**没读到输出**——vitest 把 ANSI 颜色码插在 `Tests` 与数字之间、也插在 `×` 之前,带码去匹配 `^\s*× ` 恒不成立,于是"红 0 条"与"一个字都没读到"长成同一串空(当时 `passed` 也读成了 `?`,那才是真证据)。修法:匹配前 `.replace(/\u001b\[[0-9;]*m/g,'')`。与已有的"空输出/命令拼错也算没跑过"同族,又添一个实例。
+- ⚠️**`.js` 文件里不能写泛型实参**(本刀差点把它写进去,是 CI 之外的另一类"本地就红,只是红得看不懂"):`document.querySelectorAll<HTMLButtonElement>('button[data-i]')` 在 `.ts` 里是正解,在 `.js`(checkJs)里 `<` 被当成类型断言/小于号读 ⇒ **TS2365「Operator '<' cannot be applied to types …」**,一次报三条互相矛盾的运算符错,完全不指向"类型写法"。只能走 `/** @type {NodeListOf<HTMLButtonElement>} */ (…)`。已做成第 14 条测试:扫 `src/**/*.js`,**先剥 `//` 注释再扫** —— 文件里"为什么不能用泛型"的说明本身就带着这个写法,不剥就是注释撞自己的闸。
+- 门禁:eslint 0(自己引入的 2 条 `no-useless-escape`/`no-regex-spaces` 已修)/ `tsc --noEmit` 0 / **checkJs 210 = 新基线** / vitest **1093 项 / 97 文件** / `npm run build` 0 且三条构建断言照旧(46 prefetch / 入口不含 three / 产物无 importmap)。⚠️本刀动了 `src/gate/upload.js` 的**运行期引用写法** ⇒ 与前一版"只改脚本与文档"不同,**这次要重新构建并部署**。
+- **剩下的簇(210,重数过)**:按文件 `quizgate.js` 16 / `player-physics.js` 14 / `player.js` 11 / `minimap.js` 10 / `scene7-tippler.js`·`finale.js`·`ark-freeflight-hud.js` 各 10 / `audio-blip.js` 9 / `settings/spirit-page.js` 8 / `dialog-voice.mjs` 8;`upload.js` 只剩 1 条(`ctx.media.audioManager.playHint` on `unknown`)—— 按 `types/ctx.d.ts:31-34` 记的规矩,`audioManager` 这类"唯一权威是模块里的对象字面量"的成员要**连"声明 ≡ 写入方"的钉子一起写**,手写形状等于给消费方一个假保证 ⇒ 那是独立一批,不在这里做。
+
 
 
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
@@ -975,7 +1000,7 @@ node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色�
                                   #   headless 无 GPU,SwiftShader 编全站着色器实测 35-45s,机器一忙就冲破预算,
                                   #   这条当天连挡两次发布;FPS 仍量仍打印,循环存活由 posD 逐帧读数 + 截图非纯色兜住。
                                   #   同一个坑与同一次改法见 b612-preload-film-probe 那条**)
-npx vitest run                    # 前端单测 1088 项 / 97 文件(2026-10-15 15:00 实测 23.08s 全绿;物理/碰撞/状态机/游戏状态/存档/路由契约/配额/灯光预算/剧情纯逻辑/
+npx vitest run                    # 前端单测 1093 项 / 97 文件(2026-10-15 17:35 实测全绿;物理/碰撞/状态机/游戏状态/存档/路由契约/配额/灯光预算/剧情纯逻辑/
                                   #   身份与授权/上传覆盖与分片GC/WS守卫/SSE限流/资源释放/队列/循环生命周期/
                                   #   保留期清扫/AI用量台账/R2待发台账/缩略图同权/mylinks配额/白板归属/磁盘并发闸/公开API封禁闸)
 npx vitest run --coverage         # 覆盖率基线(2026-09-24 建):已测纯逻辑模块普遍 82-100%(game-state 94/collision-resolve 96/light-budget 100/store 100/vertical-physics 92);

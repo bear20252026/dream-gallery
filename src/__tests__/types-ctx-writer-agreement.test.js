@@ -147,6 +147,95 @@ describe('ctx.d.ts 三条成员声明 ≡ 各自唯一写入方', () => {
   });
 });
 
+describe('2026-10-15 第四刀:链接契约与 hangOne ≡ 服务端 / paintings.js 的真实形状', () => {
+  // 同一方向的第三簇:`ModeNamespace.myLinks / customLinks` 写的是 `string[]`,而这两个数组的**唯一
+  // 写入方是服务端裁剪**(`lib/siteconfig.js:89` 与 `:96` 的两个 `.map(l => ({…}))`)——下发的是对象数组。
+  // 后果与 mA/desert 一模一样:报错的是消费方,而消费方是对的 —— `mode.js:325` 读 `l.pos.x`、
+  // `mode.js:106/313` 读 `l.icon`、`upload.js:508` 读 `l.name`、`:523` 读 `l.id`。
+  // 以及 `GalleryNamespace.hangOne` 声明成 `(url) => void`,而 `paintings.js:309` 是三个参数、
+  // 返回一个画框 Group:`upload.js:395` 因此报 TS2554,紧接着读 `g.userData.ox/oy/oz` 报 3 条 TS2339。
+  const SC = read('lib/siteconfig.js');
+  /** 从服务端那两行 `.map(l => ({ a: l.a, b: l.b }))` 里取**下发出去的键集合** */
+  function servedKeys(re, label) {
+    const m = SC.match(re);
+    expect(m, `lib/siteconfig.js 里找不到 ${label} 那行裁剪(改写法要同步改这条断言)`).not.toBe(
+      null
+    );
+    return m[1]
+      .split(',')
+      .map((s) => s.split(':')[0].trim())
+      .filter(Boolean)
+      .sort();
+  }
+
+  it('MyLinkItem 的成员集合 ≡ 服务端 myLinks 裁剪出的键', () => {
+    const served = servedKeys(/\.map\(l => \(\{([^}]*)\}\)\);/, 'myLinks');
+    expect(served).toEqual(['id', 'model', 'name', 'pos', 'url']);
+    expect(ifaceMembers('MyLinkItem').sort()).toEqual(served);
+    expect(DTS).not.toMatch(/^ {2}myLinks: string\[\];$/m);
+    // pos 的形状取自同文件 :209 的构造点(数字三元组或 null),不是数组
+    expect(SC).toMatch(/obj\.pos[\s\S]{0,90}x:[\s\S]{0,40}y:[\s\S]{0,40}z:/);
+    expect(memberLine('ModeNamespace', 'myLinks')).toBe('MyLinkItem[]');
+  });
+
+  it('CustomLinkItem 的成员集合 ≡ 服务端 customLinks 裁剪出的键', () => {
+    const served = servedKeys(/customLinks\.map\(l => \(\{([^}]*)\}\)\)/, 'customLinks');
+    expect(served).toEqual(['icon', 'id', 'model', 'name', 'url']);
+    expect(ifaceMembers('CustomLinkItem').sort()).toEqual(served);
+    expect(DTS).not.toMatch(/^ {2}customLinks: string\[\];$/m);
+    expect(memberLine('ModeNamespace', 'customLinks')).toBe('CustomLinkItem[]');
+  });
+
+  it('hangOne 的参数个数 ≡ paintings.js 定义的形参个数,且返回值不是 void', () => {
+    const pj = read('src/gallery/paintings.js');
+    const def = pj.match(/function hangOne\(([^)]*)\)/);
+    expect(def, 'paintings.js 里找不到 function hangOne(...)').not.toBe(null);
+    const wrote = def[1]
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    expect(wrote).toEqual(['mU', 'caption', 'aura']);
+    expect(pj).toMatch(/ctx\.gallery\.hangOne = hangOne/);
+    const decl = memberLine('GalleryNamespace', 'hangOne');
+    const m = decl.match(/^\((.*)\) => ([\w\s|]+)$/);
+    expect(m, 'hangOne 的声明写法变了,这条钉子要跟着改: ' + decl).not.toBe(null);
+    expect(m[1].split(',').length).toBe(wrote.length); // 少一个参数就是 upload.js:395 那条 TS2554
+    expect(m[2].trim()).toBe('Group'); // 写成 void 等于宣布"路标读不到 userData"
+    expect(pj).toMatch(/\n {2}return g;\n\}/); // 写入方确实有返回
+  });
+
+  it('flyAudio 指向 HTMLAudioElement(唯一写入方 peaks.js 的 new Audio)', () => {
+    const pk = read('src/kunlun/peaks.js');
+    expect(pk).toMatch(/const flyAudio = new Audio\(/);
+    expect(pk).toMatch(/ctx\.kunlun\.flyAudio = flyAudio/);
+    expect(memberLine('KunlunNamespace', 'flyAudio')).toBe('HTMLAudioElement | null');
+    expect(DTS).not.toMatch(/^ {2}flyAudio: unknown;$/m);
+  });
+
+  it('.js 里不许出现泛型实参写法(checkJs 会把 < 读成断言/比较)', () => {
+    // querySelectorAll<HTMLButtonElement>(…) 这类写法在 .ts 里对,在 .js 里会报
+    // TS2365「Operator '<' cannot be applied」—— 本刀差点把它当成"类型修好了"。
+    const bad = [];
+    const dir = path.join(ROOT, 'src');
+    for (const rel of fs
+      .readdirSync(dir, { recursive: true })
+      .filter((f) => typeof f === 'string' && /\.js$/.test(f))
+      .map((f) => String(f).replace(/\\/g, '/'))) {
+      const src = read(path.join('src', rel));
+      // 先把 // 注释剥掉再扫:文件里"为什么不能用泛型"的说明本身就带着这个写法,
+      // 不剥就等于让注释去撞自己的闸门(本仓的注释密度高,这类自撞不止一次)。
+      const code = src.replace(/^[ \t]*\/\/.*$/gm, '');
+      if (
+        /\.\w+<(?:NodeListOf|HTMLMediaElement|HTMLButtonElement|HTMLInputElement)\s*>\s*\(/.test(
+          code
+        )
+      )
+        bad.push(rel);
+    }
+    expect(bad, '这些文件用了 .js 里不可解析的泛型实参(改成 JSDoc cast)').toEqual([]);
+  });
+});
+
 describe('video-wall.js 的 playVideo 句柄有类型可用(注释级,不动运行期)', () => {
   const vw = read('src/scene/media/video-wall.js');
 
