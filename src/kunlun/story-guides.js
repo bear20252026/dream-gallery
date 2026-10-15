@@ -3,8 +3,8 @@
 // 罗盘单一权威 ctx.ui.storyTarget 的写入保留在本模块(单写者不变)。
 // deps 注入(2026-10-10 审查 P2 巨石第二批):planets.js 的章节/门现身/岛表/主场景均为
 // 可变模块状态,经 getter 注入;消费方(scene6/7/late-planets/8 个探针)只认场景对象名,零感知。
-import * as THREE from 'three';
 import { ctx } from '../ctx.js';
+import { createBeacon, disposeBeacon } from '../shared/beacon-manager.js';
 import { ENDING_GATE_CHAPTER } from '../shared/ending-logic.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
 
@@ -17,28 +17,12 @@ let gateGuideBeacon = null,
 let princeBeacon = null,
   princeArrow = null; // B612 小王子
 function makeGuideBeacon(scene, x, z, gy, h, r, opacity, name) {
-  const m = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xffd9a0,
-      transparent: true,
-      opacity: opacity,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      fog: false,
-    })
-  );
-  m.position.set(x, gy + h / 2 + 0.2, z);
-  m.userData.baseOpacity = opacity;
-  m.name = name;
+  const m = createBeacon({ x, z, baseY: gy, lift: 0.2, h, r, opacity, name });
   scene.add(m);
   return m;
 }
-function dropGuideBeacon(scene, b) {
-  if (!b) return;
-  scene.remove(b);
-  b.geometry.dispose();
-  b.material.dispose();
+function dropGuideBeacon(b) {
+  disposeBeacon(b); // 按 mesh.parent 摘:旧写法要现取场景,取空即抛
 }
 export function updateStoryGuides() {
   const active = ctx.scene.activeWorld || 'main';
@@ -107,7 +91,7 @@ export function updateStoryGuides() {
   } else if (!wantGate && (gateGuideArrow || gateGuideBeacon)) {
     removeFloatArrow(DEPS.getScene(), gateGuideArrow);
     gateGuideArrow = null;
-    dropGuideBeacon(DEPS.getScene(), gateGuideBeacon);
+    dropGuideBeacon(gateGuideBeacon);
     gateGuideBeacon = null;
   }
   if (gateGuideBeacon)
@@ -129,7 +113,7 @@ export function updateStoryGuides() {
     const bw = DEPS.getWorldManager().getWorld('b612').scene;
     removeFloatArrow(bw, princeArrow);
     princeArrow = null;
-    dropGuideBeacon(bw, princeBeacon);
+    dropGuideBeacon(princeBeacon);
     princeBeacon = null;
   }
   if (princeBeacon) princeBeacon.material.opacity = princeBeacon.userData.baseOpacity * pulse;
@@ -140,13 +124,13 @@ export function updateStoryGuides() {
 export function dropAllStoryGuides() {
   const s = DEPS.getScene();
   removeFloatArrow(s, gateGuideArrow);
-  dropGuideBeacon(s, gateGuideBeacon);
+  dropGuideBeacon(gateGuideBeacon);
   const bw =
     DEPS.getWorldManager() &&
     DEPS.getWorldManager().getWorld &&
     DEPS.getWorldManager().getWorld('b612');
   if (bw) {
     removeFloatArrow(bw.scene, princeArrow);
-    dropGuideBeacon(bw.scene, princeBeacon);
+    dropGuideBeacon(princeBeacon);
   }
 }

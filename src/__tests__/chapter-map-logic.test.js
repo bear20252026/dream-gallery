@@ -8,6 +8,8 @@ import {
   decodeSave,
   applySave,
   collectSave,
+  importSave,
+  restoreSave,
   MAX_CODE_CHARS,
   SAVE_FIELDS,
 } from '../shared/chapter-map-logic.mjs';
@@ -152,5 +154,106 @@ describe('chapter map', () => {
   });
   it('saveBackup 不进 SAVE_FIELDS(否则存档码里套存档码,每导一次翻一倍)', () => {
     expect(Object.keys(SAVE_FIELDS)).not.toContain('saveBackup');
+  });
+  // —— M-04(第六轮外部审计):写不进去必须说出来 ——
+  it('applySave 全落盘时 ok:true、failed 空', () => {
+    const r = applySave(fakeStore(), {
+      scene2: true,
+      planetsChapter: 3,
+      endingAnswer: 'yes',
+      portfolio: { a: 1 },
+    });
+    expect(r).toEqual({ ok: true, failed: [] });
+  });
+  it('setter 返回假值(0 / "" / null / undefined)不算写失败:只认严格 === false', () => {
+    // 判定口径钉死在这里。若写成 `!ok`,setNum(k, 0) 这种"把赋值结果当返回值"的 setter
+    // 会被当成失败 ⇒ 一次本来成功的载入被报成"存不下",玩家被拦在门外。
+    const writes = [];
+    const store = {
+      mark: (k) => (writes.push(k), undefined),
+      unmark: (k) => (writes.push(k), null),
+      setNum: (k, v) => (writes.push(k), v), // planetsChapter:0 → 返回 0
+      setStr: (k, v) => (writes.push(k), v), // endingAnswer:'' → 返回 ''
+      setJson: (k, v) => (writes.push(k), v),
+    };
+    const r = applySave(store, {
+      scene2: false,
+      page1: true,
+      planetsChapter: 0,
+      endingAnswer: '',
+      journeyMemories: {},
+    });
+    expect(writes).toEqual([
+      'scene2',
+      'page1',
+      'planetsChapter',
+      'endingAnswer',
+      'journeyMemories',
+    ]);
+    expect(r.ok).toBe(true);
+    expect(r.failed).toEqual([]);
+  });
+  it('某项没落盘时 failed 列出键名、ok:false(载入路径据此拒绝 reload)', () => {
+    const store = {
+      mark: () => true,
+      unmark: () => true,
+      setNum: (k) => (k === 'planetsChapter' ? false : true), // 模拟配额满时这一键写失败
+      setStr: () => true,
+      setJson: () => true,
+    };
+    expect(applySave(store, { scene2: true, planetsChapter: 3 })).toEqual({
+      ok: false,
+      failed: ['planetsChapter'],
+    });
+  });
+  it('flag 清不掉(unmark 报错)同样计为失败', () => {
+    const store = {
+      mark: () => true,
+      unmark: () => false,
+      setNum: () => true,
+      setStr: () => true,
+      setJson: () => true,
+    };
+    expect(applySave(store, { scene2: false }).failed).toEqual(['scene2']);
+  });
+  // —— M-04:载入/撤销的落盘顺序。不可逆操作不许以"看起来像成功"收场 ——
+  it('importSave:快照写不进 ⇒ noBackup,一个字段的现有进度都不覆盖', () => {
+    const s = fakeStore({ scene2: true, planetsChapter: 5 });
+    s.setJson = () => false; // localStorage 配额满 / 隐私模式
+    expect(importSave(s, { scene2: false, planetsChapter: 9 })).toEqual({
+      action: 'noBackup',
+      failed: [],
+    });
+    expect(s.flag('scene2')).toBe(true);
+    expect(s.num('planetsChapter')).toBe(5);
+  });
+  it('importSave:快照记的是载入**前**的进度(顺序反了就等于备份了新档)', () => {
+    const s = fakeStore({ scene2: true, planetsChapter: 5 });
+    expect(importSave(s, { planetsChapter: 9 }).action).toBe('reload');
+    expect(s.num('planetsChapter')).toBe(9);
+    expect(s.json('saveBackup', null).data.planetsChapter).toBe(5);
+  });
+  it('importSave:字段没全落盘 ⇒ partial,快照留着让玩家可以撤销', () => {
+    const s = fakeStore({ scene2: true });
+    const real = s.setNum;
+    s.setNum = (k, v) => (k === 'planetsChapter' ? false : real(k, v));
+    expect(importSave(s, { scene2: false, planetsChapter: 9 })).toEqual({
+      action: 'partial',
+      failed: ['planetsChapter'],
+    });
+    expect(s.json('saveBackup', null)).toBeTruthy();
+  });
+  it('restoreSave:撤到一半不清快照,撤成功才清(一次性)', () => {
+    const s = fakeStore({ planetsChapter: 9 });
+    const snap = { at: 1, data: { planetsChapter: 5 } };
+    s.m.saveBackup = snap;
+    const real = s.setNum;
+    s.setNum = (k, v) => (k === 'planetsChapter' ? false : real(k, v));
+    expect(restoreSave(s, snap)).toEqual({ action: 'partial', failed: ['planetsChapter'] });
+    expect(s.json('saveBackup', null)).toBe(snap); // 重试依据还在
+    s.setNum = real;
+    expect(restoreSave(s, snap)).toEqual({ action: 'reload', failed: [] });
+    expect(s.num('planetsChapter')).toBe(5);
+    expect(s.json('saveBackup', null)).toBeNull();
   });
 });

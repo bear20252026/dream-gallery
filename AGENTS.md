@@ -28,14 +28,234 @@
 - 门禁:npm test 6 条脚本 198 项 / vitest **978 项**(964+14)/ eslint 0 / tsc --noEmit 0 / `npm run build` 0 且 `[entry-weight]`、`[no-importmap]`、`[core-preload] 45 条` 三条构建断言照旧 / checkJs **308 = 基线**(新增 0 条)。
 - ⚠️**要记住的三条纪律**:①**"断言写对了"不等于"测到了"** —— 凡是"从 X 状态恢复"这类测试,必须先断言 X 状态此刻成立;②**否定式断言要自己造反例**(说"没有残留"就先把残留埋进去),否则它永远绿;③改**加权排序**这类最底层之前,先把"当前真实影响"量成一张表(换位几条),否则说不清这次是"修 bug"还是"改行为"。
 
+### PR1 已上线(2026-10-14 12:48 合并 f71a0d8 / DEPLOY_OK f71a0d8)
+
+- **发布链**:PR **#21**(head `5173adf`)由 ruleset 的 required checks 自动合并 ⇒ merge `f71a0d8`。合并前逐字核过 **CI 验的树 == 要部署的树**:`git rev-parse 5173adf^{tree}` = `f71a0d8^{tree}` = **`f47e9267aa51a72ff23210ee45fb7ea353d4753c`**;两个 required context(build-and-test 57s、smoke 1m54s)都 pass。
+- **线上复验(全过)**:首页 200、`/healthz` `{"ok":true,"uptime":66}`、首页引用的 chunk 与本地 dist 同名且 200、漂移复检 **OK 198 / DRIFT 0 / MISSING 0**;`csp-stage-probe --prod` = **CSP_STAGE_OK**(三页各 1 条内联,全归 CF,我方 0 条);`boot-cost-probe` 沙箱 **670KB / 资源 55 / prefetch 45 条全带 crossorigin**;`BASE_URL=prod b612-prod-worlds` **六条断言全绿**(activeWorld=main → 小地图在场 → 进 B612 → 非主世界小地图隐藏 → storybook 入景 → 国王星 + kingStoryScene 入景),第 ④ 段仍卡在探针头写明的那条已知失效(等返回钮超时),**失败点与描述逐字对上**才判为旧红而非回归。
+- **新契约在生产真的工作**(这是 M-13 唯一的正面证据,光看单测不算):`.tmp/worldstatus-probe.cjs` 走闸门进世界后读到
+  `__worldStatus = {tag:"后台", status:"ready", loaded:5, failed:[], skipped:8}`、`__worldPhase = "后台:完成"`、`__deferredWorldReady` 已是 object(以前 resolve undefined)。skipped 的 8 项正是搁置的旧玩法(永恒厅/飞舟/风铃/壁炉/雪窗/重置视角/放下/终章),loaded 的 5 项是仍在演的(第6场国王/第7场虚荣/第7场酒鬼/第8-9场/回忆层)⇒ **`isShelved()` 收成单一源之后,两条链都按同一规则数得出来**。
+- 顺带入库 `scripts/known_hosts`(deploy 的 SSH 主机信任锚,此前只在本机):ED25519 指纹 `SHA256:R5xJj0fcpba1a94Y9ZnZr6anApzUYXWtlqJYd7lnlww` 与**已跟踪的** `scripts/hostkey-fingerprint.txt` 逐字一致,该 IP 早就写在 deploy.sh/AGENTS.md 等多处已跟踪文件里 ⇒ 没有新增任何披露;入库后新克隆走"锁定"而不是 accept-new 的 TOFU。
+- ⚠️**这一批发了四次才发出去,原因全在本机侧,结论一条没打折**(发版的机械动作是对的,失败都停在闸门里):
+  · 第 1 次:vitest 两条**超时**(scene-manager-rollback 的 beforeAll hook 20s、no-secrets 的用例 60s)红 ⇒ 停第 3 步。单独重跑 **86 文件 / 978 项全绿,43.5s** ⇒ 是争用不是回归;争用来源之一就是我自己并发跑的递归 grep。日志里 `import 406s / tests 241s` 而墙钟只有 90s,就是超线程调度的形状。
+  · 第 2 次:跑到第 6→7 步之间被**我的工具 10 分钟超时**杀掉(PR 已建、`--auto` 已挂)⇒ GitHub 随后自动合并,**但没部署**。教训:长流程用 `nohup … & disown` 脱离,别让工具超时咬断发布;而 wrapper 的 exit code 一律不算数(`cmd | tail` 的 $? 属于 tail)。
+  · 第 3 次:`test-mobile.js` 等 `#b612Gate` 60s 超时(前两次同一条都 6/6 过)⇒ 又是本机负载,停第 3 步。
+  · 第 4 次:`release.sh` 正确报「相对 GitHub 的 main 没有任何新内容 ⇒ 未构建、未开 PR、未部署」——**因为它真的没有新内容**(已合并)。照脚本自己给的口径走 `deploy.sh --yes` 补发,并在部署前手工做上面那次树哈希核对。
+  · 三条可复用的规矩:①发布期间**不要并发跑别的重活**(grep/探针都算);②发布失败先看它停在哪一步 + 读自己的结论行,再决定要不要重跑;③若 PR 已被 CI 自动合并而线上没动,就**核对树哈希**后直接 deploy,不要为了"走一遍流程"再烧一次构建。
+
+### PR2 + PR3 已落地(2026-10-14 下午,本地全绿待发)
+
+**PR2 = 资源所有权(M-14 剩的那半 + M-15 唯一实例)**
+
+- `src/hot.js` 给捕获路径补上**代次守卫**:`installCaptures` 先问 `isLiveBag(bag)`,不在任就**不装**;
+  `bag.async` 改成"装了才卸"。理由写在那段注释里 —— 迟到回调如果照旧装补丁,对象会落进一个
+  `dispose` 时已 `length = 0` 的死 `bag.objs`,再没人释放;而"不装"时这些对象由**现任世代**的捕获接管,归它释放。
+- ⚠️**写基线测试时撞出一个比审计说得更重的真缺陷**:原实现把"装之前是什么"记在 `bag._prevAdd` /
+  `_prevAppend` / `_prevSetInterval` / `_prevOnTick` **四个单槽**里。`bag.async()` 进出会再压一层,
+  内层 install 覆盖单槽、内层 uninstall 又把单槽**置 null** ⇒ 轮到 `hotEnd()`/`dispose()` 时
+  `if (bag._prevAdd)` 已经是假,**外层那层补丁永远卸不掉**:每次热更都在 `s.add`/`appendChild`/`onTick`
+  上留一层壳,壳还越叠越厚。现在改成**安装栈**(`bag._captureStack`,install 压一层、uninstall 弹一层,
+  `dispose` 用 `drainCaptures` 吐干净)。仍然只影响 dev/HMR。
+- `src/gallery/portal.js` 原来**完全在 HMR 生命周期之外**(M-15 全站唯一真实例):顶层 `eventBus.on(...)`
+  把退订函数直接丢,外加 window 监听 / head style / `ctx.onTick` 各一份。现按站内 26 个模块同一套约定
+  接 `hotBegin('portal')` + `bag.custom` 登记三件捕获管不到的清理 + `hotEnd`/`accept`。
+- 新增 `src/__tests__/hot-generation.test.js`(6 条,`vi.hoisted` 桩掉 `ctx.js` 才跑得动 node 环境):
+  基线(本轮存活期间一直捕获、`hotEnd` 之后停)/ 迟到回调不落死 bag 且由现任接管 / 不许把现任摘走 /
+  `register` 与捕获**共用同一个代次判据**(把 `REG[name]` 与 `REG[bag.name]` 两份实现合成一份)/ DOM 同规则 /
+  `hotEnd` 卸干净(专门钉上面那个单槽缺陷)。
+
+**PR3 = 持久化的结果契约(M-11 + M-17)**
+
+- `lib/store.js`:`saveGateData()` 现在**返回结论对象**
+  `{ ok, savedAt, sqliteOk, sqliteReason, jsonOk, errors[], ms, queuedMs }`,SQLite 与 JSON 镜像**各记各的**
+  (`sqliteReason` 分 `ok|disabled|unavailable|error`,后两种之一;`unavailable` = 原生模块没装成,是设计内回退,
+  不算失败,否则每次保存都红)。`_savedAt` 从"入队时取"改成"**任务体内取**"——排队严重时镜像里记的会比真正写盘更早,
+  而加载仲裁正是按 `_savedAt` 取较新一方。另加 `saveGateDataSync()`(同步收尾,优雅关闭用)与 `lastSaveResult()`;
+  `onWrite` 探针回调现在同时给 `ms`(纯写)与 `queuedMs`(排队等待)——以前只量得到后者。
+- ★**这条链永不 reject**:失败一律折成 `{ok:false}` 的**已解决**结果。原因不是风格 —— 全站 **85 处**
+  `saveGateData()` 是不 await 的即发即忘,Node ≥15 对未处理 rejection **直接终结进程**,所以"诚实的 reject"
+  等于给每次磁盘故障配一次全站崩溃。诚实体现在**结论可读**,不体现在把异常抛给不接的人。
+- `lib/aiusage.js`:①`flush()` 那句"写失败不清 dirty(台账不能静默丢账)"原本是**空的** —— try/catch 包的
+  是异步入队那一下,永远捕不到;现在按结果把条数**退回 pending**。②`stop()` 改走 `saveGateDataSync()`
+  并返回 `{ok, pending, error}`:关闭路径上"入队"等于赌进程还活着,而 pm2 grace 到点就 SIGKILL。
+- `lib/r2outbox.js`:`writeNow()` 返回 `{ok, wrote, error}` 并留 `lastWrite` 观测位(`outboxStats().lastWrite`);
+  `flush()` 不再"把落盘前排着的条数当返回值"(`{ok, wrote, pending, entries, error}`);
+  `stopOutbox()` 不再把结论丢掉 ⇒ 优雅关闭第一次能区分"没抛"与"已落盘"。
+- 接线的调用方(只接**用户可见的那一个** + 关闭路径,其余 80+ 处保持即发即忘,不改行为):
+  `lib/files-upload.js` 的 `DELETE /api/files/...` 现在 await 结论 —— 文件已删但记录没落成时回
+  `200 {ok:true, warning:…}` 并打错误日志(不假装成功,也不让客户端重试删除);`server.js` 的
+  `beginShutdown` 对 AI 用量台账与 R2 台账都按结论打日志。
+
+**反向验证(专家的验收原话:破坏被验证条件时测试确实失败)**
+- `isLiveBag` 恒真 ⇒ hot-generation 恰好 **2 红**(迟到回调那条 + DOM 那条);
+- `uninstallCaptures` 弹层后清栈(模拟旧单槽缺陷)⇒ **2 红**(基线那条 + "hotEnd 卸干净"那条);
+- `r.ok = true`(谎报成功)⇒ test-store-sqlite **3 红**(SQLite 注入 / 镜像注入 / 同步路径三条)。
+全部还原后复绿。**注**:这一轮做反向验证时我用 `git checkout -- src/hot.js lib/store.js` 收尾,把两个文件
+**整套未提交的新工作抹回了 HEAD** —— `src/hot.js` 靠事先的 `.tmp` 备份救回,`lib/store.js` 凭上下文重写。
+教训已入本机 memory(有未提交工作的文件不许用 checkout/restore/stash/clean 回退,改用"备份 + 对称 replace")。
+
+**门禁(这一批的数字)**:npm test 6 条脚本 **7 / 22 / 108 / 46 / 20 / 6 = 209 项 0 失败**(test-store-sqlite 从 11 项涨到 22 项,
+新增的就是四个失败注入场景:基线前置 / SQLite 影子写坏 / 镜像 ENOENT 且进程必须还活着 / 同步收尾路径);
+vitest **987 项 / 87 文件**(978 + hot-generation 6 + aiusage 2 + outbox 1);eslint 0;tsc --noEmit 0;
+`npm run build` 通过且三条构建断言照旧(45 prefetch / 入口不含 three / dist 无 importmap);checkJs **308 = 基线**(新增 0)。
+
+
+### PR4 已落地(2026-10-14 晚,本地全绿待发)
+
+**M-19 = `depcruise` 的入口里没有后端**(`package.json:32,34` 两条脚本 → `depcruise src server.js lib`)
+- **审计原文说重了,按实测修正**:「`lib/` 的依赖方向完全没人守」不成立。`depcruise src` 实测已覆盖
+  **50 个后端磁盘源码文件中的 49 个** —— 靠 `src/__tests__/` 下 33 个测试文件 require 了 `lib/*`
+  (grep 全仓:`src/` 业务代码**一处都不引用**后端)。真正缺的是**入口**:覆盖面寄生在测试文件的引用关系上,
+  测试一挪走闸就静默变窄;而 `server.js` 完全不在图里(没有任何模块引用它 ⇒ 传 `src` 时它连"依赖"都当不上)。
+- 数字:改前 **382 模块 / 1288 边**,改后 **383 / 1309** ⇒ 净多的就是 `server.js` 本体 + 它的 21 条出边;两者都 0 违规。
+- CI 不用动:test.yml:95 跑的就是 `npm run depcruise`。**没有新开 job** —— ruleset 25039505 的必需上下文按
+  job id(`build-and-test`/`smoke`)匹配,新 job 会永远 pending。与 `check-backend-manifest.cjs` 各管各的
+  (那边 `--no-config`,只管"清单 ⊇ 真实依赖"),没造第二道平行闸;复跑仍 ✅(可达 51 / 清单 53)。
+- **反向验证**:造一对没有任何引用者的后端循环文件 `lib/__rv_a.js ↔ lib/__rv_b.js` ⇒
+  旧范围 **382/1288、0 违规(绿灯)**;新范围 **385/1311、`error no-circular`、exit 1**。删回原位复绿。
+  这就是这条审计项的全部价值:**测试文件没引用到的后端文件,以前根本不在判定范围内**。
+
+**M-18 = `stream.guard()` 的还位保证从调用方收归本地**(`lib/upload/stream.js`)
+- 实测双调是**常态不是边角**:一次**成功**上传 `release()` 被调 **2 次**(`ws finish` + `req close`);
+  一次**越限中止** **2~3 次**(abort 内一次、`ws error` 一次、`req close` 一次);一次**客户端断连** **2 次**
+  (线上 IncomingMessage 是 `aborted` 然后 `close`)。今天没炸**只因为**四个调用点传的都是 `quota.js` 里带
+  `freed` 牌的 `slot.release`(`abuse.releaseUploadSlot` / `chunks.releaseInflight` 自身也幂等)
+  ⇒ 与审计自陈一致:**不是现役漏洞,是保证放错了地方**。
+- 改法:guard 内加 `released` 标志,**先立牌再调用**(`opts.release()` 抛了也不重试 —— 重试就可能是双扣);
+  文件头"四条结束路径"那段补一句"这四条**会交汇**,不是四选一"。行为对今天四个调用点零变化。
+- 测试新增 4 条断言:`src/__tests__/lib-upload-modules.test.js`。判据**必须用朴素非幂等计数器** ——
+  传 `slot.release` 去断言"只还一次"等于什么都没测(它被调 3 次也只减 1 次位)。
+- **反向验证**:摘掉 flag ⇒ **3 红**,全部是 `expected 2 to be 1`(成功路 / 越限路 / 断连路各多还一次);
+  用 `.bak` + 对称还原(md5 比对一致)后 31 项复绿。
+  ⚠️ 断连那条**第一版是假绿**的:手工 `Readable` 只 fire `close` 不 fire `aborted`,所以只走一条路,
+  摘掉 flag 也照样通过 ⇒ 改成按线上形态补一次 `req.emit('aborted')` 才真正测到双路。
+  这一处要是没做反向验证就会带进仓库当"已覆盖"。
+
+**门禁(PR4 之后)**:npm test 6 条脚本 **7 / 22 / 108 / 46 / 20 / 6 = 209 项 0 失败**(未涨,新断言都在 vitest 侧);
+vitest **991 项 / 87 文件**(987 + M-18 那 4 条);eslint 0;tsc --noEmit 0;`npm run build` 通过且三条构建断言照旧
+(45 prefetch / 入口不含 three / dist 无 importmap);checkJs **308 = 基线**(新增 0);
+`npm run depcruise` + `check-backend-manifest.cjs` 双绿。
+⚠️ prettier 对 `lib/upload/stream.js` / `package.json` 报 warn **不是本轮引入**:`git show HEAD` 版同样报
+(stream.js 后端一贯紧凑单行 `try{…}catch(e){}`,且 lint-staged 对 `lib/**/*.js` 只 eslint --fix 不 prettier;
+CI 无任何 prettier 步骤),package.json 那 90 个 CR 是本地签出的 CRLF、我动的只有 2 行 ⇒ 不顺手重排这两个文件。
+
+### 稳定性包 A 已落地(2026-10-14 深夜,M-01 + M-05,本地全绿待发)
+
+**本批核实(M-05 三条全部属实,而且比原文更硬;M-01 三条字面属实但定性要改)**
+
+| 断言 | 结论 | 关键证据 |
+|---|---|---|
+| M-05 `enter()`/`enterWithoutPush()` 两套重复实现 | **属实** | 62 行 vs 45 行,commit/runWarp/rollback 骨架近乎逐行相同,真差异只有 4 处:压栈与否、来源相机缓存、恢复哪份快照、回滚带不带 `options` |
+| M-05 后者缺 finally ⇒ 切换锁死 | **属实,且可达** | 旧 `enter` 把 `runWarp` 整段包在 try/catch(231-266),旧 `enterWithoutPush` 只有 `await runWarp(...)`(349),而 `warpOpts(id)`(363)与 `this.capture()`(329)都落在保护之外 ⇒ 过场/标签/快照任一抛错,`transitioning` 永不复位。量化:`transitioning` 被 **7 个导航入口**当闸门读(portal:54 / earth-day:379 / late-planets:572 / nav-buttons:40 / star-map:266 / voyage:65 / world-travel:13);更糟的是 4 处星球回程传送(scene6-king:226、scene7-tippler:261、scene7-vanity:137、late-planets:544)写成 `Promise.resolve(wm.back()).then(ok=>…).catch(()=>{})` ⇒ 抛错进 reject 分支被**静默吞掉**,而此时门已 disarm、信标已删 ⇒ 玩家被困外星、零信号;`back()/toMain()` 里 `if (!ok) 还原栈` 这条既有防线在该路径上根本执行不到 |
+| (审计没说)**回滚可能滚两次** | **属实** | 旧 `enter` 的 commitError 分支把 `await this.rollbackEnter(...)` 写在 try **内**(243),它自己抛错会被外层 catch(254)接住 ⇒ **再滚一次、第二次 pop**,把无关的合法历史 `[main, b]` 也掏空 |
+| M-01 `initialized=true` 写在循环前 / 一个系统 init 抛错仍装后面的 / 之后注册只告警 | **字面属实,但三条都是有意的既有设计**(注释在案) | ①是重入防护:把它挪到循环之后,单测里"系统在自己的 init 里再调 init"直接 RangeError。②是刻意的容错:一个玩法模块炸了不该把整个世界带走。真缺口是**外面读不到**:`main.js:286` 把 `init()` 返回值丢掉、失败只落 console.warn,且 `initialized` 一次置真后二次 init 一律被拒,连"上次砸了哪几个"都无处可查 ⇒ 与 PR1 的 **M-13 同一类**(告警代替结构化结论),故沿用同一套结论形状,**不改装配语义** |
+| (审计没说的连带后果) | **记录,本批不改** | init 失败的系统仍在 `systems` 里,`update(dt)` 每帧照调 ⇒ 半装配态持续跑 + 每帧一条告警。要跳过 failed 系统属于新的生命周期语义(= M-06 显式生命周期试点),本批只把它做成**可见**(点名进 `failed`) |
+
+⚠️**编号对账**:`AGENTS.md` 里"加权排序"一直是 **M-12**,而 PR1 的 commit 标题把它写成了「(M-01)」—— 以本文件为准:**M-01 = 组合根**。不改写已发布的历史,记在这里免得后人以为 M-01 已在那一批做完。
+
+**落地**
+
+- **M-05**:`src/core/scene-manager.js` 新增单一核心 `transition(id, {back, snapshot, options})`,`enter()` / `enterWithoutPush()` 退成两个薄适配(对外名称、签名、`ctx.scene.enterWorld/leaveWorld/toMainWorld` 契约一字未动)。三条纪律:**finally 复位 transitioning** / **失败一律按 false 返回、不外抛**(调用方那套 `if (!ok)` 才接得到信号) / **回滚只一次**(`dropStackEntry: pushedSource`,capture 就炸 ⇒ 不 pop)。三条既有日志前缀逐字保留(push 路 `world enter failed:`、`world enter failed(过场):`,back 路 `世界切换提交失败:`),只有 back 路过场炸是新的一条 `世界切换过场失败:`。统一时把 back 路的 `rollbackEnter` 也开始透传 `options`(旧 enter 那半没传,leave 拿到的上下文与正常切换不一致)—— 现状生产世界都没注册 enter/leave 钩子(planets.js:108/319 只给 scene/ground/meta)⇒ 线上打不着,记在此处以便行为变更有据可查。
+- **M-01**:`src/core/composition-root.js` 的 `init()` 返回并记录 `{status:'ready'|'degraded'|'failed', loaded[], failed:[{name,message}], skipped[]}`,新增 `initStatus()` 读出口(`window.__compositionRoot.initStatus()` 现成可达,不开新全局、不动 boot 接线);init 之后注册的名字进 `skipped` 并把 status 拉到 `degraded`;出去的是**冻结副本**;`dispose()` 令结论作废(→ null)。`initialized = true` 仍在循环前,并由新单测把"为什么"钉成契约。
+- **新增测试**:`src/__tests__/scene-manager-transition.test.js`(6 条:进入路过场炸 / 回程路过场炸(逐字复刻 scene6-king 的 `Promise.resolve(…).then(ok…)` 形态,断言拿到的是 `false` 而不是 `rejected:…`)/ 回滚自身炸只 pop 一次 / 回程成功仍按条目快照恢复且不写来源相机缓存 / 过场未落期间闸门不误清 / capture 炸不 pop 别人历史)+ `src/__tests__/composition-root-assembly.test.js`(8 条:点名与确定性顺序 / 一个炸其余照装 + degraded / 全炸 = failed / 空根 = ready 而非 failed / 迟到注册进 skipped 且每帧仍 update / dispose 作废可重装 / **重入防护** / 副本不可污染)。合并前那份 `scene-manager-rollback.test.js` 8 条**未改一行**,正好当"两份合一没改行为"的回归网。
+- **反向验证 9 条**(`.tmp/rv-packA.mjs`:改坏 → 跑 → 还原 → md5 复核):
+  R1 不点名失败系统 ⇒ 2 红 · R2 抛错就 break ⇒ 2 红 · R3 迟到注册不进账 ⇒ 2 红 · R4 `initialized` 移到循环之后 ⇒ **恰好 1 红**(只有重入那条,RangeError)· R5 交内部对象而非副本 ⇒ 1 红 ·
+  R6 摘掉 finally ⇒ 4 红 · R7 回滚再滚第二次 ⇒ 1 红 · R8 回程路也缓存相机 ⇒ 1 红 · R9 `dropStackEntry` 硬写 true ⇒ 2 红。全部还原后复绿。
+  ⚠️其中两条是**我自己的预期算错**,按事实改档而不是改测试:R4 第一版替换实际把 `initialized = true` **整个删掉**了(4 红),那不是审计说的写法;R9 预期 1 红、实际 2 红(back 那条也会因多 pop 而栈错位)。
+- 门禁:npm test 6 条脚本 **7/22/108/46/20/6 = 209 项 0 失败**(exit 0);vitest **1005 项 / 89 文件**(991+14);eslint 0;tsc --noEmit 0;`npm run build` 0 且三条构建断言照旧(45 prefetch / 入口不含 three / dist 无 importmap);`npm run depcruise` 0 违规(385 modules / 1314 deps,+2 个测试文件);checkJs **308 = 基线**(中途一度 313:解构参数 `options = {}` 被推成 `{}` ⇒ 5 条 TS2339,补 JSDoc 参数类型后回到基线,**没有动基线数字**)。
+- ⚠️**要记住的三条**:①**"补了 catch"不等于"补了 finally"** —— 查这类锁死要按「从置真到复位之间有几条出口」数,旧 `enterWithoutPush` 的 commit 是有错误处理的(10-09 治理过),漏的正是过场自身那一路;②**合并两份实现时每条差异都要判定"是缺陷还是契约"**,判据是"谁消费它"(`world.camera` 只有 planets.js:140 读 ⇒ 保留差异;leave 钩子的 `options` 上下文 ⇒ 统一);③**新增 checkJs 错误不要靠抬基线过关**,一行 JSDoc 参数类型就能回到基线。
+- ⚠️prettier 这次与 PR4 相反:`composition-root.js` 改完 `--check` 报 warn,而 **HEAD 版是干净的** ⇒ 是我引入的排版偏差,不是历史遗留,已 `prettier --write` 修回(该文件本地签出是 CRLF,prettier 写回 LF,`core.autocrlf` 让 `git diff` 仍只显示我动的 46 行)。反向验证 9 条在排版之后**整批重跑一遍**,仍然 9/9 且还原 md5 逐字节一致 ⇒ 表上的数字对应最终这棵树。
+
+### 稳定性包 B 已落地(2026-10-14 深夜,M-02 + M-03 + M-04,本地全绿待发)
+
+**本批核实(三条断言都回读过代码;两条的定性要改,一条比原文更硬)**
+
+| 断言 | 结论 | 关键证据 |
+|---|---|---|
+| M-04 存档码导入吞失败、撤销不可靠 | **属实,但机制不是"会抛异常"** | `store-api.js` 的 `mark/unmark/setNum/setStr/setJson` 一律**返回布尔**(`rawSet/rawRemove`),旧 `applySave` 把返回值整个丢掉 ⇒ 落盘失败静悄悄、UI 照样 `location.reload()`。真不可逆的是**备份那一步没人检查**:`setJson('saveBackup', snap)` 失败后仍然覆盖进度 ⇒ 玩家点「撤销」时无据可依。⚠️顺带纠正一个我的初判:`delete obj.missing` 返回 **true**,"撤销一个不存在的键"不会被误记成失败 |
+| M-02 write-through 先通知后写回 / 抛错被吞 | **字面属实,现役打不着 ⇒ 定性=潜在债** | `gameState.subscribe` 在生产里**零消费者**;10 个绑定 prop 的 `apply` 全是纯赋值,不会抛。值得修的是另一条:**同值早返回把写回粘死** —— 一次失败后再 `set(key, 同一个值)` 永远不补写,ctx 与 gameState 长期不一致 |
+| M-03 剧情链裸 `setTimeout`,离场后台词弹到新场景 | **属实,但要说清是"谁关的对话框"** | `gameshell-dialog.js` 的 `cancelWorld` 走 `closeDialog(suppressDone)` **跳过 onDone** ⇒ 链子只剩心跳守护,而心跳判的是 `dialogOpen() === false`:「这句说完了」和「玩家走人了」在那个布尔上**同形** ⇒ 下一句在新场景弹出。全仓 9 份 `speakSeq`,3 份已带 `ticket = visit`(scene3-night:241 / scene3-memory:307 / scene6-king:47),5 份没有(earth-day / late-planets / scene2-draw / scene7-tippler / scene7-vanity),`ending-journey.js` 只有 `speakGen`、**全文件零 world 判定** |
+| (审计没给的边界) | **遵守** | 对话系统已有统一票据 ⇒ 本包一行没动 `gameshell-dialog.js` |
+
+**落地**
+
+- **M-04**:`src/shared/chapter-map-logic.mjs` 把"顺序"做成可测的纯函数 —— `applySave`(:176)回报 `{ok, failed[]}`,判据严格 `=== false`(写 `!ok` 会把 `setNum(k, 0)` / `setStr(k, '')` 误判成失败);`importSave`(:203)**先落快照再覆盖**,快照落不下去就 `noBackup` 一个字段都不动;`restoreSave`(:215)撤到一半**不清快照**(那是唯一的重试依据)。`src/ui/chapter-map.js` 按 `noBackup / partial / reload` 三分支收口,前两支**不刷新**、按钮 disarm、文案点名几条没落盘。
+- **M-02**:`src/core/game-state.js` 改成**先 write-through、后 notify**(订阅者回头读 ctx 已是新值);写回失败进 `pendingWrite`,`set(key, 同值)` 的早返回分支(:50)**补写欠账但不重复通知**。早返回本体一个字不拆 —— 它是 `state-system` 镜像回写的防回环闸,拆了就无限递归,新增单测把这条契约钉住。
+- **M-03**:新增纯模块 `src/shared/story-ticket.mjs`(`later / wait / cancel / bump / here / onTeardown / leaks`)。票据化三章:`scene7-vanity.js:30`、`scene7-tippler.js:153`、`ending-journey.js:233` —— 所有 `setTimeout` 改 `story.later`、`clearTimeout` 改 `story.cancel`、裸 `await wait(ms)` 改 `if (!(await story.wait(ms))) return`,离场(`prevWorld` 判定)与 `dispose()` 各 `bump()` 一次。**另三处单世界短链只补守卫、不上票据**(earth-day:60 `inDesert()` / late-planets:53 `speakSeq(…, home)` / scene2-draw:390):它们没有跨场 await、没有需要复位的幕布,加票据只是多一套要维护的账 —— 写在这里免得下一个人当漏改。
+- **ending-journey 的收尾是本批唯一"枚举完才看得见"的一块**:`tick` 的 switch 只接 `idle / well / farewell-wait`(switch 的三个 case),而 `wait / wake / busy / muzzle / farewell` 五个全是"有链子在飞或行动提示挂着"的瞬态;离场时 `tick` 还会 `hideAction()` 把提示收走 ⇒ 被打断又不交回 `idle`,玩家回沙漠就**永久站着不动**(比原缺陷更死)。第一版我只写了 `busy / farewell` 两条,是靠把全文件 15 处 `mode =` 逐条对回 switch 才发现的(:134 那行注释里的取值表本身就是过时的 —— 既没写 `busy` 也没写 `wait`,读注释会漏)。铃铛(`ending-audio.js:124` `bellsOn` 内部自递归 `setTimeout`)票据够不到,只能在 teardown 里显式 `bellsOff()`。
+
+**新增测试**:story-ticket.test.js(10 条,新文件)、chapter-map-logic.test.js(11 → **19**)、game-state.test.js(7 → **12**,原 7 条一字未改全过 ⇒ 没动既有契约)。
+
+**反向验证 16 条**(`.tmp/rv-packB-m03.mjs` / `.tmp/rv-packB-m03-probe.mjs` / 包内 m04、m02 各一份;改坏 → 跑 → 还原 → md5 逐字节复核):
+
+- M-04 5 条、M-02 5 条 —— 全部按预期变红。
+- 票据 8 条:S2 摘在场闸 2 红 · S3 bump 不判挂起 await 1 红 · S4 bump 不清账 1 红 · S5 不跑 teardown 1 红 · S6 cancel 不清 timer 1 红 · S7 `here()` 恒真 1 红 · S8 不登记计时器 1 红 · **S1 信息项(允许全绿)**:只摘"轮次闸"单测抓不到,因为 `bump()` 已把计时器全 `clearTimeout` —— 轮次闸是给"以后有人加了不记账的计时器"上的第二道保险,如实记成"单测够不到",不写成已覆盖。
+- 接线 3 条(驱动真浏览器):P1 整条链退回老写法 ⇒ **主判据变红**,漏出来的正是审计那句话的现场:`That is a queer hat you are wearing.` 弹在 b612;P2 只撤 `bump()`、P3 只把心跳换回裸 `setTimeout` ⇒ 均**全绿**(信息项):症状需要"裸心跳 + 无入口守卫"这对同时缺席,单留一半就被另一半挡住。⇒ 探针钉的是**这一对**,不是某个单点。
+
+**新增探针**:`scripts/probe/b612-chain-leak-probe.cjs`(7 条断言,自起 :3281,chapter=1 预置直测 326)。链路:清场对话(开局有等玩家回应的带选项对话 ⇒ lock 队列会把后面每一环堵死,石门按钮也不亮)→ 圈外重新武装再走进门半径(`planet-logic.gateStep` 触发即解除,直接把人摆到门上传不动)→ 进 326 → **等「仰慕者」那句真的在屏幕上** → `ctx.scene.leaveWorld()` → 16s 采样窗判"没有 326 的台词弹到 b612 + stage 仍停在 chainA" → 重回 326 判"台本从头再讲"(bump 不许把这一章钉死)。指纹用 `story-text.mjs` 的双语子串,不用"有没有对话框"(B612 自己会说话,必误报)。
+
+- 门禁:npm test 6 条脚本 **7/22/108/46/20/6 = 209 项 0 失败**(exit 0,未涨);vitest **1028 项 / 90 文件**(1005 + 10 票据 + 8 存档码 + 5 写回);eslint 0;tsc --noEmit 0;`npm run build` 0 且三条构建断言照旧(45 prefetch / 入口不含 three / dist 无 importmap),main chunk 269,574 B(< 512 KB 闸);`npm run depcruise` 0 违规(**387 modules / 1319 deps**,较包 A +2/+5);checkJs **308 = 基线**(新增 0)。
+- ⚠️**要记住的四条**:①改字符串状态机之前**先把所有 `mode =` 列一遍**,再逐个问"switch 接不接得住"—— 这轮的死锁风险(`wait/wake/busy/muzzle/farewell`)不在审计的清单里,是数出来的;②"两道闸互相冗余"要如实写成信息项,**不要**为了凑红数去编一条抓不到的用例,也**不要**因为单测抓不到就把闸拆掉;③探针的前置条件读 **DOM**,别读 200ms 采样器 —— 第一版就是这么假报了一次「台词没上屏」;④`story.later(fn, ms)` 刻意与 `setTimeout` 同签名,回退成裸写法只需换函数名,这条设计让 P1/P3 那类反向验证能一行改坏。
+- ⚠️**本批未做、已记档**:①`ending-epilogue.js` 仍吃 `ending-journey.js:226` 注入的那个裸 `wait` —— :161-194 一共 11 处 await(9 处 `stageCaption` + 2 处 `CTL.wait`),尾声自有一套字幕排期,动它属于另一包;②`applySave` 对 `json` 字段仍是 `v != null` 才写 ⇒ 存档码里为 `null` 的字段**不会清掉本地值**(导入一份旧码,`portfolio`/`journeyMemories` 可能残留)—— 属语义变更,留给结构包一起判;③`chapter-map.js` 那三个 UI 分支在 node 环境下不可单测,只能通过 `importSave`/`restoreSave` 的返回值间接钉住。
+
+### 结构包 C 已落地(2026-10-15,M-06 + M-07 + M-08 + M-09 + M-10 + 山丘产物溯源,本地全绿待发)
+
+**本批核实(六个条目拆成七行断言,逐行回读过代码;三行的数量或定性与审计原文不同)**
+
+| 断言 | 结论 | 关键证据 |
+|---|---|---|
+| M-06 系统生命周期没有显式状态 | **属实,而且正是包 A 写下"记录,本批不改"的那一条** | 包 A 只做成了**可见**:`init` 失败的系统仍在 `systems` 里、`update(dt)` 每帧照调 ⇒ 半装配态一边跑一边刷告警。这批就是那条语义:`uninit / ready / failed` 三态 + update 只调 ready + dispose 只拆 ready/failed |
+| M-07 光柱信标重复(审计点名 5 份) | **实测 7 份** | 5 份 `makeBeacon`(scene6-king:115 / scene7-vanity:65 / scene7-tippler:188 / scene3-night:50 / late-planets:84)**之外**还有 `earth-day.js:300` 内联一根(顶口手写 0.24)与 `story-guides.js:19 makeGuideBeacon`。七份几何与材质**逐字相同**(`CylinderGeometry(r*0.55, r, h, 10, 1, true)` + `MeshBasicMaterial 0xffd9a0` + DoubleSide + `depthWrite:false` + `fog:false`),差别只有"底面 y 从哪来"和"挂哪个场景" |
+| M-07「stardust 三份 tryPickup/tryDoorTeleport 该合并」 | **不合并,是决定不是漏做** | 三份逐行 diff 过:除场景名与日志前缀外**行为一致**,合并要每章注入 4~5 个回调 ⇒ 收益为负。**真病是数在漂**:四章各写死字面量 `9`(=3²),而 `planet-logic.mjs` 里早就备好的 `PICK_RADIUS` **一处都没被引用**,`DOOR_RADIUS` 还写着 2.5(与现实 3m 不符) |
+| M-08 类型渐进 | **病不在"缺类型",在"声明与唯一写入方互相矛盾"** | 最大簇 `scene/media/video-wall.js` 26 条:24 条是 `playVideo` 借 `<video>` 元素本身记账的四个句柄,2 条来自 `types/ctx.d.ts` 的假声明。三条假声明各有出处(mA / houseMats / worldManager),其中 `mA: Material[]` 是从 `src/ctx.js` 那行「houseMats/mA 房屋材质分组」**抄错**来的,而 checkJs 自己就在 audio-manager.js:187 报 TS2740 打这条声明的脸 |
+| M-09 `tt()` 带全局注册副作用 | **属实,且数据层有 8 组真歧义** | `_shown` 以**显示文本**为主键、后写覆盖前写(`story-text.mjs`,唯一消费方 `gameshell-dialog.js:37~40`)。普查走真实导出:**497 条双语、0 条半截、唯一 en/zh 各 433、64 条良性重复、8 组撞键**(同 en 不同 zh 4 + 同 zh 不同 en 4) |
+| M-10 legacy 过滤用中文标签 | **属实** | `LEGACY_MODULE_LABELS` 让标签同时是**显示文字和身份键**:把「远方山巅」改一个字,那条搁置规则静默失效、模块重新开始加载(旧玩法回魂),而**全仓没有一条测试会红** |
+| 山丘产物无溯源 | **属实,但 git 里一直有,只是没跟着产物走** | `public/hill` 的最后一个提交 == `hill-src` 的最后一个提交 == `29822c073d7171373bbfc754c43598539fc0ebde`(2026-10-14 03:07:34 +0800),而 14 个产物文件里没有任何版本戳(主站有 `shared/build-info.mjs` + `__B612_BUILD__`,山丘没有) |
+
+**落地**
+
+- **M-06**:`src/core/composition-root.js` 用 `lifecycle` Map 给每个系统记 `'uninit' | 'ready' | 'failed'`(`stateOf()` 读),`update()` 只调 ready,`dispose()` 只拆 ready/failed —— **failed 要拆**(init 到一半建出的资源,清理比不清理好)、**uninit 不拆**(它的 dispose 是按"init 已完成"写的,没 init 就拆可能造出新异常);`initStatus()` 结论加 `states[]`(冻结副本),新增 `lifecycleOf(name)` 单点读数。动手前提先量过:**生产里没有任何系统在 init 之后注册**(main.js 的顺序是先 `loadWorldModules` → register 全部 19 → init),所以"跳过 uninit"实际只改探针/HMR/误用三条路径 —— 这条前提写在测试文件头,免得下一个人以为是行为大改。
+- **M-07**:新增 `src/shared/beacon-manager.js`(`createBeacon` / `arm`「一格 named slot 只立一根」/ `removeBeacon` / `pulseBeacon`),7 处建柱点改为 import ⇒ 那条**零 PointLight 铁律**(光柱一律自发光、不进光照预算,由 `core/light-budget.js` 兜底扫)从此只写在一个地方 —— 它的代价不是行数,是"谁在某一份里顺手加个 PointLight,灯光预算就在那颗星上被悄悄吃掉,而且没有测试会红"。`story-guides.js` 的呼吸是 `0.75+sin(t*1.7)*0.25`(远距门指引,节奏本就与拾取信标的 `0.8+sin(t*1.9)*0.25` 不同)⇒ **只并几何与拆除,不并 pulse**,决定写在文件头。边界:模块不知道世界名、星屑坐标、探针用的信标名,那些留在各章(是剧情)。
+- **半径单一源**:`src/shared/planet-logic.mjs` `PICK_RADIUS = 3` / `DOOR_RADIUS = 3`(2.5 那个值从没和现实对上),四章(scene6-king / scene7-vanity / scene7-tippler / late-planets)全部 import;`325 星屑因为 3m 圈离出生点太近被整体挪过位`,所以这两个数是剧情调过的,测试注释里钉明"别顺手改大改小"。
+- **M-08**:四处**纯声明**改动,运行时一行未动 —— ① `video-wall.js` 给 `playVideo` 加 `TaggedVideo = HTMLVideoElement & {_vGen?, _vEndedFn?, _vCanPlayFn?, _vPollId?}` typedef(句柄挂在元素上是有意的:下一次调用要靠它们摘掉上一轮还挂在同一个元素上的监听器),消 24 条;② `types/ctx.d.ts` `mA: Material[]` → `HTMLAudioElement`(唯一写入方 `audio-manager.js:96 let mA = new Audio()` / `:187 ctx.media.mA = mA`,读者 audio-manager:174~197 / video-wall:282 / upload:229),消 3 条;③ `houseMats: Material[]` → `Record<string, MeshStandardMaterial[]>`(写入方 `scene.js:913` 给的是 `{wall,base,deco,ceil}` 对象、`housecolor.js:55/121/125` 按组名索引,选 Record 就是因为键是字符串),消 5 条;④ `worldManager?: unknown` → `SceneManager`,用 `import type` 指向 `src/core/scene-manager.js:55` **真实导出的类**而不是另手写一份 interface,消 16 条(getWorld 9 / back 4 / transitioning 2 / enter 1,而那些方法本来就在类上)。`src/ctx.js` 登记册两行改正(mA 归媒体、houseMats 归挂画)并保留事故记录。⇒ checkJs **258 = 新基线**(见下)。**明确不做整仓 .js→.ts**;`ctx.d.ts` 里其它 `: unknown` 成员(`planeApi/foxApi/scrollLink/audioManager/loopManager`)**一个字没动** —— 它们的唯一权威是各模块里的对象字面量,没有现成类型可指,手写一份形状等于给消费方一个假保证(`mA: Material[]` 就是这条路的下场),理由写在那份 d.ts 里。
+- **M-09**:只做"看得见"的三件事 —— ①登记已知 8 组(连两处出处),②拦住新增(新撞键即红,**修好一组不会变红**),③用合成用例钉住"后写覆盖"这个机制本身(不依赖具体译文,改译文不误红)。**没有擅自改写任何译本文案**:8 组里有 5 组看着"该统一"(书页八标题、狐狸标题、地理学家大小写…),但统一成哪个是主人的文学决定。真修法只有一个:行 ID 化,让 `_shown` 的键从译文文本换成 ID —— 全仓 `tt(` **336 处 / 46 个文件**,是独立一批。
+- **M-10**:`legacy.mjs` 的 `LEGACY_MODULE_LABELS` → `LEGACY_MODULE_IDS`(12 条,ASCII、与所加载文件同名)+ `isShelved(entry)` 成为**唯一判定**;`world-chain.mjs` / `world-loader.js` 只接线,不在别处再写第二遍判定。`label` 退回纯显示文字与 `__worldPhase` 读数(6 个探针在读,措辞是对外契约,由测试钉住)。
+- **山丘产物溯源**:`scripts/hill-artifacts.cjs`(`record` / `check`)+ 生成物 `scripts/hill-artifacts.json` —— 14 个产物的 sha256 与字节数、`built.command = 'cd hill-src && pnpm build'`、`ciRebuilds: false`、`artifactCommit == hillSrcCommit == 29822c073d71…`、`worktreeClean: true`。清单**住在 `public/hill` 之外**,因为 `hill-src/vite.config.ts` 是 `outDir: '../public/hill', emptyOutDir: true`,放进产物目录会被下一次构建删掉。
+  - ⚠️**这条闸门第一版在 CI 上红、本地绿,而 CI 是对的**:摘要原本按**本机检出的字节**算,Windows 把多行文本检出成 CRLF(Linux 是 LF)⇒ 三个 `fonts/*-OFL.txt` 加 `index.html` 被打成"内容变了但清单没更新";压缩过的单行产物没有换行所以不受影响 —— 正因为只红四处、且红的是 license 文本,它看起来更像"CI 上的产物被谁改过"。现文本类先 `\r\n → \n` 归一再算摘要(woff2/png 等二进制不参与),清单重新 record(只有那 4 条 bytes/sha 变,其余 10 条一字未动)。
+  - 不变量做成**与平台无关的可测命题**(第 6 条测试):借 `HILL_ARTIFACTS_DIR` / `HILL_ARTIFACTS_MANIFEST` 在临时目录造一份 CRLF 检出的产物集 `record`,再把同一份内容换成 LF 检出 `check` ⇒ 必须 `✓`;反向随手一条:真加一字节必须红(否则"归一"就是放宽)。摘掉归一 ⇒ **2 红**(这条 + 真目录那条),还原后 6 绿。这条在两台形状上都会红,不会再靠某一台机器的行尾风格蒙过去。
+
+**新增测试**(7 个文件 / **58 项**):composition-root-lifecycle(7)、world-loader-shelving(12)、beacon-manager(16)、planet-radius-single-source(4)、types-ctx-writer-agreement(7)、story-text-collision(6)、hill-artifacts-provenance(**6**,含 CI 抓到的行尾那条)。vitest 90 文件 1028 项 → **97 文件 / 1086 项**。
+
+**反向验证 36 条**(每条都是"改坏 → 跑 → 还原 → md5 逐字节复核"):
+
+- **M-06 / M-10 共 7 条**(`.tmp/rv-m06-m10.sh`):L1 摘掉 update 的 ready 闸 ⇒ 2 红 · L2 dispose 连 uninit 一起拆 ⇒ 1 红 · L3 init 抛错也标 ready ⇒ 3 红 · S1 搁置判定退回按 `entry.label` ⇒ 红的正是「改标签不改加载行为」(审计那条病的现场)· S2 搁置集合塞一个不存在的 id ⇒ 2 红 · S3 只改中文标签 ⇒ 2 红(「显示文字一字未改」+「标签序列整体保持」,而**加载行为那条照绿** ⇒ 身份与显示确实分开了)· S4 只改 id ⇒ 4 红。⚠️这一组是**记录前补做的**:M-06/M-10 落得早、只留下测试没留下脚本,所以重新打了一遍断点才敢写数,不写"应该红过"。
+- **M-07 7 条**(`.tmp/rv-m07.sh`):①光柱挂上 PointLight ②材质改成 MeshStandard ③`arm` 幂等去掉 ④漏 dispose 几何 ⑤不从 `mesh.parent` 摘 ⑥`lift` 不进高度 ⑦**第八份内联光柱**(临时往 `src/kunlun/` 塞一个 `makeBeacon9`)。**半径 4 条**(`.tmp/rv-radius.sh`):①回程门退回字面量 9 ②拾取退回 `near(..., 9)` ③`DOOR_RADIUS` 改回 2.5 ④某章不再 import 常量。
+- **M-08 7 条**(`.tmp/rv-m08.sh`):①②③把三条假声明逐条改回去 ④`@param` 退回裸 `HTMLVideoElement` ⑤别处再挂一份 `_vCanPlayFn` 记账 ⑥`src/ctx.js` 登记册退回「houseMats/mA 房屋材质分组」那一行 ⑦**四条一起改回 ⇒ checkJs 精确回到 306** —— 这一条是"−48 是归因、不是靠放宽"的唯一硬证据。
+- **M-09 5 条**(`.tmp/rv-m09.sh` + `.tmp/rv-m09-breaks.cjs` b1~b5):新增 zh 撞键 / 新增 en 撞键 / 造一条半截双语条目 / 把反查改成首写覆盖 / 在别处再建一张 `_shown`。
+- **山丘 6 条**(`.tmp/rv-hill.sh`):①偷偷改一个产物字节 ②往产物目录塞未登记文件 ③清单谎称 CI 会重建 ④`emptyOutDir` 被关掉(⇒ 断言"清单必须住在产物目录之外"失去依据)⑤`hill-src` 多一处 `room.start()` 调用 ⑥`index.html` 引一个不在清单里的 chunk。
+
+**真浏览器验收(M-07)**:`.tmp/beacon-live-check.cjs` 直跑本地 :3281 —— `[计数对话] 出现 / [石门信标] storyBeaconGate 立起 / [场景现存信标] ["storyBeaconGate"] / [曾立起] ["storyBeaconBox","storyBeaconGate"] / [已撤除] ["storyBeaconBox"] / [同格重复立] {"storyBeaconBox":1,"storyBeaconGate":1} / pageerrors(0)`,主场景 PointLight 25(scene3 自备的余烬/门光是既有的,不算信标)。同一支探针在收拢**之前**打不出 `storyBeaconGate`(旧写法在箱信标撤走的那一格不再重建)⇒ 这条差异就是收敛的正面证据,不是"测试没红而已"。
+
+- 门禁:npm test 6 条脚本 **7/22/108/46/20/6 = 209 项 0 失败**(exit 0,未涨);vitest **1085 项 / 97 文件**;eslint 0;tsc --noEmit 0;`npm run build` 0 且三条构建断言照旧(**46 prefetch** / 入口不含 three / dist 无 importmap;prefetch 较包 B 的 45 +1,是新增的 `shared/beacon-manager.js` 进了核心链),main chunk **270,846 B**(< 512 KB 闸);`scripts/probe/boot-cost-probe.cjs` 退出 0(沙箱首屏 **675KB / 56 资源 / 46 条 prefetch 全带 crossorigin**);`npm run depcruise` 0 违规(**395 modules / 1351 deps**,较包 B +8/+32);checkJs **258 = 新基线**(开工时基线文件写 308、**实测 306**;四刀归因 −48:typedef 24 / mA 3 / houseMats 5 / worldManager 16;新增 0,错误分布未变)。
+- ⚠️**要记住的六条**:①**基线文件里的数会虚高** —— 降 checkJs 基线之前必须重新数一遍,别拿 `checkjs-baseline.txt` 当起点(这次 308 vs 实测 306 的 2 条差没人追,只按实测记账);②`: unknown` 本身不是错,**手写一份与写入方不一致的形状**才是错 —— 收类型先找"唯一写入方",有现成的类/元素就指过去,没有就**留着别动**并把理由写在声明旁边;③撞键这类普查要从**真实导出**量(import 后递归收集),`story-text.mjs` 里有动态构造的 key,正则扫源码会漏;④产物溯源测试**不要断 git** —— CI 是浅检出/detached,断"提交号对不对"必然假红;git 信息在**记录时**写进清单,测试只核对清单与字节;⑤探针红先与**生产**比一遍再定性:`b612-guidance-probe`(`✗ [进程行] 325 国王之星(storyBeat) | v=null` + `waitForFunction` 45s 超时)与 `b612-327-guidance-probe`(`waitForFunction` 20s 超时)在本地与 `BASE_URL=https://cloudbear.cloud` 下**失败点逐字相同** ⇒ 判为探针自有的预置债(过时),不是本批回归,但也**没顺手修**;⑥工具类四条坑:`perl -0777 -pi -e 's/^…$/…/'` **必须带 `/m`**(否则整文件被当成一条字符串,`^…$` 只匹配首尾,断点静默打不上 ⇒ 每个断点都要 grep 反查一遍)、vitest 打印的是 `     × <完整标题>`,匹配红项要用 `grep -E '^ *× ' | grep -qF "关键字"`,不要写 `grep -qF "× 关键字"`、JSDoc 类型正则里可选标记要写成字符类 `[*?]?:`,写成 `'\\*?\\?:'` 会变成"必须有个问号"、Write/Edit 之后有 prettier 钩子会重排文件,连续第二次编辑必须重读。
+- ⚠️**本批未做、已记档**:①M-07 的第三件 `story-session` **没抽**:全仓 9 份 `speakSeq`,签名有四种形状 —— `(seq,i,done)`(scene2-draw:390 / earth-day:65 / scene7-tippler:161 / scene7-vanity:38)、`(seq,i,done,ticket=visit)`(scene3-night:234 / scene3-memory:307 / scene6-king:45)、`(seq,i,done,home)`(late-planets:54)、`(seq,then)`(ending-journey:236)⇒ 抽共享模块得先统一签名,那是动 9 章调用点的独立一批;票据本身包 B 已经上到该上的三条。②`scene3-memory`/`scene6-king` 那两份信标的呼吸节奏仍留在各自文件里(只并了几何与拆除)。③M-09 的行 ID 化(336 处 `tt(` / 46 文件)。④山丘清单**管不到**"`hill-src` 改了但没重跑 build"这一类漂移 —— 产物里没有版本戳可比,要治得先在 hill-src 构建里注入戳(对齐主站的 `__B612_BUILD__`),属另一批。⑤checkJs 剩下的簇已按两种顺序排好,下一批照表收:**按文件** `upload.js` 21 / `planets.js` 17 / `quizgate.js` 16 / `player.js`·`player-physics.js`·`minimap.js` 各 14 / `gallery/mode.js` 13 / `scene7-tippler.js`·`finale.js`·`ark-freeflight-hud.js` 各 10;**按类** `value` on HTMLElement 16、`style` 与 `onclick` on Element 各 9、`message` on unknown 9、`material` on Object3D 9、`kunlun` on `{ getH: … }` 7,`TS2339` 共 194 条。
+
 ### 第六轮还没动的部分(已排期)
 
-PR2 = M-14(`hot.js` 用**销毁时**的 `ctx.scene.s` 去摘**创建时**所属场景的资源 ⇒ 跨世界残留 + GPU 已释放)/ `bag.async()` 执行前不校验代次 / M-15 未退订监听;
-PR3 = M-11(`saveGateData()` 链尾 `.catch` 吞错 ⇒ 调用方 `await` 也判不出落盘成败;且 `_savedAt` 先于写入被改、任务读的是共享活对象)+ M-17(`stopOutbox()→flush()→writeNow()` 把布尔结果丢了);
-PR4 = M-19(`depcruise` 只扫 src,lib/ 不在入口)/ M-18(`stream.guard()` 的 `release()` 不自我幂等 —— **审计自己注明今天调用方恰好幂等,所以不是现役漏洞**);
-稳定性包 A = M-01(组合根 `initialized=true` 写在循环前、某系统 init 抛错仍继续装后面的、运行后注册只告警)、M-05(`enter()`/`enterWithoutPush()` 两套重复实现且后者缺 finally ⇒ `transitioning` 可能永久为真把切换锁死);
+> **2026-10-14 二次核实的修正**(下面每条都回读过代码,范围与审计原文不同,按修正后的做):
+> - **M-14 只剩一半,而且不是 P1**。跨 Scene 登记那半 **2026-10-11 已经补上了**:`src/kunlun/planets.js:32-39` 的 `addWorldObj()` 就是 `scene.add(obj)` + `bag.register(obj,{scene})`,注释还写着"捕获补丁只挂在 `ctx.scene.s.add`"——正是审计指的那个缺口。**真没的那半是代次守卫**:`bag.register` 有(`hot.js:149` `REG[name] !== bag` ⇒ 晚到的当场摘除释放),但 `installCaptures` 里 `s.add` 的包装(`hot.js:28-31`)**没有** ⇒ 已 dispose 的旧 bag 被迟到的 `bag.async` 回调重新装上去,期间进 `bag.objs` 的对象落在一个已被 `length=0` 清空的死数组上,再没人释放 = 真泄漏。影响面**只在 dev/HMR**(生产不二次装配)⇒ 定 P3;其余 25 个 hotBegin 模块里只有 planets.js 往非主场景挂东西,scene3-memory/scene6-king/scene7-tippler 那些 `w.scene.add` 根本没进 bag(它们是搁置的旧玩法)。
+> - **M-15 的"全站没退订"不成立**:journey-system(`:656`)、toast、state-system、gameshell-system、plane-flight、sheep-companion、scene10-fox 都存了 unsub 并在 dispose 里调。**唯一实例是 `src/gallery/portal.js:64`** —— 模块顶层 `eventBus.on('world:changed', …)` 把返回的退订函数直接丢弃,全文件没有 dispose/hotEnd ⇒ HMR 二次导入就是双份。按"补一个实例"来修,别写成"全站通病"。
+> - **M-03 只适用于剧情链,别顺手改对话系统**:`src/kunlun/ending-journey.js:225` 是裸 `const wait = (ms) => new Promise(r => setTimeout(r, ms))`,`veil()`(318-327)/`drawMuzzle()`(512-516)一路 await 下去,全文件 grep 不到任何 gen/version/cancel/token ⇒ 中途换世界,旧对白/tint 会在新场景弹。**对照**:`src/core/gameshell-dialog.js:312-336` **已经有**统一票据(`scopeVersions`/`worldVersions` bump + `dispose()` 清 typeTimer/hideTimer)⇒ 那一处不是裸 setTimeout。
+> - **M-18 属实但今天打不着**:`lib/upload/stream.js:34-37` 的 `release()` 没有"已释放"标志,调两次就减两次在途账;审计自己也注明现役调用方恰好幂等 ⇒ 2 行加个 flag 即可,不必大动。**已落地**(实测双调次数 2 / 2~3 / 2,见上一节)。
+> - **M-19 属实但范围要说准**:`package.json:32,34` 的 `deps`/`depcruise` 都只扫 `src`,CI 跑的是 `npm run depcruise`(test.yml:95)。**~~`server.js` + `lib/` 的依赖方向完全没人守~~ —— 实测 49/50 个后端文件是靠 `src/__tests__/` 的 require 顺路扫到的,漏的是**入口**不是覆盖**(详见上一节)。做之前先读 test.yml:105 已有的 `check-backend-manifest.cjs`(它管"清单覆盖真实依赖",本次部署日志里那句"从 server.js 可达 51 个,清单 53 个"就是它),别造第二个平行闸。**已落地**。
+> - **M-02 的严重性比原文更硬**:除了"先 notify 后写回",还有一条 **粘性**——`game-state.js:29` 的 `if (state[key] === value) return` 让写回失败之后**再 set 同一个值也永远不会重试**,ctx 就停在旧值直到有人写一个不同的值。改时必须一起改 `src/__tests__/game-state.test.js:61-72`(那里明确钉住了"apply 抛错被吞 / 自身状态仍已写"这个契约)。
+> - **M-04 的机制与原文不同**:`store.set*` **不抛错、返回布尔**(`src/state/store-api.js:139-147`,配额满只 `console.warn` + return false),而 `applySave`(`chapter-map-logic.mjs:159-168`)逐字段写并把返回值全丢 ⇒ 半数写失败也照样 `location.reload()`(`chapter-map.js:246-248`),重载后没落盘的字段回滚成旧值 = 混合档,玩家零提示。修法是汇总布尔并给提示/可撤销,不是包 try/catch。
+
+PR2 = **已落地(见上一节)**:M-14 剩下的那半(捕获路径的代次守卫)+ 安装栈缺陷 + M-15 唯一实例 `portal.js`;
+PR3 = **已落地(见上一节)**:M-11 `saveGateData` 结果契约 + M-17 `flush()`/`stopOutbox()` 结论 + aiusage 退回 pending;
+PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.js` 与 `lib/`)+ M-18(`stream.guard()` 的 `release()` 自我幂等 —— **审计自己注明今天调用方恰好幂等,所以不是现役漏洞**,改的是保证归属);
+稳定性包 A = **已落地(见上一节)**:M-01(组合根 `initialized=true` 写在循环前、某系统 init 抛错仍继续装后面的、运行后注册只告警)、M-05(`enter()`/`enterWithoutPush()` 两套重复实现且后者缺 finally ⇒ `transitioning` 可能永久为真把切换锁死);
 包 B = M-02(GameState 先 notify 后写回 ctx)、M-03(326/327 多层裸 `setTimeout`,离开章节无统一票据 ⇒ 旧对白在新场景弹、剧情被旧回调改写)、M-04(`applySave` 逐字段写而不汇总失败,失败也照样 reload);
-结构包 C(P2)= M-06 显式生命周期试点、M-07 抽 `story-session`/`stardust`/`beacon-manager`、M-08 类型渐进(明确**不要**整仓 .js→.ts)、M-09 剧情文本按语句 ID 取(`tt()` 现在带全局注册副作用)、M-10 legacy 过滤改用稳定 ID 而非中文标签、山丘产物溯源。
+结构包 C(P2)= **已落地(见上一节)**:M-06 显式生命周期试点、M-07 抽 `story-session`/`stardust`/`beacon-manager`(信标实测 **7** 份而非 5;`story-session` 因四种签名未抽,已记档)、M-08 类型渐进(checkJs 306 → **258**,明确**不要**整仓 .js→.ts)、M-09 剧情文本按语句 ID 取(`tt()` 现在带全局注册副作用,本批只登记撞键)、M-10 legacy 过滤改用稳定 ID 而非中文标签、山丘产物溯源。
 ⚠️其中 **M-02 动手前先读 `src/__tests__/game-state.test.js` 原文**:审计指出该测试把"写回失败 GameState 仍保留新值"钉成了**已确认契约** —— 别把有意的兼容行为当 bug 改掉。
 
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
@@ -217,6 +437,7 @@ PR4 = M-19(`depcruise` 只扫 src,lib/ 不在入口)/ M-18(`stream.guard()` 的 
   |---|---|---|
   | 2026-10-13 | 0 | 形状回环修好后的第一次;`visits 源 1003 / 表 1034`(表只受保留期约束,判 0 不判错) |
   | 2026-10-14 | 0 | 第二次(在 `2739e3b` 后端上线后跑)+ **同日第三次(`e39e480` 的 CSP 发布之后再跑,仍 0)**;若干条"表多出行"仍是保留期内的历史行,按设计不判失败。**同日重跑不加天数** —— 这张表按"每天一次"计,明天(10-15)那次才算第 3 天 |
+  | 2026-10-15 | 0 | **第 3 天**。`结果: 一致(退出码 0)`,末尾仍有一批"表多出行"(vid 与时间戳都是保留期内的历史行 / 读到的那一瞬在途写入),按设计不判失败。距"连续 7 天"还差 4 天 |
   往后每跑一天就在此表加一行;**中间出现 1 或 2 则天数归零重计**(那说明影子写又漏了形状或有新写入点没接线)。
 - 🔴**发布阻断级缺陷(本轮自己造出来的,已修 + 已上守卫)**:`backend-sync.sh` 的后端清单原本是 `FILES=$(echo server.js lib/*.js …)`,而 **glob 不递归** —— R1/R2 拆出的 `lib/repo/*`(5)、`lib/upload/*`(8)、`lib/migrations/*.sql`(1)共 **14 个文件一个都不会被上传**。照那份清单发布:线上 `server.js → lib/store → lib/shadow → lib/repo/chat` 直接 `Cannot find module`,pm2 反复重启 = **全站 502**;而 md5 差集、上传、复核会**全部绿灯**,因为清单从没往那些子目录看一眼。这是"静默的成功比响亮的失败危险得多"的第 N 个实例,且这次由重构本身引入。
   - 修法:清单收成唯一出处 **`scripts/backend-files.sh`**(`backend_files()` = server.js + `find lib -type f \( -name '*.js' -o -mjs -o -cjs -o -sql \)` + `src/shared/mediarules.mjs`),`backend-sync.sh` 与 `verify-drift.sh` **共用**它(以前后者也写死 `lib/*.js`,于是"线上根本没有这些模块"会被复核报成一致)。清单条目 **37 → 52**(51 个后端源码 + 唯一被点名带上服务器的只读对账脚本 `scripts/admin/table-parity.cjs` —— 它按 `__dirname/../..` 解析仓库根,不在 `<根>/scripts/admin/` 就跑不起来,而"能不能切读"必须在有那块盘的盒子上判定)。扩展名是**写死的白名单**而不用 `find lib -type f`:将来 `lib/` 里落出 `.db`/`.json`/`.env` 之类不该进 web root 的文件时,默认不跟着传。公网侧 `lib/security.js` 的 `staticDenied()` 按**首个路径段**放行/拒绝(`lib` 与 `scripts` 都在拒绝集里,`*.cjs` 后缀再挡一次),所以新建子目录不构成新暴露。
@@ -650,8 +871,12 @@ node scripts/test/test-store-sqlite.js # SQLite 持久层 11 项(迁移/DB 权�
 node scripts/test/test.js         # 后端 108 项(数据校验/API/安全边界/审批门/上传限制/邀请/协商缓存/健康检查)
 node scripts/test/test-session.js # 会话机制 46 项(吊销永久 + 过期自愈 + 兼容护栏 + dk 归并收紧;2026-10-11 起进 npm test)
 node scripts/test/test-upload-security.js # 上传归属 20 项(同 UA 陌生人互不可见 + 存量迁移 + 吊销即断)
-node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色器错误/JS异常/空屏)
-npx vitest run                    # 前端单测 871 项 / 79 文件(物理/碰撞/状态机/游戏状态/存档/路由契约/配额/灯光预算/剧情纯逻辑/
+node scripts/test/test-mobile.js  # 手机端渲染 6 项(iPhone 模拟:着色器错误/JS异常/空屏;**2026-10-15 起等的是"世界接棒"
+                                  #   = 电影收束 ∧ __bootState.worldStarted ∧ #c 显形,不再把 getFPS()>0 关进 90s 闸门 ——
+                                  #   headless 无 GPU,SwiftShader 编全站着色器实测 35-45s,机器一忙就冲破预算,
+                                  #   这条当天连挡两次发布;FPS 仍量仍打印,循环存活由 posD 逐帧读数 + 截图非纯色兜住。
+                                  #   同一个坑与同一次改法见 b612-preload-film-probe 那条**)
+npx vitest run                    # 前端单测 978 项 / 86 文件(物理/碰撞/状态机/游戏状态/存档/路由契约/配额/灯光预算/剧情纯逻辑/
                                   #   身份与授权/上传覆盖与分片GC/WS守卫/SSE限流/资源释放/队列/循环生命周期/
                                   #   保留期清扫/AI用量台账/R2待发台账/缩略图同权/mylinks配额/白板归属/磁盘并发闸/公开API封禁闸)
 npx vitest run --coverage         # 覆盖率基线(2026-09-24 建):已测纯逻辑模块普遍 82-100%(game-state 94/collision-resolve 96/light-budget 100/store 100/vertical-physics 92);

@@ -162,9 +162,21 @@ let sequenceStarted = false;
 let sequenceTriggered = false;
 
 /**
+ * playVideo 借 DOM 元素本身记账的四个句柄:世代号 + 两个事件回调 + 轮询定时器。
+ * 挂在 <video> 上(而不是模块变量)是有意的:同一时刻只有一条序列,但句柄必须活过
+ * 本次调用 —— 下一次 playVideo 要靠它们摘掉上一轮还挂在同一个元素上的监听器。
+ * @typedef {HTMLVideoElement & {
+ *   _vGen?: number,
+ *   _vEndedFn?: ((this: HTMLVideoElement, ev: Event) => void) | null,
+ *   _vCanPlayFn?: ((this: HTMLVideoElement, ev: Event) => void) | null,
+ *   _vPollId?: number | null,
+ * }} TaggedVideo
+ */
+
+/**
  * 播放单个视频，返回 Promise 在视频结束后 resolve。
  * 保持静音播放（浏览器限制），20s 超时兜底。
- * @param {HTMLVideoElement} el - 视频元素
+ * @param {TaggedVideo} el - 视频元素
  * @param {string} src - 视频 CDN URL
  * @returns {Promise<void>}
  */

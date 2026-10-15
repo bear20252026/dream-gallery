@@ -11,16 +11,22 @@ import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 import { ctx } from '../ctx.js';
 import { SCENE7_TIPPLER, SCENE5, tt, whoSpk } from '../shared/story-text.mjs';
-import { PLANETS, ISLAND_R, ISLAND_TOP_K } from '../shared/planet-logic.mjs';
+import {
+  PLANETS,
+  ISLAND_R,
+  ISLAND_TOP_K,
+  PICK_RADIUS,
+  DOOR_RADIUS,
+} from '../shared/planet-logic.mjs';
+import { createStoryTicket } from '../shared/story-ticket.mjs';
+import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
 
 let arrivalDone = false; // 本次进 327 的入梦链已启动
 let sceneDone = false; // 全链+拾星完成(章节已推进)
 let pickupArmed = false; // 台词全部收束(含沉默停顿),星屑可拾
 let starTaken = false; // 星屑已拾(幂等守卫)
 let speakTimer = null; // 心跳守护句柄
-let moteBeacon = null; // 星屑光柱信标:台词链收束后立起,拾取即撤
 let doorArmed = false; // 回程石环已可传送(章节完成后置位;走进石环 3m 即回 B612)
-let doorBeacon = null; // 回程石环光柱信标:拾星后立起,进门即撤
 let chapterCached = -1; // 章节快照(-1=未读):tick 每帧读 localStorage 太奢,0.5s 粒度足够
 let tickN = 0;
 let assetsLoading = false; // 酒鬼布景只挂一次
@@ -147,8 +153,13 @@ function mountTipplerSet() {
   );
 }
 
+// M-03(第六轮外部审计):本章台词链的票据。离开 327 时 bump() —— 心跳守护只看
+// `dialogOpen() === false`,而 cancelWorld 关掉对话框同样满足它,老写法会把下一句在新场景里弹出来。
+const story = createStoryTicket(() => ctx.scene.activeWorld === 'king327');
+
 // —— 台词队列:lock 互斥 + spent 幂等 + 心跳守护(与 scene6-king 同规) ——
 function speakSeq(seq, i, done) {
+  if (!story.here()) return;
   if (i >= seq.length) {
     if (done) done();
     return;
@@ -158,7 +169,7 @@ function speakSeq(seq, i, done) {
   const finish = function () {
     if (spent) return;
     spent = true;
-    clearTimeout(speakTimer);
+    story.cancel(speakTimer);
     speakSeq(seq, i + 1, done);
   };
   ctx.openDialog({
@@ -169,8 +180,8 @@ function speakSeq(seq, i, done) {
     lock: true,
     onDone: finish,
   });
-  clearTimeout(speakTimer);
-  speakTimer = setTimeout(
+  story.cancel(speakTimer);
+  speakTimer = story.later(
     function () {
       if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
     },
@@ -178,80 +189,55 @@ function speakSeq(seq, i, done) {
   );
 }
 
-// —— 光柱信标(零 PointLight 铁律:全 MeshBasicMaterial,fog:false;同 scene6 规制) ——
-function makeBeacon(x, z, h, r, opacity, name) {
-  const m = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xffd9a0,
-      transparent: true,
-      opacity: opacity,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      fog: false,
-    })
-  );
-  m.position.set(x, ISLE_TOP_Y + h / 2 + 0.1, z);
-  m.userData.baseOpacity = opacity;
-  m.name = name || 'storyBeacon';
-  return m;
-}
+// —— 光柱信标:建/拆/呼吸都在 shared/beacon-manager.js(零 PointLight 铁律在那儿唯一表达) ——
 function tipplerScene() {
   const w = ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('king327') : null;
   return w ? w.scene : null;
 }
+// 格子簿:一格只立一根;'mote' = 星屑(拾取即撤),'door' = 回程石环(进门即撤)
+const beacons = createBeaconKeeper(() => tipplerScene());
 function armMoteBeacon() {
-  if (moteBeacon) return;
-  const sc = tipplerScene();
-  if (!sc) return;
-  const mote = sc.getObjectByName('sproutMote'); // 坐标单一源(planets.js 摆位)
-  moteBeacon = makeBeacon(
-    mote ? mote.position.x : 0,
-    mote ? mote.position.z : 9,
-    3.0,
-    0.4,
-    0.3,
-    'storyBeaconMote'
-  );
-  sc.add(moteBeacon);
+  beacons.arm('mote', (sc) => {
+    const mote = sc.getObjectByName('sproutMote'); // 坐标单一源(planets.js 摆位)
+    return {
+      x: mote ? mote.position.x : 0,
+      z: mote ? mote.position.z : 9,
+      baseY: ISLE_TOP_Y,
+      lift: 0.1,
+      h: 3.0,
+      r: 0.4,
+      opacity: 0.3,
+      name: 'storyBeaconMote',
+    };
+  });
 }
 function removeMoteBeacon() {
-  if (!moteBeacon) return;
-  const sc = tipplerScene();
-  if (sc) sc.remove(moteBeacon);
-  moteBeacon.geometry.dispose();
-  moteBeacon.material.dispose();
-  moteBeacon = null;
+  beacons.remove('mote');
 }
 function armDoorBeacon() {
-  if (doorBeacon) return;
-  const sc = tipplerScene();
-  if (!sc) return;
-  const d = sc.getObjectByName('sproutDoor'); // 坐标单一源(planets.js 摆位)
-  doorBeacon = makeBeacon(
-    d ? d.position.x : 0,
-    d ? d.position.z : -3.4,
-    3.4,
-    0.42,
-    0.26,
-    'storyBeaconDoor'
-  );
-  sc.add(doorBeacon);
+  beacons.arm('door', (sc) => {
+    const d = sc.getObjectByName('sproutDoor'); // 坐标单一源(planets.js 摆位)
+    return {
+      x: d ? d.position.x : 0,
+      z: d ? d.position.z : -3.4,
+      baseY: ISLE_TOP_Y,
+      lift: 0.1,
+      h: 3.4,
+      r: 0.42,
+      opacity: 0.26,
+      name: 'storyBeaconDoor',
+    };
+  });
 }
 function removeDoorBeacon() {
-  if (!doorBeacon) return;
-  const sc = tipplerScene();
-  if (sc) sc.remove(doorBeacon);
-  doorBeacon.geometry.dispose();
-  doorBeacon.material.dispose();
-  doorBeacon = null;
+  beacons.remove('door');
 }
 function tryDoorTeleport(pl) {
   const sc = tipplerScene();
   const d = sc && sc.getObjectByName('sproutDoor');
   const dx = pl.p.x - (d ? d.position.x : 0),
     dz = pl.p.z - (d ? d.position.z : -3.4);
-  if (dx * dx + dz * dz >= 9) return false;
+  if (dx * dx + dz * dz >= DOOR_RADIUS * DOOR_RADIUS) return false;
   doorArmed = false;
   removeDoorBeacon(); // 玩家已到:信标完成使命
   const wm = ctx.scene.worldManager;
@@ -280,7 +266,7 @@ function tryPickup(pl, onPick) {
   const m = motePos();
   const dx = pl.p.x - m.x,
     dz = pl.p.z - m.z;
-  if (dx * dx + dz * dz < 9) {
+  if (dx * dx + dz * dz < PICK_RADIUS * PICK_RADIUS) {
     starTaken = true;
     removeMoteBeacon(); // 玩家已到:信标完成使命
     // flame 是 326 的 key,327 是 leaf —— 错一个字母就藏错星球(2026-09-27 探针实锤)
@@ -297,6 +283,7 @@ ctx.onTick(function scene7Tick() {
   const active = ctx.scene.activeWorld || '';
   // 离开 327:复位入梦标记——同会话内再进可重新触发
   if (prevWorld === 'king327' && active !== 'king327') {
+    story.bump(); // M-03:离开本章 ⇒ 台词链心跳与延时演出作废
     if (!sceneDone) {
       arrivalDone = false;
       pickupArmed = false;
@@ -310,18 +297,10 @@ ctx.onTick(function scene7Tick() {
   // 回程石环传送:章节完成后常驻(含重访),走到环 3m 内即回 B612
   if (doorArmed && tryDoorTeleport(ctx.player.pl)) return;
   // 回程信标呼吸(存活期在 sceneDone 之后,须放在早退之前)
-  if (doorBeacon) {
-    doorBeacon.rotation.y += 0.004;
-    doorBeacon.material.opacity =
-      doorBeacon.userData.baseOpacity * (0.8 + Math.sin(Date.now() * 0.0019) * 0.25);
-  }
+  pulseBeacon(beacons.get('door'), Date.now() * 0.001);
   if (sceneDone) return;
   // 信标呼吸(光柱缓慢旋绕+透明度起伏,与 scene6 同律)
-  if (moteBeacon) {
-    moteBeacon.rotation.y += 0.004;
-    moteBeacon.material.opacity =
-      moteBeacon.userData.baseOpacity * (0.8 + Math.sin(Date.now() * 0.0019) * 0.25);
-  }
+  pulseBeacon(beacons.get('mote'), Date.now() * 0.001);
   // 章节快照:首帧读一次,之后每 30 帧兜底刷新
   tickN = (tickN + 1) % 30;
   if (chapterCached < 0 || tickN === 0) chapterCached = ctx.store.num('planetsChapter');
@@ -343,7 +322,7 @@ ctx.onTick(function scene7Tick() {
         sceneDone = true;
         doorArmed = true;
         // 完成toast 延一拍:单元素 toast 会互相顶替,先让「拾获星屑」独立亮一拍
-        setTimeout(function () {
+        story.later(function () {
           try {
             ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE7_TIPPLER.doneToast));
           } catch (e) {}
@@ -353,7 +332,7 @@ ctx.onTick(function scene7Tick() {
         // toast 亮完翻出旅途卡「下一夜」,点继续直达下一颗星;没有旅途卡时退回老指引
         if (ctx.ui.voyage) ctx.ui.voyage.offer(3600);
         else
-          setTimeout(function () {
+          story.later(function () {
             try {
               ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE5.gotoDoor), 6000);
             } catch (e) {}
@@ -364,7 +343,7 @@ ctx.onTick(function scene7Tick() {
 
   if (arrivalDone) return;
   arrivalDone = true;
-  setTimeout(function () {
+  story.later(function () {
     // 入梦导语(planet-logic 为 327 写好的星球导语,首次接线)
     const cfg = PLANETS.find(function (p) {
       return p.num === '327';
@@ -372,14 +351,14 @@ ctx.onTick(function scene7Tick() {
     try {
       ctx.ui.kunlunSpeak && ctx.kunlunSpeak(tt({ en: 'The Tippler', zh: cfg.tts }));
     } catch (e) {}
-    setTimeout(function () {
+    story.later(function () {
       window.__scene7b = window.__scene7b || {};
       window.__scene7b.stage = 'chain';
       speakSeq(SCENE7_TIPPLER.chain, 0, function () {
         // 沉默演出(定稿:沉默。酒鬼把自己关了进去)——2.2s 停顿,不上锁不阻塞
         window.__scene7b.stage = 'silence';
         const armPickup = function () {
-          if (ctx.scene.activeWorld !== 'king327') return;
+          if (!story.here()) return;
           window.__scene7b.stage = 'pickup';
           pickupArmed = true;
           // 行动指引三件套:台词只讲戏,「去哪」由 toast 直说 + 光柱信标指——拾取即撤
@@ -388,7 +367,7 @@ ctx.onTick(function scene7Tick() {
             ctx.ui.modeToast && ctx.ui.modeToast(tt(SCENE7_TIPPLER.pickupToast), 6000);
           } catch (e) {}
         };
-        setTimeout(function () {
+        story.later(function () {
           // Witness card: count the three bottles at his feet (optional, skippable; he never reacts).
           window.__scene7b.stage = 'witness';
           if (ctx.ui.witness)

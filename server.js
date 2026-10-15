@@ -160,11 +160,27 @@ let shuttingDown = false;
 function beginShutdown(exit) {
   try { flushTrack(); } catch (e) { console.error('[shutdown] 埋点批量落盘失败:', e && (e.message || e)); }
   // AI 用量台账是合并写盘(5s / 20 条),退出前必须 stop() 收尾,否则窗口内最后几条丢盘。
-  try { require('./lib/aiusage').stop(); } catch (e) { console.error('[shutdown] AI 用量收尾失败:', e && (e.message || e)); }
+  // stop() 现在走同步写并返回结论(2026-10-14 M-11:入队式的收尾在 SIGKILL 面前不可信)。
+  try {
+    const st = require('./lib/aiusage').stop();
+    if (st && st.ok === false) {
+      console.error('[shutdown] AI 用量台账收尾**没落成**:', st.error || '无错误信息', '仍待写条数:', st.pending);
+    }
+  } catch (e) { console.error('[shutdown] AI 用量收尾失败:', e && (e.message || e)); }
   // 保留期清扫的日定时器(已 unref),与其它后台定时器口径一致:显式停一次不留悬挂。
   try { require('./lib/retention').stopRetention(); } catch (e) { console.error('[shutdown] 保留期清扫停止失败:', e && (e.message || e)); }
   // R2 待发台账:stopOutbox() = 合并落盘 + 清两个定时器(不要只调 flush(),那会留悬挂句柄)。
-  try { require('./lib/r2outbox').stopOutbox(); } catch (e) { console.error('[shutdown] R2 台账收尾失败:', e && (e.message || e)); }
+  // ⚠️2026-10-14 M-17:stopOutbox() 现在返回结论 —— 以前 `flush(); return was;` 把落盘成败丢了,
+  //   这一行"没抛"就被读成"已落盘"。台账写坏了并不致命(内存台账照常,下次变更再试),
+  //   但关闭日志必须说真话,否则排查"R2 为什么少了一批对象"时会被这条误导。
+  try {
+    const st = require('./lib/r2outbox').stopOutbox();
+    if (st && st.flushed === false) {
+      console.error('[shutdown] R2 台账收尾**没落成**(内存照常,下次变更再试):', st.error || '无错误信息', '未同步条数:', st.pending);
+    } else if (st && st.pending) {
+      console.log('[shutdown] R2 台账已落盘,仍待补推 ' + st.pending + ' 条(那是网络侧的事,不是没存上)');
+    }
+  } catch (e) { console.error('[shutdown] R2 台账收尾失败:', e && (e.message || e)); }
   try { closeMediaSse(); } catch (e) { console.error('[shutdown] SSE 收束失败:', e && (e.message || e)); }
   try {
     const filesUpload = require('./lib/files-upload');

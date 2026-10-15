@@ -23,32 +23,28 @@ export function legacyOn() {
   }
 }
 
-/** world-loader 里属于旧玩法的模块(按标签);默认跳过加载 */
-export const LEGACY_MODULE_LABELS = new Set([
-  '温柔度',
-  '答题门',
-  '远方山巅',
-  '塔楼',
-  '永恒厅',
-  '飞舟',
-  '风铃',
-  '壁炉',
-  '雪窗',
-  '重置视角',
-  '放下',
-  '终章',
+/** 世界模块清单里属于旧玩法的**稳定 id**;默认跳过加载。
+ *  ⚠️这里存的必须是 id,不是中文标签(第六轮审计 M-10):标签是给人看的显示文字,
+ *  改一个字(「远方山巅」→「远山」)就把一条搁置规则静默作废 —— 那个模块会重新开始加载,
+ *  而没有任何测试会红。id 与所加载的文件同名,改名要同时动 world-loader 的那一行,改得掉也看得见。 */
+export const LEGACY_MODULE_IDS = new Set([
+  'quiz', // 温柔度
+  'quizgate', // 答题门
+  'peaks', // 远方山巅
+  'dome-towers', // 塔楼
+  'eternal', // 永恒厅
+  'ark', // 飞舟
+  'windchime', // 风铃
+  'fireplace', // 壁炉
+  'snowwin', // 雪窗
+  'resetview', // 重置视角
+  'letgo', // 放下
+  'finale', // 终章
 ]);
 
 /** 这一条模块是不是"被搁置"的旧玩法。规则只在这里定义一次:
- *  activeModules 用它过滤,加载链(core/world-chain.js)也用它统计"跳过名单"——
- *  两边各写一遍 `LEGACY_MODULE_LABELS.has(...)` 早晚会对不上(第六轮审计 M-10 说的就是这个)。 */
+ *  加载链(core/world-chain.mjs)用它统计"跳过名单",别在别处再写一遍判定。 */
 export function isShelved(entry, on) {
   const keep = on === undefined ? legacyOn() : on;
-  return !keep && LEGACY_MODULE_LABELS.has(entry[0]);
-}
-
-/** 过滤加载链:旧玩法关闭时去掉 LEGACY_MODULE_LABELS 里的模块 */
-export function activeModules(list, on) {
-  const keep = on === undefined ? legacyOn() : on;
-  return keep ? list : list.filter((e) => !LEGACY_MODULE_LABELS.has(e[0]));
+  return !keep && LEGACY_MODULE_IDS.has(entry && entry.id);
 }

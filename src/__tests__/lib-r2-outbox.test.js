@@ -390,10 +390,50 @@ describe('启停与定时器卫生', () => {
     await outbox.pumpNow();
     expect(r2PutMock).toHaveBeenCalledTimes(1); // 到期的账由 pump 接手推
     expect(vi.getTimerCount()).toBeGreaterThan(0); // 周期 pump + 去抖窗口
-    expect(outbox.stopOutbox()).toBe(true);
+    // 2026-10-14 M-17:stopOutbox() 以前 `flush(); return was;` —— 落盘成败被丢掉,调用方(server.js
+    // 优雅关闭)把"没抛"读成"已落盘"。现在返回 { was, flushed, pending, error }。
+    const st = outbox.stopOutbox();
+    expect(st.was).toBe(true);
+    expect(st.flushed).toBe(true); // 台账确实落成了
+    expect(st.pending).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
-    expect(outbox.stopOutbox()).toBe(false); // 幂等
+    expect(outbox.stopOutbox().was).toBe(false); // 幂等
     expect(outbox.outboxStats().started).toBe(false);
+  });
+
+  it('注入:台账写坏 ⇒ flush()/stopOutbox() 报 false 且条数留在 pending(不谎称已落盘)', async () => {
+    outbox.startOutbox();
+    outbox.enqueuePut('photos', 'ledger-broken.jpg', srcFile());
+    await tick();
+    const good = outbox.flush();
+    expect(good.ok).toBe(true); // 前置条件:换坏路径之前它本来是落得成的
+
+    // 把台账文件位置换成一个**同名目录**:rename 与退回覆盖写都会 EISDIR/EPERM
+    const blocked = path.join(TMP, 'blocked-ledger.json');
+    fs.mkdirSync(blocked, { recursive: true });
+    process.env.R2_OUTBOX_FILE = blocked;
+    outbox.enqueuePut('photos', 'ledger-broken-2.jpg', srcFile());
+    await tick();
+    const bad = outbox.flush();
+    expect(bad.ok).toBe(false);
+    expect(bad.entries).toBeGreaterThan(0); // 以前这里返回的就是这个数,而且它长得像结论
+    expect(bad.pending).toBeGreaterThan(0); // 没落成就不许说"已同步"
+    expect(/EISDIR|EPERM| Directory/.test(bad.error)).toBe(true);
+    const s = outbox.outboxStats();
+    expect(s.lastWrite.ok).toBe(false); // 观测面也留了痕(admin 页/日志据此能看见)
+
+    const stoppedWhileBroken = outbox.stopOutbox();
+    expect(stoppedWhileBroken.flushed).toBe(false); // 关闭路径同样不能报假成功
+
+    // 还原 ⇒ 下一次照常成立(一次写坏不会把台账打断;内存台账始终是唯一真相)
+    process.env.R2_OUTBOX_FILE = LEDGER;
+    outbox.startOutbox();
+    outbox.enqueuePut('photos', 'ledger-ok-again.jpg', srcFile());
+    await tick();
+    const back = outbox.flush();
+    expect(back.ok).toBe(true);
+    expect(back.pending).toBe(0);
+    outbox.stopOutbox();
   });
 
   it('周期 pump 自己会把到期条目再推一遍(没人再上传也自愈)', async () => {

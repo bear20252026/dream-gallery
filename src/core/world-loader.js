@@ -15,51 +15,59 @@
 import { isShelved as isShelvedLegacy } from '../shared/legacy.mjs';
 import { runChain } from './world-chain.mjs';
 
-/** 核心链:进图前必须就绪(串行,阻塞揭幕) @type {Array<[string, () => Promise<unknown>]>} */
+// 每条 = { id, label, load }。**id 是身份键**(稳定、ASCII、与所加载文件同名),
+// label 只用于显示与 `__worldPhase` 字符串(那串有 6 个探针在读,措辞一字不改)。
+// 搁置规则按 id 判(shared/legacy.mjs)—— 改 label 不会静默改加载行为。
+
+/** 核心链:进图前必须就绪(串行,阻塞揭幕) @type {Array<{id:string,label:string,load:() => Promise<unknown>}>} */
 export const WORLD_MODULES = [
-  ['场景', () => import('../scene/scene.js')],
-  ['媒体', () => import('../scene/media.js')],
-  ['牌子', () => import('../gallery/signs.js')],
-  ['喷泉', () => import('../gallery/fountains.js')],
-  ['标记', () => import('../gallery/markers.js')],
-  ['链接', () => import('../gallery/links.js')],
-  ['挂画', () => import('../gallery/paintings.js')],
-  ['模式', () => import('../gallery/mode.js')],
-  ['塔楼', () => import('../gallery/dome-towers.js')],
-  ['设置', () => import('../gate/settings.js')],
-  ['上传', () => import('../gate/upload.js')],
-  ['房屋色', () => import('../gate/housecolor.js')],
-  ['温柔度', () => import('../gate/quiz.js')],
-  ['沙漠', () => import('../scene/desert.js')],
-  ['玩家', () => import('../scene/player.js')],
-  ['答题门', () => import('../gate/quizgate.js')],
-  ['远方山巅', () => import('../kunlun/peaks.js')],
-  ['灵蕴', () => import('../kunlun/spirits.js')],
-  ['星球世界', () => import('../kunlun/planets.js')],
-  ['对话', () => import('../kunlun/story-dialogs.js')],
-  ['石门', () => import('../gallery/portal.js')],
-  ['坠机点', () => import('../gallery/crash-site.js')],
-  ['画羊', () => import('../gate/scene2-draw.js')],
-  ['书页一', () => import('../gate/scene3-night.js')],
-  ['状态机', () => import('../player/states/PlayerStates.js')],
-  ['后处理', () => import('../scene/postprocessing.js')],
+  { id: 'scene', label: '场景', load: () => import('../scene/scene.js') },
+  { id: 'media', label: '媒体', load: () => import('../scene/media.js') },
+  { id: 'signs', label: '牌子', load: () => import('../gallery/signs.js') },
+  { id: 'fountains', label: '喷泉', load: () => import('../gallery/fountains.js') },
+  { id: 'markers', label: '标记', load: () => import('../gallery/markers.js') },
+  { id: 'links', label: '链接', load: () => import('../gallery/links.js') },
+  { id: 'paintings', label: '挂画', load: () => import('../gallery/paintings.js') },
+  { id: 'mode', label: '模式', load: () => import('../gallery/mode.js') },
+  { id: 'dome-towers', label: '塔楼', load: () => import('../gallery/dome-towers.js') },
+  { id: 'settings', label: '设置', load: () => import('../gate/settings.js') },
+  { id: 'upload', label: '上传', load: () => import('../gate/upload.js') },
+  { id: 'housecolor', label: '房屋色', load: () => import('../gate/housecolor.js') },
+  { id: 'quiz', label: '温柔度', load: () => import('../gate/quiz.js') },
+  { id: 'desert', label: '沙漠', load: () => import('../scene/desert.js') },
+  { id: 'player', label: '玩家', load: () => import('../scene/player.js') },
+  { id: 'quizgate', label: '答题门', load: () => import('../gate/quizgate.js') },
+  { id: 'peaks', label: '远方山巅', load: () => import('../kunlun/peaks.js') },
+  { id: 'spirits', label: '灵蕴', load: () => import('../kunlun/spirits.js') },
+  { id: 'planets', label: '星球世界', load: () => import('../kunlun/planets.js') },
+  { id: 'story-dialogs', label: '对话', load: () => import('../kunlun/story-dialogs.js') },
+  { id: 'portal', label: '石门', load: () => import('../gallery/portal.js') },
+  { id: 'crash-site', label: '坠机点', load: () => import('../gallery/crash-site.js') },
+  { id: 'scene2-draw', label: '画羊', load: () => import('../gate/scene2-draw.js') },
+  { id: 'scene3-night', label: '书页一', load: () => import('../gate/scene3-night.js') },
+  { id: 'player-states', label: '状态机', load: () => import('../player/states/PlayerStates.js') },
+  { id: 'postprocessing', label: '后处理', load: () => import('../scene/postprocessing.js') },
 ];
 
-/** 后台链:进图后不阻塞补载(远区/深剧情;保持相对顺序) @type {Array<[string, () => Promise<unknown>]>} */
+/** 后台链:进图后不阻塞补载(远区/深剧情;保持相对顺序) @type {Array<{id:string,label:string,load:() => Promise<unknown>}>} */
 export const WORLD_MODULES_DEFERRED = [
-  ['永恒厅', () => import('../kunlun/eternal.js')],
-  ['飞舟', () => import('../kunlun/ark.js')],
-  ['风铃', () => import('../kunlun/windchime.js')],
-  ['壁炉', () => import('../kunlun/fireplace.js')],
-  ['雪窗', () => import('../kunlun/snowwin.js')],
-  ['第6场国王', () => import('../kunlun/scene6-king.js')],
-  ['第7场虚荣', () => import('../kunlun/scene7-vanity.js')],
-  ['第7场酒鬼', () => import('../kunlun/scene7-tippler.js')],
-  ['第8-9场商人/点灯人/地理学家', () => import('../kunlun/late-planets.js')],
-  ['回忆层', () => import('../kunlun/scene3-memory.js')],
-  ['重置视角', () => import('../kunlun/resetview.js')],
-  ['放下', () => import('../kunlun/letgo.js')],
-  ['终章', () => import('../kunlun/finale.js')],
+  { id: 'eternal', label: '永恒厅', load: () => import('../kunlun/eternal.js') },
+  { id: 'ark', label: '飞舟', load: () => import('../kunlun/ark.js') },
+  { id: 'windchime', label: '风铃', load: () => import('../kunlun/windchime.js') },
+  { id: 'fireplace', label: '壁炉', load: () => import('../kunlun/fireplace.js') },
+  { id: 'snowwin', label: '雪窗', load: () => import('../kunlun/snowwin.js') },
+  { id: 'scene6-king', label: '第6场国王', load: () => import('../kunlun/scene6-king.js') },
+  { id: 'scene7-vanity', label: '第7场虚荣', load: () => import('../kunlun/scene7-vanity.js') },
+  { id: 'scene7-tippler', label: '第7场酒鬼', load: () => import('../kunlun/scene7-tippler.js') },
+  {
+    id: 'late-planets',
+    label: '第8-9场商人/点灯人/地理学家',
+    load: () => import('../kunlun/late-planets.js'),
+  },
+  { id: 'scene3-memory', label: '回忆层', load: () => import('../kunlun/scene3-memory.js') },
+  { id: 'resetview', label: '重置视角', load: () => import('../kunlun/resetview.js') },
+  { id: 'letgo', label: '放下', load: () => import('../kunlun/letgo.js') },
+  { id: 'finale', label: '终章', load: () => import('../kunlun/finale.js') },
 ];
 
 // 链的执行与结论都在 core/world-chain.mjs(可单测的纯逻辑);本文件只负责"用什么加载、结论挂到哪儿"。
@@ -87,7 +95,7 @@ async function loadChain(list, tag, fatal) {
   return runChain(list, {
     tag,
     fatal,
-    load: (label, thunk) => thunk(),
+    load: (entry) => entry.load(),
     isShelved: isShelvedLegacy,
     onPhase: setPhase,
     onFail: (label, e) => {

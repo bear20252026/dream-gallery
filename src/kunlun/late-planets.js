@@ -11,8 +11,9 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { tt, whoSpk } from '../shared/story-text.mjs';
 import { SCENE8_BUSINESS, SCENE8_LAMP, SCENE9_GEO } from '../shared/story-text.mjs';
-import { PLANETS } from '../shared/planet-logic.mjs';
+import { PLANETS, PICK_RADIUS, DOOR_RADIUS } from '../shared/planet-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
+import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
 import { setLampLit } from './planet-props.js';
 
 const STAGES = {
@@ -31,7 +32,7 @@ const PICKUP_TOAST = {
 };
 
 // —— 每颗星的状态(换星即复位未完成的那颗) ——
-const st = {}; // world → { arrival, pickupArmed, starTaken, done, doorArmed, beacon, doorBeacon, figure }
+const st = {}; // world → { arrival, pickupArmed, starTaken, done, doorArmed, figure }(光柱信标改由 keepers 记账)
 function S(world) {
   return (st[world] = st[world] || {});
 }
@@ -48,7 +49,10 @@ function obj(world, name) {
 
 // —— 台词队列(与 scene7-vanity 同规:lock 互斥 + spent 幂等 + 心跳守护) ——
 let speakTimer = null;
-function speakSeq(seq, i, done) {
+// M-03:加 home 判定。心跳守护只看 `dialogOpen() === false`,而离开这颗星时 cancelWorld
+// 关对话框同样满足它,老写法会把下一句台词弹在新场景里(链子还会顺带推进章节)。
+function speakSeq(seq, i, done, home) {
+  if (ctx.scene.activeWorld !== home) return;
   if (i >= seq.length) {
     if (done) done();
     return;
@@ -59,7 +63,7 @@ function speakSeq(seq, i, done) {
     if (spent) return;
     spent = true;
     clearTimeout(speakTimer);
-    speakSeq(seq, i + 1, done);
+    speakSeq(seq, i + 1, done, home);
   };
   const hold = Math.max(4600, ((item.en || '').length * 65) | 0);
   ctx.openDialog({
@@ -72,54 +76,42 @@ function speakSeq(seq, i, done) {
   });
   clearTimeout(speakTimer);
   speakTimer = setTimeout(function () {
+    if (ctx.scene.activeWorld !== home) return;
     if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
   }, hold + 2600);
 }
 
-// —— 光柱信标(零 PointLight:MeshBasicMaterial,fog:false) ——
-function makeBeacon(x, y, z, h, r, opacity) {
-  const m = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xffd9a0,
-      transparent: true,
-      opacity,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      fog: false,
-    })
-  );
-  m.position.set(x, y + h / 2, z);
-  m.userData.baseOpacity = opacity;
-  m.name = 'storyBeacon';
-  return m;
+// —— 光柱信标:几何/材质/拆/呼吸都在 shared/beacon-manager.js(零 PointLight 铁律在那儿唯一表达)。
+// 这里三颗星共用同一套流程,所以 keeper 按世界名分格,槽位仍叫 beacon / doorBeacon(状态字段旧名)。
+const keepers = new Map(); // world → keeper
+function beaconKeeper(world) {
+  let k = keepers.get(world);
+  if (!k) {
+    k = createBeaconKeeper(() => worldScene(world));
+    keepers.set(world, k);
+  }
+  return k;
 }
 function dropBeacon(world, key) {
-  const s = S(world);
-  const b = s[key];
-  if (!b) return;
-  b.parent && b.parent.remove(b);
-  b.geometry.dispose();
-  b.material.dispose();
-  s[key] = null;
+  const k = keepers.get(world);
+  return k ? k.remove(key) : false;
 }
 function armBeacon(world, key, objName, h) {
-  const s = S(world);
-  if (s[key]) return;
-  const sc = worldScene(world);
+  const k = beaconKeeper(world);
+  if (k.has(key)) return;
   const o = obj(world, objName);
-  if (!sc || !o) return;
+  if (!o) return;
   // 星屑/石环都挂在岛组下(独立世界岛心为原点);岛顶高度 = 星屑 y - 1.15(planets.js buildIsland)
   const top = (obj(world, 'sproutMote')?.position.y || 1.15) - 1.15;
-  s[key] = makeBeacon(
-    o.position.x,
-    top + 0.1,
-    o.position.z,
+  k.arm(key, {
+    x: o.position.x,
+    z: o.position.z,
+    baseY: top + 0.1,
     h,
-    0.42,
-    key === 'beacon' ? 0.3 : 0.26
-  );
-  sc.add(s[key]);
+    r: 0.42,
+    opacity: key === 'beacon' ? 0.3 : 0.26,
+    name: 'storyBeacon',
+  });
 }
 
 // —— 纸剪影:回忆里的大人(画布画,Sprite 永远面向镜头) ——
@@ -445,7 +437,7 @@ function geoGame(world, done) {
       if (it.ok) next();
       else {
         window.__late[world] = 'flower';
-        speakSeq(SCENE9_GEO.flower, 0, next);
+        speakSeq(SCENE9_GEO.flower, 0, next, world);
       }
     };
   });
@@ -459,21 +451,31 @@ function begin(world) {
   window.__late[world] = 'chainA';
   setTimeout(function () {
     if (ctx.scene.activeWorld !== world) return;
-    speakSeq(cfg.text.chainA, 0, function () {
-      if (ctx.scene.activeWorld !== world) return;
-      window.__late[world] = 'game';
-      cfg.game(world, function () {
+    speakSeq(
+      cfg.text.chainA,
+      0,
+      function () {
         if (ctx.scene.activeWorld !== world) return;
-        window.__late[world] = 'chainB';
-        speakSeq(cfg.text.chainB, 0, function () {
-          window.__late[world] = 'pickup';
-          s.pickupArmed = true;
-          ctx.ui.journey?.clearGoal?.('late-planets'); // 罗盘改指星屑(planets.js 目标解析的兜底)
-          armBeacon(world, 'beacon', 'sproutMote', 3.0);
-          ctx.ui.modeToast?.(tt(PICKUP_TOAST), 6000);
+        window.__late[world] = 'game';
+        cfg.game(world, function () {
+          if (ctx.scene.activeWorld !== world) return;
+          window.__late[world] = 'chainB';
+          speakSeq(
+            cfg.text.chainB,
+            0,
+            function () {
+              window.__late[world] = 'pickup';
+              s.pickupArmed = true;
+              ctx.ui.journey?.clearGoal?.('late-planets'); // 罗盘改指星屑(planets.js 目标解析的兜底)
+              armBeacon(world, 'beacon', 'sproutMote', 3.0);
+              ctx.ui.modeToast?.(tt(PICKUP_TOAST), 6000);
+            },
+            world
+          );
         });
-      });
-    });
+      },
+      world
+    );
   }, 1400);
 }
 function pick(world) {
@@ -527,14 +529,10 @@ ctx.onTick(function latePlanetsTick() {
   if (!cfg) return;
   const s = S(active);
   const t = Date.now() * 0.001;
-  for (const k of ['beacon', 'doorBeacon']) {
-    const b = s[k];
-    if (!b) continue;
-    b.rotation.y += 0.004;
-    b.material.opacity = b.userData.baseOpacity * (0.8 + Math.sin(t * 1.9) * 0.25);
-  }
+  const kb = keepers.get(active);
+  if (kb) for (const key of kb.keys()) pulseBeacon(kb.get(key), t);
   // 回程石环(章节完成后常驻):走进 3m → 回 B612(与 325~327 同规)
-  if (s.doorArmed && near(active, 'sproutDoor', 9)) {
+  if (s.doorArmed && near(active, 'sproutDoor', DOOR_RADIUS * DOOR_RADIUS)) {
     s.doorArmed = false;
     dropBeacon(active, 'doorBeacon');
     const wm = ctx.scene.worldManager;
@@ -565,7 +563,7 @@ ctx.onTick(function latePlanetsTick() {
   }
   if (chapterCached < cfg.idx) return; // 前一颗还没走完(导航与旅途卡不会送人来,双保险)
   if (s.pickupArmed && !s.starTaken) {
-    if (near(active, 'sproutMote', 9)) pick(active);
+    if (near(active, 'sproutMote', PICK_RADIUS * PICK_RADIUS)) pick(active);
     return;
   }
   if (s.arrival) return;

@@ -4,11 +4,13 @@
 import { describe, it, expect } from 'vitest';
 import { runChain, chainHealthy } from '../core/world-chain.mjs';
 
+// 条目形状 2026-10-15 起为 `{ id, label, load }`(M-10):id 是身份键,label 是显示文字。
+// 下面 7 条断言的**判据一字未动**,只是把 `entry[0]` 换成 `entry.label`、把 isShelved 的取样从标签换成 id。
 const LIST = [
-  ['a', 1],
-  ['b', 2],
-  ['c', 3],
-  ['d', 4],
+  { id: 'a', label: 'a', load: () => {} },
+  { id: 'b', label: 'b', load: () => {} },
+  { id: 'c', label: 'c', load: () => {} },
+  { id: 'd', label: 'd', load: () => {} },
 ];
 
 describe('runChain 的结构化结论', () => {
@@ -16,8 +18,8 @@ describe('runChain 的结构化结论', () => {
     const seen = [];
     const res = await runChain(LIST, {
       tag: '后台',
-      load: async (label) => {
-        seen.push(label);
+      load: async (entry) => {
+        seen.push(entry.label);
       },
     });
     expect(res).toMatchObject({ tag: '后台', status: 'ready' });
@@ -33,9 +35,9 @@ describe('runChain 的结构化结论', () => {
     const fails = [];
     const res = await runChain(LIST, {
       tag: '后台',
-      load: async (label) => {
-        seen.push(label);
-        if (label === 'b') throw new Error('404 ' + label);
+      load: async (entry) => {
+        seen.push(entry.label);
+        if (entry.label === 'b') throw new Error('404 ' + entry.label);
       },
       onFail: (label, e) => fails.push([label, e.message]),
     });
@@ -54,9 +56,9 @@ describe('runChain 的结构化结论', () => {
       runChain(LIST, {
         tag: '核心',
         fatal: true,
-        load: async (label) => {
-          seen.push(label);
-          if (label === 'a') throw new Error('网络抖了一下');
+        load: async (entry) => {
+          seen.push(entry.label);
+          if (entry.label === 'a') throw new Error('网络抖了一下');
         },
         onPhase: (p) => phases.push(p),
       })
@@ -69,10 +71,10 @@ describe('runChain 的结构化结论', () => {
     const seen = [];
     const res = await runChain(LIST, {
       tag: '后台',
-      load: async (label) => {
-        seen.push(label);
+      load: async (entry) => {
+        seen.push(entry.label);
       },
-      isShelved: (entry) => entry[0] === 'c',
+      isShelved: (entry) => entry.id === 'c',
     });
     expect(seen).toEqual(['a', 'b', 'd']);
     expect(res.skipped).toEqual(['c']);

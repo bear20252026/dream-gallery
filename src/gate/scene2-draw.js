@@ -389,6 +389,7 @@ function grow(p, t, isFill, delay) {
 // —— 台词队列:逐条手绘对话框,点按或按句长自动下一条;lock 互斥 + 心跳守护 ——
 function speakSeq(seq, i, done) {
   if (!active) return done && done();
+  if ((ctx.scene.activeWorld || 'main') !== 'main') return; // M-03:画羊台本只在沙漠里讲
   if (i >= seq.length) return done && done();
   const item = seq[i];
   const stay = Math.max(4600, ((item.en || '').length * 65) | 0); // 长句更久,点按可提前
@@ -411,6 +412,8 @@ function speakSeq(seq, i, done) {
   });
   clearTimeout(wd);
   wd = setTimeout(function () {
+    // M-03:离开沙漠时 cancelWorld 关掉对话框,`dialogOpen() === false` 不等于"这句说完了"
+    if ((ctx.scene.activeWorld || 'main') !== 'main') return;
     if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
   }, stay + 2600);
 }

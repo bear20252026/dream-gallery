@@ -19,6 +19,7 @@ import { ctx } from '../ctx.js';
 import { eventBus } from '../core/event-bus.js';
 import { Z } from '../shared/z-layers.mjs';
 import { tt, scriptLang } from '../shared/story-text.mjs';
+import { createStoryTicket } from '../shared/story-ticket.mjs';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { openBook, sketchSvg } from '../ui/book-pages.js';
 import { BOOK_PAGES, SCENE_WELL, SCENE_FAREWELL, ENDING_UI, WHO } from '../shared/story-text.mjs';
@@ -223,15 +224,23 @@ function setGoal(goal) {
   } catch (e) {}
 }
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// M-03(第六轮外部审计):结局是一条横跨几十拍的链(画册页 → 找井 → 画嘴套 → 告别 → 尾声),
+// 此前它只有一串**裸 setTimeout / 裸 wait**,全文件没有一处 `world:changed` 判定 ——
+// 玩家在"第二天傍晚"幕布淡出中途走进石门,幕布会停在半透明,心跳守护还会把下一句台词弹在新场景。
+// 票据把这条链收成一个可作废的"这一轮":离开沙漠或 dispose ⇒ bump(),计时器全清、
+// 挂起的 await 以 false 落回(链子 return),幕布/滤镜/画稿复位。
+// 注意:交给 ending-epilogue 的 `wait` 仍是上面那个裸 Promise(尾声自有一套字幕排期,本包不动,已记档)。
+const story = createStoryTicket(inMain);
 
 // ===================== 台词(照 scene10-fox.js 范式) =====================
 function speakSeq(seq, then) {
+  if (!story.here()) return; // 已不在沙漠:这一串台词不开了(旧写法会在新场景里开)
   const gen = ++speakGen;
   let i = 0;
   const next = () => {
     if (gen !== speakGen) return;
     if (i >= seq.length) {
-      clearTimeout(speakTimer);
+      story.cancel(speakTimer);
       then && then();
       return;
     }
@@ -240,7 +249,7 @@ function speakSeq(seq, then) {
     const finish = function () {
       if (spent) return;
       spent = true;
-      clearTimeout(speakTimer);
+      story.cancel(speakTimer);
       next();
     };
     const dur = Math.max(4600, ((item.en || '').length * 65) | 0);
@@ -257,8 +266,8 @@ function speakSeq(seq, then) {
       finish();
       return;
     }
-    clearTimeout(speakTimer);
-    speakTimer = setTimeout(function () {
+    story.cancel(speakTimer);
+    speakTimer = story.later(function () {
       if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
     }, dur + 2600);
   };
@@ -318,17 +327,17 @@ function runAction() {
 async function veil(entry, ms) {
   veilEl.textContent = tt(entry);
   veilEl.classList.add('show');
-  await wait(30);
+  if (!(await story.wait(30))) return; // 已被 bump:复位由票据收尾做过,这里直接收链
   veilEl.style.opacity = '1';
-  await wait(1500 + (ms || 1600));
+  if (!(await story.wait(1500 + (ms || 1600)))) return;
   veilEl.style.opacity = '0';
-  await wait(1400);
+  if (!(await story.wait(1400))) return;
   veilEl.classList.remove('show');
 }
 function flashTint(color, ms) {
   tintEl.style.background = color;
   tintEl.style.opacity = '1';
-  setTimeout(() => {
+  story.later(() => {
     tintEl.style.opacity = '0';
   }, ms || 900);
 }
@@ -404,7 +413,7 @@ function openTheBook() {
     onDone() {
       setStep(ENDING.BOOK);
       mode = 'idle';
-      setTimeout(() => startWell(false), 900);
+      story.later(() => startWell(false), 900);
     },
     onClose() {
       mode = 'idle';
@@ -498,7 +507,7 @@ function wakeWell() {
   stopListening();
   setGoal(null);
   // 唤醒:井在唱歌 —— 一串清亮的水音
-  [0, 180, 420, 700].forEach((ms, i) => setTimeout(() => bellOnce(0.03 - i * 0.004), ms));
+  [0, 180, 420, 700].forEach((ms, i) => story.later(() => bellOnce(0.03 - i * 0.004), ms));
   shiftDayTo(6.2, 7000); // 黎明
   setPrinceMode('well');
   placePrince(WELL_POS.x + 2.1, WELL_POS.z + 0.6, null, WELL_POS.x, WELL_POS.z);
@@ -513,7 +522,7 @@ async function drawMuzzle() {
   mode = 'busy';
   sketchEl.innerHTML = sketchSvg('muzzle');
   sketchEl.classList.add('show');
-  await wait(3200);
+  if (!(await story.wait(3200))) return;
   sketchEl.classList.remove('show');
   speakSeq(SCENE_WELL.muzzle, async () => {
     setStep(ENDING.WELL);
@@ -579,7 +588,7 @@ function farewellNear() {
   speakSeq(SCENE_FAREWELL.near, () => {
     sheepBoxVisible(false); // 羊跟他回家了
     shiftDayTo(22.6, 6500); // 天暗透
-    setTimeout(() => bellsOn(1600, 0.022), 4000); // 礼物:会笑的小铃铛
+    story.later(() => bellsOn(1600, 0.022), 4000); // 礼物:会笑的小铃铛
     speakSeq(SCENE_FAREWELL.gift, () => {
       bellsOff();
       speakSeq(SCENE_FAREWELL.last, () => fall());
@@ -592,15 +601,15 @@ function fall() {
     'radial-gradient(30% 22% at 50% 80%,rgba(255,214,110,.75),rgba(255,214,110,0) 70%)',
     380
   );
-  setTimeout(() => {
+  story.later(() => {
     setPrinceMode('falling');
     resetFall();
   }, 700);
-  setTimeout(() => {
+  story.later(() => {
     speakSeq([{ who: WHO.caption, en: SCENE_FAREWELL.fall.en, zh: SCENE_FAREWELL.fall.zh }], () => {
       setStep(ENDING.FAREWELL);
       setPhase(null);
-      setTimeout(() => playEpilogue(), 1800);
+      story.later(() => playEpilogue(), 1800);
     });
   }, 2600);
 }
@@ -649,7 +658,7 @@ function tick(dt) {
         // (earth-day.js)。地球之日走完(earthDay)才接「今夜,去找井」。画册页仍可由 endingApi.openBook 翻看。
         if (!ctx.store.flag('earthDay')) return;
         setStep(ENDING.BOOK);
-        setTimeout(() => startWell(false), 2400);
+        story.later(() => startWell(false), 2400);
         mode = 'wait';
       } else if (step === ENDING.BOOK) startWell(true);
       else if (step === ENDING.WELL) startFarewell();
@@ -681,6 +690,36 @@ export function createEndingJourney() {
         ? ctx.scene.worldManager.getWorld('main').scene
         : ctx.scene.s;
       buildDom();
+      // M-03 收尾(整轮只登记一次,幂等):幕布/滤镜/画稿复位、铃铛收声,并把 mode 交回 idle。
+      // 交回 idle 是这条链能续上的关键:tick 的 switch 只认 idle/well/farewell-wait,而
+      // wait/wake/busy/muzzle/farewell 都是"有链条或行动提示在飞"的瞬态。这些状态里被 bump,
+      // 计时器已清、台词链已停、而离场时 tick 又把行动提示 hideAction 掉了 —— 不交回 idle,
+      // 玩家回到沙漠就只能站着不动(结局永久卡死)。回到 idle 后状态机按存档 step 重播这一段。
+      // 铃铛是自排计时器(bellsOn 内部递归 setTimeout),票据管不到,只能显式收声。
+      story.onTeardown(() => {
+        if (veilEl) {
+          veilEl.classList.remove('show');
+          veilEl.style.opacity = '0';
+        }
+        if (tintEl) tintEl.style.opacity = '0';
+        if (sketchEl) sketchEl.classList.remove('show');
+        bellsOff();
+        if (
+          mode === 'wait' ||
+          mode === 'wake' ||
+          mode === 'busy' ||
+          mode === 'muzzle' ||
+          mode === 'farewell'
+        )
+          mode = 'idle';
+      });
+      // M-03:离开沙漠(进石门/传送/从章节地图去别处)⇒ 结局这一轮作废。
+      // 本文件此前没有任何 world:changed 订阅,几十拍的链条只能跑到新场景里去。
+      unsub.push(
+        eventBus.on('world:changed', (e) => {
+          if (e && e.to && e.to !== 'main') story.bump();
+        })
+      );
       // 切换语言:行动卡与尾声字幕就地换成另一种语言(2026-10-03 测试反馈)
       const onLang = () => {
         if (actionFn && actionLabel) actionEl.querySelector('button').textContent = tt(actionLabel);
@@ -748,8 +787,8 @@ export function createEndingJourney() {
       acc = 0;
     },
     dispose() {
-      speakGen++;
-      clearTimeout(speakTimer);
+      speakGen++; // 已在同步递归里的链子就地收不住口,靠它断
+      story.bump(); // M-03:计时器全清 + 挂起 await 落回 false + 幕布/滤镜/画稿复位
       bellsOff();
       stopWater();
       unsub.forEach((f) => f && f());
