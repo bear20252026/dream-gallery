@@ -28,7 +28,16 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const ROOT = path.resolve(__dirname, '..', '..');
-const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
+/**
+ * ⚠️这里必须先把 CRLF 归一成 LF。这个文件里的断言**两种方向都会栽在行尾上**:
+ *   · `toMatch(/\n {2}return g;\n\}/)` —— Windows 检出是 `;\r\n}`,`\n` 前面多了个 `\r`,
+ *     于是**在 CI(LF)全绿、在本机 checkout 后恒红**;release.sh 中途 `git checkout` 就会触发,
+ *     2026-10-15 那次纯文档发布就是这样红的(第四刀我自己写的这条,当时工作树是 Edit 工具留下的 LF,所以没暴露)。
+ *   · `not.toMatch(/^ {2}mA: Material\[\];$/m)` —— 同样因为 `\r` 卡在 `$` 前面,**永远匹配不上**,
+ *     于是"这条谎不许回来"的闸变成一条永真的空断言(比假红更坏:它看起来在守,其实什么都没守)。
+ * 归一成 LF 等于让本机与 CI 看到同一份字节,断言只对**内容**敏感,不再对检出方式敏感。
+ */
+const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n');
 const DTS = read('types/ctx.d.ts');
 
 // 从 `export interface X { ... }` 体里取某成员的声明行(两格缩进的那个键)
