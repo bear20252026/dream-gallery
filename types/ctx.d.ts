@@ -129,6 +129,21 @@ export interface PlayerState {
   onGround: boolean;
   gliding: boolean;
   glideEnergy: number;
+  /**
+   * 以下四条是**太空(非主世界)那一套**的键输入票据,不是装饰:
+   * 写入方全部在 `src/scene/player.js` 的 `tickPhysics()`(非主世界把主世界物理整套短路后,
+   * 把跳跃/下降键转成交给 planets.js 消费的四个字段),读取方是 `src/kunlun/planets.js:774-819`
+   * (太空移动分支读两条 `*T` 做爆发衰减、读两条 `space*` 做持续升降,并在松键时清零)。
+   * 2026-10-15 之前这里只声明到 `glideEnergy`,于是 planets.js 读它们各报一次 TS2339(共 10 条)。
+   */
+  /** 上升爆发剩余时长(秒):按下跳跃键瞬间置 0.3,planets.js 每帧递减 —— ← player.js:152 */
+  boostT: number;
+  /** 下降爆发剩余时长(秒):按下下降键瞬间置 0.3 —— ← player.js:157 */
+  boostDownT: number;
+  /** 跳跃键是否按住(持续上升)—— ← player.js:155 */
+  spaceUp: boolean;
+  /** 下降键是否按住(持续下降)—— ← player.js:160 */
+  spaceDown: boolean;
 }
 
 export interface PlayerNamespace {
@@ -151,6 +166,24 @@ export interface PlayerNamespace {
   quizPassScore: number;
 }
 
+/**
+ * 沙海表面对象 `ctx.media.desert` 的真实形状。
+ * 每一项都对着**定义处**抄,不是想象中的接口(改地形/大气时请同步这里):
+ *   - `getH` ← `src/scene/desert/terrain.js:93` `export const getH = function (x, z)`
+ *   - `update` ← `src/scene/desert.js:7` `function update(dt, time)`;调用点 `loop-manager.js:331`
+ *   - `kunlun` ← 昆仑巅平面坐标 `{ x: KX, z: KZ }`(`desert.js:22`),消费者拿它算离山巅的距离
+ *   - `dayNight` ← `src/scene/desert/atmosphere.js:172` `export function dayNight(hour)`;调用点 `loop-manager.js:342`
+ *   - `assertAboveGround` ← `src/scene/desert/terrain.js:106`,**实心山铁律的机器闸门**:
+ *     摆放落点埋进山心就 console.error + toast 并返回 false(正常返回 true)
+ */
+export interface DesertSurface {
+  getH: (x: number, z: number) => number;
+  update: (dt: number, time: number) => void;
+  kunlun: { x: number; z: number };
+  dayNight: (hour: number) => void;
+  assertAboveGround: (x: number, y: number, z: number, tag?: string) => boolean;
+}
+
 export interface MediaNamespace {
   vidEl: HTMLVideoElement;
   v45El: HTMLVideoElement;
@@ -160,7 +193,15 @@ export interface MediaNamespace {
   v45Mesh: Mesh;
   drawMusicCanvas: () => void;
   bigScreenHold: boolean;
-  desert: { getH: (x: number, z: number) => number };
+  /**
+   * 沙海表面对象。⚠️原先这里只写了 `{ getH }` 一个成员 —— 而**唯一写入方**
+   * `src/scene/desert.js:22` 交出去的是 5 个成员,于是消费者每次读 `kunlun` / `assertAboveGround`
+   * / `update` / `dayNight` 都报 TS2339(12 条),而且 `desert.js` 自己那行字面量还被判
+   * "Object literal may only specify known properties"(TS2353)——声明比运行时窄,报错的是消费者。
+   * 形状逐项取自真实定义处,消费侧实测只用到这五个(`desert.getH` 23 / `desert.kunlun` 7 /
+   * `desert.assertAboveGround` 4 / `desert.update` 1 / `desert.dayNight` 1)。
+   */
+  desert: DesertSurface;
   dayHour: number;
   updateFireworks: () => void;
   pG: BufferAttribute;

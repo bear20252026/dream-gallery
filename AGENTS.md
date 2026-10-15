@@ -319,6 +319,44 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
 结构包 C(P2)= **已落地(见上一节)**:M-06 显式生命周期试点、M-07 抽 `story-session`/`stardust`/`beacon-manager`(信标实测 **7** 份而非 5;`story-session` 因四种签名未抽,已记档)、M-08 类型渐进(checkJs 306 → **258**,明确**不要**整仓 .js→.ts)、M-09 剧情文本按语句 ID 取(`tt()` 现在带全局注册副作用,本批只登记撞键)、M-10 legacy 过滤改用稳定 ID 而非中文标签、山丘产物溯源。
 ⚠️其中 **M-02 动手前先读 `src/__tests__/game-state.test.js` 原文**:审计指出该测试把"写回失败 GameState 仍保留新值"钉成了**已确认契约** —— 别把有意的兼容行为当 bug 改掉。
 
+## 2026-10-15 checkJs 第三刀:再收 22 条(258 → 236),两簇的根因还是"声明比运行期窄"
+
+第五轮审计遗留的 `I 第三刀`(#34)今天开了第一刀。**没有动基线换数字**,两簇各做了归因:
+
+- **`ctx.media.desert` 只声明了 `{ getH }`** —— 而唯一写入方 `src/scene/desert.js:22` 交出去的是
+  `{ getH, update, kunlun:{x,z}, dayNight, assertAboveGround }` 五个成员。后果不是"少写一行类型"那么轻:
+  11 条 TS2339 全挂在**真实存在**的成员上(`desert.kunlun` 被读 7 次、`assertAboveGround` 4 次 —— 后者正是
+  「实心山铁律」那道机器闸门),外加 1 条 TS2353 嫌写入方自己的字面量"多写了 `update`"。
+  修法:新增 `export interface DesertSurface`,**逐项对着定义处抄**(terrain.js:93 / desert.js:7 /
+  atmosphere.js:172 / terrain.js:106 返回 boolean),`MediaNamespace.desert` 指过去 ⇒ −12。
+- **`PlayerState` 停在 `glideEnergy`** —— `player.js` 的 `tickPhysics()` 在非主世界会写四个太空键字段
+  (`boostT`:152 / `spaceUp`:155 / `boostDownT`:157 / `spaceDown`:160),`planets.js:774-819` 逐帧读 ⇒ 10 条 TS2339。
+  补声明的同时**把这四个字段的初值补进 `pl` 字面量**(`boostT: 0, boostDownT: 0, spaceUp: false, spaceDown: false`):
+  "声明说有"就得"对象真的有",只改类型不改运行期等于继续在类型上撒谎;运行时行为等价(读 `undefined > 0`
+  与 `0 > 0` 同假),全仓没有任何一处 `Object.keys(pl)` / 展开 / 序列化 `pl`,不存在"多四个键"的下游。
+
+- **归因反向验证(不是"看起来少了几条")**:单独把 `desert` 改回窄写法 ⇒ 236+12 = **248**;
+  单独从 `PlayerState` 删掉 `boostT` 一行 ⇒ 236+10 = **246**;两条一起退 ⇒ 精确回到 **258**;还原后 236。
+  ⚠️**两次注入都栽在同一个坑**:本机签出是 CRLF,用 `s.replace(/^…\n/m)` 或 `[\s\S]*?…\n` 这种**写死 `\n`** 的
+  模式会"替换调用成功、实际一条没删",于是差点把"没测到"记成"改了没影响"。现在每次注入都先断言
+  `s.length !== before`(没打上就抛错)再跑 —— 这条与已有的"`perl -0777` 必须带 `/m`"是同一族。
+- **闸门落在既有出处,不新造平行闸**:`src/__tests__/types-ctx-writer-agreement.test.js`(包 C 建的那份,
+  专管"声明 ≡ 唯一写入方")加了两条**集合相等**断言:
+  `DesertSurface` 的成员集合必须等于 `desert.js` 那行字面量的键集合;`PlayerState` 的成员集合必须等于
+  `pl` 字面量的键集合(并显式要求四个太空字段两边都在)。方向是故意的 —— 单向 `toContain` 挡不住
+  **声明比运行期窄**,而这两簇的病正是窄。反向:改窄 desert / 删一条 PlayerState 字段 ⇒ 各**恰好 1 条红**。
+  辅助函数 `ifaceMembers()` 自己带一条"一个成员都没解析到就抛错",防排版变化把断言洗成空转。
+- 门禁:eslint 0 / `tsc --noEmit` 0 / depcruise 0 违规 / **checkJs 236 = 新基线** /
+  vitest **1088 项 / 97 文件** / `npm run build` 0(三条构建断言照旧)。
+- **剩下的簇**(按类):`value` on HTMLElement 16、`style`/`onclick` on Element 各 9、`message` on unknown 9、
+  `material` on Object3D 9、`width` on HTMLElement 6、`dataset` on Element 6、`disabled` on Element 5 …;
+  按文件:`upload.js` 21 / `planets.js` 17→? / `quizgate.js` 16 / `minimap.js` 14 / `mode.js` 13。
+  ⚠️注意这份表是**今天动手前**数的(`planets.js` 已因 PlayerState 那刀少 10);下一刀要先重数,
+  而且 DOM 那一族(`Element`/`HTMLElement`)真正要的是"把 `el()` / `querySelector` 的结果收成带类型的助手",
+  属于小而实的重构 —— 不要靠 `/** @type {any} */` 把数字压下去(那是把谎言从运行期搬进注释)。
+
+
+
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
 
 审计方只读源码、未跑测试,并明确「不把此前已修复的问题重复计为缺陷」。6 条工程断言逐条回读后:**4 条成立(其中 1 条比审计说得更严重)、2 条部分成立、1 条误报**;素材版权与译本授权两条按主人指示不处理。
