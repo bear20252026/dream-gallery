@@ -17,6 +17,7 @@ process.env.RETENTION_DISABLED = '1';
 process.env.TOKEN = 'geoip-t0ken';
 
 const require = createRequire(import.meta.url);
+const store = require('../../lib/store.js'); // 命名空间:容量那条用例要把落盘换成计数器
 const { gateData, saveGateData } = require('../../lib/store.js');
 const geoip = require('../../lib/geoip.js');
 const admin = require('../../lib/admin.js');
@@ -50,13 +51,23 @@ beforeAll(() => {
     return realFetch(...a);
   };
 });
-afterAll(() => {
+// 收尾必须**先把写链排干再删临时目录**。
+// 起因(2026-10-15 上线 PR3 之后暴露):容量那条用例连着调几千次 `note()`,每次都往 store 的写链上挂一个
+// 整库快照落盘任务;以前链尾 `.catch` 把一切吞掉,现在 2026-10-14 的结果契约会把"没落成"如实报出来 ⇒
+// 这条用例单次运行刷出 **1929 行** `保存未完全落盘: ENOENT .../gate_data.json.tmp` —— 目录被 afterAll 先删了,
+// 队列里剩下的任务全数落空。判清楚了两件事:①这是**测试自己的收尾时序**,不是 store 的缺陷、也不是配置问题;
+// ②`note()` 真的每次调用都落一次全库快照(生产 3 个入口都走它)⇒ 写放大量级有了实测数,记进 AGENTS,
+//   但不在这条用例里顺手改持久化语义(合并写盘是本仓刻意未做的决定,见 2026-08 那条)。
+afterAll(async () => {
   global.fetch = realFetch;
+  const drained = await saveGateData(); // 把此前入队的写盘全部落成,再动目录
   try {
     fs.rmSync(tmp, { recursive: true, force: true });
   } catch {
     /* 临时目录清不掉不影响结论 */
   }
+  if (drained && drained.ok === false)
+    console.warn('[lib-geoip] 收尾排干时仍有没落成的写盘:', (drained.errors || []).join(' | '));
 });
 
 describe('lib/geoip.js — 国家码读数', () => {
@@ -98,9 +109,35 @@ describe('lib/geoip.js — 国家码读数', () => {
   });
 
   it('④规模有上限,超了淘汰最旧(与旧实现同一数量级)', () => {
-    for (let i = 0; i < geoip.GEO_MAX + 5; i++)
-      geoip.note(req({ country: 'CN', visitor: '192.0.2.' + (i % 200) + 'x' + i }));
+    // 这条断言是**纯内存**的(capKeys 淘汰),但 `note()` 每次写入都顺手落一次整库快照
+    // (线上快照 2.3MB / 一次落盘 p95 ≈ 94ms)⇒ 不加处理就是 2005 次全盘序列化 + 落盘:本文件单次跑到 28 秒。
+    // 更糟的是这些写**排成异步链**,同步用例跑完时还剩一千多次没执行,等 afterAll 删掉临时目录就全数落空 ⇒
+    // 刷出 **1929 行** `保存未完全落盘: ENOENT`(2026-10-15 上线"结果契约"后第一次现形;契约只是把原来的静默说出来,
+    // 写放大与收尾时序都在那儿躺着)。做法:`lib/geoip.js` 现取 `store.saveGateData()`(命名空间口径,
+    // 与 lib/aiusage.js / lib/track.js 同),这里把它换成计数器 —— 于是这条用例既验到淘汰,也验到"每次写入确实落一次盘"。
+    const realSave = store.saveGateData;
+    let saves = 0;
+    store.saveGateData = () => {
+      saves++;
+      return Promise.resolve({
+        ok: true,
+        savedAt: Date.now(),
+        sqliteOk: true,
+        sqliteReason: 'ok',
+        jsonOk: true,
+        errors: [],
+        ms: 0,
+        queuedMs: 0,
+      });
+    };
+    try {
+      for (let i = 0; i < geoip.GEO_MAX + 5; i++)
+        geoip.note(req({ country: 'CN', visitor: '192.0.2.' + (i % 200) + 'x' + i }));
+    } finally {
+      store.saveGateData = realSave;
+    }
     expect(Object.keys(gateData.geo).length).toBeLessThanOrEqual(geoip.GEO_MAX);
+    expect(saves).toBe(geoip.GEO_MAX + 5); // 每个新 IP 一次写:计数器不是空转,也没多写
   });
 
   it('值没变时不重复落盘(全量快照写盘很贵)', () => {
