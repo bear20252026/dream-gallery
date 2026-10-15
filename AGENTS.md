@@ -213,7 +213,8 @@ CI 无任何 prettier 步骤),package.json 那 90 个 CR 是本地签出的 CRLF
 
 **落地**
 
-- **M-06**:`src/core/composition-root.js` 用 `lifecycle` Map 给每个系统记 `'uninit' | 'ready' | 'failed'`(`stateOf()` 读),`update()` 只调 ready,`dispose()` 只拆 ready/failed —— **failed 要拆**(init 到一半建出的资源,清理比不清理好)、**uninit 不拆**(它的 dispose 是按"init 已完成"写的,没 init 就拆可能造出新异常);`initStatus()` 结论加 `states[]`(冻结副本),新增 `lifecycleOf(name)` 单点读数。动手前提先量过:**生产里没有任何系统在 init 之后注册**(main.js 的顺序是先 `loadWorldModules` → register 全部 19 → init),所以"跳过 uninit"实际只改探针/HMR/误用三条路径 —— 这条前提写在测试文件头,免得下一个人以为是行为大改。
+- **M-06**:`src/core/composition-root.js` 用 `lifecycle` Map 给每个系统记 `'uninit' | 'ready' | 'failed'`(`stateOf()` 读),`update()` 只调 ready,`dispose()` 只拆 ready/failed —— **failed 要拆**(init 到一半建出的资源,清理比不清理好)、**uninit 不拆**(它的 dispose 是按"init 已完成"写的,没 init 就拆可能造出新异常);`initStatus()` 结论加 `states[]`(冻结副本),新增 `lifecycleOf(name)` 单点读数。动手前提先量过:**生产里没有任何系统在 init 之后注册**(main.js 的顺序是先 `loadWorldModules` → register **全部 23 个**(2026-10-15 线上 `initStatus().loaded` 实测数)→ init),所以"跳过 uninit"实际只改探针/HMR/误用三条路径 —— 这条前提写在测试文件头,免得下一个人以为是行为大改。
+  - ⚠️**更正我先前写下的记录**:上一版这里写着"新增 `lifecycleOf(name)` 单点读数",**代码里没有这个函数**(`stateOf` 是模块内私有,对外只有 `initStatus().states[]` 这张表)。这条是今晨线上探针直接打出来的:`window.__compositionRoot.lifecycleOf` 读出来是 `undefined`,而 `initStatus()` 正常返回 23 条 ready。⇒ 对外读数就一个 `initStatus()`;真要按名字单点查,得先加(目前没有消费者,先不加)。
 - **M-07**:新增 `src/shared/beacon-manager.js`(`createBeacon` / `arm`「一格 named slot 只立一根」/ `removeBeacon` / `pulseBeacon`),7 处建柱点改为 import ⇒ 那条**零 PointLight 铁律**(光柱一律自发光、不进光照预算,由 `core/light-budget.js` 兜底扫)从此只写在一个地方 —— 它的代价不是行数,是"谁在某一份里顺手加个 PointLight,灯光预算就在那颗星上被悄悄吃掉,而且没有测试会红"。`story-guides.js` 的呼吸是 `0.75+sin(t*1.7)*0.25`(远距门指引,节奏本就与拾取信标的 `0.8+sin(t*1.9)*0.25` 不同)⇒ **只并几何与拆除,不并 pulse**,决定写在文件头。边界:模块不知道世界名、星屑坐标、探针用的信标名,那些留在各章(是剧情)。
 - **半径单一源**:`src/shared/planet-logic.mjs` `PICK_RADIUS = 3` / `DOOR_RADIUS = 3`(2.5 那个值从没和现实对上),四章(scene6-king / scene7-vanity / scene7-tippler / late-planets)全部 import;`325 星屑因为 3m 圈离出生点太近被整体挪过位`,所以这两个数是剧情调过的,测试注释里钉明"别顺手改大改小"。
 - **M-08**:四处**纯声明**改动,运行时一行未动 —— ① `video-wall.js` 给 `playVideo` 加 `TaggedVideo = HTMLVideoElement & {_vGen?, _vEndedFn?, _vCanPlayFn?, _vPollId?}` typedef(句柄挂在元素上是有意的:下一次调用要靠它们摘掉上一轮还挂在同一个元素上的监听器),消 24 条;② `types/ctx.d.ts` `mA: Material[]` → `HTMLAudioElement`(唯一写入方 `audio-manager.js:96 let mA = new Audio()` / `:187 ctx.media.mA = mA`,读者 audio-manager:174~197 / video-wall:282 / upload:229),消 3 条;③ `houseMats: Material[]` → `Record<string, MeshStandardMaterial[]>`(写入方 `scene.js:913` 给的是 `{wall,base,deco,ceil}` 对象、`housecolor.js:55/121/125` 按组名索引,选 Record 就是因为键是字符串),消 5 条;④ `worldManager?: unknown` → `SceneManager`,用 `import type` 指向 `src/core/scene-manager.js:55` **真实导出的类**而不是另手写一份 interface,消 16 条(getWorld 9 / back 4 / transitioning 2 / enter 1,而那些方法本来就在类上)。`src/ctx.js` 登记册两行改正(mA 归媒体、houseMats 归挂画)并保留事故记录。⇒ checkJs **258 = 新基线**(见下)。**明确不做整仓 .js→.ts**;`ctx.d.ts` 里其它 `: unknown` 成员(`planeApi/foxApi/scrollLink/audioManager/loopManager`)**一个字没动** —— 它们的唯一权威是各模块里的对象字面量,没有现成类型可指,手写一份形状等于给消费方一个假保证(`mA: Material[]` 就是这条路的下场),理由写在那份 d.ts 里。
@@ -238,6 +239,30 @@ CI 无任何 prettier 步骤),package.json 那 90 个 CR 是本地签出的 CRLF
 - 门禁:npm test 6 条脚本 **7/22/108/46/20/6 = 209 项 0 失败**(exit 0,未涨);vitest **1085 项 / 97 文件**;eslint 0;tsc --noEmit 0;`npm run build` 0 且三条构建断言照旧(**46 prefetch** / 入口不含 three / dist 无 importmap;prefetch 较包 B 的 45 +1,是新增的 `shared/beacon-manager.js` 进了核心链),main chunk **270,846 B**(< 512 KB 闸);`scripts/probe/boot-cost-probe.cjs` 退出 0(沙箱首屏 **675KB / 56 资源 / 46 条 prefetch 全带 crossorigin**);`npm run depcruise` 0 违规(**395 modules / 1351 deps**,较包 B +8/+32);checkJs **258 = 新基线**(开工时基线文件写 308、**实测 306**;四刀归因 −48:typedef 24 / mA 3 / houseMats 5 / worldManager 16;新增 0,错误分布未变)。
 - ⚠️**要记住的六条**:①**基线文件里的数会虚高** —— 降 checkJs 基线之前必须重新数一遍,别拿 `checkjs-baseline.txt` 当起点(这次 308 vs 实测 306 的 2 条差没人追,只按实测记账);②`: unknown` 本身不是错,**手写一份与写入方不一致的形状**才是错 —— 收类型先找"唯一写入方",有现成的类/元素就指过去,没有就**留着别动**并把理由写在声明旁边;③撞键这类普查要从**真实导出**量(import 后递归收集),`story-text.mjs` 里有动态构造的 key,正则扫源码会漏;④产物溯源测试**不要断 git** —— CI 是浅检出/detached,断"提交号对不对"必然假红;git 信息在**记录时**写进清单,测试只核对清单与字节;⑤探针红先与**生产**比一遍再定性:`b612-guidance-probe`(`✗ [进程行] 325 国王之星(storyBeat) | v=null` + `waitForFunction` 45s 超时)与 `b612-327-guidance-probe`(`waitForFunction` 20s 超时)在本地与 `BASE_URL=https://cloudbear.cloud` 下**失败点逐字相同** ⇒ 判为探针自有的预置债(过时),不是本批回归,但也**没顺手修**;⑥工具类四条坑:`perl -0777 -pi -e 's/^…$/…/'` **必须带 `/m`**(否则整文件被当成一条字符串,`^…$` 只匹配首尾,断点静默打不上 ⇒ 每个断点都要 grep 反查一遍)、vitest 打印的是 `     × <完整标题>`,匹配红项要用 `grep -E '^ *× ' | grep -qF "关键字"`,不要写 `grep -qF "× 关键字"`、JSDoc 类型正则里可选标记要写成字符类 `[*?]?:`,写成 `'\\*?\\?:'` 会变成"必须有个问号"、Write/Edit 之后有 prettier 钩子会重排文件,连续第二次编辑必须重读。
 - ⚠️**本批未做、已记档**:①M-07 的第三件 `story-session` **没抽**:全仓 9 份 `speakSeq`,签名有四种形状 —— `(seq,i,done)`(scene2-draw:390 / earth-day:65 / scene7-tippler:161 / scene7-vanity:38)、`(seq,i,done,ticket=visit)`(scene3-night:234 / scene3-memory:307 / scene6-king:45)、`(seq,i,done,home)`(late-planets:54)、`(seq,then)`(ending-journey:236)⇒ 抽共享模块得先统一签名,那是动 9 章调用点的独立一批;票据本身包 B 已经上到该上的三条。②`scene3-memory`/`scene6-king` 那两份信标的呼吸节奏仍留在各自文件里(只并了几何与拆除)。③M-09 的行 ID 化(336 处 `tt(` / 46 文件)。④山丘清单**管不到**"`hill-src` 改了但没重跑 build"这一类漂移 —— 产物里没有版本戳可比,要治得先在 hill-src 构建里注入戳(对齐主站的 `__B612_BUILD__`),属另一批。⑤checkJs 剩下的簇已按两种顺序排好,下一批照表收:**按文件** `upload.js` 21 / `planets.js` 17 / `quizgate.js` 16 / `player.js`·`player-physics.js`·`minimap.js` 各 14 / `gallery/mode.js` 13 / `scene7-tippler.js`·`finale.js`·`ark-freeflight-hud.js` 各 10;**按类** `value` on HTMLElement 16、`style` 与 `onclick` on Element 各 9、`message` on unknown 9、`material` on Object3D 9、`kunlun` on `{ getH: … }` 7,`TS2339` 共 194 条。
+
+### PR2-PR4 + 包 A/B/C 已上线(2026-10-15 11:37,merge `7754149` / DEPLOY_OK `7754149`)
+
+- **发布链**:分支 `rel/20261014-193950` → **PR #22**(head `e2528e1`)→ required checks(`build-and-test` + `smoke`)全绿 → 合并 `7754149`。
+  部署前逐字核过 **CI 验的树 == 要部署的树**:`git rev-parse e2528e1^{tree}` = `7754149^{tree}` = **`2b8ed421d148e366b7939447759dc7c91b0a6d86`**。
+  分两步发(`--no-deploy` 先合、再单独 `deploy.sh --yes`),理由是昨天踩过的:整条一条龙跑会越过工具的单命令上限,
+  被咬断在"已合并、未部署"的中间态比慢十分钟贵得多。
+- **CI 第一次是红的,而且抓到的是一条真缺陷(不是环境噪音)**:`hill-artifacts-provenance` 报三个
+  `fonts/*-OFL.txt` 与清单不一致 —— 溯源摘要按**本机检出的字节**算 sha256,Windows 把多行文本检出成 CRLF、CI 是 LF。
+  细节、修法与那条"与平台无关"的新单测见上面结构包 C 的更正条目。**本地全绿而 CI 红 = 这条闸门本来就该在 CI 上。**
+- **线上复验(全过)**:首页 200、`/healthz {"ok":true,"uptime":28}`(确实是新进程)、漂移复核 **OK 200 DRIFT 0 MISSING 0**、
+  后端清单 51 可达 / 53 清单、6 个后端文件上传后 md5 一致(线上 `lib/store.js` = `246b2781e922` 与本地同值,
+  新契约字段 7 处命中、`r2outbox` 的 `{was,flushed}` 与 `stream.js` 的 `released` 都在);
+  `csp-stage-probe --prod` = **CSP_STAGE_OK**(三页内联仍全部归位 CF,我方 0 条);
+  `boot-cost-probe` 沙箱 **675KB / 56 资源 / 46 条 prefetch 全带 crossorigin**;
+  `BASE_URL=prod b612-prod-worlds` **六条断言全绿**,第 ④ 段仍按探针头写明的那条已知失效红(`waitForFunction 25000ms`,
+  卡在"进国王星之后等返回钮"),**与本次改动前(10-14 那次)失败点逐字相同** ⇒ 判旧红;
+  **新增的 `b612-chain-leak-probe` 线上 7/7 全绿**(M-03 的正面证据:离场后 16s 观察窗 97 拍里没有把 326 的台词弹到 b612、
+  `stage` 仍停在 chainA 没被心跳推着走、重回 326 台本从头再讲 ⇒ 票据既挡漏白也没把这一章钉死);
+  线上 pm2 日志 60 行内没有 `[store] 保存未完全落盘` / `Unhandled` / 台账退回待写 ⇒ 新结果契约在正常路径上不产生噪音。
+- **两条对外契约的线上读数**(光单测不算数):`__worldStatus = {后台, ready, loaded:5, failed:0, skipped:8}`(与 10-14 一致,
+  ⇒ M-10 换成稳定 ID 之后 `label` 与 `__worldPhase` 的对外措辞确实没变);
+  包 A 新出的 `__compositionRoot.initStatus()` = `{status:'ready', loaded:23, failed:[], skipped:[]}`,
+  `states[]` 23 条全 ready ⇒ "生产里没有系统在 init 之后注册"那条前提线上成立。
 
 ### 第六轮还没动的部分(已排期)
 
