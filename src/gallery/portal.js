@@ -48,7 +48,11 @@ padBtn.style.cssText =
   'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:' +
   Z.navBtn +
   ';display:none;padding:14px 36px;border-radius:24px;border:2px solid rgba(255,214,130,.9);background:rgba(30,18,8,.92);color:#ffe9c4;font-size:18px;letter-spacing:4px;cursor:pointer;font-family:inherit';
-padBtn.onclick = function () {
+// 「进入 B612」大按钮的动作。下面 :126 原本直接 `padBtn.onclick()` 复用它 —— 运行时没问题,
+// 但 lib.dom 把 onclick 声明成 `(ev: MouseEvent) => any`,零参调用就是 TS2554。
+// 动作本身不读 event,所以抽成命名函数:一边挂 onclick、一边直接调用
+// (不改成 `padBtn.click()`,那会多派发一个真实 click 事件)。
+function activatePad() {
   if (ctx.ui.dialogOpen?.() || ctx.overlay.anyOpen()) return;
   const wm = ctx.scene.worldManager;
   if (!wm || wm.transitioning) return; // navGuard 语义:切换中不重复触发
@@ -67,7 +71,8 @@ padBtn.onclick = function () {
       },
     },
   });
-};
+}
+padBtn.onclick = activatePad;
 document.body.appendChild(padBtn);
 
 // 从 B612/星球返回主世界:解除武装(落点就在石门旁,不解除下一帧又弹回——
@@ -123,6 +128,6 @@ ctx.onTick(function portalTick() {
   if (step.fire) {
     gateArmed = false; // 触发即解除;从 B612 返回落在圈内不再回弹
     showPad(false);
-    padBtn.onclick();
+    activatePad();
   }
 });

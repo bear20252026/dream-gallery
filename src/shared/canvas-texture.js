@@ -7,7 +7,7 @@ import * as THREE from 'three';
  * 创建画布纹理
  * @param {number} w    画布宽 px
  * @param {number} h    画布高 px
- * @param {(ctx: CanvasRenderingContext2D) => void} draw 全部绘制逻辑
+ * @param {(ctx: CanvasRenderingContext2D, cv: HTMLCanvasElement) => void} draw 全部绘制逻辑(第 2 个实参就是这块画布本身,:17 实际会传)
  * @returns {THREE.CanvasTexture}
  */
 export function canvasTexture(w, h, draw) {

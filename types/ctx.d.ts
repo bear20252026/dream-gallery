@@ -88,7 +88,15 @@ export interface SceneNamespace {
   jB: HTMLElement;
   aB: HTMLElement;
   avatar: Group;
-  kintsugiOn: boolean;
+  /**
+   * 金缮效果的**启动函数**,不是布尔。写入方 `src/scene/scene.js:769
+   * ctx.scene.kintsugiOn = setupKintsugi(roof, roofThick)`,而 `src/scene/kintsugi.js:9`
+   * 那个 setup 走到末尾 `return enableKintsugi`(:38 起定义的无参函数)。
+   * 原先声明成 `boolean` 是把 kintsugi.js 里那个**模块内同名局部变量** `let kintsugiOn = false`(:36)
+   * 当成了 ctx 成员 —— 于是两个真消费者(sky-progress.js:205 / :215「100 档触发金缮」)报
+   * TS2349「This expression is not callable」,而写入方自己报 TS2322。
+   */
+  kintsugiOn: () => void;
   // ↓ 2026-10-14 补齐(同 KunlunNamespace:声明落后于 src/ctx-scene.js 的 properties 数组)。
   /** 画廊布局常量表 —— 建造几何/碰撞边界/探针坐标共用的单一源,挂的是 scene/layout.mjs 的 LAYOUT ← scene/scene.js:183 */
   layout: {
@@ -318,7 +326,14 @@ export interface ModeNamespace {
   renderCustomLinks: () => void;
   applyTexGate: () => void;
   texAllowed: ((url: string) => boolean) | null;
-  linkGuard: () => void;
+  /**
+   * 链接门禁。2026-10-15 从 `() => void` 改成真实形状:写入方 `src/gallery/mode.js:172
+   * function linkGuard(linkKey)` 明确 `return true / false`(注释:"返回 true = 已接管"),
+   * 唯一消费方 `src/gallery/paintings.js:595` 正是拿它做真值判断并 `return`。
+   * 原先声明成 void 让那行同时报 TS2554 + TS1345;而那行**多传**的第二个实参 `cg`
+   * 是实现里根本不存在的死参数,已按声明删掉(不是把声明改成两个参数去迁就写错的调用)。
+   */
+  linkGuard: (linkKey: string) => boolean;
   spawnLinkModel: (type: string, url: string) => Object3D;
   trackClick: (linkId: string) => void;
   LINK_MODEL_TYPES: string[];
@@ -326,16 +341,44 @@ export interface ModeNamespace {
   openUpload: () => void;
 }
 
+/**
+ * 一颗灵蕴在罗盘页上的呈现。逐项取自**唯一原始写入方**
+ * `src/kunlun/spirits.js:467 function spiritsState()` 的 `SPIRITS.map(...)` 字面量。
+ * `state` 实际只会是 'got' / 'open' / 'locked' 三种,但那里是 map 回调里的三元表达式,
+ * TS 会把它推成 `string`(没有 as const),所以声明也只能写 string —— 写成语字面量联合
+ * 等于让写入方自己报错。星球岛那版是把上面这个函数**再包一层**
+ * (`src/kunlun/planets.js:861` 用 decorateSpiritsState 覆盖 name/en/place),所以两个写入方
+ * 都得能赋进同一个声明,这也是这条钉子要比「形状对不对」而不是「谁先写」的原因。
+ */
+export interface SpiritItem {
+  name: string;
+  en: string;
+  emotion: string;
+  color: string;
+  place: string;
+  state: string;
+}
+
 export interface KunlunNamespace {
   flightLock: boolean;
   eternalHandlers: Record<string, (...args: unknown[]) => void>;
-  eternalClick: () => void;
-  eternalTeleport: () => void;
-  eternalWelcome: () => void;
-  eternalKeepOut: () => void;
+  /**
+   * ↓ 这六条 2026-10-15 一起改:原先全写成 `() => void`,而实现收参数、有的还返回值、拆场景时会被置
+   *   null。声明收 0 参 ⇒ 每个「先判存在再调用」的消费点同时报两条错(TS2554 参数数 + TS1345
+   *   「void 不能测真值」),eternalKeepOut 一条就咬住 7 个文件 14 条。形状逐项取自真实写入方:
+   *   eternal.js:687 `function (cg)`(cg 取调用方 paintings.js:516 的 `hs[0].object`,是 Object3D)、
+   *   eternal.js:653 `function teleport(intoHall)`(只被传 true/false)、eternal.js:639 `welcome()`、
+   *   eternal.js:29 `function (x, z) { return inHall(x, z); }`、ark.js:753 `function ()`、
+   *   letgo.js:150 `function (name) { … return false / true }`。
+   *   null 来自各文件的 bag.custom 拆场路径(eternal.js:756~761、ark.js:912、letgo.js:243)。
+   */
+  eternalClick: ((cg: Object3D) => void) | null;
+  eternalTeleport: ((intoHall: boolean) => void) | null;
+  eternalWelcome: (() => void) | null;
+  eternalKeepOut: ((x: number, z: number) => boolean) | null;
   groundOverride: ((x: number, z: number) => number | null) | null;
-  arkTeleportToPeak: () => void;
-  letgoRecall: () => void;
+  arkTeleportToPeak: (() => void) | null;
+  letgoRecall: ((name: string) => boolean) | null;
   peakVidEl: HTMLVideoElement | null;
   /**
    * 飞舟/山峰背景音乐元素。**唯一写入方 `src/kunlun/peaks.js:49 const flyAudio = new Audio(...)`
@@ -350,7 +393,14 @@ export interface KunlunNamespace {
   isDone: () => boolean;
   spiritMark: () => { x: number; z: number } | null;
   spiritsTTS: string[];
-  spiritsState: unknown[];
+  /**
+   * 2026-10-15 从 `unknown[]` 改成函数:它和上一行 `isDone: () => boolean` 出自**同一个**
+   * `Object.assign(ctx.kunlun, { spiritsState, isDone, ... })`(spirits.js:493~498),
+   * 只有它被写成了数组。后果是消费者 `spirit-page.js:19` 的
+   * `ctx.kunlun.spiritsState ? ctx.kunlun.spiritsState() : []` 报 TS2349「不可调用」,
+   * 而包装方 `planets.js:861` 报 TS2322 —— 数组形状连"能不能调用"都答错了。
+   */
+  spiritsState: () => SpiritItem[];
   checkSkyMs: () => void;
   fadeTeleport: (target: Vector3, yaw: number) => void;
   rebuildEternalPicks: () => void;
@@ -435,7 +485,14 @@ export interface StoreAPI {
 }
 
 export interface UINamespace {
-  modeToast: (msg: string) => void;
+  /**
+   * 轻提示统一入口。2026-10-15 补第二个参数:写入方 `src/gallery/mode.js:40
+   * ctx.ui.modeToast = (msg, duration) => emit('ui:toast', { text: msg, duration: duration || 2200 })`
+   * —— 时长是**可选**的(实现里用 `|| 2200` 兜底),但 9 个调用点确实传了它
+   * (journey-system:101 / scene2-draw:107 / late-planets:471 / scene6-king:418 /
+   * scene7-tippler:337,367 / scene7-vanity:212,236,248),声明停在 1 参就是 9 条 TS2554。
+   */
+  modeToast: (msg: string, duration?: number) => void;
   openDialog: (opts: unknown) => void;
   dialogOpen: () => boolean;
   cancelDialogScope: (scope: string) => void;

@@ -592,7 +592,7 @@ function onC3D(e) {
       const linkKey = Object.keys(LINKS).find((k) => cg.userData[k]);
       // 模式门禁(mode.js):普通模式下屏蔽指定外链(金山文档/瑶华传/秘密花园),情书卷轴改写为说明书
       if (linkKey) {
-        if (ctx.mode.linkGuard && ctx.mode.linkGuard(linkKey, cg)) return;
+        if (ctx.mode.linkGuard && ctx.mode.linkGuard(linkKey)) return;
         window.openPanel(LINKS[linkKey], '外部链接');
         return;
       }
