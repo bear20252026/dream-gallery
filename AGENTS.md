@@ -429,6 +429,17 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   **HEAD 本来就不合排**(实测过才这么说),按 `.prettierignore` 头部那条"只排版新写/正在改的文件"的口径
   **没有顺手重排**,免得 45 条类型修复混进 12 行无关排版差异。
 - ⚠️本刀动了 `portal.js`(抽出命名函数)、`paintings.js`(删死参)、`mode.js`(fillRect 参数)**运行期源码** ⇒ 要重新构建并部署。
+- **已上线并线上复验(PR #30 → merge `2592c7d` → `DEPLOY_OK 2592c7d`)**:required checks `build-and-test` / `smoke` 双绿,合并后核对 **CI 验的树 == 部署的树**(`eb35c81c52dc7420d2780247fd17d53acd83596c`);部署快照六个字段全给结论(`BACKEND=verified / FRONTEND=extracted / RESTART=online / MODELS=synced / VERIFY=ok / DRIFT=ok`),漂移复核 **OK 200 DRIFT 0 MISSING 0**,`/healthz {"ok":true,"uptime":16}`(确实是新进程),线上首页引用的两个 `main-*.js` 都 200,线上 `assets/entrygate-zkhnb0oc.js` 里 grep 到本次短哈希 **`2592c7d`**;合并后的树上复测 checkJs **165 = 基线**。
+- **被改到的那三条运行期路径,验证是分层做的**:① 真正跑通切世界的是 `scripts/probe/b612-prod-worlds.cjs`(`BASE_URL=https://cloudbear.cloud` **直测生产 bundle**)—— 它 `进入 B612(activeWorld=b612)` 那条断言**就是走 `portal.js:127` 的 `activatePad()`**(探针的做法:把玩家坐标摆到门前 10m 等按钮亮,再把 `pl.p.z` 推进圈内触发 `step.fire`),前六条全绿,第七条 `waitForFunction 25000ms` 超时**与第四刀记的是同一条旧红**(头 4-5 行写明的④),不是回归;② `csp-stage-probe --prod` 仍 **CSP_STAGE_OK**(CF 注入的 jsd beacon 3 条照旧记为"待拍板");③ 新写的 `.tmp/portal-pad-check.cjs`(本地 4/4、线上 4/4)只钉两件事:`#gateBtn` **存在**、`onclick` 是函数,线上模式按纪律**不点击**。
+  ⚠️两个坑记下来:a) `#gateBtn` 平时 `display:none`,用 `waitForSelector` 等它**可见**会恒超时(第一次跑就栽在这儿,而同一段 `evaluate` 里 `querySelectorAll('body > [id]')` 明明看得见它)—— 等"存在"要自己写轮询;本地那次点击打印出 `busy=true`(dialog/overlay 守卫命中)⇒ **本地点击并没有走到 `wm.enter`**,所以"本地验过切世界"这句话不能说,能说的只有上面①那条生产探针。
+- ⚠️**husky 的 pre-commit 会把"正在改的文件"整份 prettier 重排**:本批 `sky-progress.js` 与 `audio-blip.js` 各有约 12 行与本次无关的排版差异一起进了 `2592c7d`(这两份在 HEAD 本来就不合排,`.prettierignore` 头部的口径就是"只排版新写/正在改的文件")。CI 验的正是重排后的树 ⇒ 不是隐患,但**读 diff 时要认得出哪些只是排版**;想避免就得先把整份文件排版一次单独发。
+- ⚠️**紧接着踩到的一条真缺陷(由那次纯文档发布暴露,已修)**:`types-ctx-writer-agreement.test.js` 里的断言**对检出方式敏感**,而不是只对内容敏感。
+  `toMatch(/\n {2}return g;\n\}/)` 在 LF(CI)下绿,在 Windows 检出的 `;\r\n}` 下 `\n` 前面多一个 `\r` ⇒ **CI 全绿、本机 checkout 后恒红**;
+  而反向的 `not.toMatch(/^ {2}mA: Material\[\];$/m)` 更坏 —— 同一个 `\r` 卡在 `$` 前面让它**永远匹配不上**,于是"这条谎不许回来"的闸变成一条**永真的空断言**(看起来在守,其实什么都没守)。
+  第四刀写完时工作树是 Edit 工具留下的 LF,所以本机也没红过 ⇒ 两条都没暴露;是 `release.sh` 中途 `git checkout` 把文件换回 CRLF 才让第一条红的。
+  **修法**:`read()` 读源码时统一 `.replace(/\r\n/g,'\n')` —— 让本机与 CI 看到同一份字节(文件头把这条写成注释了)。
+  修完在 **CRLF 检出**下重新证伪过三条"不许回来"的闸(`mA`→`Material[]`、`myLinks`→`string[]`、`desert`→窄形状):各红 1 条、还原后 28 项全绿。
+  ⇒ 记这条:**凡是拿正则读源码文本的断言,写的时候就要当场假设检出可能是 CRLF**,别只用 `\n`/`$`;而"not.toMatch 型"的闸门必须**注射一次证明它会红**,否则会一直空转。
 - **剩下的簇(165,重数过)**:按码只剩 `TS2339 149 / TS2322 7 / TS2810 3 / TS2740 2 / TS2345 2 / TS2769 1 / TS2683 1`
   —— 这一刀之后 **TS2554 / TS1345 / TS2349 / TS2365 全部归零**。按文件 `quizgate.js` 16 / `player-physics.js` 14 /
   `minimap.js` 10 / `ark-freeflight-hud.js` 10 / `audio-blip.js` 9 / `player.js` 9 / `scene7-tippler.js` 8 /
