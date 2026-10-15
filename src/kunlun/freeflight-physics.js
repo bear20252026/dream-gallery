@@ -33,10 +33,34 @@ const _euler = new THREE.Euler();
 const _qTmp = new THREE.Quaternion();
 
 /**
+ * 飞行**状态包**里由本模块读写的七个字段。持有者是 ark.js:422 的 `freeFlight`
+ * (它还带 `on`/`lastT`/`boostHold` 这些本模块不碰的字段,传变量进来不触发多余属性检查)。
+ * 单测的 `mkState` 逐字段同形(2026-10-15 第六刀回读核实)。
+ * @typedef {{ pos:THREE.Vector3, quat:THREE.Quaternion, vel:THREE.Vector3,
+ *   pitchRate:number, rollRate:number, energy:number, autoNav:boolean }} FlightState
+ */
+/**
+ * 输入包。`autoNavTarget` **不是** Vector3:唯一生产写入方 ark.js:563 传的是 `DOCK`(字面量
+ * `{x,y,z}`),而本模块只把它交给 `Vector3.copy()` —— 那个 API 收的就是 `{x,y,z}` 结构。
+ * 旧注释写 `Vector3|null` 会让生产调用点变成假错,所以这里按写入方的真实形状声明。
+ * `groundHeightAt` 可选:函数体 `input.groundHeightAt ? … : 0` 写明了可省。
+ * @typedef {{ pitchIn:number, rollIn:number, boostHold:boolean, boostKey:boolean,
+ *   autoNavTarget?:{x:number, y:number, z:number}|null,
+ *   groundHeightAt?:(x:number, z:number)=>number, centerX:number, centerZ:number }} FlightInput
+ */
+/**
+ * 事件标志(经 flags 回传给游戏流程,状态包之外唯一出口)。
+ * @typedef {{ dock:boolean, groundHit:boolean, boundaryHit:boolean }} FlightFlags
+ */
+
+/**
  * 单步飞行积分·原地变异核(生产路径,零分配)。
  * 直接改写传入 state 的 pos/quat/vel/pitchRate/rollRate/energy/autoNav,返回事件标志。
  * 调用方在两次调用之间不得持有对 pos/quat/vel 的旧引用(ark.js 每帧覆写,满足)。
- * @returns {{ dock: boolean, groundHit: boolean, boundaryHit: boolean }} flags
+ * @param {FlightState} s
+ * @param {FlightInput} input
+ * @param {number} dt
+ * @returns {FlightFlags} flags
  */
 export function stepFlightInto(s, input, dt) {
   const P = FLIGHT_PARAMS;
@@ -131,10 +155,10 @@ export function stepFlightInto(s, input, dt) {
  * 单步飞行积分(纯函数,契约与 2026-08-30 版逐位一致)。
  * 克隆输入状态 → 原地核(stepFlightInto) → 返回全新对象;输入 state 不被修改
  * (freeflight-physics.test.js 的「纯函数性」用例钉死此语义)。
- * @param {object} state { pos, quat, vel, pitchRate, rollRate, energy, autoNav }
- * @param {object} input { pitchIn, rollIn, boostHold, boostKey, autoNavTarget(Vector3|null), groundHeightAt(x,z), centerX, centerZ }
+ * @param {FlightState} state { pos, quat, vel, pitchRate, rollRate, energy, autoNav }
+ * @param {FlightInput} input { pitchIn, rollIn, boostHold, boostKey, autoNavTarget, groundHeightAt(x,z), centerX, centerZ }
  * @param {number} dt 秒(已钳制)
- * @returns {{ state, flags: { dock, groundHit, boundaryHit } }} 新状态(全新对象)与事件标志
+ * @returns {{ state: FlightState, flags: FlightFlags }} 新状态(全新对象)与事件标志
  */
 export function stepFlight(state, input, dt) {
   const s = {

@@ -169,10 +169,10 @@ export function hotBegin(name) {
   /**
    * 显式登记一条本轮资源(捕获管不到的场景才需要用它:异步回调里 s.add 的对象、
    * 非主世界的 world.scene.add、DOM/定时器之外的任意副作用)。
-   * @param {object|(()=>void)} obj 场景对象;传函数则等价 bag.custom.push(清理钩子)
-   * @param {{scene?:object, shared?:Set|Array}} [opts] scene=对象所属场景(默认主场景);
-   *   shared=本棵子树里不许释放的共享资源集
-   * @returns {object} 原样返回 obj,便于链式使用
+   * @param {import('three').Object3D|(()=>void)} obj 场景对象;传函数则等价 bag.custom.push(清理钩子)
+   * @param {{scene?:import('three').Object3D, shared?:Set|WeakSet|Array|((res:object, kind:string)=>boolean)|null}} [opts] scene=对象所属场景(默认主场景);
+   *   shared=本棵子树里不许释放的共享资源集,形状**照 disposeObject3D 的 opts.shared**写(谓词那条签名是它的,不是我猜的)
+   * @returns {import('three').Object3D|(()=>void)} 原样返回 obj,便于链式使用
    */
   bag.register = (obj, opts) => {
     if (!obj) return obj;

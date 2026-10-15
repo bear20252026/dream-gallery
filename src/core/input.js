@@ -10,10 +10,10 @@ import { getEventBus } from './event-bus.js';
 
 /**
  * 创建统一输入 facade。
- * @param {object} input 既有 InputManager 实例(通常传 ctx.input)
- */
-/**
- * @param {import('../engine.js').InputManager} input
+ * 类型只写一份:原先这里叠了两个 JSDoc 块(`@param {object}` 在上、`InputManager` 在下),
+ * TS 认紧邻声明的那一块,上面那块**不参与检查**,于是账本里多出一条编译器根本看不见的假债
+ * (2026-10-15 第六刀 `tsc --listFiles` 实测:本文件在检查图内,而这条 `{object}` 一条错都不产)。
+ * @param {import('../engine.js').InputManager} input 既有 InputManager 实例(通常传 ctx.input)
  */
 export function createInputSystem(input) {
   const bus = getEventBus();
