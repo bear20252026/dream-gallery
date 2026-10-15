@@ -9,18 +9,17 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { Z } from '../shared/z-layers.mjs';
 import { SCENE5, tt, whoSpk } from '../shared/story-text.mjs';
-import { ISLAND_R, ISLAND_TOP_K } from '../shared/planet-logic.mjs';
+import { ISLAND_R, ISLAND_TOP_K, PICK_RADIUS, DOOR_RADIUS } from '../shared/planet-logic.mjs';
 import { kingCheckpoint } from '../shared/journey-guidance.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
+import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
 
 let arrivalDone = false; // 本次进 325 的入梦链已启动
 let sceneDone = false; // 全链+拾星完成(章节已推进)
 let pickupArmed = false; // 台词全部收束,星屑可拾
 let starTaken = false; // 星屑已拾(幂等守卫)
 let speakTimer = null; // 心跳守护句柄
-let moteBeacon = null; // 星屑光柱信标(2026-09-26 指引三件套②③):台词链收束后立起,拾取即撤
 let doorArmed = false; // 回程石环已可传送(章节完成后置位;走进石环 3m 即回 B612)
-let doorBeacon = null; // 回程石环光柱信标(storyBeaconDoor):拾星后立起,进门即撤
 // 悬浮箭(2026-09-27 3D 箭头指引):一信标一箭,星屑/石环上空各一支,同立同撤
 let arrowMote = null,
   arrowDoor = null;
@@ -28,7 +27,6 @@ let chapterCached = -1; // 章节快照(-1=未读):tick 每帧读 localStorage �
 let tickN = 0;
 let visit = 0;
 let sunsetVeil = null;
-let observationBeacon = null;
 const OWNER = 'king-memory';
 function later(fn, ms) {
   const ticket = visit;
@@ -109,58 +107,33 @@ function sunsetShow(done) {
   }, 4400);
 }
 
-// —— 光柱信标(零 PointLight 铁律:全 MeshBasicMaterial,fog:false;同 scene3-night 规制) ——
+// —— 光柱信标:建/拆/呼吸都在 shared/beacon-manager.js(零 PointLight 铁律在那儿唯一表达) ——
 // 挂 king325 独立世界场景(岛心原点,星屑在出生点身后偏南,转身才见——光柱远看可见)。
-// name 入参给探针断言用(storyBeaconMote)。
-function makeBeacon(x, z, h, r, opacity, name) {
-  const m = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xffd9a0,
-      transparent: true,
-      opacity: opacity,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      fog: false,
-    })
-  );
-  m.position.set(x, ISLE_TOP_Y + h / 2 + 0.1, z);
-  m.userData.baseOpacity = opacity;
-  m.name = name || 'storyBeacon';
-  return m;
-}
+// 信标 name 是给探针断言用的(storyBeaconMote / storyBeaconDoor),留在这里,不进共享模块。
+const beacons = createBeaconKeeper(() => kingScene());
 function armMoteBeacon() {
-  if (moteBeacon) return;
-  const w = ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('king325') : null;
-  if (!w) return;
-  const mote = w.scene.getObjectByName('sproutMote'); // 坐标单一源(planets.js 摆位)
-  moteBeacon = makeBeacon(
-    mote ? mote.position.x : MOTE_X,
-    mote ? mote.position.z : MOTE_Z,
-    3.0,
-    0.4,
-    0.3,
-    'storyBeaconMote'
-  );
-  w.scene.add(moteBeacon);
+  const sc = kingScene();
+  if (beacons.has('mote') || !sc) return;
+  const mote = sc.getObjectByName('sproutMote'); // 坐标单一源(planets.js 摆位)
+  const m = beacons.arm('mote', () => ({
+    x: mote ? mote.position.x : MOTE_X,
+    z: mote ? mote.position.z : MOTE_Z,
+    baseY: ISLE_TOP_Y,
+    lift: 0.1,
+    h: 3.0,
+    r: 0.4,
+    opacity: 0.3,
+    name: 'storyBeaconMote',
+  }));
   // 悬浮箭:星屑正上方,转身即见"去拾起";拾取同撤
   if (!arrowMote)
-    arrowMote = spawnFloatArrow(
-      w.scene,
-      moteBeacon.position.x,
-      moteBeacon.position.y + 1.5 + 0.9,
-      moteBeacon.position.z,
-      { name: 'guideArrowMote' }
-    );
+    arrowMote = spawnFloatArrow(sc, m.position.x, m.position.y + 1.5 + 0.9, m.position.z, {
+      name: 'guideArrowMote',
+    });
 }
 function removeMoteBeacon() {
-  if (!moteBeacon) return;
-  const w = ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('king325') : null;
-  if (w) w.scene.remove(moteBeacon);
-  moteBeacon.geometry.dispose();
-  moteBeacon.material.dispose();
-  moteBeacon = null;
-  removeFloatArrow(w ? w.scene : null, arrowMote);
+  if (!beacons.remove('mote')) return;
+  removeFloatArrow(kingScene(), arrowMote);
   arrowMote = null;
 }
 
@@ -171,9 +144,8 @@ function kingScene() {
   return w ? w.scene : null;
 }
 function armDoorBeacon() {
-  if (doorBeacon) return;
   const sc = kingScene();
-  if (!sc) return;
+  if (beacons.has('door') || !sc) return;
   const d = sc.getObjectByName('sproutDoor'); // 坐标单一源(planets.js 摆位)
   ctx.ui.journey?.setGoal(OWNER, {
     world: 'king325',
@@ -182,33 +154,25 @@ function armDoorBeacon() {
     zh: '走进石环，回到 B612',
     en: 'Step into the ring, back to B612',
   });
-  doorBeacon = makeBeacon(
-    d ? d.position.x : 0,
-    d ? d.position.z : -3.4,
-    3.4,
-    0.42,
-    0.26,
-    'storyBeaconDoor'
-  );
-  sc.add(doorBeacon);
+  const m = beacons.arm('door', () => ({
+    x: d ? d.position.x : 0,
+    z: d ? d.position.z : -3.4,
+    baseY: ISLE_TOP_Y,
+    lift: 0.1,
+    h: 3.4,
+    r: 0.42,
+    opacity: 0.26,
+    name: 'storyBeaconDoor',
+  }));
   // 悬浮箭:石环正上方,"走进去回 B612";进门同撤
   if (!arrowDoor)
-    arrowDoor = spawnFloatArrow(
-      sc,
-      doorBeacon.position.x,
-      doorBeacon.position.y + 1.7 + 0.9,
-      doorBeacon.position.z,
-      { name: 'guideArrowDoor' }
-    );
+    arrowDoor = spawnFloatArrow(sc, m.position.x, m.position.y + 1.7 + 0.9, m.position.z, {
+      name: 'guideArrowDoor',
+    });
 }
 function removeDoorBeacon() {
-  if (!doorBeacon) return;
-  const sc = kingScene();
-  if (sc) sc.remove(doorBeacon);
-  doorBeacon.geometry.dispose();
-  doorBeacon.material.dispose();
-  doorBeacon = null;
-  removeFloatArrow(sc, arrowDoor);
+  if (!beacons.remove('door')) return;
+  removeFloatArrow(kingScene(), arrowDoor);
   arrowDoor = null;
 }
 function tryDoorTeleport(pl) {
@@ -216,7 +180,7 @@ function tryDoorTeleport(pl) {
   const d = sc && sc.getObjectByName('sproutDoor');
   const dx = pl.p.x - (d ? d.position.x : 0),
     dz = pl.p.z - (d ? d.position.z : -3.4);
-  if (dx * dx + dz * dz >= 9) return false;
+  if (dx * dx + dz * dz >= DOOR_RADIUS * DOOR_RADIUS) return false;
   doorArmed = false;
   removeDoorBeacon(); // 玩家已到:信标完成使命
   const wm = ctx.scene.worldManager;
@@ -246,7 +210,7 @@ function tryPickup(pl, onPick) {
   const m = motePos();
   const dx = pl.p.x - m.x,
     dz = pl.p.z - m.z;
-  if (dx * dx + dz * dz < 9) {
+  if (dx * dx + dz * dz < PICK_RADIUS * PICK_RADIUS) {
     starTaken = true;
     removeMoteBeacon(); // 玩家已到:信标完成使命
     ctx.kunlun.hideSproutMote && ctx.kunlun.hideSproutMote();
@@ -276,11 +240,7 @@ ctx.events.on('world:changed', ({ from, to }) => {
 });
 
 function removeObservationBeacon() {
-  if (!observationBeacon) return;
-  observationBeacon.parent?.remove(observationBeacon);
-  observationBeacon.geometry.dispose();
-  observationBeacon.material.dispose();
-  observationBeacon = null;
+  beacons.remove('observation');
 }
 function runObservation(id, done) {
   const ticket = visit;
@@ -292,11 +252,19 @@ function runObservation(id, done) {
   ctx.ui.journey
     .beginTask(OWNER, id, {
       onTarget(point) {
-        removeObservationBeacon();
+        beacons.remove('observation'); // 观察点是换一个目标就挪一根,不复用旧的
         const sc = kingScene();
         if (!sc) return;
-        observationBeacon = makeBeacon(point.x, point.z, 1.5, 0.3, 0.3, 'kingObservationBeacon');
-        sc.add(observationBeacon);
+        beacons.arm('observation', () => ({
+          x: point.x,
+          z: point.z,
+          baseY: ISLE_TOP_Y,
+          lift: 0.1,
+          h: 1.5,
+          r: 0.3,
+          opacity: 0.3,
+          name: 'kingObservationBeacon',
+        }));
       },
     })
     .then((result) => {
@@ -409,19 +377,11 @@ ctx.onTick(function scene6Tick() {
   if (doorArmed && tryDoorTeleport(ctx.player.pl)) return;
   // 回程信标呼吸(存活期在 sceneDone 之后,须放在早退之前)+ 悬浮箭同拍
   const nowSec = Date.now() * 0.001;
-  if (doorBeacon) {
-    doorBeacon.rotation.y += 0.004;
-    doorBeacon.material.opacity =
-      doorBeacon.userData.baseOpacity * (0.8 + Math.sin(nowSec * 1.9) * 0.25);
-  }
+  pulseBeacon(beacons.get('door'), nowSec);
   if (arrowDoor) tickArrow(arrowDoor, nowSec);
   if (sceneDone) return;
   // 信标呼吸(光柱缓慢旋绕+透明度起伏,与 scene3-night 同律)
-  if (moteBeacon) {
-    moteBeacon.rotation.y += 0.004;
-    moteBeacon.material.opacity =
-      moteBeacon.userData.baseOpacity * (0.8 + Math.sin(nowSec * 1.9) * 0.25);
-  }
+  pulseBeacon(beacons.get('mote'), nowSec);
   if (arrowMote) tickArrow(arrowMote, nowSec);
   // 章节快照:首帧读一次,之后每 30 帧兜底刷新(?storyreset 重开会话=页面重载,自愈)
   tickN = (tickN + 1) % 30;

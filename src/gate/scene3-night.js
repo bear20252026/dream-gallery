@@ -9,6 +9,7 @@ import { ctx } from '../ctx.js';
 import { SCENE3, tt, whoSpk } from '../shared/story-text.mjs';
 import { replyChoices } from '../shared/dialog-replies.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
+import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { DAY_HOURS } from '../shared/dayphase-logic.mjs';
 import { ENDING_GATE_CHAPTER } from '../shared/ending-logic.mjs'; // 结局线门槛(2026-10-03)
@@ -17,9 +18,8 @@ let armed = false;
 let boxProp = null;
 let gateGlow = null;
 let gateGlowTimer = null;
-let boxBeacon = null; // 羊箱光柱信标(2026-09-26 主人报「指引不清晰」):夜里找得到箱子
-let gateBeacon = null; // 石门光柱信标:黑夜里 14m 外的光晕不够醒目,光柱远看可见
-let b612Beacon = null; // 书页一完成后去 B612 的石门信标(2026-09-27 补齐:同一扇门现在通 B612)
+// 光柱信标(2026-09-26 主人报「指引不清晰」):羊箱 / 石门 / 去 B612 各一格,格名即槽位
+// 黑夜里 14m 外的光晕不够醒目,光柱远看可见;建/拆/呼吸全在 shared/beacon-manager.js
 // 悬浮箭(2026-09-27 3D 箭头指引):一信标一箭,光柱管远看,箭管精确落点,同立同撤
 let arrowBox = null,
   arrowGate = null,
@@ -45,33 +45,20 @@ function ground(x, z) {
   return ctx.media && ctx.media.desert && ctx.media.desert.getH ? ctx.media.desert.getH(x, z) : 0;
 }
 
-// —— 光柱信标(零 PointLight 铁律:全 MeshBasicMaterial,fog:false 夜里远处可见) ——
-// name 入参给探针断言用(storyBeaconBox / storyBeaconGate)
-function makeBeacon(x, z, h, r, opacity, name) {
-  const gy = ground(x, z);
-  const m = new THREE.Mesh(
-    new THREE.CylinderGeometry(r * 0.55, r, h, 10, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xffd9a0,
-      transparent: true,
-      opacity: opacity,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      fog: false,
-    })
-  );
-  m.position.set(x, gy + h / 2 + 0.2, z);
-  m.userData.baseOpacity = opacity;
-  m.name = name || 'storyBeacon';
-  ctx.scene.s.add(m);
-  return m;
-}
-function removeBeacon(b) {
-  if (!b) return;
-  ctx.scene.s.remove(b);
-  b.geometry.dispose();
-  b.material.dispose();
-}
+// —— 光柱信标:建/拆/呼吸都在 shared/beacon-manager.js(零 PointLight 铁律在那儿唯一表达)。
+// name 是给探针断言用的(storyBeaconBox / storyBeaconGate / storyBeaconB612),留在本章。
+// 本章光柱立在**主场景**的地形上,底面高度现取 ground(x,z),再抬 0.2 免得与地面共面。
+const beacons = createBeaconKeeper(() => ctx.scene.s);
+const beaconAt = (x, z, h, r, opacity, name) => ({
+  x,
+  z,
+  baseY: ground(x, z),
+  lift: 0.2,
+  h,
+  r,
+  opacity,
+  name,
+});
 
 function armNight() {
   if (armed) return;
@@ -130,7 +117,9 @@ function buildBox() {
   }
   boxProp = box;
   // 信标:光柱指箱子(夜里/远处的「去听听」视觉锚点;玩家开口后即撤)
-  if (!boxBeacon) boxBeacon = makeBeacon(BOX_X, BOX_Z, 2.0, 0.22, 0.22, 'storyBeaconBox');
+  const boxBeacon = beacons.arm('box', () =>
+    beaconAt(BOX_X, BOX_Z, 2.0, 0.22, 0.22, 'storyBeaconBox')
+  );
   // 悬浮箭(2026-09-27):落在光柱顶上空,指精确落点;玩家到箱边同撤
   if (!arrowBox && boxBeacon)
     arrowBox = spawnFloatArrow(ctx.scene.s, BOX_X, boxBeacon.position.y + 1.0 + 0.9, BOX_Z, {
@@ -165,7 +154,11 @@ function armGateGlow() {
   }
   // 行动指引(2026-09-26 主人报「指引不清晰」):台词只说「亮了」,玩家不知道下一步
   // 是走进去 —— toast 直说 + 光柱信标从远处就能看到门在哪
-  gateBeacon = makeBeacon(GATE_X, GATE_Z, 3.4, 0.42, 0.26, 'storyBeaconGate');
+  // 先撤旧格再立:门光可以收掉后重亮(page1 完成时撤过),旧实现直接覆盖会留下一根无主网格
+  beacons.remove('gate');
+  const gateBeacon = beacons.arm('gate', () =>
+    beaconAt(GATE_X, GATE_Z, 3.4, 0.42, 0.26, 'storyBeaconGate')
+  );
   // 悬浮箭(2026-09-27):门洞正上方,走进去即撤
   if (!arrowGate && gateBeacon)
     arrowGate = spawnFloatArrow(ctx.scene.s, GATE_X, gateBeacon.position.y + 1.7 + 0.9, GATE_Z, {
@@ -200,7 +193,7 @@ function armB612() {
   // 旅途卡(2026-10-04 衔接整改):王子说完「你也看见了吗」,翻出「第四夜 · 国王」直接启程;
   // 选「再待一会儿」时,下面的石门光柱照旧指路(同一扇门通 B612)
   ctx.ui.voyage?.offer(1200);
-  if (b612Beacon) {
+  if (beacons.has('b612')) {
     guideB612();
     return;
   }
@@ -210,7 +203,9 @@ function armB612() {
   } catch (e) {
     console.debug('[scene3-night] 石门现身失败(信标指引照常):', e);
   }
-  b612Beacon = makeBeacon(GATE_X, GATE_Z, 3.4, 0.42, 0.26, 'storyBeaconB612');
+  const b612Beacon = beacons.arm('b612', () =>
+    beaconAt(GATE_X, GATE_Z, 3.4, 0.42, 0.26, 'storyBeaconB612')
+  );
   if (!arrowB612 && b612Beacon)
     arrowB612 = spawnFloatArrow(ctx.scene.s, GATE_X, b612Beacon.position.y + 1.7 + 0.9, GATE_Z, {
       name: 'guideArrowB612',
@@ -231,9 +226,7 @@ function guideB612() {
   });
 }
 function removeB612() {
-  if (!b612Beacon) return;
-  removeBeacon(b612Beacon);
-  b612Beacon = null;
+  if (!beacons.remove('b612')) return;
   removeFloatArrow(ctx.scene.s, arrowB612);
   arrowB612 = null;
 }
@@ -288,11 +281,7 @@ ctx.onTick(function scene3NightTick() {
   if ((ctx.scene.activeWorld || 'main') !== 'main') return;
   // 信标呼吸(光柱缓慢旋绕+透明度起伏;夜里远看也像「活的」)+ 悬浮箭浮沉自转(同拍)
   const bt = Date.now() * 0.001;
-  for (const b of [boxBeacon, gateBeacon, b612Beacon]) {
-    if (!b) continue;
-    b.rotation.y += 0.004;
-    b.material.opacity = b.userData.baseOpacity * (0.8 + Math.sin(bt * 1.9) * 0.25);
-  }
+  for (const k of beacons.keys()) pulseBeacon(beacons.get(k), bt);
   for (const a of [arrowBox, arrowGate, arrowB612]) {
     if (!a) continue;
     tickArrow(a, bt);
@@ -312,15 +301,14 @@ ctx.onTick(function scene3NightTick() {
       gateGlow = null;
       clearInterval(gateGlowTimer);
     }
-    removeBeacon(gateBeacon); // 书页一完成:石门指引同样收束
-    gateBeacon = null;
+    beacons.remove('gate'); // 书页一完成:石门指引同样收束
     removeFloatArrow(ctx.scene.s, arrowGate);
     arrowGate = null;
     // exitBridge 说完 → 立 B612 去向指引(同一扇门现在通 B612)
     speakSeq([SCENE3.exitBridge], 0, armB612);
   }
   // 已在去 B612 路上:走进石门 4m 即传送,信标完成使命(portal 也会传,此处只清信标)
-  if (b612Beacon) {
+  if (beacons.has('b612')) {
     try {
       const pl = ctx.player.pl;
       const dx = pl.p.x - GATE_X,
@@ -338,8 +326,7 @@ ctx.onTick(function scene3NightTick() {
     const d = Math.hypot(pl.p.x - boxProp.position.x, pl.p.z - boxProp.position.z);
     if (d < 5.5) {
       countingShown = true;
-      removeBeacon(boxBeacon); // 玩家已到箱边:信标完成使命
-      boxBeacon = null;
+      beacons.remove('box'); // 玩家已到箱边:信标完成使命
       removeFloatArrow(ctx.scene.s, arrowBox);
       arrowBox = null;
       // 数数行 + 轮到玩家开口(REPLIES.night,2026-09-26 主人令「不仅仅是在放台词」):

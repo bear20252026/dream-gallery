@@ -203,33 +203,60 @@ export class SceneManager {
     }
   }
 
-  async enter(id, options = {}) {
+  /**
+   * 世界切换的唯一实现(M-05,2026-10-14:原 enter / enterWithoutPush 两份合并于此)。
+   * back=false:进入新世界并把来源压入返回栈;back=true:回程(back/toMain),不压栈、用调用方给的快照。
+   * 三条对外不变量(每条都有单测钉着):
+   *  ① transitioning 的复位只有这一处(finally)。两份实现里"一份有 try/catch、一份没有"正是锁死的根源:
+   *     旧 enterWithoutPush 直接 await runWarp(...) 且 warpOpts(id)/capture() 都在保护之外,一旦过场自身抛错,
+   *     标志永久为真 ⇒ 7 个拿它当闸门的导航入口(portal/earth-day/late-planets/nav-buttons/star-map/voyage/
+   *     world-travel)与 enter/enterWithoutPush 自己全部从此静默拒绝切换。
+   *  ② 失败一律按 false 返回,不把异常抛给调用方。back()/toMain() 的 `if (!ok)` 还原栈、以及 4 处星球回程
+   *     传送(scene6-king 等)的"未成即重武装门/信标"都只在拿到 false 时才接得到信号;抛出去会被调用方
+   *     自己的 .catch(() => {}) 吞掉 ⇒ 玩家被困外星且零信号。
+   *  ③ 回滚只发生一次。旧 enter 的 commitError 分支里 rollbackEnter 写在 try 内,它自己抛错会被外层 catch
+   *     再接住并**再滚一次** ⇒ 多 pop 一层,把无关的合法历史(如 [main, b])也掏掉。
+   * @param {string} id 目的地世界 id
+   * @param {{ back?: boolean, snapshot?: Record<string, unknown>|null, options?: Record<string, unknown> }} [cfg]
+   */
+  async transition(id, { back = false, snapshot = null, options = {} } = {}) {
     if (this.transitioning || id === this.activeWorld) return false;
     const target = this.getWorld(id);
     const source = this.getWorld();
-    if (!target || !target.loaded) return false;
-    if (ctx.kunlun.flightLock) return false;
+    if (!target || !target.loaded || ctx.kunlun.flightLock) return false;
     this.transitioning = true;
-    const sourceSnapshot = this.capture();
-    const avatarHome = ctx.scene.avatar ? ctx.scene.avatar.parent : null;
-    this.worldStack.push({ id: source.id, snapshot: sourceSnapshot });
+    let sourceSnapshot = null;
+    let avatarHome = null;
     let enteredTarget = false;
-    const commit = async () => {
-      if (source.leave) await source.leave({ from: source, to: target, options });
-      source.camera = sourceSnapshot.camera;
-      source.player = sourceSnapshot.player;
-      const avatar = ctx.scene.avatar;
-      if (avatar && target.root && avatar.parent !== target.root) target.root.add(avatar);
-      this.activeWorld = id;
-      this.syncCtx();
-      if (target.enter) await target.enter({ from: source, to: target, options });
-      enteredTarget = true;
-      if (options.snapshot) this.restore(options.snapshot);
-      else if (options.player) this.restore({ player: options.player, camera: options.camera });
-      eventBus.emit('world:changed', { from: source.id, to: target.id });
-    };
+    let pushedSource = false;
+    let commitError = null;
+    let failure = null;
     try {
-      let commitError = null;
+      sourceSnapshot = this.capture();
+      avatarHome = ctx.scene.avatar ? ctx.scene.avatar.parent : null;
+      if (!back) {
+        this.worldStack.push({ id: source.id, snapshot: sourceSnapshot });
+        pushedSource = true;
+      }
+      const commit = async () => {
+        if (source.leave) await source.leave({ from: source, to: target, options });
+        if (!back) {
+          // 缓存来源世界的相机/玩家状态,供下次再进入它时还原(回程路不缓存:目的地快照本来就是调用方的)
+          source.camera = sourceSnapshot.camera;
+          source.player = sourceSnapshot.player;
+        }
+        // 第三人称角色随世界走(2026-09-06 修复:此前回程那份漏了,返回后第三人称看不到自己)
+        const avatar = ctx.scene.avatar;
+        if (avatar && target.root && avatar.parent !== target.root) target.root.add(avatar);
+        this.activeWorld = id;
+        this.syncCtx();
+        if (target.enter) await target.enter({ from: source, to: target, options });
+        enteredTarget = true;
+        if (back) this.restore(snapshot);
+        else if (options.snapshot) this.restore(options.snapshot);
+        else if (options.player) this.restore({ player: options.player, camera: options.camera });
+        eventBus.emit('world:changed', { from: source.id, to: target.id });
+      };
       await runWarp(
         () =>
           commit().catch((e) => {
@@ -237,33 +264,55 @@ export class SceneManager {
           }),
         warpOpts(id)
       );
-      this.transitioning = false;
-      if (commitError) {
-        console.error('[scene-manager] world enter failed:', source.id, '→', id, commitError);
-        await this.rollbackEnter({
-          source,
-          target,
-          snapshot: sourceSnapshot,
-          avatarHome,
-          enteredTarget,
-          dropStackEntry: true,
-        });
-        return false;
-      }
-      return true;
+      if (commitError) failure = commitError;
     } catch (e) {
+      failure = e;
+    } finally {
       this.transitioning = false;
-      console.error('[scene-manager] world enter failed(过场):', source.id, '→', id, e);
+    }
+    if (!failure) return true;
+    // 三条既有前缀逐字保留(Sentry / 控制台过滤按文本认它们);只有"回程路过场炸"是新的一条
+    if (!back) {
+      console.error(
+        '[scene-manager] world enter failed' + (commitError ? ':' : '(过场):'),
+        source.id,
+        '→',
+        id,
+        failure
+      );
+    } else {
+      console[commitError ? 'warn' : 'error'](
+        '[scene-manager] 世界切换' + (commitError ? '提交' : '过场') + '失败:',
+        source.id,
+        '→',
+        id,
+        failure
+      );
+    }
+    try {
       await this.rollbackEnter({
         source,
         target,
         snapshot: sourceSnapshot,
         avatarHome,
         enteredTarget,
-        dropStackEntry: true,
+        dropStackEntry: pushedSource,
+        options,
       });
-      return false;
+    } catch (e) {
+      console.error(
+        '[scene-manager] 回滚自身失败(刻意不重试:第二次回滚会多掏一层返回栈):',
+        source.id,
+        '→',
+        id,
+        e
+      );
     }
+    return false;
+  }
+
+  async enter(id, options = {}) {
+    return this.transition(id, { options });
   }
 
   /**
@@ -320,50 +369,12 @@ export class SceneManager {
     return ok;
   }
 
+  /**
+   * 回程切换:与 enter 走同一份 transition 核心(M-05 之前是两份近乎重复的实现,
+   * 差异全靠人眼维护 —— 少一份 finally 就是从这里长出来的)。名称保留给 back()/toMain() 与探针。
+   */
   async enterWithoutPush(id, snapshot, options = {}) {
-    if (this.transitioning || id === this.activeWorld) return false;
-    const target = this.getWorld(id);
-    const source = this.getWorld();
-    if (!target || !target.loaded || ctx.kunlun.flightLock) return false;
-    this.transitioning = true;
-    const sourceSnapshot = this.capture();
-    const avatarHome = ctx.scene.avatar ? ctx.scene.avatar.parent : null;
-    let enteredTarget = false;
-    const commit = async () => {
-      if (source.leave) await source.leave({ from: source, to: target, options });
-      // 第三人称角色随世界走:enter() 有这段,enterWithoutPush(返回主世界走此路)此前漏了,
-      // 角色会遗留在原世界场景里,返回后第三人称视角看不到自己(2026-09-06 修复)
-      const avatar = ctx.scene.avatar;
-      if (avatar && target.root && avatar.parent !== target.root) target.root.add(avatar);
-      this.activeWorld = id;
-      this.syncCtx();
-      if (target.enter) await target.enter({ from: source, to: target, options });
-      enteredTarget = true;
-      this.restore(snapshot);
-      eventBus.emit('world:changed', { from: source.id, to: target.id });
-    };
-    // 提交半程失败(leave/enter/restore 抛错)原被 .catch(() => {}) 吞掉:指针可能停在
-    // 半装配状态且调用方(back/toMain)拿到 true 以为成功。现回滚并按 false 返回,
-    // 调用方的"未成"恢复路径(重武装门/信标)才接得到信号(2026-10-09 空 catch 治理)
-    let commitOk = true;
-    await runWarp(
-      () =>
-        commit().catch(async (e) => {
-          commitOk = false;
-          console.warn('[scene-manager] 世界切换提交失败:', source.id, '→', id, e);
-          await this.rollbackEnter({
-            source,
-            target,
-            snapshot: sourceSnapshot,
-            avatarHome,
-            enteredTarget,
-            options,
-          });
-        }),
-      warpOpts(id)
-    );
-    this.transitioning = false;
-    return commitOk;
+    return this.transition(id, { back: true, snapshot, options });
   }
 
   async dispose() {

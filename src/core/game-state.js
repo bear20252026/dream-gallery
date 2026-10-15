@@ -10,6 +10,8 @@ export function createGameState(initial) {
   // 发 `${ns}:changed:${prop}` / `${ns}:changed` 事件——使 gameState.set 成为唯一写入口,
   // 旧读 ctx.<ns>.<prop> 仍经 vault 拿到新值(零回归)。每个命名空间在 state-system.init 里 bindNamespace 注册。
   const nsBindings = {};
+  // M-02 欠账表:prop -> 尚未成功写回的值。apply 抛过错就必须留痕,否则这次写永久丢掉(见 set)。
+  const pendingWrite = new Map();
 
   function notify(key, value, old) {
     listeners.forEach((fn) => {
@@ -21,24 +23,39 @@ export function createGameState(initial) {
     });
   }
 
+  // 写回命名空间(单入口真正"落到 ctx"的那一步)。失败不抛给调用方,但要记欠账等下一次补写。
+  function writeThrough(key, value) {
+    const b = nsBindings[key];
+    if (!b) return true;
+    try {
+      b.apply(key, value);
+      pendingWrite.delete(key);
+      return true;
+    } catch (e) {
+      pendingWrite.set(key, value);
+      console.warn('[game-state] write-through 失败:', key, e.message);
+      return false;
+    }
+  }
+
   return {
     get(key) {
       return state[key];
     },
     set(key, value) {
-      if (state[key] === value) return;
+      // 同值也要补写欠账。这句早返回不能拆(state-system.js 的镜像回写靠它防回环),
+      // 但 M-02 之前的写法让它顺带把失败的写回也钉死了:state[key] 已是新值 ⇒ 同值重设永不再试,
+      // 于是 gameState 说新值、ctx 说旧值,两边各读各的,直到页面刷新。
+      if (state[key] === value) {
+        if (pendingWrite.has(key)) writeThrough(key, value);
+        return;
+      }
       const old = state[key];
       state[key] = value;
+      // 先写回 ctx 再通知:通知期间订阅者里读 ctx.<ns>.<prop> 的旧代码必须已经看得到新值。
+      // 原先 notify 在前,同一次变更给出两个答案(gameState 新、ctx 还旧),订阅方按 ctx 判定就错。
+      writeThrough(key, value);
       notify(key, value, old);
-      // Stage 4 写回:经命名空间 setter 回写 ctx + 发事件(读者零改动)。
-      const b = nsBindings[key];
-      if (b) {
-        try {
-          b.apply(key, value);
-        } catch (e) {
-          console.warn('[game-state] write-through 失败:', key, e.message);
-        }
-      }
     },
     patch(obj) {
       if (!obj) return;
@@ -70,4 +87,3 @@ const gameState = createGameState();
 export function getGameState() {
   return gameState;
 }
-

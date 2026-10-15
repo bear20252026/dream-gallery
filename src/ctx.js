@@ -48,6 +48,9 @@
  * - vidEl/v45El 大屏1号/4·5号视频元素
  * - vidTex/v45Tex 对应视频纹理
  * - vidMesh/v45Mesh 对应视频墙网格(点击播放/暂停)
+ * - mA            背景音乐元素(HTMLAudioElement,audio-manager.js 写入)
+ *   ⚠️原先这行写成「houseMats/mA 房屋材质分组」,把媒体命名空间的 mA 当成了 gallery 的
+ *   houseMats,types/ctx.d.ts 又照抄成 `Material[]` —— 注释与声明一起错(2026-10-15 核实,见该文件)。
  * - bigScreenHold 大屏轮播闸口(三连读未签完=1号原地循环)
  * - kunlunSpeak TTS 统一入口(失败静默;/api/tts 代理)
  * - dayHour       沙漠昼夜时刻(0-24,desert.js 写入)
@@ -68,7 +71,7 @@
  * - zoomOut 画框缩回复位
  * - zG      当前放大的画框(player.js 按 Escape 时读取)
  * - hangOne     挂画(上传后新照换芯空框用)
- * - houseMats/mA 房屋材质分组(housecolor.js 换色用)
+ * - houseMats     房屋可染色材质分组 {wall,base,deco,ceil}(scene.js:913 写入,housecolor.js 换色用)
  *
  * ── 玩家(scene/player.js 写入) ──
  * @property {{p:THREE.Vector3,y:number,pi:number}} pl 玩家状态:位置/偏航/俯仰

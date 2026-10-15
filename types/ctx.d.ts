@@ -20,8 +20,19 @@ import type {
   Mesh,
   Group,
   Material,
+  MeshStandardMaterial,
   Intersection,
 } from 'three';
+// 世界管理器的**真实类**(src/core/scene-manager.js:55 导出)。用 import 类型而不是另写一份
+// interface:2026-10-15 核实,`worldManager?: unknown` 一条声明压着 16 条 TS2339
+// (getWorld 9 / back 4 / transitioning 2 / enter 1),而那些方法**本来就在类上**
+// (registerWorld/enter/back/toMain/transitioning/…) —— 手写接口只会和类各漂各的,
+// 拿类本身当权威则不可能漂。
+// 对照:本文件里其它 `: unknown` 成员(`planeApi/foxApi/scrollLink/audioManager/loopManager`)
+//   仍旧是 unknown,它们的唯一权威是各模块里的对象字面量,没有现成的类型可指。手写一份形状
+//   = 再造一条没人钉的声明,而 `mA: Material[]` 就是这条路的下场(见 MediaNamespace.mA)。
+//   要收它们得连"声明 ≡ 写入方"的钉子一起写,那是独立一批。
+import type { SceneManager } from '../src/core/scene-manager.js';
 
 // ===================== 命名空间类型 =====================
 
@@ -60,7 +71,7 @@ export interface SceneNamespace {
   renderPostProcessing?: () => void;
   resizePostProcessing?: (w: number, h: number) => void;
   activeWorld?: string;
-  worldManager?: unknown;
+  worldManager?: SceneManager;
   worldStack?: unknown[];
   enterWorld?: (id: string, opts?: unknown) => unknown;
   leaveWorld?: (opts?: unknown) => unknown;
@@ -165,7 +176,17 @@ export interface MediaNamespace {
   mpMat: Material;
   guideMesh: Mesh;
   scrollLink: unknown;
-  mA: Material[];
+  /**
+   * 背景音乐元素(HTML5 Audio)。2026-10-15 核实:properties 数组里这一项的**唯一写入方**是
+   * src/scene/media/audio-manager.js:96 `let mA = new Audio()` → :187 `ctx.media.mA = mA`,
+   * 三个读取方(audio-manager.js:174~197、video-wall.js:282、upload.js:229)一律按
+   * HTMLAudioElement 用(.paused / .pause / .play)。原先声明成 `Material[]` 是照抄
+   * src/ctx.js 的人类可读注释「houseMats/mA 房屋材质分组」—— 那行把媒体命名空间的 mA
+   * 和 gallery 的 houseMats 当成同一件事,注释与声明一起错。
+   * checkJs 的 TS2740(audio-manager.js:187「HTMLAudioElement 缺 Material[] 的 29 个成员」)
+   * 正是这条假声明自己报出来的矛盾,不是代码写错。
+   */
+  mA: HTMLAudioElement;
   audioManager: unknown;
   // ↓ 2026-10-14 补齐(同 KunlunNamespace:声明落后于 properties 数组),形状取自真实赋值点。
   /** 启动音视频序列(需用户手势)← src/scene/media/video-wall.js:339 挂 triggerSequence */
@@ -184,10 +205,23 @@ export interface GalleryNamespace {
   zoomIn: (cg: Group) => void;
   zG: Group | null;
   hangOne: (url: string) => void;
-  houseMats: Material[];
+  /**
+   * 房屋可染色材质分组:键 = wall / base / deco / ceil。
+   * 2026-10-15 核实:唯一写入方 src/scene/scene.js:913 挂的是**对象**(:206 建,四组元素
+   * 全是 MeshStandardMaterial,:216 push 墙共享材质、:762 push 屋顶两块),原先声明的
+   * `Material[]` 与之矛盾 ⇒ housecolor.js:55 按组名 `houseMats[g]` 取数组、:121/:125 取
+   * `.wall` 全在报错(那两条 TS2339 是声明的错,不是取法的错)。
+   * 用 Record 而不是四个具名键,因为 housecolor.js 按 GROUPS 表以 string 索引;
+   * 四组的实际键名见 src/scene/scene.js:206 与 src/gate/housecolor.js 的 GROUPS。
+   */
+  houseMats: Record<string, MeshStandardMaterial[]>;
   openHouseColor: () => void;
   /** 审查#10(2026-10-08):墙体 InstancedMesh 化后的挂画墙清单(scene.js 直供)。挂画只依赖 position/rotation.y/userData._half */
-  wallSpecs: { position: { x: number; y: number; z: number }; rotation: { y: number }; userData: { _half: number } }[];
+  wallSpecs: {
+    position: { x: number; y: number; z: number };
+    rotation: { y: number };
+    userData: { _half: number };
+  }[];
 }
 
 export interface ModeNamespace {
@@ -319,8 +353,18 @@ export interface UINamespace {
   dialogOpen: () => boolean;
   cancelDialogScope: (scope: string) => void;
   advanceDialog: () => void;
-  portfolio: { open: () => void; count: () => number; thumb: (id: string) => SVGSVGElement | null } | null;
-  witness: { ask: (id: string, opts?: { target?: number }) => Promise<{ skipped: boolean; value?: string; taps?: number }>; cancel: () => void } | null;
+  portfolio: {
+    open: () => void;
+    count: () => number;
+    thumb: (id: string) => SVGSVGElement | null;
+  } | null;
+  witness: {
+    ask: (
+      id: string,
+      opts?: { target?: number }
+    ) => Promise<{ skipped: boolean; value?: string; taps?: number }>;
+    cancel: () => void;
+  } | null;
   chapterMap: { open: () => void } | null;
   starMap: { open: () => void; close: () => void; isOpen: () => boolean } | null;
   voyage: {

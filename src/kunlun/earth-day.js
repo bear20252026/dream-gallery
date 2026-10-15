@@ -10,6 +10,7 @@ import { ctx } from '../ctx.js';
 import { tt, whoSpk } from '../shared/story-text.mjs';
 import { SCENE10, EARTH_UI } from '../shared/story-text.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
+import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { earthDue, EARTH_STOPS, EARTH_DONE } from '../shared/earth-day-logic.mjs';
@@ -29,8 +30,7 @@ const POS = {
 
 let mode = 'idle'; // idle | walking | talking | fox | done
 let built = false;
-let beacon = null,
-  arrow = null;
+let arrow = null;
 let props = {}; // name → Object3D
 let globe = null;
 let speakTimer = null;
@@ -39,6 +39,8 @@ let started = false;
 function scene() {
   return ctx.scene.worldManager ? ctx.scene.worldManager.getWorld('main').scene : ctx.scene.s;
 }
+// 光柱信标:建/拆/呼吸统一走 shared/beacon-manager.js(零 PointLight 铁律只在那儿写一次)
+const beacons = createBeaconKeeper(scene);
 function gh(x, z) {
   return ctx.media && ctx.media.desert ? ctx.media.desert.getH(x, z) : 0;
 }
@@ -55,7 +57,13 @@ function posOf(key) {
 }
 
 // —— 台词(同 scene7 范式:autoHide 按长度 + 心跳 + spent 幂等) ——
+// M-03:地球之日在沙漠里,但链子此前不问"人还在不在沙漠"。心跳只看 `dialogOpen() === false`,
+// 而离开沙漠时 cancelWorld 关掉对话框同样满足它 ⇒ 下一句会弹在 B612/星球的场景里。
+function inDesert() {
+  return (ctx.scene.activeWorld || 'main') === 'main';
+}
 function speakSeq(seq, i, done) {
+  if (!inDesert()) return;
   if (i >= seq.length) {
     done && done();
     return;
@@ -79,6 +87,7 @@ function speakSeq(seq, i, done) {
   });
   clearTimeout(speakTimer);
   speakTimer = setTimeout(() => {
+    if (!inDesert()) return;
     if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
   }, hold + 2600);
 }
@@ -275,12 +284,7 @@ function loadRealRoses(sc) {
 // —— 指引:光柱 + 悬浮箭 + 罗盘目标 ——
 function clearGuide() {
   const sc = scene();
-  if (beacon) {
-    sc.remove(beacon);
-    beacon.geometry.dispose();
-    beacon.material.dispose();
-    beacon = null;
-  }
+  beacons.remove('guide'); // 光柱:拆几何+材质,按 mesh.parent 摘(旧写法 scene() 取空时会抛)
   if (arrow) removeFloatArrow(sc, arrow);
   arrow = null;
 }
@@ -290,22 +294,17 @@ function guideTo(key) {
   if (!p) return;
   const sc = scene();
   const y = gh(p.x, p.z);
-  beacon = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.24, 0.42, 4, 10, 1, true),
-    new THREE.MeshBasicMaterial({
-      color: 0xffd9a0,
-      transparent: true,
-      opacity: 0.3,
-      side: THREE.DoubleSide,
-      depthWrite: false,
-      fog: false,
-    })
-  );
-  beacon.position.set(p.x, y + 2, p.z);
-  beacon.userData.baseOpacity = 0.3;
-  beacon.name = 'earthBeacon';
-  sc.add(beacon);
-  arrow = spawnFloatArrow(sc, p.x, y + 5, p.z, { name: 'earthArrow' });
+  // 光柱参数与其余各章同源(createBeacon):顶口 = 0.42*0.55 = 0.231(旧这里手写 0.24,差 9mm)
+  const b = beacons.arm('guide', {
+    x: p.x,
+    z: p.z,
+    baseY: y,
+    h: 4,
+    r: 0.42,
+    opacity: 0.3,
+    name: 'earthBeacon',
+  });
+  if (b) arrow = spawnFloatArrow(sc, p.x, y + 5, p.z, { name: 'earthArrow' });
   const label = EARTH_UI.stops[key];
   ctx.ui.journey?.setPhase?.(OWNER, {
     world: 'main',
@@ -419,7 +418,7 @@ export function createEarthDay() {
       acc += dt;
       const t = performance.now() * 0.001;
       if (arrow) tickArrow(arrow, t);
-      if (beacon) beacon.material.opacity = 0.3 * (0.8 + Math.sin(t * 1.9) * 0.25);
+      pulseBeacon(beacons.get('guide'), t); // 呼吸(自转对圆柱本身不可见,与各章同一份实现)
       if (acc < 0.1) return;
       acc = 0;
       const inMain = (ctx.scene.activeWorld || 'main') === 'main';

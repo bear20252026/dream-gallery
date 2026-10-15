@@ -1,0 +1,90 @@
+{
+  "_why": "public/hill 是入库的构建产物且 CI 不重建 ⇒ 这份清单是它与 hill-src 之间唯一的机械联系。重构建后必须重新 record。",
+  "built": {
+    "source": "hill-src/",
+    "command": "cd hill-src && pnpm build",
+    "variant": "solo(默认;HILL_SOLO=0 是可联机的另一变体,不入库)",
+    "packageManager": "pnpm@10.18.0(hill-src/package.json 的 packageManager 字段)",
+    "outDir": "../public/hill(emptyOutDir: true ⇒ 重构建会端掉整目录)",
+    "guard": "node scripts/hill-solo-guard.cjs(CI 读现成产物判定,不重建)",
+    "ciRebuilds": false,
+    "artifactCommit": "29822c073d7171373bbfc754c43598539fc0ebde",
+    "artifactDate": "2026-10-14T03:07:34+08:00",
+    "hillSrcCommit": "29822c073d7171373bbfc754c43598539fc0ebde",
+    "hillSrcDate": "2026-10-14T03:07:34+08:00",
+    "worktreeClean": true,
+    "recordedAt": "2026-10-14T17:17:08Z"
+  },
+  "files": [
+    {
+      "file": "assets/config-C_3XuXU6.js",
+      "bytes": 353112,
+      "sha256": "5d50d354974982295017f2cddb5c64479ca27ff0d2fb42c4ac9b32a5c48f4d06"
+    },
+    {
+      "file": "assets/game-CT5fm31x.js",
+      "bytes": 165272,
+      "sha256": "6f0c8feeb251a663dc1c8f00ac3c71208d2fb92b10657b8133e2a0cb15206503"
+    },
+    {
+      "file": "assets/index-Bt8ddSyq.js",
+      "bytes": 81756,
+      "sha256": "ed692d678f65e5101f0a1577c34e013f9c5d065571a281cfd5c884455d651e0f"
+    },
+    {
+      "file": "assets/index-DmNtlv3l.css",
+      "bytes": 28737,
+      "sha256": "171801685be71db4a52e2d9376c1741653a422169426e711ac11346e5e3a1fd9"
+    },
+    {
+      "file": "assets/physics-C_nInHgz.js",
+      "bytes": 4334730,
+      "sha256": "782fe08c41bd9b16a71333b7a2512de1f8aa319a6550a803e5c03a09ac767bf6"
+    },
+    {
+      "file": "assets/renderer-BHAEoHh0.js",
+      "bytes": 1430,
+      "sha256": "a3abe6ad36f1b2ae860103efee170888da7c346a10ec7140243c1b95ace7099b"
+    },
+    {
+      "file": "assets/three.core-DbUm3LuT.js",
+      "bytes": 218327,
+      "sha256": "613dcad10df4cf408d7c1acf8050c6552f2c2dcbe828447a3ff6a860e7bc9e5f"
+    },
+    {
+      "file": "fonts/Figtree-OFL.txt",
+      "bytes": 4481,
+      "sha256": "3b2cf414f05f46c29e551980d3b99bdf13a0eb00622976ff9ad59e81c8ff988a"
+    },
+    {
+      "file": "fonts/Figtree-VF.subset.woff2",
+      "bytes": 23660,
+      "sha256": "b3976c5969c8b1afd81dc3e314b61d8ffe3f3f58cf40906443105d330e6e0bdf"
+    },
+    {
+      "file": "fonts/NotoSansSC-OFL.txt",
+      "bytes": 4481,
+      "sha256": "e35ffdebb2225b49814c31889cbb3ce69cb3509e6a9f431edaba5e1a6de8cd15"
+    },
+    {
+      "file": "fonts/NotoSansSC-VF.subset.woff2",
+      "bytes": 1869368,
+      "sha256": "38f4c5f927f746b3dfa4c3a5d7edf0b7a3e828e27438418fa54f9e1565289412"
+    },
+    {
+      "file": "fonts/Sora-OFL.txt",
+      "bytes": 4478,
+      "sha256": "fdd8dfd9b77fc1b71917ba0b8c6f86152f8daa96f4b51a5f41391b4ebf5dc322"
+    },
+    {
+      "file": "fonts/Sora-VF.subset.woff2",
+      "bytes": 41696,
+      "sha256": "438fbf4582548e76b266a738f2c11bcbd5137978f2d2e2f3aaabd49df69186f2"
+    },
+    {
+      "file": "index.html",
+      "bytes": 1355,
+      "sha256": "39d7b1c74d4be3d6eef8479dc1b075bf155545c0238af113cd549cf0274bcf9e"
+    }
+  ]
+}

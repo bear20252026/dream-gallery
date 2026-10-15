@@ -41,7 +41,10 @@ export function chapterList() {
     id: 'earth',
     world: 'main',
     title: { zh: '书页八 · 地球之日', en: 'Page VIII · a day on Earth' },
-    note: { zh: '蛇、花、回声、玫瑰园、狐狸', en: 'The snake, a flower, an echo, the roses, the fox' },
+    note: {
+      zh: '蛇、花、回声、玫瑰园、狐狸',
+      en: 'The snake, a flower, an echo, the roses, the fox',
+    },
     done: earthDone,
     ready: (f) => endingReady(f),
   });
@@ -155,14 +158,62 @@ export function decodeSave(code) {
   }
 }
 
-/** 把解析好的存档写回 store(调用方随后刷新页面) */
+/**
+ * 把解析好的存档写回 store(调用方随后刷新页面)。
+ *
+ * 存档码是玩家手上唯一的进度副本,而 localStorage 会真的写不进去(隐私模式、配额满、被策略禁用)。
+ * 此前这里的写失败被整个吞掉:调用方照样 `location.reload()`,于是"载入成功"地展示一份**缺了几项**
+ * 的进度 —— 而载入路径又是在覆盖旧存档,玩家看不出丢了什么,也回不去。所以必须逐字段回报。
+ *
+ * 判定只认**严格 `=== false`**:storeApi 的 setNum/setStr/setJson 透传的是"这次落盘成没成",
+ * 但别处(含单测里的 fakeStore)的 setter 常把赋值表达式的值当返回值 —— `setNum(k, 0)` 返回 0、
+ * `unmark` 返回 `delete` 的布尔。用 `!ok` 判失败会把"正常写入了一个假值"当成写失败。
+ *
+ * @param {object} store
+ * @param {Object<string, *>} data decodeSave 或快照里的字段值
+ * @returns {{ok: boolean, failed: string[]}} failed = 没能落盘的 SAVE_FIELDS 键名
+ */
 export function applySave(store, data) {
+  const failed = [];
   for (const [k, type] of Object.entries(SAVE_FIELDS)) {
     if (!(k in data)) continue;
     const v = data[k];
-    if (type === 'flag') v ? store.mark(k) : store.unmark(k);
-    else if (type === 'num') store.setNum(k, v);
-    else if (type === 'str') store.setStr(k, v);
-    else if (v != null) store.setJson(k, v);
+    let ok;
+    if (type === 'flag') ok = v ? store.mark(k) : store.unmark(k);
+    else if (type === 'num') ok = store.setNum(k, v);
+    else if (type === 'str') ok = store.setStr(k, v);
+    else if (v != null) ok = store.setJson(k, v);
+    if (ok === false) failed.push(k);
   }
+  return { ok: failed.length === 0, failed };
+}
+
+/**
+ * 「载入这份存档码」的完整落盘顺序(纯逻辑,单测钉死;UI 只按 action 决定刷不刷、说什么)。
+ *
+ * 顺序里每一步都会真的失败(localStorage 配额满 / 隐私模式 / 被策略禁用),而 M-04 之前的写法
+ * 把失败全吞了还照旧 `location.reload()`,于是"覆盖当前进度"这种不可逆操作以一句"载入成功"收场:
+ *   ① 快照存不下 ⇒ **停手,一个字段都不写**。没有这份快照就没有「撤销上一次载入」,
+ *      而导错码等于把玩家几个月的进度直接冲掉,冲完还看不出发生过。
+ *   ② 快照存好了才覆盖字段;有项没落盘 ⇒ 不 reload。缺项的新进度立刻刷页会把提示一起冲走,
+ *      停下来说清楚,玩家才能自己选「重开看看实际存下了什么」还是「撤销退回载入前」。
+ *
+ * @returns {{action: 'noBackup'|'partial'|'reload', failed: string[]}}
+ */
+export function importSave(store, data) {
+  const snap = { at: Date.now(), data: collectSave(store) };
+  if (store.setJson('saveBackup', snap) === false) return { action: 'noBackup', failed: [] };
+  const { failed } = applySave(store, data);
+  return { action: failed.length ? 'partial' : 'reload', failed };
+}
+
+/**
+ * 「撤销上一次载入」:把快照写回。
+ * 只有**全部存下**才清掉 saveBackup —— 撤到一半就清快照,等于把唯一的重试依据也删了。
+ * @returns {{action: 'partial'|'reload', failed: string[]}}
+ */
+export function restoreSave(store, backup) {
+  const { failed } = applySave(store, (backup && backup.data) || {});
+  if (!failed.length) store.setJson('saveBackup', null);
+  return { action: failed.length ? 'partial' : 'reload', failed };
 }

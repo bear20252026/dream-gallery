@@ -9,8 +9,10 @@ export const B612_SPAWN = { pos: [-1.5, 2, -8.5], yaw: Math.PI }; // 天幕壳�
 export const GATE_POS = { x: 0.1, z: 56.0 }; // 主世界石门位置
 export const GATE_RADIUS = 4; // 主世界石门自动传送半径(m)
 export const PAD_RADIUS = 3; // 石台触发半径(m)
-export const DOOR_RADIUS = 2.5; // 岛上回程门半径(m)
-export const PICK_RADIUS = 3; // 星屑拾取半径(m)
+export const DOOR_RADIUS = 3; // 岛上回程石环传送半径(m) —— scene6/7 三份 tryDoorTeleport + late-planets 同判据
+// (2026-10-15 包C 核实:原写 2.5 且**无人引用**,四章实判一律 3m、AGENTS.md 也记的「走进石环 3m 即回」;
+//  现把常量改成现实值并由四章 import,半径不再是每章各写一个 9)
+export const PICK_RADIUS = 3; // 星屑拾取半径(m) —— 325 血泪(2026-09-27):星屑须摆在出生点 3m 圈外,改这个数要连带挪坐标
 export const kingSpawnY = () => ISLAND_R * ISLAND_TOP_K + 1.6; // 星球岛面站立高度
 
 /* ===================== 六星章节数据(key 与 spirits SPIRITS 同序同键) ===================== */
@@ -131,7 +133,14 @@ export function spawnFor(targetWorld) {
       onGround: true,
       gliding: false,
     };
-  return { position: { x: 0, y: 2, z: 12 }, yaw: 0, pitch: 0, vy: 0, onGround: true, gliding: false };
+  return {
+    position: { x: 0, y: 2, z: 12 },
+    yaw: 0,
+    pitch: 0,
+    vy: 0,
+    onGround: true,
+    gliding: false,
+  };
 }
 export function kingSpawnPoint() {
   return { x: 0, y: kingSpawnY(), z: 4, yaw: 0, pitch: 0, vy: 0, onGround: true, gliding: false };

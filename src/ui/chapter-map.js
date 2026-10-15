@@ -14,8 +14,8 @@ import {
   canTravel,
   encodeSave,
   decodeSave,
-  applySave,
-  collectSave,
+  importSave,
+  restoreSave,
 } from '../shared/chapter-map-logic.mjs';
 
 const TEXT = {
@@ -56,6 +56,19 @@ const TEXT = {
     en: 'Returns your progress to what it was **before** that save code, then reopens the game. Tap again to confirm.',
   },
   undoSure: { zh: '确定,撤销', en: 'Yes, undo' },
+  // —— M-04(第六轮审计):写失败必须说出来,不能"载入成功"地少存几项 ——
+  noBackup: {
+    zh: '这个浏览器存不下备份(存储已满或被禁用)。没有备份,载入出错就回不去了,已停止载入。',
+    en: 'This browser could not store a backup (storage is full or disabled). Without a backup a wrong load cannot be undone, so nothing was loaded.',
+  },
+  partial: {
+    zh: '有 N 项存档没能存下(存储已满或被禁用)。重新打开游戏看到的是实际存下的进度;想退回载入前,点「撤销上一次载入」。',
+    en: 'N save field(s) could not be written (storage is full or disabled). Reopening the game shows what actually saved; to go back, use Undo last load.',
+  },
+  undoFail: {
+    zh: '存档没能写回这个浏览器(存储已满或被禁用)。载入前的快照还在,可以再点一次重试。',
+    en: 'The save could not be written back to this browser (storage is full or disabled). The snapshot from before the load is still there - tap again to retry.',
+  },
   close: { zh: '合上', en: 'Close' },
   busy: {
     zh: '先把眼前这段对话或动作完成,再出发。',
@@ -197,8 +210,15 @@ export function createChapterMap() {
           return;
         }
         // 快照存的是**字段值本身**,不经 decodeSave ⇒ 不会被它的钳位(str 截 40、num 夹 0-99)改写
-        applySave(ctx.store, backup.data);
-        ctx.store.setJson('saveBackup', null); // 一次性:撤完就清,防连点把刚恢复的进度又换掉
+        const r = restoreSave(ctx.store, backup);
+        if (r.action === 'partial') {
+          // 撤到一半就 reload = 把"实际存下了什么"藏起来;快照也没清,清了就再没有重试的依据
+          console.warn('[chapter-map] 撤销未能落盘:', r.failed.join(', '));
+          undo.dataset.armed = '';
+          undo.textContent = tt(TEXT.undo) + ' · ' + when; // 标签复原(带日期那版)
+          msg.textContent = tt(TEXT.undoFail);
+          return;
+        }
         location.reload();
       };
     }
@@ -241,10 +261,21 @@ export function createChapterMap() {
         apply.textContent = tt(TEXT.applySure);
         return;
       }
-      // 落盘前先给当前进度拍一份快照:这一句是"撤销上一次载入"唯一的数据来源。
-      // 顺序不能反 —— applySave 会把旧值覆盖掉,之后再 collectSave 拿到的就是新存档了。
-      ctx.store.setJson('saveBackup', { at: Date.now(), data: collectSave(ctx.store) });
-      applySave(ctx.store, data);
+      // 顺序(先快照、后覆盖、只有全落盘才 reload)在 shared/chapter-map-logic.mjs 的 importSave 里,单测钉死
+      const r = importSave(ctx.store, data);
+      if (r.action === 'noBackup') {
+        apply.dataset.armed = '';
+        apply.textContent = tt(TEXT.apply);
+        msg.textContent = tt(TEXT.noBackup);
+        return;
+      }
+      if (r.action === 'partial') {
+        console.warn('[chapter-map] 载入未能全部落盘:', r.failed.join(', '));
+        apply.dataset.armed = '';
+        apply.textContent = tt(TEXT.apply);
+        msg.textContent = tt(TEXT.partial).replace('N', String(r.failed.length));
+        return; // 不 reload:提示会被刷掉,而这份缺项进度要玩家自己决定重开还是撤销
+      }
       location.reload();
     };
   }

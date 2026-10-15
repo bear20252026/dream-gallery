@@ -6,8 +6,9 @@
 //
 // 三条设计约束(都是这个仓库的血泪):
 //  ① 顺序即依赖:严格按 list 的先后加载,不并发(后台链内部保持原相对顺序);
-//  ② 搁置规则单一源:`isShelved` 由 shared/legacy.mjs 提供,别在这里再写一遍标签判断;
+//  ② 搁置规则单一源:`isShelved` 由 shared/legacy.mjs 提供(它按 entry.id 判),别在这里再写一遍判定;
 //  ③ **fatal 链失败要如实抛出**,但结论先写进返回值对应的状态里,别让"抛了"变成"什么都没发生"。
+// 条目形状 `{ id, label, load }`:label 只进显示与 `__worldPhase` 字符串,id 才是身份。
 export async function runChain(list, opts = {}) {
   const {
     tag = '链',
@@ -17,15 +18,17 @@ export async function runChain(list, opts = {}) {
     onPhase = () => {},
     onFail = () => {},
   } = opts;
-  if (typeof load !== 'function') throw new Error('[world-chain] 缺少 load(label, thunk)');
+  if (typeof load !== 'function') throw new Error('[world-chain] 缺少 load(entry)');
   const res = { tag, status: 'ready', loaded: [], failed: [], skipped: [] };
   for (const entry of list) {
-    const label = entry[0];
-    const thunk = entry[1];
-    if (isShelved(entry)) { res.skipped.push(label); continue; }
+    const label = entry.label;
+    if (isShelved(entry)) {
+      res.skipped.push(label);
+      continue;
+    }
     try {
       onPhase(tag + ':' + label, entry);
-      await load(label, thunk);
+      await load(entry);
       res.loaded.push(label);
     } catch (e) {
       res.failed.push(label);
