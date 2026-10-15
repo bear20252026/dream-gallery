@@ -97,6 +97,15 @@ ctx.mode.openUpload = function () {
   toggleUpPanel(true);
 }; // ⚙ 设置二级页入口
 const $ = (id) => document.getElementById(id);
+/**
+ * 面板模板里那三个输入框(见本文件 :60 `#file` / :65 `#lkName` / :66 `#lkUrl`)。
+ * `$()` 只能推出 HTMLElement,而 `.files` 只在 HTMLInputElement 上、`.value` 同理 ⇒
+ * 与其在 7 个读写点各写一遍内联 cast(仓库别处的写法),不如在这里取**一次**带类型的引用:
+ * 元素由本文件自己的 markup 创建,类型可比别处更确定,读数点也更难漂。
+ */
+const fileInput = /** @type {HTMLInputElement} */ ($('file'));
+const lkNameInput = /** @type {HTMLInputElement} */ ($('lkName'));
+const lkUrlInput = /** @type {HTMLInputElement} */ ($('lkUrl'));
 $('tabPhoto').onclick = () => {
   $('tabPhoto').classList.add('on');
   $('tabLink').classList.remove('on');
@@ -109,10 +118,10 @@ $('tabLink').onclick = () => {
   $('paneLink').style.display = 'block';
   $('panePhoto').style.display = 'none';
 };
-$('drop').onclick = () => $('file').click();
+$('drop').onclick = () => fileInput.click();
 let picked = null;
-$('file').onchange = () => {
-  picked = $('file').files[0] || null;
+fileInput.onchange = () => {
+  picked = fileInput.files[0] || null;
   if (picked) {
     const isVid = isVideo(picked.name, picked.type);
     const max = maxBytes(isVid);
@@ -222,7 +231,13 @@ function playUploadHint(onEnd) {
         if (onEnd) onEnd();
       };
       const pauseOthers = () => {
-        const all = new Set(document.querySelectorAll('video,audio'));
+        // 这一族全是 HTMLMediaElement(标签选的 video/audio + 各模块持有的媒体元素),下面
+        // `.paused`/`.pause()` 要的是媒体元素。⚠️这里**不能**写 `querySelectorAll<HTMLMediaElement>(…)`:
+        // .js 文件里 `<` 会被当成类型断言/小于号读(TS2365「Operator '<' cannot be applied」),
+        // 泛型实参只在 .ts/.mts 里可用 —— 只能按仓库惯例走 JSDoc cast。
+        const all = new Set(
+          /** @type {NodeListOf<HTMLMediaElement>} */ (document.querySelectorAll('video,audio'))
+        );
         [
           ctx.media.vidEl,
           ctx.media.v45El,
@@ -436,8 +451,8 @@ let pickedModel = 'sphere';
     const b = document.createElement('button');
     b.textContent = n;
     b.onclick = () => {
-      $('lkName').value = n;
-      $('lkUrl').value = u;
+      lkNameInput.value = n;
+      lkUrlInput.value = u;
     };
     pw.appendChild(b);
   }
@@ -456,8 +471,8 @@ let pickedModel = 'sphere';
   });
 }
 $('doLk').onclick = async () => {
-  const name = $('lkName').value.trim(),
-    url = $('lkUrl').value.trim();
+  const name = lkNameInput.value.trim(),
+    url = lkUrlInput.value.trim();
   if (!name || !/^https?:\/\//i.test(url)) {
     prog('名称和 http(s) 链接都要填对');
     return;
@@ -481,8 +496,8 @@ $('doLk').onclick = async () => {
     if (!r.ok) throw new Error(d.error || '失败');
     prog('你召来了一件凡间的造物。B612收下了。');
     ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('你召来了一件凡间的造物。B612收下了。');
-    $('lkName').value = '';
-    $('lkUrl').value = '';
+    lkNameInput.value = '';
+    lkUrlInput.value = '';
     if (ctx.mode.refreshMode) await ctx.mode.refreshMode();
     renderMyLinks();
     guideTo(pos);
@@ -511,7 +526,11 @@ async function renderMyLinks() {
         )
         .join('')
     : '<div style="font-size:11px;opacity:.5">还没有自己的链接</div>';
-  myLinkListEl.querySelectorAll('button[data-i]').forEach((b) => {
+  // 这些删除钮由上面那段模板亲手生成(`<button data-i="…">`),所以按 HTMLButtonElement 取。
+  // ⚠️同样不能写成 `querySelectorAll<HTMLButtonElement>(…)`:见上一处关于 .js 里泛型实参的说明。
+  /** @type {NodeListOf<HTMLButtonElement>} */
+  const delBtns = myLinkListEl.querySelectorAll('button[data-i]');
+  delBtns.forEach((b) => {
     b.onclick = async () => {
       const l = list[+b.dataset.i];
       b.disabled = true;

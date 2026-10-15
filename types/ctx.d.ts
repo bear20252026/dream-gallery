@@ -245,7 +245,15 @@ export interface GalleryNamespace {
   /** 画框飞入放大 ← src/gallery/painting-zoom.js:20(挂点 paintings.js:657) */
   zoomIn: (cg: Group) => void;
   zG: Group | null;
-  hangOne: (url: string) => void;
+  /**
+   * 挂一幅画并返回那个画框 Group。**唯一写入方 `src/gallery/paintings.js:309`,三个参数**:
+   * `(mU 路径, caption 配文, aura 气质归类或 null)`;返回 `hangOn()`/`takeoverEmpty()` 建出的 `Group`
+   * (后者只在拿到空框时返回,拿不到就走前者新建 ⇒ 不会返回 null)。
+   * ⚠️原先声明成 `(url: string) => void`:参数少两个 ⇒ 调用方 `upload.js:395` 报 TS2554,
+   * 返回写成 void ⇒ 紧接着 `upload.js:399` 读 `g.userData.ox/oy/oz`(路标起点)报 3 条 TS2339。
+   * 那四条都是声明的错:`ctx.mode.myUploads.push(name)` 之后立刻要靠这个 Group 拉金色路标。
+   */
+  hangOne: (url: string, caption: string, aura: string | null) => Group;
   /**
    * 房屋可染色材质分组:键 = wall / base / deco / ceil。
    * 2026-10-15 核实:唯一写入方 src/scene/scene.js:913 挂的是**对象**(:206 建,四组元素
@@ -265,12 +273,42 @@ export interface GalleryNamespace {
   }[];
 }
 
+/**
+ * 访客自己的链接 —— **唯一写入方 = 服务端裁剪**:`lib/siteconfig.js:89`
+ * `.map(l => ({ id, name, url, model, pos }))`(客户端只可能收到这五个键,`aid/dk/ts` 不下发)。
+ * `pos` 的形状取同文件 `:209`:`{x,y,z}|null`(数字,不是数组)。
+ * ⚠️原先这里写的是 `string[]` —— 那是**比运行时窄**的假声明:消费方 `mode.js:325` 读 `l.pos.x`、
+ * `upload.js:508` 读 `l.name`、`:523` 读 `l.id`,三条 TS2339 报的是声明的错,不是取法的错。
+ * 钉子:`src/__tests__/types-link-contract.test.js`(声明成员集合 ≡ 服务端 map 出来的键集合)。
+ */
+export interface MyLinkItem {
+  id: string;
+  name: string;
+  url: string;
+  model: string;
+  pos: { x: number; y: number; z: number } | null;
+}
+
+/**
+ * 后台配置的展示区链接 —— **唯一写入方 = `lib/siteconfig.js:96`**
+ * `.map(l => ({ id, name, url, icon, model }))`;四个字符串由 `POST /api/admin/links` 一律
+ * `String(...).trim()` 生成(同文件 `:148-154`),`icon` 可能是空串(空=挂模型而非原图案)。
+ * 消费者:`mode.js:106/313`(`l.icon` 真值判定)、`linkSigOf`(`l.model || 'sphere'`)。
+ */
+export interface CustomLinkItem {
+  id: string;
+  name: string;
+  url: string;
+  icon: string;
+  model: string;
+}
+
 export interface ModeNamespace {
   siteMode: 'normal' | 'special';
   demoPhotos: string[];
   myUploads: string[];
-  myLinks: string[];
-  customLinks: string[];
+  myLinks: MyLinkItem[];
+  customLinks: CustomLinkItem[];
   myUploadTokens: Record<string, string>;
   myCaptions: Record<string, string>;
   applyPaintMode: () => void;
@@ -299,7 +337,15 @@ export interface KunlunNamespace {
   arkTeleportToPeak: () => void;
   letgoRecall: () => void;
   peakVidEl: HTMLVideoElement | null;
-  flyAudio: unknown;
+  /**
+   * 飞舟/山峰背景音乐元素。**唯一写入方 `src/kunlun/peaks.js:49 const flyAudio = new Audio(...)`
+   * → `:50 ctx.kunlun.flyAudio = flyAudio`**(那行的注释就写着"上传提示音需要暂停它")。
+   * 原先是 `unknown` ⇒ 消费者 `upload.js:233` 把它塞进媒体 Set 时报 "unknown 不能赋给 Element",
+   * 紧接着 `:236/:237` 的 `.paused`/`.pause()` 全部落在 Element 上而报错。
+   * 留 `| null`:peaks.js 是后台链模块,上传面板可能先于它装配,而 `upload.js` 那边本来就是
+   * `if (m) all.add(m)` 带守卫的写法。
+   */
+  flyAudio: HTMLAudioElement | null;
   spiritsGot: () => number;
   isDone: () => boolean;
   spiritMark: () => { x: number; z: number } | null;
