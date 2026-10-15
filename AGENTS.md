@@ -288,6 +288,16 @@ CI 无任何 prettier 步骤),package.json 那 90 个 CR 是本地签出的 CRLF
   ③`afterAll` 改成先 `await saveGateData()` 排干再删目录(顺序收口,不靠运气)。
 - **反向验证**:把 `note()` 里那次落盘注释掉 ⇒ `AssertionError: expected +0 to be 2005` 恰好红这一条;
   还原后 10/10。全量复跑:**落盘告警 0 行**、vitest 1086 项 / 97 文件、checkJs 258 = 基线、eslint / tsc / depcruise 全 0。
+- **上线与线上功能证据(PR #24 → merge `0c3ee9a`,`DEPLOY_OK 0c3ee9a`)**:1 个后端文件上传后 md5 一致、
+  首页 200、`/healthz uptime 69`、漂移 **OK 200 DRIFT 0 MISSING 0**。
+  ⚠️**光看这些还不能说"改的那行被执行过"** —— 重启后 `geo` 读数 `header:0`,意思是还没有**真正过闸门**的请求走到
+  `note()`(那 10 次 `noProxy` 全是服务器自己 curl 本机)。于是补了一次真过闸的线上动作再读:
+  `BASE_URL=prod b612-prod-worlds`(六条断言全绿,第 ④ 段仍是那条已知旧红)之后
+  `geo = {"header":1,"noHeader":0,"noProxy":10,"local":0,"overwritten":12,"entries":799,"source":"cloudflare-cf-ipcountry","outbound":false}`
+  ⇒ `header 0→1`、entries 798→799、`outbound:false` 不变、pm2 日志 120 行内 `is not a function / ReferenceError / TypeError / Unhandled / 保存未完全` **0 行**。
+  这条"读数从 0 变 1"才是 `store.saveGateData()` 现取写法在生产上跑通的正证;只读 healthz/漂移会把它当成已验。
+- 顺带一条运维口径:服务器上那个后台令牌的环境变量名是 **`TOKEN`**(不是 `ADMIN_TOKEN`)——
+  `.env` 用 `set -a; . /opt/gallery/.env` 读入后走 `x-token` 头,**令牌值一律不打印**,只打印响应的键名与计数。
 
 
 ### 第六轮还没动的部分(已排期)
