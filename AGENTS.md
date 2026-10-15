@@ -383,6 +383,63 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
 
 
 
+## 2026-10-15 checkJs 第五刀:再收 45 条(210 → 165),这一族的病名是「参数表说谎」
+
+第四刀收的是"成员清单与写入方不一致",这一刀收的是**函数形状**:声明写 `() => void`,实现收 1~2 个参数、
+有的返回 boolean、拆场景时还被置成 null。后果按**站点**计 —— 每个「先判存在再调用」的消费点同时吃两条错
+(TS2554 参数数 + TS1345「void 不能测真值」),`eternalKeepOut` 一条声明就咬住 7 个文件 14 条。
+
+- **归因(逐条相加 = 45,与观测降幅一致)**:`eternalKeepOut` 15(消费点 14 + 写入方 eternal.js:29 那条 TS2322)、
+  `modeToast` 10(9 个调用点 + mode.js:40 写入方)、`letgoRecall` 3、`eternalClick` 2、`linkGuard` 2、
+  `kintsugiOn` 3、`spiritsState` + 它的装饰器 3、`bell` 的 JSDoc 3、`canvasTexture` 的 draw 1、
+  `fillRect` 多传的第 5 参 1、`SKY_MS` 元组 1、`portal.js` 的 `padBtn.onclick()` 1。
+  ⚠️这次的归因**不是**跑 16 轮 tsc 回退换来的,而是把改前/改后两份**全集**做集合差
+  (`sed -E 's/\(([0-9]+),([0-9]+)\)//'` 去掉行列号后 `comm -23`),消失的 45 条每条都能按
+  「文件 + 错误码 + 消息」指回一个改动。这条路比逐条回退便宜一个数量级,且天然不会重复计数 ——
+  代价是它只能证明"消失的这些条归谁",不能证明"没有新长出来的"(所以**必须同时做反向 comm 看新增**,
+  本刀新增只有 1 条,就是装饰器那条,已连根修掉)。
+- ⚠️**`kintsugiOn: boolean` 是从同名局部变量抄来的**:`src/scene/kintsugi.js:36` 有一句
+  `let kintsugiOn = false`(那是模块内部的开关),而 ctx 上挂的是 `scene.js:769 setupKintsugi(...)` 的返回值
+  (`kintsugi.js` 走到末尾 `return enableKintsugi`)。**同名不同物** ⇒ 查声明时"按名字找变量"会找错地方,
+  只有按"ctx 上这个成员的赋值行"找才找得到。这类错的症状是消费者 TS2349「This expression is not callable」。
+- ⚠️**装饰器的 JSDoc 也会说谎**:`story-progress.mjs` 的 `decorateSpiritsState` 把入参写成
+  `Array<{name,en,place}>`,比它实际透传的记录窄(它只覆盖这三个字段,其余原样带过去),
+  于是返回值跟着掉字段 ⇒ 包装方 `planets.js:861` 赋不进 `() => SpiritItem[]`。改成 `@template {Object} T` +
+  `@returns {T[]}`,「装饰不吞字段」这件事从此由类型保证,而不是由注释保证。
+- ⚠️**有两类错在调用点,不在声明**,修法是把多传的那个删掉,而不是把声明放宽去迁就它:
+  `paintings.js:595 ctx.mode.linkGuard(linkKey, cg)`(实现只有一个形参,`cg` 是死参数)、
+  `mode.js:226 cx.fillRect(8, 8, 240, 80, 16)`(把上一行 `roundRect` 的圆角半径抄进了 `fillRect`,
+  第 5 个实参没人收 —— 运行期无害,语义上是写错了)。
+- **新增 14 条钉子**(该文件 14 → **28 项**):八条按表逐个核「声明参数个数 ≡ 写入方形参个数」
+  (写入方三种写法都认:`= function (…)` / `= (…) =>` / `= 具名函数`,第三种回到同文件的定义去数)、
+  一条核「可空性 ≡ 文件里有没有 `= null`」(两边都由源码裁决,单向 `toContain` 挡不住)、
+  一条核"返回真值的三个成员不再被声明成 void"、一条核"没有任何 `modeToast` 调用点传得比声明多"
+  (自己写了个从 `(` 扫到配对 `)` 的数参数器,先剥 `//` 注释)、一条核 `kintsugiOn`、
+  一条核 `SpiritItem` 成员集合 ≡ `spirits.js` 的 `SPIRITS.map` 字面量键(六个:`color emotion en name place state`),
+  以及**一条类级别闸门**:全仓任何声明为 `() => void` 的 ctx 成员,只要写入方用直接函数/箭头写法收了参数就红
+  (标识符转发与 `Object.assign` 那种写法它看不住,由各自的逐条钉子负责)。
+- ⚠️**证伪脚本第一轮 10 条注入里有 2 条根本没注射进去**:①跨行锚点在 CRLF 检出的文件里恒不命中
+  (又是这条坑,`\r?\n` 只解决了切分、没解决 `includes` 锚点);②我把 `modeToast('B612谢过你。')` 记成了
+  `spirit-page.js`,实际在 `sky-progress.js:191`。两条都在**脚本自己的结论**里露出来了
+  (`找不到锚点 ⇒ 这条没测成`),补做后 10/10 打红、还原后 28 项全绿。⇒ 结论:**注入脚本必须把"锚点没命中"
+  和"钉子没红"当成两种不同的失败打印出来**,否则"0 红"又会变成"没测到"。
+- 门禁:eslint 0 / `tsc --noEmit` 0 / depcruise 0 违规 / **checkJs 165 = 新基线** / vitest **1107 项 / 97 文件** /
+  `npm run build` 0 且三条构建断言照旧(46 prefetch / 入口不含 three / 产物无 importmap)。
+  prettier:我改的文件里三个原本合排、现在仍合排;另外三个(`audio-blip.js`/`story-progress.mjs`/`sky-progress.js`)
+  **HEAD 本来就不合排**(实测过才这么说),按 `.prettierignore` 头部那条"只排版新写/正在改的文件"的口径
+  **没有顺手重排**,免得 45 条类型修复混进 12 行无关排版差异。
+- ⚠️本刀动了 `portal.js`(抽出命名函数)、`paintings.js`(删死参)、`mode.js`(fillRect 参数)**运行期源码** ⇒ 要重新构建并部署。
+- **剩下的簇(165,重数过)**:按码只剩 `TS2339 149 / TS2322 7 / TS2810 3 / TS2740 2 / TS2345 2 / TS2769 1 / TS2683 1`
+  —— 这一刀之后 **TS2554 / TS1345 / TS2349 / TS2365 全部归零**。按文件 `quizgate.js` 16 / `player-physics.js` 14 /
+  `minimap.js` 10 / `ark-freeflight-hud.js` 10 / `audio-blip.js` 9 / `player.js` 9 / `scene7-tippler.js` 8 /
+  `dialog-voice.mjs` 8;按类 `value` on HTMLElement 10、`style` on Element 9、`message` on unknown 9、
+  `material` on Object3D 9、`onclick` on Element 8、`width` on HTMLElement 6、`dataset` on Element 5
+  ⇒ 下一刀两条路:**DOM 那一族**(45 条,要做的是把 `el()`/`querySelector` 的结果收成带类型的助手,是小而实的重构)、
+  **`{object}` 选项包那一族**(audio-blip.js 9 条,一个 `@typedef` 就能收完,顺带能治 player-physics 的 pitch/gy/onGround)。
+  `audioManager` 那条"声明 ≡ 写入方"的钉子仍按上一刀的规矩单独一批做。
+
+
+
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
 
 审计方只读源码、未跑测试,并明确「不把此前已修复的问题重复计为缺陷」。6 条工程断言逐条回读后:**4 条成立(其中 1 条比审计说得更严重)、2 条部分成立、1 条误报**;素材版权与译本授权两条按主人指示不处理。

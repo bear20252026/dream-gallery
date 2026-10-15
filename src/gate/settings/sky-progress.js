@@ -12,6 +12,9 @@ function skyVal() {
 }
 
 // 里程碑 11 档:屏幕中央大字 3 秒 + TTS 旁白(每档只触发一次);100% 后出选择对话框
+// 写成元组而不是让 TS 自己推:推出来是整个数组共享 `string | number`,于是
+// `checkSkyMs` 里 `v >= m`(:202)报 TS2365「number 与 string|number 不能比」。
+/** @type {Array<[number, string, string]>} */
 const SKY_MS = [
   [5, '第一道裂痕的边缘，亮起了微光。', '第一道裂痕的边缘，亮起了微光。B612等这一刻，等了很久。'],
   [10, '天穹记住了你的声音。', '天穹记住了你的声音。你答对的每一道题，都在为它缝上第一针。'],
@@ -149,7 +152,9 @@ const SKY_LINES = [
 function showMs(big, tts, isFull) {
   const d = document.createElement('div');
   d.style.cssText =
-    'position:fixed;inset:0;z-index:' + Z.veilFx + ';display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
+    'position:fixed;inset:0;z-index:' +
+    Z.veilFx +
+    ';display:flex;align-items:center;justify-content:center;pointer-events:none;opacity:0;transition:opacity .5s';
   const inner = document.createElement('div');
   inner.style.cssText =
     'max-width:86vw;text-align:center;font-size:clamp(20px,5vw,34px);letter-spacing:3px;color:#ffe9c4;text-shadow:0 0 30px rgba(255,200,100,.6),0 2px 12px rgba(0,0,0,.8);line-height:1.8';
@@ -174,7 +179,9 @@ function skyFullDialog() {
   const d = document.createElement('div');
   d.id = 'skyFullDlg';
   d.style.cssText =
-    'position:fixed;inset:0;z-index:' + Z.veilLock + ';display:flex;align-items:center;justify-content:center;background:rgba(12,6,12,.55)';
+    'position:fixed;inset:0;z-index:' +
+    Z.veilLock +
+    ';display:flex;align-items:center;justify-content:center;background:rgba(12,6,12,.55)';
   d.innerHTML =
     '<div style="background:linear-gradient(160deg,rgba(38,22,34,.98),rgba(24,14,26,.98));border:1px solid rgba(255,214,170,.4);border-radius:18px;padding:24px 26px;text-align:center;color:#ffe9c4;max-width:88vw">' +
     '<div style="font-size:15px;letter-spacing:2px;line-height:2;margin-bottom:14px">天穹已合。接下来，你想——</div>' +
@@ -322,7 +329,9 @@ function drawSky() {
 const skyOv = document.createElement('div');
 skyOv.id = 'skyOv';
 skyOv.style.cssText =
-  'position:fixed;inset:0;z-index:'+Z.skyProgress+';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+  'position:fixed;inset:0;z-index:' +
+  Z.skyProgress +
+  ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
 const skyCard = document.createElement('div');
 skyCard.style.cssText =
   'width:min(380px,92vw);max-height:82vh;overflow-y:auto;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;text-align:center;box-shadow:0 24px 80px rgba(0,0,0,.55)';

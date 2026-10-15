@@ -173,9 +173,15 @@ export function storyNext(flags) {
 /**
  * 罗盘页(spiritsState)装饰:前 PLANETS.length 项覆盖 name/en,并给已点亮章节
  * 的 place 追加「 · 已点亮」。原数组不动(返回新对象)。
- * @param {Array<{name:string,en:string,place:string}>} arr prevSpiritsState() 结果
+ * ⚠️这里原先把 arr 写成 `Array<{name,en,place}>` —— 比实际**窄**:它只覆盖那三个字段,
+ * 其余字段(emotion/color/state)原样带过去,可声明一窄,返回值就跟着掉那三个字段,
+ * 于是包装方 `planets.js:861 ctx.kunlun.spiritsState = function () {…}` 赋不进
+ * `() => SpiritItem[]`(TS2322)。改成模板:进出同一个 T,装饰不吞字段这件事由类型保证。
+ * @template {Object} T
+ * @param {?T[]} arr prevSpiritsState() 结果(null → 空数组)
  * @param {Array<{name:string,en:string,place:string}>} planets PLANETS(与 SPIRITS 同序)
  * @param {number} chapter 当前章节
+ * @returns {T[]}
  */
 export function decorateSpiritsState(arr, planets, chapter) {
   return (arr || []).map(function (st, i) {

@@ -223,7 +223,7 @@ function makeLabel(text, sub, color) {
       cx.beginPath();
       cx.roundRect(8, 8, 240, 80, 16);
       cx.fill();
-    } else cx.fillRect(8, 8, 240, 80, 16);
+    } else cx.fillRect(8, 8, 240, 80); // 旧浏览器没有 roundRect:退化成直角(第 5 个实参 fillRect 收不到,也无需)
     cx.fillStyle = color || '#ffffff';
     cx.font = 'bold 28px Arial';
     cx.textAlign = 'center';

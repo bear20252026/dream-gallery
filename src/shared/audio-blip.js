@@ -45,7 +45,14 @@ export function tone({ freq, gain, delay = 0, decay = 1.4, dest, audioCtx }) {
 export function chime(base, o = {}) {
   const decay = o.decay || 1.4;
   tone({ freq: base, gain: o.peak || 0.2, decay, dest: o.dest, audioCtx: o.audioCtx });
-  tone({ freq: base * 2, gain: o.peak || 0.2, delay: o.delay2 !== undefined ? o.delay2 : 0.12, decay, dest: o.dest, audioCtx: o.audioCtx });
+  tone({
+    freq: base * 2,
+    gain: o.peak || 0.2,
+    delay: o.delay2 !== undefined ? o.delay2 : 0.12,
+    decay,
+    dest: o.dest,
+    audioCtx: o.audioCtx,
+  });
 }
 
 /**
@@ -53,6 +60,8 @@ export function chime(base, o = {}) {
  * @param {number} f    基音频率
  * @param {number} g    基音增益
  * @param {number} dur  衰减时长 s
+ * @param {AudioNode} [dest]     空间音频输出节点(finale/peaks 之外的空间化调用方用;多数站点只传前 3 个)
+ * @param {AudioContext} [audioCtx] 上述节点所属 context
  */
 export function bell(f, g, dur, dest, audioCtx) {
   tone({ freq: f, gain: g, decay: dur, dest, audioCtx });
@@ -67,7 +76,8 @@ export function bell(f, g, dur, dest, audioCtx) {
  */
 export function windChime(delay, dest, audioCtx) {
   [523.25, 1046.5, 1569.8].forEach((f, k) =>
-    tone({ freq: f, gain: [0.2, 0.09, 0.045][k], delay: delay || 0, decay: 2.5, dest, audioCtx }));
+    tone({ freq: f, gain: [0.2, 0.09, 0.045][k], delay: delay || 0, decay: 2.5, dest, audioCtx })
+  );
 }
 
 /**

@@ -236,6 +236,231 @@ describe('2026-10-15 第四刀:链接契约与 hangOne ≡ 服务端 / paintings
   });
 });
 
+describe('2026-10-15 第五刀:被写成 `() => void` 的成员,参数表 ≡ 写入方', () => {
+  // 这一簇不是"形状窄了",是**参数表**在说谎:声明收 0 个参数、返回 void,实现收 1~2 个、返回 boolean,
+  // 而拆场景时还会把成员置成 null。后果按站点计:每个"先判存在再调用"的消费点同时吃两条错
+  // (TS2554 参数数 + TS1345「void 不能测真值」),`eternalKeepOut` 一条声明咬住 7 个文件 14 条,
+  // `modeToast` 一条咬住 9 个文件 9 条,写入方自己还要各报一条 TS2322(实现赋不进声明)。
+  // 所以这里钉三件事:参数个数、能不能返回真值、会不会被置 null —— 全部从写入方取。
+  const TABLE = [
+    ['KunlunNamespace', 'eternalKeepOut', 'src/kunlun/eternal.js'],
+    ['KunlunNamespace', 'eternalClick', 'src/kunlun/eternal.js'],
+    ['KunlunNamespace', 'eternalTeleport', 'src/kunlun/eternal.js'],
+    ['KunlunNamespace', 'eternalWelcome', 'src/kunlun/eternal.js'],
+    ['KunlunNamespace', 'arkTeleportToPeak', 'src/kunlun/ark.js'],
+    ['KunlunNamespace', 'letgoRecall', 'src/kunlun/letgo.js'],
+    ['ModeNamespace', 'linkGuard', 'src/gallery/mode.js'],
+    ['UINamespace', 'modeToast', 'src/gallery/mode.js'],
+  ];
+
+  /**
+   * 从写入方那一行取形参个数。三种写法都要能吃:
+   *   `ctx.kunlun.X = function (x, z) {`(eternalKeepOut / eternalClick / letgoRecall)
+   *   `ctx.ui.X = (msg, duration) => {`(modeToast)
+   *   `ctx.kunlun.X = teleport;`(eternalTeleport / eternalWelcome:同文件里找到那个具名函数再数)
+   * 返回 null 表示这条锚点没认出来 —— 调用方会直接把测试判失败,不会"静默通过"。
+   */
+  function writerArity(file, ns, member) {
+    const src = read(file);
+    const direct = src.match(
+      new RegExp(
+        'ctx\\.' +
+          ns +
+          '\\.' +
+          member +
+          '\\s*=\\s*(?:function\\s*\\(([^)]*)\\)|\\(([^)]*)\\)\\s*=>)'
+      )
+    );
+    if (direct) {
+      const p = (direct[1] ?? direct[2] ?? '').trim();
+      return p === '' ? 0 : p.split(',').length;
+    }
+    const ref = src.match(
+      new RegExp('ctx\\.' + ns + '\\.' + member + '\\s*=\\s*([A-Za-z_$][\\w$]*)\\s*;')
+    );
+    if (!ref) return null;
+    const fn = src.match(new RegExp('function\\s+' + ref[1] + '\\s*\\(([^)]*)\\)'));
+    if (!fn) return null;
+    const p = fn[1].trim();
+    return p === '' ? 0 : p.split(',').length;
+  }
+
+  /** 声明里函数形状的形参个数:`((x: number, z: number) => boolean) | null` → 2,`() => void` → 0 */
+  function declaredArity(decl) {
+    const m = decl.match(/\(\s*([^()]*)\)\s*=>/);
+    if (!m) throw new Error('声明不是函数形状,这条钉子要跟着改: ' + decl);
+    return m[1].trim() === '' ? 0 : m[1].split(',').length;
+  }
+
+  for (const [ns, member, file] of TABLE) {
+    it(`${member} 的声明参数个数 ≡ ${file} 写入方的形参个数`, () => {
+      const decl = memberLine(ns, member);
+      expect(decl, `types/ctx.d.ts 里找不到 ${ns}.${member}`).not.toBe(null);
+      const wrote = writerArity(file, ns.replace(/Namespace$/, '').toLowerCase(), member);
+      expect(wrote, `${file} 里认不出 ctx.${ns}.${member} 的写入方写法`).not.toBe(null);
+      expect(declaredArity(decl)).toBe(wrote);
+      // 写入方收参数 ⇒ 声明绝不能还是 `() => void`(那正是本刀消掉的那条谎)
+      if (wrote > 0) expect(decl).not.toMatch(/^(\(\) => void)( \| null)?$/);
+    });
+  }
+
+  it('可空性 ≡ 拆场路径:会被置 null 的成员必须声明成 | null', () => {
+    // 恒等式两边都由源码决定:左边是"文件里有没有 `ctx.ns.m = null`",右边是"声明有没有 | null"。
+    // 少一边就是漏 —— 有 `| null` 而没人置 null,等于宣布了一个运行期不存在的态;
+    // 反过来(本刀之前)置了 null 却没声明,消费者那句 `if (ctx.kunlun.eternalKeepOut)` 就成了无根据的守卫。
+    const NULLABLE = [
+      ['src/kunlun/eternal.js', 'eternalClick', true],
+      ['src/kunlun/eternal.js', 'eternalTeleport', true],
+      ['src/kunlun/eternal.js', 'eternalWelcome', true],
+      ['src/kunlun/eternal.js', 'eternalKeepOut', true],
+      ['src/kunlun/ark.js', 'arkTeleportToPeak', true],
+      ['src/kunlun/letgo.js', 'letgoRecall', true],
+      ['src/gallery/mode.js', 'linkGuard', false],
+      ['src/gallery/mode.js', 'modeToast', false],
+    ];
+    for (const [file, member, isNull] of NULLABLE) {
+      const ns = TABLE.find((t) => t[1] === member)[0];
+      const assignsNull = new RegExp('ctx\\.\\w+\\.' + member + '\\s*=\\s*null\\b').test(
+        read(file)
+      );
+      expect(assignsNull, `${file} 里 ${member} 的置 null 情况变了(钉子要跟着改)`).toBe(isNull);
+      const decl = memberLine(ns, member);
+      expect(decl.endsWith('| null'), `${member} 的声明可空性不对: ${decl}`).toBe(isNull);
+    }
+  });
+
+  it('返回真值的三个成员不再被声明成 void', () => {
+    // 这三个的返回值就是它们的用途:消费者靠它决定"要不要继续往下走"。
+    // 写成 void 之后,TS 认为 `if (ctx.kunlun.eternalKeepOut(...))` 是在测一个 void —— 报 TS1345,
+    // 而下一个人会以为"这行代码有问题",实际代码是对的。
+    for (const m of ['eternalKeepOut', 'letgoRecall'])
+      expect(memberLine('KunlunNamespace', m)).toMatch(/\) => boolean\)/);
+    expect(memberLine('ModeNamespace', 'linkGuard')).toBe('(linkKey: string) => boolean');
+    const pj = read('src/gallery/paintings.js');
+    expect(pj).toMatch(/if \(ctx\.mode\.linkGuard && ctx\.mode\.linkGuard\(linkKey\)\) return;/);
+    // 死参数不许靠"把声明改成两个参数"来消错:实现只有一个形参
+    expect(read('src/gallery/mode.js')).toMatch(/function linkGuard\(linkKey\) \{/);
+    expect(read('src/kunlun/eternal.js')).toMatch(
+      /ctx\.kunlun\.eternalKeepOut = function \(x, z\) \{\r?\n {2}return inHall\(x, z\);/
+    );
+  });
+
+  it('modeToast 的每个调用点传的实参个数不超过声明', () => {
+    // 声明从 1 参修成 2 参(可选)之后,这条钉的是**另一边**:以后谁加第三个实参,
+    // 要么先改写入方,要么先改声明,不能悄悄多传。
+    const decl = memberLine('UINamespace', 'modeToast');
+    expect(decl).toBe('(msg: string, duration?: number) => void');
+    const arity = declaredArity(decl);
+    const bad = [];
+    for (const rel of fs
+      .readdirSync(path.join(ROOT, 'src'), { recursive: true })
+      .filter((f) => typeof f === 'string' && /\.(js|mjs)$/.test(f))
+      .map((f) => String(f).replace(/\\/g, '/'))
+      .filter((f) => !f.startsWith('__tests__/'))) {
+      const code = read(path.join('src', rel)).replace(/^[ \t]*\/\/.*$/gm, '');
+      const re = /\.modeToast\s*\(/g;
+      let m;
+      while ((m = re.exec(code))) {
+        const n = countArgs(code, re.lastIndex);
+        if (n > arity)
+          bad.push(`${rel}:${code.slice(0, m.index).split(/\r?\n/).length} 传了 ${n} 个`);
+      }
+    }
+    expect(bad, '这些调用点传得比 modeToast 的声明还多').toEqual([]);
+  });
+
+  /** 从 `(` 之后扫到配对的 `)`,数顶层逗号(空参算 0) */
+  function countArgs(src, openAt) {
+    let depth = 1;
+    let i = openAt;
+    let commas = 0;
+    let seen = false;
+    while (i < src.length && depth > 0) {
+      const c = src[i];
+      if ('([{'.includes(c)) depth++;
+      else if (')]}'.includes(c)) depth--;
+      else if (depth === 1 && c === ',') commas++;
+      if (depth > 0 && c !== ' ' && c !== '\n' && c !== '\t' && c !== ')' && c !== ',') seen = true;
+      i++;
+    }
+    return seen ? commas + 1 : 0;
+  }
+
+  it('kintsugiOn 是函数,不是布尔(写入方 return 的是 enableKintsugi)', () => {
+    expect(memberLine('SceneNamespace', 'kintsugiOn')).toBe('() => void');
+    const sc = read('src/scene/scene.js');
+    expect(sc).toMatch(/ctx\.scene\.kintsugiOn = setupKintsugi\(/);
+    const k = read('src/scene/kintsugi.js');
+    expect(k).toMatch(/function enableKintsugi\(\)/);
+    expect(k).toMatch(/return enableKintsugi;/);
+    expect(DTS).not.toMatch(/^ {2}kintsugiOn: boolean;$/m);
+  });
+
+  it('SpiritItem 的成员集合 ≡ spirits.js 里 SPIRITS.map 交出去的键', () => {
+    expect(memberLine('KunlunNamespace', 'spiritsState')).toBe('() => SpiritItem[]');
+    expect(DTS).not.toMatch(/^ {2}spiritsState: unknown\[\];$/m);
+    const sp = read('src/kunlun/spirits.js');
+    const m = sp.match(
+      /function spiritsState\(\)[\s\S]{0,600}?return SPIRITS\.map\(\(sp, i\) => \(\{([\s\S]*?)\}\)\);/
+    );
+    expect(m, 'spirits.js 里 function spiritsState() 的写法变了,这条钉子要跟着改').not.toBe(null);
+    const wrote = m[1]
+      .split(/\r?\n/)
+      .map((l) => l.match(/^ {4}([A-Za-z_$][\w$]*)\s*:/))
+      .filter(Boolean)
+      .map((x) => x[1])
+      .sort();
+    expect(wrote).toEqual(['color', 'emotion', 'en', 'name', 'place', 'state']);
+    expect(ifaceMembers('SpiritItem').sort()).toEqual(wrote);
+    // 星球岛那版是**再包一层**,装饰器必须原样带过其余字段(@template),否则返回值只剩 name/en/place,
+    // 赋不进 `() => SpiritItem[]`(planets.js:861 的 TS2322 就是这么来的)。
+    const st = read('src/shared/story-progress.mjs');
+    expect(st).toMatch(/@template \{Object\} T/);
+    expect(st).toMatch(/@param \{\?T\[\]\} arr/);
+    expect(st).toMatch(/@returns \{T\[\]\}/);
+  });
+
+  it('全仓不许再出现"声明 () => void 而写入方收参数"的成员(防这一类重新长回来)', () => {
+    // 这一条是本刀的闸门:上面那些是逐个人的钉子,这条是**类**的钉子。
+    // 只认直接赋函数/箭头的写法(`ctx.ns.X = function (a…)` / `= (a…) =>`),
+    // 标识符转发与 Object.assign 那种写法这里看不住,由各自的逐条钉子负责。
+    const offenders = [];
+    const nsOf = {};
+    let curIface = '';
+    for (const line of DTS.split(/\r?\n/)) {
+      const head = line.match(/^export interface ([A-Za-z_$][\w$]*)/);
+      if (head) {
+        curIface = head[1];
+        continue;
+      }
+      const m = line.match(/^ {2}([A-Za-z_$][\w$]*)[*?]?:\s*\(\(\) => void\)( \| null)?;$/);
+      if (m && curIface) nsOf[m[1]] = curIface;
+    }
+    for (const rel of fs
+      .readdirSync(path.join(ROOT, 'src'), { recursive: true })
+      .filter((f) => typeof f === 'string' && /\.(js|mjs)$/.test(f))
+      .map((f) => String(f).replace(/\\/g, '/'))
+      .filter((f) => !f.startsWith('__tests__/'))) {
+      const src = read(path.join('src', rel));
+      const re =
+        /ctx\.(\w+)\.([A-Za-z_$][\w$]*)\s*=\s*(?:function\s*\(([^)]*)\)|\(([^)]*)\)\s*=>)/g;
+      let m;
+      while ((m = re.exec(src))) {
+        const [, nsKey, member, p1, p2] = m;
+        const iface = nsOf[member];
+        if (!iface) continue;
+        const p = (p1 ?? p2 ?? '').trim();
+        const n = p === '' ? 0 : p.split(',').length;
+        const wantNs = iface.replace(/Namespace$/, '').toLowerCase();
+        // 命名空间也要对上:同名成员挂在别的 ns 上不冤枉它
+        if (n > 0 && wantNs === nsKey)
+          offenders.push(`${iface}.${member} ← ${rel}(写入方 ${n} 个形参)`);
+      }
+    }
+    expect(offenders, '这些成员被声明成 () => void,但写入方收参数').toEqual([]);
+  });
+});
+
 describe('video-wall.js 的 playVideo 句柄有类型可用(注释级,不动运行期)', () => {
   const vw = read('src/scene/media/video-wall.js');
 
