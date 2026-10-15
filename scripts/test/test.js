@@ -5,9 +5,25 @@
 
 const { spawn } = require('child_process');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..', '..');
+// 数据根隔离(2026-10-15,与 security-fix-probe 的 H1 修复同一规矩):整份 gate 数据挪进临时目录。
+// 原先只备份/恢复 gate_data.json,而 2026-09-18 起 SQLite 才是主持久层 ⇒ 四个临时实例真正写的是仓库根
+// gate_data.db,JSON 恢复了 DB 没恢复;下次启动按 _savedAt 仲裁还会认那份被测试污染的 DB。
+// SQLITE_PATH 由 lib/store.js:19 从 DATA_FILE 派生,跟着进临时目录,不必单独设。
+// 目录名固定、**开跑先扫**:收尾那次 rmSync 常常删不掉——父进程自己(require lib/quiz → lib/store)
+// 还握着 gate_data.db 的句柄(store.js:20 的 close 挂在 process.on('exit'),在 rmSync 之后才跑),
+// Windows 上是 EPERM。用固定名 + 下次启动先清,累积就被封顶了(每次跑都换新名的话会一轮留一个)。
+const DATA_DIR = path.join(os.tmpdir(), 'dg-testjs-data');
+try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch (e) { /* 上一轮的句柄可能还没放 */ }
+fs.mkdirSync(DATA_DIR, { recursive: true });
+const ISOLATED_DATA_FILE = path.join(DATA_DIR, 'gate_data.json');
+// ⚠️ 光给子进程打 env 不够:本文件第 18 行 require('../../lib/quiz.js'),而 lib/quiz.js:10 就 require
+// ./store ⇒ **测试进程自己**一加载就把仓库根 gate_data.json/.db 当数据根打开(SQLITE_ENABLED 时
+// lib/store.js:20 立刻 initDb)。所以必须先把 process.env 指向临时目录,再 require 任何 lib。
+process.env.GATE_DATA_FILE = ISOLATED_DATA_FILE;
 const { QUIZ_PASS_SCORE } = require('../../lib/quiz.js'); // 分数线单一源:测试判定跟随服务端常量,不再单独硬编码
 let passed = 0, failed = 0;
 const children = [];
@@ -22,7 +38,7 @@ function startServer(port, extraEnv = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['server.js'], {
       cwd: ROOT,
-      env: { ...process.env, PORT: String(port), ...extraEnv },
+      env: { ...process.env, PORT: String(port), GATE_DATA_FILE: ISOLATED_DATA_FILE, ...extraEnv },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
     children.push(child);
@@ -508,13 +524,8 @@ async function testQuiz(base) {
 }
 
 (async () => {
-  // 数据隔离:备份并恢复 gate_data.json,防止本地数据(含真实访客)污染断言
-  const GATE_FILE = path.join(ROOT, 'gate_data.json');
-  const GATE_BAK = GATE_FILE + '.testbak';
-  let hadGate = false;
-  try {
-    if (fs.existsSync(GATE_FILE)) { fs.copyFileSync(GATE_FILE, GATE_BAK); hadGate = true; }
-  } catch (e) {}
+  // 数据隔离:整份 gate 数据在临时目录里跑,仓库根一个字节都不动。
+  // 旧写法是备份/恢复 gate_data.json——SQLite 成为主层(2026-09-18)后那等于只恢复了一半。
   try {
     await testData();
     const base1 = await startServer(3210);
@@ -532,11 +543,7 @@ async function testQuiz(base) {
     console.error('\n测试执行异常: ' + e.message + ' | cause: ' + ((e.cause && (e.cause.code || e.cause.message)) || '无'));
   } finally {
     children.forEach(c => c.kill());
-    try {
-      if (hadGate) fs.copyFileSync(GATE_BAK, GATE_FILE);
-      else if (fs.existsSync(GATE_FILE)) fs.unlinkSync(GATE_FILE);
-      if (fs.existsSync(GATE_BAK)) fs.unlinkSync(GATE_BAK);
-    } catch (e) {}
+    try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch (e) { /* 临时目录清不掉不影响结论 */ }
   }
   console.log(`\n结果: ${passed} 通过, ${failed} 失败`);
   process.exit(failed ? 1 : 0);

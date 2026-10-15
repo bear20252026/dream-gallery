@@ -3,15 +3,20 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { chromium } = require('playwright-core');
 
 const ROOT = path.join(__dirname, '..', '..');
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n); } };
 
+// 数据根隔离(2026-10-15):不打 GATE_DATA_FILE,临时服务器就按 lib/store.js:9/19 的默认值写仓库根
+// gate_data.json + gate_data.db(保留期清扫"启动先跑一次",实测 1 秒内落盘)。
+const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'spirit-hud-probe-'));
+
 (async () => {
   const server = spawn(process.execPath, ['server.js'], {
-    cwd: ROOT, env: { ...process.env, PORT: '3216' }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: ROOT, env: { ...process.env, PORT: '3216', GATE_DATA_FILE: path.join(DATA_DIR, 'gate_data.json') }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise(r => server.stdout.on('data', d => d.toString().includes('服务器已启动') && r()));
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -72,5 +77,6 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   await browser.close();
   server.kill();
+  try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch { /* 临时目录清不掉不影响结论 */ }
   process.exit(fail ? 1 : 0);
 })();

@@ -8,11 +8,20 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const { chromium, devices } = require('playwright-core');
 
 const ROOT = path.join(__dirname, '..', '..');
 let passed = 0, failed = 0;
 const children = [];
+// 数据根隔离(2026-10-15,与 test.js / security-fix-probe 同一规矩):临时服务器一启动就会往
+// lib/store.js:9/19 默认指的仓库根 gate_data.json + gate_data.db 写(保留期清扫"启动先跑一次"),
+// 而本文件只是渲染验收,不该动真实数据。
+// 目录名固定 + 开跑先扫:被 kill 的服务器释放 SQLite 句柄有延迟,收尾 rmSync 在 Windows 上常 EPERM;
+// 固定名让上一轮的残留变成这一轮的清理,而不是每跑一次留一个目录。
+const DATA_DIR = path.join(os.tmpdir(), 'dg-testmobile-data');
+try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch (_) { /* 上一轮的句柄可能还没放 */ }
+fs.mkdirSync(DATA_DIR, { recursive: true });
 function ok(cond, name) {
   if (cond) { passed++; console.log('  ✓ ' + name); }
   else { failed++; console.error('  ✗ ' + name); }
@@ -21,7 +30,7 @@ function ok(cond, name) {
 function startServer(port) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['server.js'], {
-      cwd: ROOT, env: { ...process.env, PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: ROOT, env: { ...process.env, PORT: String(port), GATE_DATA_FILE: path.join(DATA_DIR, 'gate_data.json') }, stdio: ['ignore', 'pipe', 'pipe'],
     });
     children.push(child);
     child.stdout.on('data', d => { if (d.toString().includes('服务器已启动')) resolve(`http://localhost:${port}`); });
@@ -120,10 +129,12 @@ function startServer(port) {
 
   await browser.close();
   children.forEach(c => c.kill());
+  try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch (_) { /* 临时目录清不掉不影响结论 */ }
   console.log(`\n结果: ${passed} 通过, ${failed} 失败`);
   process.exit(failed ? 1 : 0);
 })().catch(e => {
   children.forEach(c => { try { c.kill(); } catch (_) {} });
+  try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch (_) {}
   console.error('测试执行失败:', e);
   process.exit(1);
 });

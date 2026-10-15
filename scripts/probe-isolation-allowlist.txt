@@ -1,0 +1,14 @@
+# 自起 server.js 但不隔离数据根的脚本 —— 由 scripts/admin/probe-isolation-guard.cjs 强制核对
+# 一行一个路径(相对仓库根),# 之后是**为什么允许它这么干**。加一条等于欠一条:这里的每一项都该在
+# 下一次碰到该文件时顺手补掉,清单只许缩短。**新的自起服务器脚本一律要隔离,不许往这里加。**
+#
+# 以下全部是 README(scripts/probe/README.md「一次性/陈旧探针」段落)已声明不在验收路径上的脚本:
+# 都不在 npm test、也不在 ADMIN_GUIDE「上线前必跑」清单里,跑之前请先看 scripts/probe/README.md。
+scripts/probe/probe-fix4.js            # 2026-08 上传修复一次性验证;自己直写 gate_data 种子,加隔离要连种子路径一起改
+scripts/probe/probe-hint.js            # 同上,一次性;也直写种子
+scripts/probe/probe-hmr.js             # 一次性 HMR 实验,还会临时改源文件;起在 :3000 开发口
+scripts/probe/spirit-terrain-probe.js  # 2026-07 底灵蕴地形选址一次性(README 归类)
+scripts/probe/kintsugi-probe.js        # 2026-07 底金缮一次性选址
+scripts/probe/flame-spot-probe.js      # 一次性选址,跑完即弃
+scripts/probe/titlecard-probe.js       # 一次性标题卡多端口试验
+scripts/probe/b612-storybook-probe.cjs # 文件头自述「一次性归档」(2026-09-06 Phase C)

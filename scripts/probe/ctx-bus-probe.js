@@ -5,15 +5,22 @@
 // 用法: node scripts/probe/ctx-bus-probe.js
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const { chromium } = require('playwright-core');
 
 const ROOT = path.join(__dirname, '..', '..');
 let pass = 0, fail = 0;
 const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n); } };
 
+// 数据根隔离(2026-10-15,与 security-fix-probe 的 H1 修复同一规矩):不打 GATE_DATA_FILE 就按
+// lib/store.js:9/19 的默认值拿仓库根 gate_data.json/.db 起服,启动清扫会在几秒内覆写真实数据根。
+const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ctxbusprobe-'));
+const probeEnv = () => ({ ...process.env, PORT: '3222', GATE_DATA_FILE: path.join(DATA_DIR, 'gate_data.json') });
+
 (async () => {
   const server = spawn(process.execPath, ['server.js'], {
-    cwd: ROOT, env: { ...process.env, PORT: '3222' }, stdio: ['ignore', 'pipe', 'pipe'],
+    cwd: ROOT, env: probeEnv(), stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise(r => server.stdout.on('data', d => d.toString().includes('服务器已启动') && r()));
   const browser = await chromium.launch({ channel: 'msedge', headless: true });
@@ -138,5 +145,6 @@ const ok = (c, n) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail
   console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
   await browser.close();
   server.kill();
+  try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch { /* 临时目录清不掉不影响结论 */ }
   process.exit(fail ? 1 : 0);
 })();
