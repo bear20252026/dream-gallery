@@ -30,6 +30,13 @@ const pl = {
   onGround: true,
   gliding: false,
   glideEnergy: 5,
+  // 太空那一套键输入(非主世界由 tickPhysics 写:player.js:152-160,消费方 planets.js:774-819)。
+  // 给初值是为了让"这四个字段存在"从第一帧就成立 —— 以前它们要等第一次按键才凭空出现,
+  // 主世界里读到的是 undefined(值上等价:false/> 0 不成立,但类型上是另一回事)。
+  boostT: 0,
+  boostDownT: 0,
+  spaceUp: false,
+  spaceDown: false,
 };
 cam.position.copy(pl.p);
 cam.rotation.y = pl.y;
