@@ -9,13 +9,14 @@
 import { ctx } from '../ctx.js';
 import { Z } from '../shared/z-layers.mjs';
 import { scriptLang } from '../shared/story-text.mjs';
+import { byIdCanvas } from '../shared/dom-typed.js'; // #mc 是 <canvas>(index.html:125),getContext/width/height 都在这层
 
 const { OL, OR, OT, OBE, OBR, IL, IR, IRT, IRB } = ctx;
 // ⚠️ 不要在模块顶层捕获 ctx.player.pl —— 本模块经 import 提升,求值早于
 //    player.js 挂载 pl(实测报 "reading 'p'" 每帧异常);必须在 drawMap() 内现取。
 
 // ===================== 画布与两档尺寸 =====================
-export const mapCanvas = document.getElementById('mc');
+export const mapCanvas = byIdCanvas('mc');
 const mapCtx = mapCanvas.getContext('2d');
 // 放大档 2026-10-03 加大(测试反馈「小地图太小」):桌面 320,窄屏按视口收,最小 220
 // 手机上小图缩到 112(2026-10-03 测试反馈「手机顶部挤成一团」)

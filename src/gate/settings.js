@@ -5,6 +5,7 @@ import { hotBegin, hotEnd } from '../hot.js';
 import { skyApi, openSky } from './settings/sky-progress.js';
 import { chatApi } from './settings/chat-room.js';
 import { spApi } from './settings/spirit-page.js';
+import { byIdInput } from '../shared/dom-typed.js'; // #nickInput / #gearNickInput 都是 <input>(index.html),.value 只在 HTMLInputElement 上
 import { wishApi, openWish } from './settings/wish-page.js';
 import { etPickApi, openEternalPick } from './settings/upload-import.js';
 import { qApi, openQuality } from './settings/quality.js';
@@ -226,7 +227,7 @@ document.getElementById('nickX').onclick = function () {
   sessionStorage.setItem('nickPopOff', '1');
 };
 document.getElementById('nickSave').onclick = function () {
-  saveNick(document.getElementById('nickInput').value, function () {
+  saveNick(byIdInput('nickInput').value, function () {
     pop.classList.remove('show');
     popShown = true;
     sessionStorage.setItem('nickPopOff', '1');
@@ -249,12 +250,12 @@ function bindGear() {
       li.style.transition = 'transform .5s';
       li.style.transform = panelOpen ? 'rotate(180deg)' : 'rotate(0deg)';
     }
-    if (panelOpen) document.getElementById('gearNickInput').value = myName;
+    if (panelOpen) byIdInput('gearNickInput').value = myName;
   };
 }
 bindGear();
 document.getElementById('gearNickSave').onclick = function () {
-  saveNick(document.getElementById('gearNickInput').value, function () {
+  saveNick(byIdInput('gearNickInput').value, function () {
     panelOpen = false;
     panel.classList.remove('show');
   });

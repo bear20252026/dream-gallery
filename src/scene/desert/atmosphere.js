@@ -4,6 +4,7 @@ import { ctx } from '../../ctx.js';
 import { getH, KX, KZ } from './terrain.js';
 import { tt } from '../../shared/story-text.mjs';
 import { legacyOn } from '../../shared/legacy.mjs';
+import { qsEl } from '../../shared/dom-typed.js'; // HUD 小元素按标签取名:.cp-needle / #dtText / #dtPhase / #dtBar / #dtName / #dtElev 都是 <div>
 const { s } = ctx;
 
 // ===================== 飞鸟 =====================
@@ -108,7 +109,7 @@ compass.innerHTML =
 // 必须写在 cssText 之后(cssText 会整体覆盖样式)
 if (!legacyOn()) compass.style.display = 'none';
 document.body.appendChild(compass);
-const cpNeedle = compass.querySelector('.cp-needle');
+const cpNeedle = qsEl(compass, '.cp-needle'); // markup 自己写的 <div class="cp-needle">,style 在 HTMLElement 这层
 
 // ===================== 天空昼夜 =====================
 const skyBg = new THREE.Color(0xd4c8a0);
@@ -329,11 +330,11 @@ const shimmer = document.createElement('div');
 shimmer.id = 'heatShimmer';
 shimmer.dataset.worldUi = 'main'; // 自声明:只主世界显示(scene-manager 扫 data-world-ui)
 document.body.appendChild(shimmer);
-const dtText = timeHud.querySelector('#dtText'),
-  dtPhase = timeHud.querySelector('#dtPhase'),
-  dtBar = timeHud.querySelector('#dtBar');
-const dtName = terrainHud.querySelector('#dtName'),
-  dtElev = terrainHud.querySelector('#dtElev');
+const dtText = qsEl(timeHud, '#dtText'),
+  dtPhase = qsEl(timeHud, '#dtPhase'),
+  dtBar = qsEl(timeHud, '#dtBar');
+const dtName = qsEl(terrainHud, '#dtName'),
+  dtElev = qsEl(terrainHud, '#dtElev');
 
 // 地名中英(2026-10-03 英文为默认)
 const TERRAIN = [

@@ -538,6 +538,97 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   `audioManager` 那条"声明 ≡ 写入方"的钉子,各自单独一批。
 
 
+## 2026-10-16 checkJs 第七刀:再收 51 条(129 → 78),这一族的病名是「DOM 取用点的类型压根没说」
+
+第六刀末尾说得很清楚:DOM 那一族要的是**把 `el()` / `querySelector` 的结果收成带类型的助手**,
+而不是逐点写 `(el as HTMLInputElement)` —— "那只是把谎换成 cast"。这一刀就是照那句话做的,
+并且把 cast 只留在**一个叶子模块**里,按标签命名。
+
+- **做法**:新增 `src/shared/dom-typed.js`(11 个助手:`byIdEl/byIdInput/byIdCanvas/byIdBtn` +
+  `qsEl/qsBtn/qsInput/qsArea/qsSelect` + `qsaEl/qsaBtn`),每个函数体一次 `/** @type {X|null} */ (…)`;
+  八个文件的取用点改走助手。**刻意不加 `instanceof` 校验** —— 那会把"今天能工作的 `<a>` 当 `<button>` 用"
+  突然变成 null,是一次真实行为变更,不属于类型批次;这条边界写在模块文件头,并被测试钉成机器闸。
+- **归因(comm 集合差法,51 条消失、0 条新增)**:`quizgate.js` 16 / `ark-freeflight-hud.js` 10 /
+  `minimap.js` 9(其中 6 条是 `#mc` 画布)/ `player.js` 4 / `atmosphere.js` 3 / `sky-progress.js` 3 /
+  `settings.js` 3 / `chat-room.js` 2 / `ark.js` 1。`spiritMark` 那 8 条(minimap 3 + player 4 + ark 1)
+  不属于助手,是**声明比写入方窄**的旧病:`types/ctx.d.ts:394` 写 `() => {x,z}|null`,而两个写入方
+  (`spirits.js:490` 的字面量 `{x,z,name,color}`,与星球模式转交的 `planetsMark` —— 后者**早就**声明成四字段)
+  都给四个 ⇒ 按写入方补齐,没有自造形状。
+- **三条只有回读才看得见的实情**:
+  1. `querySelectorAll('button')` 返回 `HTMLButtonElement`(标签选择器走 `HTMLElementTagNameMap`),
+     而 `querySelectorAll('.qz-opt')` 返回 `Element` —— **同一种遍历,一个报错一个不报**。这解释了报错表上
+     "为什么隔壁那行没事",也意味着按类名取元素一律要助手,按标签名取则不必。
+  2. HUD 的 3 条 `changedTouches` on `Event` **一个字都没改就归零了**:把 receiver 从 `Element` 收成
+     `HTMLElement` 之后,`addEventListener('touchstart', …)` 命中 lib.dom 的类型化重载,`e` 自动是 `TouchEvent`。
+     ⇒ 事件类报错先查 receiver 的类型,别急着给 handler 写 cast。
+  3. 类型化之后 `.value` 写错元素**编译器不再提醒**:注入 `qsInput(box, '#qzTa')`(`#qzTa` 实为 textarea)
+     时 checkJs 仍 0 条新增。所以这一刀的真正防线不是编译器,是下面那条 markup 反查。
+- **新增闸门:`src/__tests__/dom-typed-sites.test.js`(6 项)**。核心是一条**双向由源码裁决**的比对:
+  扫全仓对助手的每个调用点(模板插值 `${…}` 先剥掉,`byId*` 的参数按**裸 id** 处理、不当选择器),
+  从 `src/**` 的模板字符串与根级 `*.html` 建"id / class → 标签集合"两张表(323 个 id、381 个 class),
+  再要求"助手声称的标签 ≡ markup 里的真实标签";**表里查不到就进 bad 列表**,而不是静默跳过。
+  其余五条:助手本体一次 cast / 零 `instanceof` / 只走那三个原生取用(qsa* 必须 `Array.from`,其余不许多包一层);
+  **CLAIM 表 ≡ 助手自己写的 `@returns`**(表和源码漂了就红,否则比对用的是我这一份私设);
+  运行期等价(假 `document`/`root` 记名:id 用大小写混合的 `McX`,任何顺手 `toLowerCase` 都当场露;
+  返回的**必须是同一个对象**、传下去的**必须是同一个字符串**);已改过的八个文件零内联 cast;
+  全仓残留内联 DOM cast 记名成一张账(**16 条 / 8 个文件**,多一条红、少一条也红)。
+- **反向验证 7 条注射 / 全部打红 / 0 锚点未命中 / 0 还原不一致**(`.tmp/rv7-a.sh`,日志 `.tmp/rv7-a-log2.txt`):
+  I1 类型撒谎(→ markup 反查那条红)· I2 改过的文件塞回内联 cast(→ 两条)· I3 新文件塞内联 cast(→ 账本)·
+  I4 助手加 `instanceof`(→ 本体那条 + 等价那条)· I5 `@returns` 与 CLAIM 漂(→ CLAIM 比对)·
+  I6 调用点用不存在的 id(→ markup 反查)· I7 助手偷改 id(→ 运行期等价)。
+  ⚠️**第一轮 I1 报的是"锚点没打上"而不是红**:我写的锚点用双引号 `qsArea(box, "#qzTa")`,源码是单引号。
+  这正是第五刀立的那条 —— 两种失败必须分开打印,否则"0 红"会被读成"没违反"。脚本按 node 纯字符串替换重写
+  (不用 perl:上一批在 CRLF 文件上静默失手过),改完 7/7 打红。
+- ⚠️**闸门自己的四个 bug(都是"跑一遍才知道"的,记下来免得下批重踩)**:
+  ① `@returns` 写在函数**之前**的 JSDoc 里,我第一版从函数名往**后**切 ⇒ 读到的是下一个函数的类型,
+  最后一个函数直接抛"没有 @returns";改成从 `indexOf` 往前取并以 `[^@]*$` 收口。
+  ② `byId*` 的参数是裸 id 不是选择器,交给"取最后一段认键"的解析器会被当成**标签名**(`mc` → 标签 `mc`),
+  第一版六条注射前就全红 6 次。
+  ③ 匹配 `Array.from(/** @type {NodeListOf…` 的正则写成 `\/\*\s*@type` —— `/**` 有**三个** `*`,
+  `\s*` 吃不掉第三个 ⇒ qsa* 两条假红。
+  ④ 用 `.tmp` 目录验排版这件事第六刀已记(默认 `--ignore-path` 读 `.gitignore`),这一批照那条做:
+  把五个候选文件的 HEAD 版放进**未被忽略**的临时目录 + 一条故意打坏的探针先验检测器在工作,
+  才敢说"`dialog-voice.mjs` / `finale.js` / `housecolor.js` / `spirit-page.js` / `upload-import.js`
+  **这五个在 HEAD 不合排**",而其余十一个(含本批改到的全部)都合排。
+- **本刀没做的 15 条 DOM 剩项(按类)**:`value` on HTMLElement 5、`onclick` on Element 4、
+  `checked` on GlobalEventHandlers 3、`_langHandler` on Element 3。分布恰好落在那五个不合排的文件里
+  (spirit-page 5 / upload-import 3 / dialog-voice 4 / finale 2 / housecolor 1)⇒ **不是漏做,是故意不混**:
+  动它们就得先付一次"整份文件被 pre-commit 重排"的代价,按第五刀那条口径应当单独发一次排版再收类型。
+  `_langHandler` 那三条另当别论 —— 它是往 DOM 节点上挂私有属性,AGENTS 早在 308 那批就定性为
+  "要的是 WeakMap 或类型化元素,属于真重构,别和类型批次混一起做"。
+- 门禁(**六项全在这棵树上跑**):eslint 0 / `tsc --noEmit` 0 / depcruise 0 违规(**399 modules, 1373 deps**,较上批
+  +2/+11 = 新模块 + 新测试与它们的 import 边)/ **checkJs 78 = 新基线**(comm 双向:消失 51、新增 0)/
+  vitest **1126 项 / 99 文件**(1120 + 本刀 6)/ `npm test` exit 0 且 **209 项**照旧(7/22/108/46/20/6)/
+  `npm run build` 0 且三条构建断言照旧 —— ⚠️**prefetch 从 46 涨到 47**(`shared/dom-typed.js` 进了核心链,
+  新增的这条仍带 crossorigin,断言管的是"全部 crossorigin"而不是条数)/ 四条 CI 守卫全 exit 0。
+  基线文件 `scripts/checkjs-baseline.txt` 已改 129 → **78**。
+- **实机验收分层做的,而且把"测到了"与"没测到"分开说**:
+  ①`scripts/probe/minimap-probe.cjs` **17/17 全绿** —— 这是本刀最硬的一条正面证据:小地图真在跑、
+  `mapCanvas.width` 被 `drawMap` 每帧读到、单帧 0.90ms、放大档 320↔150 切换正常 ⇒ `byIdCanvas('mc')` 交付的
+  就是那块 canvas;②`scripts/probe/smoke-gate.js` **5/5**(canvas 已建 / ctx 已装 / 世界已启动 main / 灯光 ≤40 /
+  **零未捕获异常**)——`atmosphere.js` 的 6 处 `qsEl` 是模块顶层就取用并随后每帧写 `.style`,
+  若返回 null 会当场 TypeError,这条零异常就是它跑过的证据;③`npm test` 里的 `test-mobile.js` 6/6(iPhone 模拟,
+  着色器 / JS 异常 / 空屏)。三次都按纪律把自起的 `server.js` 指到临时 `GATE_DATA_FILE`,并复核仓库根
+  `gate_data.json` 的 md5 前后一字未变。
+- ⚠️**本刀"未测"的部分,登记清楚**(不算已通过):`quizgate.js`(16 条)、`ark-freeflight-hud.js`(10 条)、
+  `settings.js` / `chat-room.js` / `sky-progress.js` 里**只在点按钮时执行**的那几处。理由不是"来不及",是
+  **这些模块默认根本不加载** —— `quizgate` / `ark` / `finale` 都在 `LEGACY_MODULE_IDS`(`src/shared/legacy.mjs:30-43`,
+  12 条)里,默认模式跳过加载,`window.startQuiz` 与 `.qz-track` 在默认页面上就是不存在(我写的 `.tmp/quiz-dom-check.cjs`
+  第一版因此在**夹具**上全红,而不是代码红;加 `?legacy=1` 后在 headless 里等 12s 仍未见 `__worldStatus`,没继续挖)。
+  这三处的保障目前是:转换**逐条保持同一 root + 同一选择器字符串**(外层只做 cast)+ 运行期等价那条单测
+  (同一个对象、同一个字符串、qsa* 只多一次 `Array.from`)+ markup 反查 + 编译器零新增。
+  ⇒ 想做真验收,得先给 legacy 模式补一个能落的夹具(与 `b612-*-probe` 那批"石门/继续钮"预置同一族欠账)。
+- ⚠️**新增一条陈旧探针(本批定性,没顺手修)**:`scripts/probe/ark-free-probe.js` 等的 `window.__arkFF`
+  **在全仓已经不存在**(`grep -rn __arkFF src/` 零命中),而它 goto 的 URL 不带 `?legacy=1` ⇒
+  飞舟模块压根不加载,这条探针**从搁置那天起就是死夹具**,红在探针自己。别把它当本刀回归;要恢复它得重写预置三层。
+
+  ⚠️**本刀动了运行期源码**(八个文件的取用写法 + 一个新叶子模块)⇒ **与第六刀不同,要重新构建并部署**。
+  部署后的线上复核按上面那三层做:`smoke-gate`(CI 的 `smoke` 作业本来就会跑)+ 线上 `minimap-probe`
+  (`BASE_URL` / `PROBE_URL` 直测生产 bundle)+ 一次真机自由飞/答题门的手动确认(它们默认搁置,
+  `ark-free-probe.js` 这条探针已经管不到了,见上一条)。
+
+
+
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
 
 审计方只读源码、未跑测试,并明确「不把此前已修复的问题重复计为缺陷」。6 条工程断言逐条回读后:**4 条成立(其中 1 条比审计说得更严重)、2 条部分成立、1 条误报**;素材版权与译本授权两条按主人指示不处理。
