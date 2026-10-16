@@ -927,6 +927,50 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   属于独立一批,不为了"看起来更严"先动声明。
 
 
+## 2026-10-16 第十刀·批次0:把检查图撑大(基线 0 → **145**),并更正我自己那个"181"
+
+第九刀末尾那条"⚠️⚠️ 这条 `0` 的作用域"就是这一批的开工单。**这批没改任何产品源码**
+(动的三份:`tsconfig.checkjs.json` / `scripts/checkjs-baseline.txt` / `ctx-writer-shapes.test.js` 的地板钉子),
+所以按 release.sh 的 `--no-deploy` 走,**不部署**。
+
+- **做法**:include 从 `core/** + player/** + kunlun/avatar.js` 三个根改成 `src/**/*.js` + `src/**/*.mjs` +
+  `types/**/*.d.ts`,同时 `exclude` 加 **`src/__tests__`**。为什么必须排除测试:那 460 条住在
+  `src/__tests__/lib-*.test.js` 里,它们 `require` 后端 `lib/*`,缺的是 **node/vitest 的类型环境**,
+  不是产品代码的类型债 —— 混进产品基线只会让地板数字失去意义(这条线要单开)。
+- **实测 145 条,住在 24 个文件里**(码分布 `TS2339 124 / TS2304 7 / TS2322 6 / TS2591 2 / TS2551 2 /
+  TS2353 2 / TS2810 1 / TS2741 1`);文件排名 `plane-physics.mjs 22` / `admin-docs.js 18` / `admin-chat.js 11` /
+  `earth-day.js 10` / `admin-content.js 10` / `ending-prince.js 9` / `shared/sentry.js 8` /
+  `chapter-map-logic.mjs 7` / `error-report.js 7` / `museum.js 6` / `visitor-fp.js 5` / `room/main.js 5` /
+  `sheep-companion.js 4` / `room/lobby.js 4` / `plane-flight.js 3` / `openfilm.js 3` / 其余 8 个文件各 1-2 条。
+  ⚠️`plane-physics.mjs` 与 `chapter-map-logic.mjs` 正是第六/八刀连续写过"要纳进检查图"的那两个文件 ——
+  现在进来了,31 条一起现身。
+- **这 145 条全是旧账,不是新增长**。证据不是推理:把旧配置的 `--listFiles`(`.tmp/lf.txt`,149 个 src 文件)
+  拿来逐个查这 24 个文件,**一个都不在旧图里**;旧图内文件的报错数仍是 0。
+- ⚠️**更正我上一批写下的那个数**:当时记的是"产品侧 181"。**181 是错的**(方法错:我用
+  `grep -v '^src/__tests__/'` 从 641 里减,于是把**只被测试文件 require 进来的后端 `lib/*`**(36 条)
+  也算成了"产品侧")。按现在的口径,641 = **src 产品 145 + src/__tests__ 460 + lib 后端 36**;
+  后端那 36 条与测试那 460 条同属"缺 node 类型环境"这一条工作线,不进产品基线。
+  ⇒ 又一次印证第八刀那条:**分类正则本身会少数/多数,归因要用集合差和 `--listFiles` 实测,别用 grep 减集**。
+- **地板钉子换形但仍咬人**:`批次6-7` 那条从"基线必须 === 0"改成 `CEILING=145` 的上限判定
+  (往下压自由、往上抬必须动这个文件)。**注射实测**:基线写 146 ⇒ 恰好这 1 条红
+  (`基线被抬到 146 > 上限 145`),还原后 21 项全绿、还原文件 md5 逐字节一致。
+  写成"必须等于 145"是错的 —— 那会让下一刀切掉几十条之后反而变红,惩罚的正是要做的事。
+- **两个特殊族已认出,留给批次1+(按读到的实情,不是猜)**:
+  `shared/sentry.js` 7 条 `TS2304: Cannot find name 'Sentry'` —— 那个 SDK 是运行时用
+  `document.createElement('script')` 从 `browser.sentry-cdn.com` 挂进来的全局(index.html:19 只有 DSN meta),
+  所以缺的正是**一份全局声明**,与第九刀的 `types/browser-globals.d.ts` 同一形状(写法:按实际用到的
+  `init/browserTracingIntegration/replayIntegration/captureException/…` 收一份最小形状 + 钉子,不许 `any`)。
+  `shared/chapter-map-logic.mjs` 2 条 `TS2591: Cannot find name 'Buffer'` —— 那是 `b64encode/b64decode` 的
+  **浏览器优先 + Node 回退**分支(`typeof btoa === 'function'` 先走),运行期没问题,是检查器不认识 Node 全局;
+  修法要么给这份回退单独声明 `Buffer`,要么把回退路径改成显式注入 —— 这是设计选择,不在批次0 顺手做。
+- **CI 侧的成本要说清**:checkJs 那一步本地从 ~10s 涨到 **26.9s**(741 个 src 文件进程序)。
+  它仍是 `build-and-test` 里的一个 step(没新增 job,分支保护的 required context 名一字未变),
+  但以后再加根要顺手报一次耗时,别把 CI 预算吃到人开始怀疑"这步是不是没跑"。
+- **门禁(全在这棵树)**:checkJs **145 = 新基线**(= 实测值,不是抄来的)/ eslint 0 / `tsc --noEmit` 0 /
+  depcruise 0 违规 / vitest **1154 项 101 文件**(与第九刀一致,这批没加测试项)/ `npm test` 209 项照旧 /
+  `npm run build` 0 且三条断言照旧。
+
+
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
 
 审计方只读源码、未跑测试,并明确「不把此前已修复的问题重复计为缺陷」。6 条工程断言逐条回读后:**4 条成立(其中 1 条比审计说得更严重)、2 条部分成立、1 条误报**;素材版权与译本授权两条按主人指示不处理。
