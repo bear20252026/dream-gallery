@@ -46,6 +46,7 @@
 | b612-return-black-probe.cjs | 复现"B612 返回主世界黑屏/回弹":连续采样 activeWorld 5s+截图像素亮度 | 自起(默认 :3262,`RET_PROBE_PORT`);`BASE_URL` 可打线上 | 黑屏回归守门;2026-10-10 预置现代化 |
 | b612-world-probe.cjs | 独立世界权限链 main→b612→king→b612→main | 自起(默认 :3258,`WORLD_PROBE_PORT`) | 语义级断言 activeWorld |
 | b612-prod-worlds.cjs | 生产世界切换验证(两段式开机适配):闸门→skip→石门→国王星→原路返回 | 自起本地 :3259;`BASE_URL=https://cloudbear.cloud` 直测生产 | 断言小地图隐藏/恢复、模型入景 |
+| ctx-runtime-shape-probe.cjs | **ctx 成员"声明 ≡ 运行期实物"**:audioManager 必需成员与 arity、playHint 三分支与 onEnd 恰好一次、playOne 空参不抛、scrollLink.redraw arity、世界切换**实际载荷**键集合 `from,to`、全程零未捕获异常 | 自起(默认 :3302,`CTX_SHAPE_PORT`);`BASE_URL=https://cloudbear.cloud` 直测线上;`PROBE_BREAK=keys\|arity\|payload` 是验判据不空转的注射口(正常跑勿设) | 2026-10-16 第九刀上线后补;类型侧配 `src/__tests__/ctx-writer-shapes.test.js` |
 | b612-planets-probe.cjs | 六星章节全流程:星门传送→拾星屑→章节推进+库存→回程门 | 自起(默认 :3238,`PLANETS_PROBE_PORT`) | 头注自标"一次性归档",章节链仍可复用 |
 | witness-probe.cjs | 325/326/327 见证卡片:A 卡片 UI 独验(choice/clap/count/skip/存档),B 真场景串联 | 自起(默认 :3296,`WITNESS_PORT`);`PW_BROWSER=chromium` | worldManager.enter() 直进,不需石门模型 |
 | ending-portfolio-probe.cjs | 终章回收玩家画作:有/无画作的终屏 keepsake 缩略图 | 自起(默认 :3293,`ENDPF_PORT`);`PW_BROWSER=chromium` | 2026-10-04 |

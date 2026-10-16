@@ -20,6 +20,14 @@
   // (没有 import/export,靠 interface 合并生效),没有任何文件引用它 ⇒ 不写进 include 就不在程序里,
   // 里面的 `navigator.deviceMemory` 照样报 TS2339。skipLibCheck:true 保证拉进来只是"用声明",
   // 不会把 .d.ts 本身的检查算进基线。
-  "include": ["src/core/**/*.js", "src/player/**/*.js", "src/kunlun/avatar.js", "types/**/*.d.ts"],
-  "exclude": ["node_modules", "dist", "vendor", "scripts"]
+  // 2026-10-16 第十刀·批次0:**把检查图从"三个根 + import 闭包"扩成产品源码全量**。
+  // 为什么:旧 include(core/** + player/** + kunlun/avatar.js)靠静态/动态 import 传递闭包,
+  // `--listFiles` 实测只有 149 个 src 文件 —— earth-day / plane-flight / main / room/main / admin/* /
+  // museum / shared/sentry 这些**玩家可见路径**根本不在罩子里,于是第九刀那句"checkJs 0"
+  // 只是"被检图内 0"。按 AGENTS 立的口径("我什么都没找到"不等于"没有问题"),先把罩子撑大,
+  // 再按机制族往下切;基线因此一次性上调,那是**覆盖面**不是新债(提交信息里要写清)。
+  // ⚠️`src/**/__tests__` 必须排除:460 条错挂在那里,它们 require 后端 `lib/*`,
+  //   缺的是 node/vitest 的类型环境(另一条工作线),混进来只会让地板数字失去意义。
+  "include": ["src/**/*.js", "src/**/*.mjs", "types/**/*.d.ts"],
+  "exclude": ["node_modules", "dist", "vendor", "scripts", "src/__tests__"]
 }

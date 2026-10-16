@@ -844,10 +844,131 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   `npm test` exit 0 且 **209 项**照旧(7/22/108/46/20/6)/ `npm run build` 0 且三条断言照旧(47 prefetch /
   入口不含 three / dist 无 importmap)/ 四条 CI 守卫全 exit 0。
 - **本刀动的是运行期写法**(`export`、两处 `String()`、批次1-4 的 `instanceof` 收窄与 `errText` 取文本)
-  ⇒ **要重新构建并部署**才算上线;目前只在本地(main 上四个提交,未推送)。
+  ⇒ **要重新构建并部署**才算上线。✅ 已发(见下一条)。
+- **已上线并线上复验(PR #35 → merge `02e1054` → `DEPLOY_OK 02e1054` / `RELEASE_OK 02e1054`,2026-10-16)**:
+  这个 PR 装七个提交(`a786be2` / `f350b35` / `26d7fb2` / `d4c79df` / `a4ec13a` / `802efd0` / `67ca6a4`,head `67ca6a43`)。
+  required checks `build-and-test` + `smoke` 双绿,**CI 自己打的结论行是 `checkJs errors: 0 (baseline 0, delta 0)`**
+  (CI run `38863079648`),vitest `101 文件`、depcruise `0 违规(402 modules, 1393 dependencies)`;
+  合并后核对 **"CI 验的树 == 要部署的树" = `6f4606dee46ba06e360b6ac763f7c1da8933d420`**;
+  部署快照六字段全给结论(`BACKEND=verified / FRONTEND=extracted / RESTART=online / MODELS=synced / VERIFY=ok / DRIFT=ok`),
+  **后端这次没有变化**(第 3 步 `BACKEND_SYNC_RESULT=consistent` 直接免上传,第 6/9 步复检 `OK 53 DRIFT 0 MISSING 0`)⇒ 纯前端发布;
+  前端漂移 **OK 202 DRIFT 0 MISSING 0 TOTAL 202**,`/healthz {"ok":true,"uptime":29}`(新进程 pm2 `gallery` online),
+  线上首页引用的 chunk 与本地 dist **逐名一致**(`main-Bzz3sr4y.js` / `main-hwXhbbPT.js` 都 200),
+  版本戳 grep 在 **`assets/entrygate-BzMcwExJ.js`** 里的 **`02e1054`**(旧的 `entrygate-wyje7ytC.js` 已被差集清理删除)。
+  `BASE_URL=https://cloudbear.cloud node scripts/probe/b612-prod-worlds.cjs` **前六条全绿**
+  (主世界 / 小地图在场 / 进 B612 / 小地图隐藏 / storybook 入景 / 国王星球 + kingStoryScene),
+  第 ⑦ 段 `waitForFunction 25000ms` 与探针头写明的既有欠账逐字一致 ⇒ 判旧红;
+  **同一份结论在本地同一棵树上也这么出**(发布前跑过一次),A/B 对照成立 ⇒ 这条红不是这一刀带出来的。
+- ⚠️**prefetch 从 47 变 48,原因核过才写**:批次2 新增的 `src/shared/err-text.mjs` 被九个文件共享 ⇒ 构建给它切出
+  独立 chunk(实见 `dist/assets/err-text-DCwQ_cVZ.js`),core-preload 因此多预取一条。三条构建断言管的是
+  "全部 prefetch 带 crossorigin / 入口不含 three / dist 无 importmap",**不管条数**,所以这不是回归;
+  但第八刀那句"prefetch 仍 47"到这一刀已经**是旧数**了 —— 不核就抄,下一个 47 会变成第 N 条假结论。
+- ⚠️**线上没证到的,当天先记成未证、当天夜里补成常驻探针**(2026-10-16 `scripts/probe/ctx-runtime-shape-probe.cjs`):
+  第九刀登记时写的是"本地量过的 `audioManager` 键集 / `playHint` 三分支 / `redraw.length === 2` /
+  切换实际载荷 `{from,to}`,生产上没有对应探针 ⇒ 跑进去了不等于点过了"——那句当时成立,现在由探针变成可复跑的线上证据:
+  - 线上 `BASE_URL=https://cloudbear.cloud PROBE_WAIT_MS=120000 node scripts/probe/ctx-runtime-shape-probe.cjs`
+    ⇒ **`PROBE_OK 16/16`**:键集 = `hintQueue,hintSound,isHintPlaying,pauseAll,playHint,playOne,registerVideo,resumeAll,unregisterVideo,videoSound`;
+    `playHint` arity 3、`playOne` arity 0(带默认值的形参不计入 length ⇒ 声明里 `[item]` 那条可选性的实物对面);
+    `skipped` 那条 `onEnd` 恰好一次、`bypassSwitch=true` 返回 `play`、`playOne()` 空参不抛;
+    `scrollLink.redraw` 是函数且 arity 2;真走一次 main→b612 收到的载荷键集合 `from,to`、值 `main→b612`,
+    `worldChanged` 返回取消订阅函数(eventBus.on 契约);全程 **0 未捕获异常**。
+  - 本地自起临时服同一份 **16/16**(`GATE_DATA_FILE` 落系统临时目录;`probe-isolation-guard` 扫 148 脚本仍 0 违规,
+    新探针已按 README 的规矩**入列索引表**,不在表外的探针等于没人知道它存在)。
+  - **反向验证四遍**(`PROBE_BREAK` 是探针自带的注射口,正常跑勿设):`clean` ⇒ 16/0 exit 0;
+    `keys`(删掉 `audioManager.playHint`)⇒ 5 条红(C1 缺成员 + C1 arity + C2 三条);
+    `arity`(把 `redraw` 换成三参)⇒ **恰好 1 条红**(C3);`payload`(切换之后才订阅)⇒ C4 全组 4 条红
+    ⇒ 每条判据都可归因地咬人。
+  - 写这支探针时自己的两处错(都属"红与崩/假通过"那一族,不改掉就是又一盏假绿灯):
+    ① `PROBE_BREAK=payload` 起初写成 `ok(payload === null, '这条本就该红')` —— **把"我故意让它错过"写成会通过的断言**
+    就是假绿;改成照常判定(错过载荷 ⇒ C4 自然红)。
+    ② C2 起初只把 `playOne()` 包进 try,于是 `keys` 注射会让整个 `page.evaluate` 抛出去变成 `PROBE_CRASH`;
+    崩与红是两种结论,只有红可归因 ⇒ 两个 `playHint` 调用一起包进 try。
+  - ⚠️两条**旧坑复发 + 新坑**当场抓到:
+    ① 我先 `prettier --write .tmp/probe-fmt-check.cjs` 拿到一句"与源文件 0 diff",而 `.tmp` 被 prettier 3 的默认
+    `--ignore-path`(连 `.gitignore` 一起读)**静默跳过** ⇒ 那句"已经合排"是假的(第八刀记过这个坑,还是犯了);
+    回到真实路径 `--write` + `--check` 才拿到真结论。
+    ② `.tmp/rv9e.sh` 把 `run()` 三个参数写串了位(签名 `tag expect br`,调用传成 `tag br expect`),
+    于是四遍全只走到探针头部"PROBE_BREAK 取值不认识 ⇒ fail-closed exit 2"那道守卫:**四遍齐刷刷 rc=2、红=0**
+    —— 这种"整齐得不像话"的结果就是判据没在工作的形状(与"我什么都没找到"不许当成没有问题同一条)。
+- **补记(#30 的溯源,2026-10-16 夜里)**:上面那句"onclick 裸名对不上 expose()"只讲了一半,查完历史要改成更准的说法:
+  **`e4be70d` 那次把 `window.startGentleTest=…` 换成 `expose('startGentleTest',…)`(名字变成 `__startGentleTest`)
+  确实切断了 index.html:162/175/194 那几个裸名 onclick,但它切的是一个本来就没人能打开的面板** ——
+  `git grep gtP 3999ae9`(2026-07-28 基线)在 `src/` 里只有 quiz.js 自己的**拆卸**两行
+  (`gtP.classList.remove('show')` / `gtP.style.display='none'`),全仓(含全部 HTML/CSS)**从来没有一处给它加过 `.show`**;
+  而基线 CSS 第 38 行就是 `#gtP{…display:none…}`、第 39 行 `#gtP.show{display:flex}` ⇒ **这块 UI 从基线起就是死的,
+  不是哪次重构弄坏的**(措辞要按这个改,不然下一个人会去回滚 `e4be70d`,那是一次什么也修不到的回滚)。
+  另一条决定成本的实测:`src/gate/quiz.js` 里 **`store.` 出现 0 次** ⇒ 温柔度既不落库也不进星屑
+  (星屑读的是 `ctx.store.num('quiz')`,那是**答题门** `quizgate.js:571` 写的),所以"退役"没有下游破坏;
+  "接回来"则要给谁按、结果给谁看、要不要存 —— 三个都是产品问题,等主人定,不属于类型批次。
+- ⚠️⚠️**这条 `0` 的作用域必须写清楚,否则它就是一句过度陈述(2026-10-16 夜里实测)**:
+  `tsconfig.checkjs.json` 的 include 只有 `src/core/**` + `src/player/**` + `src/kunlun/avatar.js` 三个根,
+  其余靠静态/动态 import 拉进来 —— `--listFiles` 实测**程序里只有 149 个 src 文件**,
+  而 `src/kunlun/earth-day.js`(读 `ctx.scene.foxApi.seat()`)、`src/scene/plane-flight.js`(写 `ctx.scene.planeApi`)、
+  `src/main.js`、`src/room/main.js`、`src/admin/*`、`src/museum/*`、`src/shared/sentry.js` **都不在里面**。
+  把 include 放宽成 `['src/**/*.js','src/**/*.mjs','types/**/*.d.ts']` 再数一次:**641 条**,
+  拆干净是 **产品侧 181 / `src/__tests__` 460**(码分布 TS2339 533 · TS2322 21 · TS2554 18 · TS2739 16 · TS2740 13 ·
+  TS2345 11 · TS2304 7 · TS2353 6;文件排名 admin-docs 18 / lib-upload-transcode 12 / admin-chat 11 /
+  earth-day 10 / admin-content 10 / ending-prince 9 / lib-shadow 9 / sentry 8 / error-report 7 / museum 6 /
+  visitor-fp 5 / room-main 5)。⇒ **"基线归零"是"被检图内归零",不是"全站类型债清零"**,
+  而且那三条 `planeApi/foxApi/loopManager` 之所以"0 条错咬住",正是因为**消费者没被检查**,不是它们已经好了
+  (这条恰好推翻我自己在同一天早些时候写下的"这轮没被任何读数点咬住"的措辞 —— 那句是错的,读数点在,只是图没罩到)。
+  复现姿势(临时配置,不入库):根目录放 `tsconfig.checkjs-all.json` = `{"extends":"./tsconfig.checkjs.json",
+  "include":["src/**/*.js","src/**/*.mjs","types/**/*.d.ts"]}`,`npx tsc -p tsconfig.checkjs-all.json | grep -c "error TS"`。
+  下一刀(第十刀)的顺序因此**必须先扩图再切**:把产品源码全量拉进 include(admin/museum/room/earth-day/plane-flight/
+  sentry/error-report 这些是玩家可见路径),基线会一次性跳到 ~181,再按第九刀那套"机制族"往下压;
+  `src/__tests__` 那 460 条**不要混进来** —— 它们 require 后端 `lib/*`,缺的是 node/vitest 的类型环境,
+  那是另一条工作线,塞进产品基线只会让地板数字失去意义。⚠️扩图那一步会让基线**上调**,
+  这正是 `ctx-writer-shapes.test.js` 批次6-7 那条地板钉子设计要拦的事 ⇒ 做的人必须同时改那条测试,
+  并在提交信息里写清"跳上去的是新覆盖面,不是新债"。
 - **还剩的 unknown**:`planeApi` / `foxApi` / `loopManager` 三条 ctx.d.ts 成员仍是 `unknown`
-  —— 它们这轮没被任何读数点咬住(0 条错),按第八刀那条口径,**要收它们得连"声明 ≡ 写入方"的钉子一起写**,
+  —— ⚠️**它们"0 条错"不是因为没有读数点,而是因为读数点没在检查图里**(见上一条实测:`earth-day.js:55-56`
+  就在读 `ctx.scene.foxApi.seat()/.site()`,而那个文件不在 `--listFiles` 的 149 个里)。
+  按第八刀那条口径,**要收它们得连"声明 ≡ 写入方"的钉子一起写**,
   属于独立一批,不为了"看起来更严"先动声明。
+
+
+## 2026-10-16 第十刀·批次0:把检查图撑大(基线 0 → **145**),并更正我自己那个"181"
+
+第九刀末尾那条"⚠️⚠️ 这条 `0` 的作用域"就是这一批的开工单。**这批没改任何产品源码**
+(动的三份:`tsconfig.checkjs.json` / `scripts/checkjs-baseline.txt` / `ctx-writer-shapes.test.js` 的地板钉子),
+所以按 release.sh 的 `--no-deploy` 走,**不部署**。
+
+- **做法**:include 从 `core/** + player/** + kunlun/avatar.js` 三个根改成 `src/**/*.js` + `src/**/*.mjs` +
+  `types/**/*.d.ts`,同时 `exclude` 加 **`src/__tests__`**。为什么必须排除测试:那 460 条住在
+  `src/__tests__/lib-*.test.js` 里,它们 `require` 后端 `lib/*`,缺的是 **node/vitest 的类型环境**,
+  不是产品代码的类型债 —— 混进产品基线只会让地板数字失去意义(这条线要单开)。
+- **实测 145 条,住在 24 个文件里**(码分布 `TS2339 124 / TS2304 7 / TS2322 6 / TS2591 2 / TS2551 2 /
+  TS2353 2 / TS2810 1 / TS2741 1`);文件排名 `plane-physics.mjs 22` / `admin-docs.js 18` / `admin-chat.js 11` /
+  `earth-day.js 10` / `admin-content.js 10` / `ending-prince.js 9` / `shared/sentry.js 8` /
+  `chapter-map-logic.mjs 7` / `error-report.js 7` / `museum.js 6` / `visitor-fp.js 5` / `room/main.js 5` /
+  `sheep-companion.js 4` / `room/lobby.js 4` / `plane-flight.js 3` / `openfilm.js 3` / 其余 8 个文件各 1-2 条。
+  ⚠️`plane-physics.mjs` 与 `chapter-map-logic.mjs` 正是第六/八刀连续写过"要纳进检查图"的那两个文件 ——
+  现在进来了,31 条一起现身。
+- **这 145 条全是旧账,不是新增长**。证据不是推理:把旧配置的 `--listFiles`(`.tmp/lf.txt`,149 个 src 文件)
+  拿来逐个查这 24 个文件,**一个都不在旧图里**;旧图内文件的报错数仍是 0。
+- ⚠️**更正我上一批写下的那个数**:当时记的是"产品侧 181"。**181 是错的**(方法错:我用
+  `grep -v '^src/__tests__/'` 从 641 里减,于是把**只被测试文件 require 进来的后端 `lib/*`**(36 条)
+  也算成了"产品侧")。按现在的口径,641 = **src 产品 145 + src/__tests__ 460 + lib 后端 36**;
+  后端那 36 条与测试那 460 条同属"缺 node 类型环境"这一条工作线,不进产品基线。
+  ⇒ 又一次印证第八刀那条:**分类正则本身会少数/多数,归因要用集合差和 `--listFiles` 实测,别用 grep 减集**。
+- **地板钉子换形但仍咬人**:`批次6-7` 那条从"基线必须 === 0"改成 `CEILING=145` 的上限判定
+  (往下压自由、往上抬必须动这个文件)。**注射实测**:基线写 146 ⇒ 恰好这 1 条红
+  (`基线被抬到 146 > 上限 145`),还原后 21 项全绿、还原文件 md5 逐字节一致。
+  写成"必须等于 145"是错的 —— 那会让下一刀切掉几十条之后反而变红,惩罚的正是要做的事。
+- **两个特殊族已认出,留给批次1+(按读到的实情,不是猜)**:
+  `shared/sentry.js` 7 条 `TS2304: Cannot find name 'Sentry'` —— 那个 SDK 是运行时用
+  `document.createElement('script')` 从 `browser.sentry-cdn.com` 挂进来的全局(index.html:19 只有 DSN meta),
+  所以缺的正是**一份全局声明**,与第九刀的 `types/browser-globals.d.ts` 同一形状(写法:按实际用到的
+  `init/browserTracingIntegration/replayIntegration/captureException/…` 收一份最小形状 + 钉子,不许 `any`)。
+  `shared/chapter-map-logic.mjs` 2 条 `TS2591: Cannot find name 'Buffer'` —— 那是 `b64encode/b64decode` 的
+  **浏览器优先 + Node 回退**分支(`typeof btoa === 'function'` 先走),运行期没问题,是检查器不认识 Node 全局;
+  修法要么给这份回退单独声明 `Buffer`,要么把回退路径改成显式注入 —— 这是设计选择,不在批次0 顺手做。
+- **CI 侧的成本要说清**:checkJs 那一步本地从 ~10s 涨到 **26.9s**(741 个 src 文件进程序)。
+  它仍是 `build-and-test` 里的一个 step(没新增 job,分支保护的 required context 名一字未变),
+  但以后再加根要顺手报一次耗时,别把 CI 预算吃到人开始怀疑"这步是不是没跑"。
+- **门禁(全在这棵树)**:checkJs **145 = 新基线**(= 实测值,不是抄来的)/ eslint 0 / `tsc --noEmit` 0 /
+  depcruise 0 违规 / vitest **1154 项 101 文件**(与第九刀一致,这批没加测试项)/ `npm test` 209 项照旧 /
+  `npm run build` 0 且三条断言照旧。
 
 
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
