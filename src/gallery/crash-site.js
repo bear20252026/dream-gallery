@@ -13,6 +13,7 @@ import { STORY, tt, whoSpk } from '../shared/story-text.mjs';
 import { replyChoices } from '../shared/dialog-replies.mjs';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { DAY_HOURS } from '../shared/dayphase-logic.mjs';
+import { errText } from '../shared/err-text.mjs';
 
 const bag = hotBegin('crash-site');
 const { s } = ctx;
@@ -203,7 +204,7 @@ loader.load(
     };
   },
   undefined,
-  (e) => console.error('[crash-site] 王子模型加载失败:', e.message)
+  (e) => console.error('[crash-site] 王子模型加载失败:', errText(e))
 );
 
 // ===================== 睁眼 + 王子走近叫醒 =====================

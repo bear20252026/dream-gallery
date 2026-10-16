@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
+import { errText } from '../shared/err-text.mjs';
 
 const bag = hotBegin('dome-towers');
 const sc = ctx.scene;
@@ -65,7 +66,7 @@ createGLTFLoader().load(
   },
   undefined,
   function (e) {
-    console.warn('[dome-towers] 穹顶塔楼加载失败:', e && e.message);
+    console.warn('[dome-towers] 穹顶塔楼加载失败:', errText(e));
     hotEnd('dome-towers');
   }
 );

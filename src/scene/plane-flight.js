@@ -25,6 +25,7 @@ import { PLANE_PARAMS as P, stepPlane, planePhase, planeSpeedKmh } from './plane
 import { allowPlaneBoard } from '../shared/journey-guidance.mjs';
 import { EYE_HEIGHT } from '../shared/constants.js';
 import { eventBus } from '../core/event-bus.js';
+import { errText } from '../shared/err-text.mjs';
 
 const gs = getGameState();
 const MODEL = '/models/b612/piper-pa18-full.glb'; // 1.74MB 完整机 → 压缩后 0.31MB
@@ -250,7 +251,7 @@ export function createPlaneFlight({ input }) {
         ]);
       },
       undefined,
-      (e) => console.error('[plane-flight] 真实飞机模型加载失败:', e.message)
+      (e) => console.error('[plane-flight] 真实飞机模型加载失败:', errText(e))
     );
   }
 

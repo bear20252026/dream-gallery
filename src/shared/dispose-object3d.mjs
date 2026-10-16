@@ -40,14 +40,29 @@ export const TEXTURE_KEYS = [
 ];
 
 /**
+ * 会被本工具释放的三类资源 —— **单一出处**(原来这串字面量联合只在 `disposeObject3D` 的 opts 里写了一遍,
+ * 而 `toSharedTest` 的返回值另写一份 `kind:string`,两边对不上就是编译器报的那条 TS2345)。
+ * @typedef {"geometry"|"material"|"texture"} DisposeKind
+ */
+/**
+ * "这个资源是共享的,别释放"的谓词形状。
+ * @typedef {(res: *, kind: DisposeKind) => boolean} SharedTest
+ */
+
+/**
  * 把 `shared` 参数归一成谓词。接受 Set/WeakSet(有 .has)/数组/函数;其它一律视为"无共享集"。
- * @param {Set|WeakSet|Array|Function|null|undefined} shared
- * @returns {((res:*, kind:string)=>boolean)|null}
+ * 谓词那条写成**签名**而不是裸 `Function`(2026-10-16 第九刀):上一行 `typeof shared === 'function'`
+ * 返回的是 `Function`,而本函数的返回类型是 `SharedTest` —— `Function` 赋不进去(编译器是对的,
+ * 裸 `Function` 就是在说谎)。`.has` 那一支改用 `'has' in shared` 做窄化:它是 TS 认得的判据,
+ * 而 `typeof shared.has` 在 `Set|WeakSet|Array` 这个联合上根本取不到属性。
+ * 两支的先后与今天一致(数组仍走 `Array.isArray` 那条),对非 Set 但带 `has` 的对象也照旧放行。
+ * @param {Set|WeakSet|Array|SharedTest|null|undefined} shared
+ * @returns {SharedTest|null}
  */
 export function toSharedTest(shared) {
   if (!shared) return null;
   if (typeof shared === 'function') return shared;
-  if (typeof shared.has === 'function') return (res) => shared.has(res);
+  if ('has' in shared && typeof shared.has === 'function') return (res) => shared.has(res);
   if (Array.isArray(shared)) {
     const s = new Set(shared);
     return (res) => s.has(res);
@@ -86,7 +101,7 @@ export function isSharedBuiltinGeometry(geo) {
  * 遍历子树释放 geometry / material / material 上的贴图(内置共享资源保护 + 树内去重)。
  * @param {object|object[]} root 待释放的 Object3D(或其数组)
  * @param {{
- *   shared?: Set|WeakSet|Array|((res:*,kind:'geometry'|'material'|'texture')=>boolean),
+ *   shared?: Set|WeakSet|Array|SharedTest,
  *   skipGeometry?: boolean,
  *   skipMaterial?: boolean,
  *   skipTextures?: boolean,

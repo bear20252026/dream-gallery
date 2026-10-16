@@ -26,6 +26,7 @@ import {
 import { clampChapter, advanceChapter, decorateSpiritsState } from '../shared/story-progress.mjs'; // 剧情进度契约(2026-09-24 抽出,单测钉死;2026-09-27 加 storyNext 下一步权威)
 import { tt } from '../shared/story-text.mjs';
 import { legacyOn } from '../shared/legacy.mjs';
+import { errText } from '../shared/err-text.mjs'; // loader 的 onError 形参由 three 声明成 unknown,不能假定它有 .message
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -190,7 +191,7 @@ function loadWorldAsset(url, world, opts = {}) {
       if (opts.onLoad) opts.onLoad(model, gltf);
     },
     undefined,
-    (err) => console.warn('[planets] world asset unavailable:', url, err.message)
+    (err) => console.warn('[planets] world asset unavailable:', url, errText(err))
   );
 }
 /* ===================== 状态 ===================== */
@@ -521,7 +522,7 @@ function loadPortalPad(world, position, targetWorld) {
         root.add(m);
       },
       undefined,
-      (e) => console.warn('[planets] portal platform load failed', e.message)
+      (e) => console.warn('[planets] portal platform load failed', errText(e))
     );
   addWorldObj(world.scene, root); // 含稍后 GLB 回调里 root.add(m) 的子树(登记=整棵释放)
   pads[targetWorld] = root;
@@ -548,7 +549,7 @@ function loadPortalPad(world, position, targetWorld) {
       },
       undefined,
       function (e) {
-        console.warn('[planets] 星门模型加载失败,保留石环:', e.message);
+        console.warn('[planets] 星门模型加载失败,保留石环:', errText(e));
       }
     );
 }

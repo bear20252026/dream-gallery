@@ -209,7 +209,15 @@ export function hotBegin(name) {
    */
   bag.async = (fn) => {
     if (typeof fn !== 'function') return fn;
-    return function (...args) {
+    // 这里必须是**函数表达式**而不是箭头:`fn.apply(this, args)` 要把调用方的 this 原样透传。
+    // `@this {any}` 只给它一个类型注解,不改任何运行期语义
+    // (没有它,TS2683 报的是"这个 this 没有 annotation",而不是代码写错)。
+    /**
+     * @this {any}
+     * @param {...unknown[]} args
+     * @returns {unknown} fn 的返回值原样交回调用方
+     */
+    function wrapped(...args) {
       // 代次守卫:不在任就什么都不装(见文件头 installCaptures 上方那段)。
       // 关键是**不装就不卸** —— 卸载会把 _prevAdd(此刻记的是现任 bag 的包装)赋回去,
       // 等于把现任的捕获悄悄摘掉,那比这次泄漏更难查。
@@ -219,7 +227,8 @@ export function hotBegin(name) {
       } finally {
         if (installed) uninstallCaptures(bag);
       }
-    };
+    }
+    return wrapped;
   };
   // 捕获期间创建的:场景对象(s.add)/body DOM/定时器/每帧 ticker
   installCaptures(bag);

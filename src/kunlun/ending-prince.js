@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
+import { errText } from '../shared/err-text.mjs';
 
 const PRINCE_MODEL = '/models/b612/chibi-prince-rigged-v2.glb';
 const PRINCE_H = 3.2; // 与 crash-site.js 一致
@@ -81,7 +82,7 @@ export function loadPrince(cb) {
       cb && cb();
     },
     undefined,
-    (e) => console.error('[ending] 小王子模型加载失败(结局照常推进):', e.message)
+    (e) => console.error('[ending] 小王子模型加载失败(结局照常推进):', errText(e))
   );
 }
 function cloneFade(mm) {

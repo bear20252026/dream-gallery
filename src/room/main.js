@@ -8,6 +8,7 @@
 //   资产为 glTF(/assets/wise_zzz.glb),由 GLTFLoader 加载;缺失时回退到程序化轮滑小人。
 import * as THREE from 'three';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
+import { errText } from '../shared/err-text.mjs'; // loader 的 onError 形参由 three 声明成 unknown
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import './room.css';
 
@@ -289,7 +290,7 @@ function loadRollerblade(avatar) {
     undefined,
     (err) => {
       // 资源缺失/加载失败:保留胶囊占位,不影响房间可用性
-      console.warn('[room] wise_zzz 角色加载失败,使用占位胶囊:', err && (err.message || err));
+      console.warn('[room] wise_zzz 角色加载失败,使用占位胶囊:', errText(err));
     }
   );
 }

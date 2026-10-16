@@ -30,6 +30,7 @@ import {
 } from '../shared/fox-ground-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
 import { tt, SCENE_FOX, FOX_UI } from '../shared/story-text.mjs';
+import { errText } from '../shared/err-text.mjs';
 
 const OWNER = 'fox-scene';
 const MODEL = '/models/hall/b612-world/fox-scene.glb'; // 0.42MB(源 1.37MB,meshopt+webp)
@@ -233,7 +234,7 @@ function build() {
       placeSeat();
     },
     undefined,
-    (e) => console.error('[fox-scene] 布景模型加载失败:', e.message)
+    (e) => console.error('[fox-scene] 布景模型加载失败:', errText(e))
   );
 
   // 当前坐席光点

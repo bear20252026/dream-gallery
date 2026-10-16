@@ -23,6 +23,12 @@ function getAud() {
 }
 
 // 播放单首,返回 Promise 在该曲 ended 或超时(10s 起播失败)后 resolve
+/**
+ * @param {string} url
+ * @returns {Promise<void>} 明写 `void` 是为了让体内那两句裸 `resolve()` 成立 ——
+ *   没有这个上下文类型时 TS 把 Promise 推成 `Promise<unknown>`,而它要求 resolve **必须带一个参数**,
+ *   于是在完全正确的"这里没有值可给"处报 TS2810(编译器报的是"我推不出你的意图",不是"你写错了")。
+ */
 function playOne(url) {
   return new Promise(function (resolve) {
     const a = getAud();
