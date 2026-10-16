@@ -900,8 +900,30 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   另一条决定成本的实测:`src/gate/quiz.js` 里 **`store.` 出现 0 次** ⇒ 温柔度既不落库也不进星屑
   (星屑读的是 `ctx.store.num('quiz')`,那是**答题门** `quizgate.js:571` 写的),所以"退役"没有下游破坏;
   "接回来"则要给谁按、结果给谁看、要不要存 —— 三个都是产品问题,等主人定,不属于类型批次。
+- ⚠️⚠️**这条 `0` 的作用域必须写清楚,否则它就是一句过度陈述(2026-10-16 夜里实测)**:
+  `tsconfig.checkjs.json` 的 include 只有 `src/core/**` + `src/player/**` + `src/kunlun/avatar.js` 三个根,
+  其余靠静态/动态 import 拉进来 —— `--listFiles` 实测**程序里只有 149 个 src 文件**,
+  而 `src/kunlun/earth-day.js`(读 `ctx.scene.foxApi.seat()`)、`src/scene/plane-flight.js`(写 `ctx.scene.planeApi`)、
+  `src/main.js`、`src/room/main.js`、`src/admin/*`、`src/museum/*`、`src/shared/sentry.js` **都不在里面**。
+  把 include 放宽成 `['src/**/*.js','src/**/*.mjs','types/**/*.d.ts']` 再数一次:**641 条**,
+  拆干净是 **产品侧 181 / `src/__tests__` 460**(码分布 TS2339 533 · TS2322 21 · TS2554 18 · TS2739 16 · TS2740 13 ·
+  TS2345 11 · TS2304 7 · TS2353 6;文件排名 admin-docs 18 / lib-upload-transcode 12 / admin-chat 11 /
+  earth-day 10 / admin-content 10 / ending-prince 9 / lib-shadow 9 / sentry 8 / error-report 7 / museum 6 /
+  visitor-fp 5 / room-main 5)。⇒ **"基线归零"是"被检图内归零",不是"全站类型债清零"**,
+  而且那三条 `planeApi/foxApi/loopManager` 之所以"0 条错咬住",正是因为**消费者没被检查**,不是它们已经好了
+  (这条恰好推翻我自己在同一天早些时候写下的"这轮没被任何读数点咬住"的措辞 —— 那句是错的,读数点在,只是图没罩到)。
+  复现姿势(临时配置,不入库):根目录放 `tsconfig.checkjs-all.json` = `{"extends":"./tsconfig.checkjs.json",
+  "include":["src/**/*.js","src/**/*.mjs","types/**/*.d.ts"]}`,`npx tsc -p tsconfig.checkjs-all.json | grep -c "error TS"`。
+  下一刀(第十刀)的顺序因此**必须先扩图再切**:把产品源码全量拉进 include(admin/museum/room/earth-day/plane-flight/
+  sentry/error-report 这些是玩家可见路径),基线会一次性跳到 ~181,再按第九刀那套"机制族"往下压;
+  `src/__tests__` 那 460 条**不要混进来** —— 它们 require 后端 `lib/*`,缺的是 node/vitest 的类型环境,
+  那是另一条工作线,塞进产品基线只会让地板数字失去意义。⚠️扩图那一步会让基线**上调**,
+  这正是 `ctx-writer-shapes.test.js` 批次6-7 那条地板钉子设计要拦的事 ⇒ 做的人必须同时改那条测试,
+  并在提交信息里写清"跳上去的是新覆盖面,不是新债"。
 - **还剩的 unknown**:`planeApi` / `foxApi` / `loopManager` 三条 ctx.d.ts 成员仍是 `unknown`
-  —— 它们这轮没被任何读数点咬住(0 条错),按第八刀那条口径,**要收它们得连"声明 ≡ 写入方"的钉子一起写**,
+  —— ⚠️**它们"0 条错"不是因为没有读数点,而是因为读数点没在检查图里**(见上一条实测:`earth-day.js:55-56`
+  就在读 `ctx.scene.foxApi.seat()/.site()`,而那个文件不在 `--listFiles` 的 149 个里)。
+  按第八刀那条口径,**要收它们得连"声明 ≡ 写入方"的钉子一起写**,
   属于独立一批,不为了"看起来更严"先动声明。
 
 
