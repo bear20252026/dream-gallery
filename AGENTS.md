@@ -927,6 +927,128 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   属于独立一批,不为了"看起来更严"先动声明。
 
 
+## 2026-10-16 第十刀·批次1:裸 `object` 输入包(145 → **116**,不部署)
+
+批次0 撑开图之后剩下的第一族,两个文件 29 条,机制同一条:`@param {object}` 让编译器把
+`s.pos.x` / `store.mark(k)` 全看成"往 object 上要属性"(TS2339),**写错键名没人拦**。
+补法沿用第六刀「状态包/输入包不许裸 object」,但这一刀真正花时间的地方不是补类型,
+而是**让"补的类型不许是假的"这件事可测**。
+
+### 先核实(动手前把每条断言读回源文,并把批次0 那条"图外"结论用实测复核)
+
+- 重新数了一遍基线:`npx tsc -p tsconfig.checkjs.json --noEmit | grep -c "error TS"` = **145**,
+  分布与批次0 记的一致(plane-physics 22 / chapter-map-logic 7 在最前)。
+- **PlaneState 的八个键**:唯一初始值出处 `src/scene/plane-flight.js:193 freshState()`(数字面 8 个),
+  演化点 `:483-484`(`state = stepPlane(...).state`);本文件 `const o` 的字面键与它**一字不差**。
+- **PlaneInput 的六个键**:唯一写入方 `plane-flight.js:399 readInput()`;
+  六个全部可缺,因为实现里逐个带兜底(`inp.pitchIn || 0`、`inp.brakeHold && …`、`inp.groundHeightAt ? … : 0`)——
+  可选性是**从兜底读出来的**,不是猜的。
+- ⚠️**`crashed` 不是状态字段**:`stepPlane` 只把它写进 `flags.crash`,从不写进 `o`;
+  它是 `plane-flight.js:96 let crashed` 这个模块级旗,只在调用点 `:312 planePhase({ ...state, crashed })`
+  现场并进去。所以它待在 `PlanePhaseInput = PlaneState & { crashed?: boolean }` 里,
+  **刻意不并进 PlaneState**(并进去就成了假档案,还会诱导"物理核该复位 crashed"这种根本不归它管的活)。
+- **store 的两面**:`collectSave/encodeSave` 只读四个,`applySave/restoreSave` 只写五个,
+  `importSave` 两个都要 ⇒ 三个 `@param` 各写自己那份(`SaveReader` / `SaveWriter` / 交集),
+  不写成"整个 StoreAPI",因为那会把"本模块不碰 getSpirits/addSpirit/houseColor"假装成碰。
+  唯一写入方 `src/state/store-api.js:211 storeApi`,挂载点只有一处 `src/state/store.js:13 ctx.ui.store = storeApi`。
+- **`Buffer` 那两条 TS2591**:`@types/node` **本来就在 node_modules 里**(被 ndarray/glob 带进来的),
+  往 `tsconfig.checkjs.json` 的 `types` 加一个 `"node"` 一行的确能抹掉它们 —— 但那等于给整个
+  **浏览器**程序放开 `process`/`require`/`__dirname`/`global`,以后产品里误用 node API 会一路绿到运行时。
+  所以走"缺哪块补哪块":新建 `types/node-fallback-globals.d.ts`,只声明 `from` 与 `toString` 两个面。
+- 🔎**顺带查出来一条待主人定的**(本轮没动):`b64encode/b64decode` 的 Buffer 分支只在
+  `typeof btoa !== 'function'` 时走得到,而浏览器与 Node ≥16 **都有** `btoa` ⇒ 这条兜底实测是死分支。
+  删它属于"放松防护",不在类型刀里顺手做;只登记,不动代码。
+
+### 归因(29 条,按机制分;行号是从批次0 那份原始清单 `.tmp/cj10-start.txt` 抄的,便于逐条复核)
+
+| 机制 | 条数 | 收法 |
+| --- | --- | --- |
+| `stepPlane(s, inp)` 两个裸包 → 往 `object` 上要属性 | 17(`s` 侧 10:第 77 行一次报 `s.pos.x/y/z` 三条,78-84 各一条;`inp` 侧 7:94/95/96/100 各一条、129 一枚 `brakeHold`、182 行一次报两条 `groundHeightAt`) | `PlaneState`(8 必填)+ `PlaneInput`(6 可选) |
+| `planePhase(s)` 的裸包,含状态里根本没有的 `crashed` | 5(235 `speed` / 236 `crashed` / 237·243·251 三枚 `onGround`) | `PlanePhaseInput`(交集),`crashed` 留在旗侧 |
+| `applySave(store)` 的裸包 → 五个 setter 全 TS2339 | 5(第 182 行一次报 mark 与 unmark 两条,183/184/185 各一条) | `SaveWriter` |
+| node 兜底 `Buffer` 未声明 | 2(114/118) | `types/node-fallback-globals.d.ts` |
+| **合计** | **29** | 145 → **116** |
+
+归因不是靠肉眼:跑了一次前后 per-file 差分(`.tmp/cj10-start.txt` vs `.tmp/g1-checkjs.log`),
+**变化的文件数 = 2**,`plane-physics 22→0`、`chapter-map-logic 7→0`,741 个在图文件里再没有第三个数字动过。
+
+### 反向验证(9 条注入,全红;每条还原 md5 与注入前一致)
+
+判据文件:`src/__tests__/plane-and-save-shapes.test.js`(新,27 项 / 6 组)。它不比"类型好不好",
+只比**声明与写入方是不是同一份事实**:键集逐个比、可选性与实现里的兜底逐个比、
+方法名必须真实存在于 `storeApi` 的字面量上、`.d.ts` 的成员面必须等于文件里真出现的调用面。
+
+| # | 注入 | 判据 | checkJs |
+| --- | --- | --- | --- |
+| I1 | PlaneState 键名打错 `vspeed`→`vSpeed` | 钉子 1 红(八个键一字不差) | 116 → **119** |
+| I2 | 可选性猜反(`brakeHold` 写成必填) | 钉子 1 红 | 不测(不影响编译器) |
+| I3 | `crashed` 混进 PlaneState | 钉子 2 红(键集 + "八键里没有 crashed") | 不测 |
+| I4 | SaveWriter 少一枚 `unmark` | 钉子 2 红(键集 + setter/`=== false` 配套) | 116 → **117** |
+| I5 | Buffer 声明多给一个 `alloc` | 钉子 1 红 ⇒ **第一次跑是绿的,见下面那条陷阱** | 不测 |
+| I6 | `types` 里放进 `"node"` | 钉子 1 红(不许借整副牌照) | 不测 |
+| I7 | `include` 丢掉 `types/**/*.d.ts` | 钉子 1 红 | 116 → **120**(Buffer×2 **和** deviceMemory×2 一起回来) |
+| I8 | 退回 `@param {object} s` | 钉子 2 红 + 排他表 1 红(`types-param-bag-shapes`) | 116 → **126** |
+| I9 | 基线抬到 117 | 地板钉子 1 红(`checkJs 基线不得超过 116`) | 不测 |
+
+I7 那条是这一批最值钱的:一次注入同时把**两份**全局声明文件的贡献量出来
+(`node-fallback-globals` 2 条 + `browser-globals` 2 条),它证明"全局脚本 .d.ts 不写进 include 就是
+一句写了等于没写"这条第九刀·批次6 的教训,对新加的声明同样成立。
+
+### 工具与判据陷阱(本轮新增,都会再咬人)
+
+1. **自己在注释里写了 `@param {object}`,被自己的"裸包归零"判据读了出来** ⇒ 判据红、代码没错。
+   这是第九刀那条"注释里的 `emit('world:changed'` 被'只有一个 emit'数成两条"的**同族复发**:
+   判据读的是文本,不是读它自己的想象。改注释措辞(「花括号里只写了 `object`」),不改判据。
+2. **`--reporter=basic` 在 vitest 4 已不存在** ⇒ reporter 加载失败,九条注入明明全红,
+   汇总行却一条都读不到。修两处:用默认 reporter;并且**先剥 ANSI 色码再 `^\s*Tests` 匹配**
+   (色码在行首,不剥就一直 NO_TESTS_LINE)。读不到时必须打印 `TAIL⟨…⟩`,绝不当成"没问题"。
+3. **注入没红 ⇒ 先怀疑判据,不是先宣布安全**。I5 第一次跑是绿的:我的成员分割器只认 `,`,
+   而 interface 的成员之间是 `;` ⇒ 整块被当成一个片段,多出来的 `alloc` **根本看不见**。
+   把分隔符改成 `,` 与 `;` 都认之后 I5 才真的咬住。这一条记成口径:
+   **"钉子测不到注入"和"代码没问题"是两件事,前者是后者的假证词。**
+4. 顺带把同一个分割器的另外两个瞎点一起补上:角括号(`Object<string, *>` 里的逗号会切错)、
+   以及 `=>` 里的 `>` 不能当闭合;`literalBlock` 要跳过块注释,否则 `storeApi` 里
+   `@returns {string[]}` 这种注释花括号会骗过配对计数。
+
+### 零运行时改动(所以不部署)
+
+`.tmp/min-eq.cjs`(与 HEAD 各跑 `esbuild --minify` 比 md5,自带反向对照):
+
+```
+SAME  src/scene/plane-physics.mjs        head=3563B now=3563B
+SAME  src/shared/chapter-map-logic.mjs   head=3848B now=3848B
+CTRL  OK 改一个函数名 ⇒ md5 立刻不同(判据在读代码)
+```
+
+两个文件的运行期字节完全一致(纯注释/JSDoc),所以本批只 `--no-deploy` 合并进 main。
+⚠️ 这不等于"产物没变":构建把 git 短哈希打进 chunk 名,纯注释也会改名(第九刀已记);
+那条只影响**将来 deploy 时**的产物名,不影响"现在线上没有需要修的行为"。
+
+### 六项门禁 + 四条 CI 闸门(全绿)
+
+`vitest 1181 通过 / 102 个文件`(原 1154/101,+27 全来自新判据)、`npm test` 六个脚本
+7+22+108+46+20+6 = **209 通过 0 失败**、`eslint .` 0、`tsc --noEmit` 0(主门禁仍然 0,
+`declare var Buffer` 与已在 node_modules 里的 `@types/node` 在 `skipLibCheck` 下不打架)、
+`vite build` 265 modules、`depcruise` **403 modules / 1396 deps**
+(比批次0 的 402/1393 各 +1/+3:新判据文件本身入图,带进 `node:fs`/`node:path`/`vitest` 三条边,
+**不是产品模块多了**)、四条 CI 闸门(hill-solo / csp-page-registry / backend-manifest /
+probe-isolation)退出码全 0。checkJs = **116**,与 `scripts/checkjs-baseline.txt` 相等。
+
+### 排他账与地板
+
+- `types-param-bag-shapes.test.js` 那条"还剩两处不是漏做"到期:两处都补全后**账清空**,
+  现在全仓产品代码 0 处裸 `{object}` 的 `@param`(I8 实测会红)。
+- `ctx-writer-shapes.test.js` 的 `CEILING` 145 → **116**(I9 实测咬得住)。
+
+### 下一刀顺手能捡的一条(本轮已核实,没动)
+
+`types/ctx.d.ts:522` 的 `StoreAPI.set: (key, value) => void` **指不回写入方**:
+`store-api.js:211` 的 `storeApi` 上没有 `set` 方法,产品代码里也没有一处 `store.set(`。
+按第九刀口径这是"声明悬空",属于 ctx-drift 那一族(批次3/4),和 `planeApi`/`foxApi`/`loopManager`
+三条 `unknown` 一起收,别在类型刀里顺手删 —— 删之前得先确认没有 `ctx.store.set` 的动态调用点。
+
+
+
 ## 2026-10-16 第十刀·批次0:把检查图撑大(基线 0 → **145**),并更正我自己那个"181"
 
 第九刀末尾那条"⚠️⚠️ 这条 `0` 的作用域"就是这一批的开工单。**这批没改任何产品源码**
