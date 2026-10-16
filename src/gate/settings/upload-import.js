@@ -1,6 +1,7 @@
 import { Z } from '../../shared/z-layers.mjs';
 // upload-import.js — C2 展厅选片导入(从上传中挑选 ≤20 幅呈现在永恒展厅西墙)
 import { ctx } from '../../ctx.js';
+import { qsInput } from '../../shared/dom-typed.js'; // 每行 label 里那枚 <input type=checkbox> 由本文件上一行自己写出来
 
 const etPickOv = document.createElement('div');
 etPickOv.id = 'etPickOv';
@@ -42,16 +43,17 @@ function etRender(list) {
       '><span class="nm">' +
       name.replace(/^whiteboard-/i, '') +
       '</span>';
-    lab.querySelector('input').onchange = function () {
-      if (this.checked) {
+    const cb = qsInput(lab, 'input');
+    cb.onchange = function () {
+      if (cb.checked) {
         if (etSel.size >= 20) {
-          this.checked = false;
+          cb.checked = false;
           ctx.ui.modeToast && ctx.ui.modeToast('最多选 20 幅');
           return;
         }
         etSel.add(name);
       } else etSel.delete(name);
-      lab.className = this.checked ? 'on' : '';
+      lab.className = cb.checked ? 'on' : '';
       cnt.textContent = '已选 ' + etSel.size + ' / 20';
     };
     box.appendChild(lab);

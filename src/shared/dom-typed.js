@@ -43,6 +43,15 @@ export function byIdCanvas(id) {
 }
 
 /**
+ * 按 id 取下拉框(`<select>`)。第八刀需要:spirit-page 的 #spPrefix。
+ * @param {string} id
+ * @returns {HTMLSelectElement|null}
+ */
+export function byIdSelect(id) {
+  return /** @type {HTMLSelectElement|null} */ (document.getElementById(id));
+}
+
+/**
  * 按 id 取按钮(`<button>`)。`disabled` 只在按钮/表单元素上,普通 HTMLElement 没有。
  * @param {string} id
  * @returns {HTMLButtonElement|null}

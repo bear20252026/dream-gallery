@@ -3,6 +3,7 @@ import { Z } from '../../shared/z-layers.mjs';
 import { ctx } from '../../ctx.js';
 import { eventBus } from '../../event-bus.js';
 import { expose } from '../../debug-hooks.js';
+import { byIdSelect, qsaBtn } from '../../shared/dom-typed.js'; // #spPrefix 是 <select>,button[data-lg] 由本文件 :72 那段模板写成 <button>
 
 const spOv = document.createElement('div');
 spOv.id = 'spOv';
@@ -94,7 +95,7 @@ function renderSpirits() {
       '</div>';
   }
   spCard.innerHTML = html;
-  const sel = document.getElementById('spPrefix');
+  const sel = byIdSelect('spPrefix');
   if (sel) {
     sel.value = ctx.store.str('prefix');
     sel.onchange = () => {
@@ -117,7 +118,7 @@ function renderSpirits() {
       spApi.close();
       eventBus.emit('kunlun:teleport', { kind: 'peak' });
     };
-  spCard.querySelectorAll('button[data-lg]').forEach((b) => {
+  qsaBtn(spCard, 'button[data-lg]').forEach((b) => {
     b.onclick = () => {
       if (ctx.kunlun.letgoRecall && ctx.kunlun.letgoRecall(b.getAttribute('data-lg')))
         renderSpirits();

@@ -8,6 +8,7 @@ import { Z } from '../shared/z-layers.mjs';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { bigText } from '../ui/kit.js';
+import { qsBtn } from '../shared/dom-typed.js'; // #tcOk / #tcLater 是本文件那段卡片模板里的 <button>
 import { bell } from '../shared/audio-blip.js'; // 钟声统一实现(B1 整改)
 const bag = hotBegin('finale');
 const { s, onTick, iG } = ctx;
@@ -414,8 +415,8 @@ function showTitleCard(nick) {
     if (toSettings) ctx.ui.modeToast && ctx.ui.modeToast('在右下角 ⚙ 设置里，随时可以改雅号。');
     else ctx.ui.modeToast && ctx.ui.modeToast('前缀「六颗藏梦人·」已备好，再保存一次昵称即生效。');
   };
-  d.querySelector('#tcOk').onclick = () => done(false);
-  d.querySelector('#tcLater').onclick = () => done(true);
+  qsBtn(d, '#tcOk').onclick = () => done(false);
+  qsBtn(d, '#tcLater').onclick = () => done(true);
 }
 bag.custom.push(() => {
   const d = document.getElementById('titleCardOv');

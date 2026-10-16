@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
+import { byIdInput } from '../shared/dom-typed.js';
 hotBegin('housecolor');
 
 const GROUPS = [
@@ -126,12 +127,16 @@ for (const [name, hex] of PRESETS) {
   b.onclick = () => apply(curGroup, hex, true);
   sw.appendChild(b);
 }
+// 自定义取色那只 <input> —— markup 就在本文件 :62 那段面板模板里,取一次,下面两处读同一个元素
+const hcCustom = byIdInput('hcCustom');
 function refreshSwatch() {
   const cur = ctx.store.houseColor(curGroup);
   sw.querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.c === cur));
-  if (cur) document.getElementById('hcCustom').value = cur;
+  if (cur) hcCustom.value = cur;
 }
-document.getElementById('hcCustom').oninput = (e) => apply(curGroup, e.target.value, true);
+// 手柄里读同一个元素(hcCustom 就是这只 input 自己),不再从 e.target 上读 ——
+// e.target 的静态类型是 EventTarget,.value 那条错与"取用点没标类型"是同一个病的另一半。
+hcCustom.oninput = () => apply(curGroup, hcCustom.value, true);
 document.getElementById('hcReset').onclick = () => {
   for (const [g] of GROUPS) {
     (originals[g] || []).forEach((hex, i) => {

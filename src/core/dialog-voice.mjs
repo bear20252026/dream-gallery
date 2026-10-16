@@ -438,10 +438,19 @@ export function onVoiceEnd(cb) {
   );
 }
 
+/**
+ * 静音钮元素本体 + 记在它身上的换字监听句柄。
+ * 句柄**挂在元素上**是有意的:`disposeMuteBtn` 只拿到那个对话框,要靠元素自己找回上一轮那份
+ * 监听才摘得掉(与 `src/scene/media/video-wall.js` 的 `TaggedVideo` 同一形)。
+ * 声明在这儿的理由不是"好看":不写,四个读数点里 `b._langHandler` 就各判一条 TS2339,
+ * 而下一个人会以为"字段不存在 = 这行代码写错了"。
+ * @typedef {HTMLButtonElement & { _langHandler?: ((e: Event) => void) | null }} VoiceButton
+ */
+
 /** 对话框挂静音钮(gameshell-dialog attach 时调用;防重复安装) */
 export function installMuteBtn(dialogEl) {
   if (!dialogEl || dialogEl.querySelector('.gs-voice')) return;
-  const b = document.createElement('button');
+  const b = /** @type {VoiceButton} */ (document.createElement('button'));
   b.className = 'gs-voice';
   b.type = 'button';
   b.setAttribute('aria-label', tt({ en: 'Voice on / off', zh: '台词朗读开关' }));
@@ -479,7 +488,7 @@ export function installMuteBtn(dialogEl) {
  */
 export function disposeMuteBtn(dialogEl) {
   if (!dialogEl || !dialogEl.querySelector) return false;
-  const b = dialogEl.querySelector('.gs-voice');
+  const b = /** @type {VoiceButton|null} */ (dialogEl.querySelector('.gs-voice'));
   if (!b) return false;
   if (b._langHandler && typeof window !== 'undefined')
     window.removeEventListener('script:lang', b._langHandler);
