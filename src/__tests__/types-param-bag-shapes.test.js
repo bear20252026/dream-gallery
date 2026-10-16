@@ -338,14 +338,11 @@ describe('类级别闸门:这一族不许回来', () => {
       const n = bareBags(text).length;
       if (n) ledger[rel] = n;
     }
-    // ⚠️剩下这两处不是"漏做":plane-physics / chapter-map-logic 都**不在 checkJs 的可见图里**
-    // (tsconfig.checkjs.json 只 include src/core、src/player、src/kunlun/avatar.js,其余靠 import 传递;
-    // `tsc --listFiles` 实测这两个文件确实不在程序集里 —— 2026-10-15 记)。没有编译器背书时,
-    // 手写形状反而会变成第二条谎。要治它们得先把文件纳进检查图,那是独立一批。
-    expect(ledger).toEqual({
-      'src/scene/plane-physics.mjs': 3,
-      'src/shared/chapter-map-logic.mjs': 1,
-    });
+    // 2026-10-15 记的"剩下这两处不是漏做"已经到期:第十刀·批次0 把检查图撑成产品源码全量之后,
+    // plane-physics / chapter-map-logic 第一次被 tsc 读到(22 + 7 条 TS2339 当场现形),
+    // 批次1 把这两个文件按实际用到的面写全了 ⇒ 排他表清空。
+    // 清空的含义是**全仓产品代码里再没有裸 `{object}` 的 @param**,不是"这两个文件被豁免了"。
+    expect(ledger).toEqual({});
   }, 60000);
 
   it('tone 的点号子声明与解构形参一字不差(声明里的字段不许是摆设)', () => {

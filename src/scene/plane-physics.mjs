@@ -62,15 +62,51 @@ export const PLANE_PARAMS = {
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 const clampN = (v) => clamp(v, -1, 1);
 
+// ————————————————— 形状(第十刀·批次1)—————————————————
+// 此前这里四个包的花括号里只写了 `object`(三个 @param + 一个 @returns 里的 state),
+// ⇒ 编译器把 `s.pos.x` 一律看成"往 object 上要属性",实测报 22 条 TS2339。
+// 那 22 条不是噪音,是**没有背书**的凭证:写错一个键名(vspeed 打成 vSpeed)都不会有人拦。
+// 本文件不在旧的检查图里,这些声明从来没被 tsc 读过;批次0 把它纳进图之后才看得见。
+// 钉子:src/__tests__/plane-and-save-shapes.test.js(键集与写入方一字不差)。
+
+/**
+ * 飞行状态。**八个键,必填**(实现里 `s.pos.x`/`s.vspeed` 都是无守卫直读的,少一个就是 NaN)。
+ * `vspeed` = 垂直速度 m/s(与 `speed` 分开:speed 是水平地速,升力算的是它俩中的 v²)。
+ * 写入方有两处、形状同一个:`src/scene/plane-flight.js:193 freshState()` 造初始值,
+ * 本文件 `stepPlane` 返回的 `o` 是它的一步演化(消费点 `plane-flight.js:483-484` 把返回值写回 `state`)。
+ * @typedef {{ pos:{x:number,y:number,z:number}, yaw:number, pitch:number, roll:number, speed:number, throttle:number, onGround:boolean, vspeed:number }} PlaneState
+ */
+
+/**
+ * 一步的操纵输入。**全部可缺** —— 每个键在实现里自带兜底(`inp.pitchIn || 0`、
+ * `inp.brakeHold && …`、`inp.groundHeightAt ? … : 0`),所以写成可选是事实,不是客气。
+ * 写入方唯一:`src/scene/plane-flight.js:399 readInput()`(键盘 → 六个键)。
+ * ⚠️ 符号:`pitchIn` **负 = 拉杆抬头**(见文件头约定段;写反过一次线上探针实锤的 bug)。
+ * @typedef {{ pitchIn?:number, rollIn?:number, yawIn?:number, throttleIn?:number, brakeHold?:boolean, groundHeightAt?:(x:number,z:number)=>number }} PlaneInput
+ */
+
+/**
+ * 一步的**事件**(一次性,调用方读完即弃;这就是它不并进 PlaneState 的理由)。
+ * 写入方唯一:本函数 `flags` 的字面量。消费点:`plane-flight.js:499 r.flags.crash`。
+ * @typedef {{ liftoff:boolean, touchdown:boolean, stall:boolean, crash:boolean, boundaryHit:boolean }} PlaneFlags
+ */
+
+/**
+ * `planePhase` 的入参 = PlaneState **再多一个 crashed**。
+ * ⚠️ `crashed` 不是状态字段:`stepPlane` 只在 flags 里报 crash,从不把它写进 state。
+ * 它是 `src/scene/plane-flight.js:96 let crashed` 这个模块级旗,只在调用点 `:312`
+ * `planePhase({ ...state, crashed })` 现场并进来 —— 把 crashed 写进 PlaneState 就是假档案
+ * (会诱导出下一步"stepPlane 该复位 crashed"的错觉,而它根本不归物理核管)。
+ * @typedef {PlaneState & { crashed?:boolean }} PlanePhaseInput
+ */
+
 /**
  * 一步积分。
- * @param {object} s 状态(全新对象返回,不改入参)
- *   { pos:{x,y,z}, yaw, pitch, roll, speed, throttle, onGround, vspeed(垂直速度) }
- * @param {object} inp 输入
- *   { pitchIn, rollIn, yawIn, throttleIn, groundHeightAt(x,z) }
+ * @param {PlaneState} s 状态(全新对象返回,不改入参)
+ * @param {PlaneInput} inp 输入
  *   pitchIn/rollIn/yawIn ∈ [-1,1]; throttleIn ∈ [0,1] 是**增量**(↑/↓ 键)
  * @param {number} dt 秒(调用方必须已钳制)
- * @returns {{state:object, flags:{liftoff, touchdown, stall, crash, boundaryHit}}}
+ * @returns {{state:PlaneState, flags:PlaneFlags}}
  */
 export function stepPlane(s, inp, dt, P = PLANE_PARAMS) {
   const o = {
@@ -228,7 +264,7 @@ export function stepPlane(s, inp, dt, P = PLANE_PARAMS) {
 
 /**
  * 起落判定辅助:给 HUD / 探针用的小工具(纯读函数)。
- * @param {object} s 状态
+ * @param {PlanePhaseInput} s 状态 + crashed 旗(见 PlanePhaseInput 的 ⚠️:crashed 不归物理核写)
  * @returns {{phase:'parked'|'roll'|'lift'|'cruise'|'stall'|'down', hintZh:string, hintEn:string}}
  */
 export function planePhase(s, P = PLANE_PARAMS) {
@@ -252,11 +288,19 @@ export function planePhase(s, P = PLANE_PARAMS) {
   if (o_isRising(s)) return { phase: 'lift', hintZh: '爬升', hintEn: 'Climbing' };
   return { phase: 'cruise', hintZh: '巡航', hintEn: 'Cruise' };
 }
+/**
+ * @param {PlaneState} s
+ * @returns {boolean}
+ */
 function o_isRising(s) {
   return (s.vspeed || 0) > 0.6;
 }
 
-/** 速度 → 地速显示(km/h,玩家习惯读这个)。 */
+/**
+ * 速度 → 地速显示(km/h,玩家习惯读这个)。
+ * 只声明它**真的读的那一个键** —— 写成 PlaneState 会假装它关心姿态,而它对姿态毫无依赖。
+ * @param {{speed:number}} s
+ */
 export function planeSpeedKmh(s) {
   return Math.round(Math.max(0, s.speed) * 3.6);
 }
