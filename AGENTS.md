@@ -863,10 +863,33 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   独立 chunk(实见 `dist/assets/err-text-DCwQ_cVZ.js`),core-preload 因此多预取一条。三条构建断言管的是
   "全部 prefetch 带 crossorigin / 入口不含 three / dist 无 importmap",**不管条数**,所以这不是回归;
   但第八刀那句"prefetch 仍 47"到这一刀已经**是旧数**了 —— 不核就抄,下一个 47 会变成第 N 条假结论。
-- ⚠️**线上没有证到的,继续记成未证**(与第八刀同口径):本地那次真浏览器量到的 `audioManager` 键集、
-  `playHint` 三分支、`scrollLink.redraw.length === 2`、切换实际载荷 `{from,to}` **生产上没有对应探针**,
-  线上证据只有"六条世界链全绿 + 版本戳对得上"⇒ "跑进去了"不等于"点过了"。
-  要补的是把这几项做成 `scripts/probe/` 里的常驻探针(挂在待办,不属于类型批次)。
+- ⚠️**线上没证到的,当天先记成未证、当天夜里补成常驻探针**(2026-10-16 `scripts/probe/ctx-runtime-shape-probe.cjs`):
+  第九刀登记时写的是"本地量过的 `audioManager` 键集 / `playHint` 三分支 / `redraw.length === 2` /
+  切换实际载荷 `{from,to}`,生产上没有对应探针 ⇒ 跑进去了不等于点过了"——那句当时成立,现在由探针变成可复跑的线上证据:
+  - 线上 `BASE_URL=https://cloudbear.cloud PROBE_WAIT_MS=120000 node scripts/probe/ctx-runtime-shape-probe.cjs`
+    ⇒ **`PROBE_OK 16/16`**:键集 = `hintQueue,hintSound,isHintPlaying,pauseAll,playHint,playOne,registerVideo,resumeAll,unregisterVideo,videoSound`;
+    `playHint` arity 3、`playOne` arity 0(带默认值的形参不计入 length ⇒ 声明里 `[item]` 那条可选性的实物对面);
+    `skipped` 那条 `onEnd` 恰好一次、`bypassSwitch=true` 返回 `play`、`playOne()` 空参不抛;
+    `scrollLink.redraw` 是函数且 arity 2;真走一次 main→b612 收到的载荷键集合 `from,to`、值 `main→b612`,
+    `worldChanged` 返回取消订阅函数(eventBus.on 契约);全程 **0 未捕获异常**。
+  - 本地自起临时服同一份 **16/16**(`GATE_DATA_FILE` 落系统临时目录;`probe-isolation-guard` 扫 148 脚本仍 0 违规,
+    新探针已按 README 的规矩**入列索引表**,不在表外的探针等于没人知道它存在)。
+  - **反向验证四遍**(`PROBE_BREAK` 是探针自带的注射口,正常跑勿设):`clean` ⇒ 16/0 exit 0;
+    `keys`(删掉 `audioManager.playHint`)⇒ 5 条红(C1 缺成员 + C1 arity + C2 三条);
+    `arity`(把 `redraw` 换成三参)⇒ **恰好 1 条红**(C3);`payload`(切换之后才订阅)⇒ C4 全组 4 条红
+    ⇒ 每条判据都可归因地咬人。
+  - 写这支探针时自己的两处错(都属"红与崩/假通过"那一族,不改掉就是又一盏假绿灯):
+    ① `PROBE_BREAK=payload` 起初写成 `ok(payload === null, '这条本就该红')` —— **把"我故意让它错过"写成会通过的断言**
+    就是假绿;改成照常判定(错过载荷 ⇒ C4 自然红)。
+    ② C2 起初只把 `playOne()` 包进 try,于是 `keys` 注射会让整个 `page.evaluate` 抛出去变成 `PROBE_CRASH`;
+    崩与红是两种结论,只有红可归因 ⇒ 两个 `playHint` 调用一起包进 try。
+  - ⚠️两条**旧坑复发 + 新坑**当场抓到:
+    ① 我先 `prettier --write .tmp/probe-fmt-check.cjs` 拿到一句"与源文件 0 diff",而 `.tmp` 被 prettier 3 的默认
+    `--ignore-path`(连 `.gitignore` 一起读)**静默跳过** ⇒ 那句"已经合排"是假的(第八刀记过这个坑,还是犯了);
+    回到真实路径 `--write` + `--check` 才拿到真结论。
+    ② `.tmp/rv9e.sh` 把 `run()` 三个参数写串了位(签名 `tag expect br`,调用传成 `tag br expect`),
+    于是四遍全只走到探针头部"PROBE_BREAK 取值不认识 ⇒ fail-closed exit 2"那道守卫:**四遍齐刷刷 rc=2、红=0**
+    —— 这种"整齐得不像话"的结果就是判据没在工作的形状(与"我什么都没找到"不许当成没有问题同一条)。
 - **还剩的 unknown**:`planeApi` / `foxApi` / `loopManager` 三条 ctx.d.ts 成员仍是 `unknown`
   —— 它们这轮没被任何读数点咬住(0 条错),按第八刀那条口径,**要收它们得连"声明 ≡ 写入方"的钉子一起写**,
   属于独立一批,不为了"看起来更严"先动声明。
