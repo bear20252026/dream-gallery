@@ -265,7 +265,11 @@ function takeoverEmpty(mU, caption, aura) {
   if (!candidates.length) return null;
   const want = aura ? AURA_WALL[aura] : null;
   const target = (want && candidates.find((g) => frameDirOf(g) === want)) || candidates[0];
-  const cm = target.children[3]; // 内容面(hangOn 固定子序)
+  // 内容面:hangOn 往这个 Group 里的 add 顺序是 0=外框 1=隐形碰撞盒 2=mt 3=cM(本文件 :107 / :114 / :117 / :167),
+  // 而 cM 的材质两个分支都新建 MeshStandardMaterial(:133 视频、:163 图片)⇒ 这里说的是写入方的真实形状,不是随手 cast。
+  const cm = /** @type {THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>} */ (
+    target.children[3]
+  );
   const tex = loadTexCapped(mU, undefined, { x: target.userData.ox, z: target.userData.oz });
   // 2026-10-11 DG-GPU-003:换芯必须先释放旧图。旧 map 是这幅画独占的 loadTexCapped CanvasTexture
   // (scene.js 每次调用新建 canvas + 新纹理,已核实非共享),不换=每换芯一次漏一张 1024² 显存。

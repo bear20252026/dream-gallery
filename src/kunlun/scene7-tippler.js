@@ -141,10 +141,17 @@ function mountTipplerSet() {
       m.scale.setScalar(50);
       m.position.set(0, ISLE_TOP_Y, 0);
       m.traverse((o) => {
-        if (o.isMesh && o.material) {
-          o.material.side = THREE.DoubleSide;
-          o.material.fog = false;
-        }
+        if (!(o instanceof THREE.Mesh)) return;
+        // 单材质前提**实测过**:tippler-sky / bottles2 / man / cans 四个 GLB 里没有一个 mesh 带多 primitive
+        // (查法 .tmp/glb-prims.cjs;隔壁 chibi-prince 有 4 个多 primitive 的 mesh,GLTFLoader 也是拆成
+        // Group + 每 primitive 一个 Mesh)⇒ 走到这里的 Mesh.material 恒为一个材质,今天这句
+        // `o.material.side` 本来就建立在这个前提上。**没有**顺手改成"数组也遍历" —— 那会改变行为
+        // (数组情况今天是给数组挂属性 = 静默 no-op)。
+        // 类型写成这两种具体材质而不是基类 `Material`:基类没有 `fog`(@types 只在 MeshStandard/:292
+        // 与 MeshBasic/:170 上声明),而 GLTFLoader 对 pbr / unlit 正好只产这两种。
+        const mat = /** @type {THREE.MeshStandardMaterial|THREE.MeshBasicMaterial} */ (o.material);
+        mat.side = THREE.DoubleSide;
+        mat.fog = false;
       });
       m.name = 'tipplerSky';
       w.scene.add(m);

@@ -161,9 +161,16 @@ loader.load(
     // 世界坐标把脚底抬到轴心。不用几何包围盒——蒙皮网格的包围盒/首帧骨骼矩阵
     // 都不可靠(渲染前 boneMatrices 未更新),实测差 1.4~1.6m。
     m.updateWorldMatrix(true, true);
+    /**
+     * 首帧骨骼矩阵靠它把脚底抬到轴心(见上注:不用几何包围盒)。
+     * `@type` 而不是 `isBone` 判断:两者在这里等价(three 只把 isBone 放在 Bone.prototype 上),
+     * 但只有 instanceof 能让编译器认下来 —— 于是下面 `rootBone.matrixWorld` 那类读数不再要 cast。
+     * @type {THREE.Bone|null}
+     */
     let rootBone = null;
     m.traverse((o) => {
-      if (!rootBone && o.isBone && o.name === 'root') rootBone = o;
+      // instanceof 与 o.isBone 在这里等价(three 把 isBone 只放在 Bone.prototype 上),但只有前者能让 TS 认类型
+      if (!rootBone && o instanceof THREE.Bone && o.name === 'root') rootBone = o;
     });
     if (rootBone) {
       m.position.y -= rootBone.getWorldPosition(new THREE.Vector3()).y;
@@ -187,7 +194,7 @@ loader.load(
     wrap.position.set(DUNE.x, gh, DUNE.z); // bottom 贴地(min.y 在归一化后已近 0)
     wrap.name = 'littlePrince';
     wrap.traverse((o) => {
-      if (!o.isMesh) return;
+      if (!(o instanceof THREE.Mesh)) return;
       o.frustumCulled = false; // 无骨骼动画的静态人偶,防误剔除
       // Layer_1 = 模型自带的金色星星装饰层(0.8m 时是点缀,3.2m 后挡脸)——移除
       const mats = Array.isArray(o.material) ? o.material : [o.material];
