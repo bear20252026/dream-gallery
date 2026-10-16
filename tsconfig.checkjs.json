@@ -15,6 +15,11 @@
     // 补上它,基线才能剩下真正的债。
     "types": ["vite/client"]
   },
-  "include": ["src/core/**/*.js", "src/player/**/*.js", "src/kunlun/avatar.js"],
+  // types/ 里两份声明各有进程序的方式:`ctx.d.ts` 是被 src/ctx.js:124 的
+  // `import('../types/ctx')` 拉进来的(模块级类型引用),而 `browser-globals.d.ts` 是**全局脚本**
+  // (没有 import/export,靠 interface 合并生效),没有任何文件引用它 ⇒ 不写进 include 就不在程序里,
+  // 里面的 `navigator.deviceMemory` 照样报 TS2339。skipLibCheck:true 保证拉进来只是"用声明",
+  // 不会把 .d.ts 本身的检查算进基线。
+  "include": ["src/core/**/*.js", "src/player/**/*.js", "src/kunlun/avatar.js", "types/**/*.d.ts"],
   "exclude": ["node_modules", "dist", "vendor", "scripts"]
 }

@@ -14,6 +14,14 @@ function warpOpts(id) {
   return d ? { label: tt(d.label), color: d.color } : {};
 }
 
+/**
+ * `world:changed` 的**唯一载荷形状**。本文件 commit() 里那行 `eventBus.emit` 打的 `world:changed`
+ * 是全仓唯一的 emit 点(2026-10-16 核实),它被钉成这个类型 ⇒ 以后谁往载荷里改名/加键,
+ * 编译期就在那一行炸,不会像原先 `ctx.scene.worldChanged: (fn: (...a: unknown[]) => void) => void`
+ * 那样把矛盾推给消费者(audio-manager.js:193 与 planets.js:464 各读一个 `d.to`,
+ * 两条 TS2339 就是这么来的)。
+ * @typedef {{ from: string, to: string }} WorldChangedPayload
+ */
 let manager = null;
 
 function cloneVec(v) {
@@ -255,7 +263,10 @@ export class SceneManager {
         if (back) this.restore(snapshot);
         else if (options.snapshot) this.restore(options.snapshot);
         else if (options.player) this.restore({ player: options.player, camera: options.camera });
-        eventBus.emit('world:changed', { from: source.id, to: target.id });
+        eventBus.emit(
+          'world:changed',
+          /** @type {WorldChangedPayload} */ ({ from: source.id, to: target.id })
+        );
       };
       await runWarp(
         () =>

@@ -199,11 +199,11 @@ function round() {
     const p = document.createElementNS(SVG_NS, 'path');
     p.setAttribute('d', st.d);
     p.setAttribute('stroke', '#c9bda8');
-    p.setAttribute('stroke-width', (st.w || 3) * 0.85);
+    p.setAttribute('stroke-width', String((st.w || 3) * 0.85)); // setAttribute 的值一律转文本,这里只是把这件事写明白
     p.setAttribute('fill', 'none');
     p.setAttribute('stroke-linecap', 'round');
     p.setAttribute('stroke-linejoin', 'round');
-    p.style.opacity = 0.55;
+    p.style.opacity = '0.55'; // CSSOM 的 setter 收字符串;数值写法今天也走同一条转换
     layerGuide.appendChild(p);
     guidePaths.push(p);
   });
@@ -301,7 +301,7 @@ async function submit() {
       p.setAttribute('stroke-linecap', 'round');
       p.setAttribute('stroke-linejoin', 'round');
     }
-    p.style.opacity = 0;
+    p.style.opacity = '0';
     (st.glow ? layerGuide : layerInk).appendChild(p); // 暖光垫底,墨线在上
     anims.push(grow(p, st.t || 500, st.fill || st.glow, st.delay != null ? st.delay : i * 110));
   });

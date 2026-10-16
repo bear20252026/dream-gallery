@@ -23,15 +23,18 @@ import type {
   MeshStandardMaterial,
   Intersection,
 } from 'three';
-// 世界管理器的**真实类**(src/core/scene-manager.js:55 导出)。用 import 类型而不是另写一份
+// 世界管理器的**真实类**(src/core/scene-manager.js:63 导出)。用 import 类型而不是另写一份
 // interface:2026-10-15 核实,`worldManager?: unknown` 一条声明压着 16 条 TS2339
 // (getWorld 9 / back 4 / transitioning 2 / enter 1),而那些方法**本来就在类上**
 // (registerWorld/enter/back/toMain/transitioning/…) —— 手写接口只会和类各漂各的,
 // 拿类本身当权威则不可能漂。
-// 对照:本文件里其它 `: unknown` 成员(`planeApi/foxApi/scrollLink/audioManager/loopManager`)
-//   仍旧是 unknown,它们的唯一权威是各模块里的对象字面量,没有现成的类型可指。手写一份形状
+// 对照:本文件里还剩的 `: unknown` 成员(`planeApi/foxApi/loopManager`)仍旧是 unknown,
+//   它们的唯一权威是各模块里的对象字面量,没有现成的类型可指。手写一份形状
 //   = 再造一条没人钉的声明,而 `mA: Material[]` 就是这条路的下场(见 MediaNamespace.mA)。
 //   要收它们得连"声明 ≡ 写入方"的钉子一起写,那是独立一批。
+//   2026-10-16 第九刀收了 `scrollLink/audioManager` 这两条:audioManager 走 `typeof import()`
+//   (形状由写入方 audio-manager.js 自己声明),scrollLink 只能手写形状 + 钉子
+//   (src/__tests__/ctx-writer-shapes.test.js)—— 两条路的差别就写在各自的成员注释里。
 import type { SceneManager } from '../src/core/scene-manager.js';
 
 // ===================== 命名空间类型 =====================
@@ -76,7 +79,9 @@ export interface SceneNamespace {
   enterWorld?: (id: string, opts?: unknown) => unknown;
   leaveWorld?: (opts?: unknown) => unknown;
   toMainWorld?: (opts?: unknown) => unknown;
-  worldChanged?: (fn: (...a: unknown[]) => void) => void;
+  worldChanged?: (
+    fn: (d: import('../src/core/scene-manager.js').WorldChangedPayload) => void
+  ) => void;
   getActiveRoot?: () => unknown;
   getActiveGround?: (x: number, z: number) => unknown;
   getActiveBounds?: () => unknown;
@@ -224,7 +229,17 @@ export interface MediaNamespace {
   mpMesh: Mesh;
   mpMat: Material;
   guideMesh: Mesh;
-  scrollLink: unknown;
+  /**
+   * 卷轴「了解更多」的换文案钩子。唯一写入方 src/gallery/links.js:220
+   * `ctx.media.scrollLink = { redraw }`,`redraw` 是本仓唯一一个签名
+   * `function redraw(title, sub)`(links.js:197):`title` 必填(里面直接读 `title.length`),
+   * `sub` 可缺(里面写 `sub || ''`)。2026-10-16 第九刀:原先 `unknown` ⇒ 唯一消费者
+   * gallery/mode.js:358~359 那两行 `ctx.media.scrollLink.redraw(…)` 各报一条 TS2339。
+   * 这里只能手写形状(links.js 的 `redraw` 定义在建造函数体内,不是模块级绑定,
+   * `typeof import()` 指不到它),所以形状由 src/__tests__/ctx-writer-shapes.test.js 钉住:
+   * 声明里的参数名/个数必须与 links.js 那行 `function redraw(` 一致。
+   */
+  scrollLink: { redraw: (title: string, sub?: string) => void };
   /**
    * 背景音乐元素(HTML5 Audio)。2026-10-15 核实:properties 数组里这一项的**唯一写入方**是
    * src/scene/media/audio-manager.js:96 `let mA = new Audio()` → :187 `ctx.media.mA = mA`,
@@ -236,7 +251,15 @@ export interface MediaNamespace {
    * 正是这条假声明自己报出来的矛盾,不是代码写错。
    */
   mA: HTMLAudioElement;
-  audioManager: unknown;
+  /**
+   * 统一音频管理器。形状**不写在这里**:它是 `typeof import('./…/audio-manager.js').audioManager`,
+   * 即唯一写入方自己那份对象(声明在 src/scene/media/audio-manager.js:212,挂载在 :313
+   * `ctx.media.audioManager = audioManager`)。2026-10-16 第九刀:原先 `unknown` 一条声明压住
+   * 5 条 TS2339(gate/upload.js:219 与本文件消费者 audio-manager.js:48 读 `playHint`,
+   * audio-manager.js:283 的 `playOne` 解构自己的入参)。
+   * 写在这里的话,改 playOne 入参只需改一处 ⇒ 消费点跟着漂,不会再出现"声明 ≡ 写入方"两条腿各走各的。
+   */
+  audioManager: typeof import('../src/scene/media/audio-manager.js').audioManager;
   // ↓ 2026-10-14 补齐(同 KunlunNamespace:声明落后于 properties 数组),形状取自真实赋值点。
   /** 启动音视频序列(需用户手势)← src/scene/media/video-wall.js:339 挂 triggerSequence */
   startVidSeq: () => void;
@@ -336,8 +359,14 @@ export interface ModeNamespace {
   linkGuard: (linkKey: string) => boolean;
   spawnLinkModel: (type: string, url: string) => Object3D;
   trackClick: (linkId: string) => void;
-  LINK_MODEL_TYPES: string[];
-  MOUNTABLE_ICONS: string[];
+  // 两张都是**映射表**不是数组:写入方 mode.js:215 / :27 给的是对象字面量,消费方 upload.js:460
+  // 走 `Object.keys(types).forEach(k => types[k].name)`。原来登记成 string[] 是声明比写入方窄
+  // (第九刀:赋值处直接报 TS2740"缺 length/pop/push…")。形状照 mode.js 的 MODEL_TYPES 抄:每项三个键。
+  LINK_MODEL_TYPES: Record<
+    string,
+    { name: string; geo: () => THREE.BufferGeometry; color: string }
+  >;
+  MOUNTABLE_ICONS: Record<string, string>;
   openUpload: () => void;
 }
 
@@ -361,7 +390,16 @@ export interface SpiritItem {
 
 export interface KunlunNamespace {
   flightLock: boolean;
-  eternalHandlers: Record<string, (...args: unknown[]) => void>;
+  /**
+   * 永恒展厅厅内交互自注册表。值签名收 `cg: Object3D` 不是按某个 handler 猜的,而是按
+   * **派发契约**写的:kunlun/eternal.js:704 `const h = ctx.kunlun.eternalHandlers[act]; if (h) h(cg)`,
+   * 而 `cg` 就是上面 `eternalClick: (cg: Object3D) => void` 收到的那个命中体(paintings.js:516 `hs[0].object`)。
+   * 现有五个注册者里 finale.js:343 `spiritmark(cg)` 真读它(`cg.userData.markIndex` / `cg.userData.pulse()`),
+   * fireplace.js:92 / resetview.js:96 / snowwin.js:107 / windchime.js:68 四个 0 参函数不读 ——
+   * 0 参可赋给 1 参签名,TS 本来就这么判,所以这条声明不会逼那四个改形状。
+   * 2026-10-16 第九刀:`(...args: unknown[]) => void` 让 spiritmark 的两行 `cg.userData` 各报一条 TS2339。
+   */
+  eternalHandlers: Record<string, (cg: Object3D) => void>;
   /**
    * ↓ 这六条 2026-10-15 一起改:原先全写成 `() => void`,而实现收参数、有的还返回值、拆场景时会被置
    *   null。声明收 0 参 ⇒ 每个「先判存在再调用」的消费点同时报两条错(TS2554 参数数 + TS1345

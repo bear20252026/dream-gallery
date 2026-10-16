@@ -182,6 +182,7 @@ function drawBuildingBase() {
   c.font = "13px 'Kaiti SC','STKaiti','KaiTi',serif";
   c.textAlign = 'center';
   c.textBaseline = 'middle';
+  /** @type {[string, number, number][]} 七个房间的标签 + 格位(第三个元素是 z 向格位) */
   const rooms = [
     ['A', -11, -9],
     ['B', 11, -9],

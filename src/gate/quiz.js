@@ -108,7 +108,7 @@ function showGentleResult() {
   const rE = document.getElementById('gtResult');
   rE.style.display = 'block';
   const pct = Math.round((gScore / 100) * 100);
-  document.getElementById('gtScore').textContent = pct;
+  document.getElementById('gtScore').textContent = String(pct); // textContent 只收 string|null;DOM 侧本来就把数字转成文本,显式写出来不再靠隐式转换
   const rt = document.getElementById('gtRT'),
     rd = document.getElementById('gtRD');
   if (pct >= 90) {
@@ -145,7 +145,7 @@ function showGentleResult() {
       n = pct;
       clearInterval(t);
     }
-    document.getElementById('gtScore').textContent = n;
+    document.getElementById('gtScore').textContent = String(n);
   }, 30);
 }
 expose('restartGentleTest', function () {

@@ -587,7 +587,12 @@ function refreshGate() {
   const cfg = PLANETS[Math.min(chapter, 5)];
   if (chapter < 6) {
     gateRingMat.color.set(cfg.color);
-    const x = gateNum.material.map.image.getContext('2d');
+    // map 的实际类型由 numSprite 决定:第 259 行 `map: new THREE.CanvasTexture(cv)`,
+    // cv 是第 248 行 `document.createElement('canvas')` ⇒ CanvasTexture.image 就是那块 HTMLCanvasElement。
+    // 基类 Texture 的 `image` 在 @types/three 里是泛型默认 `unknown`(Texture.d.ts:109),
+    // 而 SpriteMaterial.map 声明成 `Texture | null`,所以这一行必须指回 CanvasTexture 才拿得到 getContext。
+    const gateCanvas = /** @type {THREE.CanvasTexture} */ (gateNum.material.map).image;
+    const x = gateCanvas.getContext('2d');
     x.clearRect(0, 0, 128, 64);
     x.font = 'bold 40px Georgia,serif';
     x.textAlign = 'center';
