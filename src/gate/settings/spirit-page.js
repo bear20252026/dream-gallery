@@ -3,11 +3,14 @@ import { Z } from '../../shared/z-layers.mjs';
 import { ctx } from '../../ctx.js';
 import { eventBus } from '../../event-bus.js';
 import { expose } from '../../debug-hooks.js';
+import { byIdSelect, qsaBtn } from '../../shared/dom-typed.js'; // #spPrefix 是 <select>,button[data-lg] 由本文件 :72 那段模板写成 <button>
 
 const spOv = document.createElement('div');
 spOv.id = 'spOv';
 spOv.style.cssText =
-  'position:fixed;inset:0;z-index:' + Z.modal + ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+  'position:fixed;inset:0;z-index:' +
+  Z.modal +
+  ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
 const spCard = document.createElement('div');
 spCard.style.cssText =
   'width:min(460px,92vw);max-height:82vh;overflow-y:auto;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)';
@@ -92,7 +95,7 @@ function renderSpirits() {
       '</div>';
   }
   spCard.innerHTML = html;
-  const sel = document.getElementById('spPrefix');
+  const sel = byIdSelect('spPrefix');
   if (sel) {
     sel.value = ctx.store.str('prefix');
     sel.onchange = () => {
@@ -115,7 +118,7 @@ function renderSpirits() {
       spApi.close();
       eventBus.emit('kunlun:teleport', { kind: 'peak' });
     };
-  spCard.querySelectorAll('button[data-lg]').forEach((b) => {
+  qsaBtn(spCard, 'button[data-lg]').forEach((b) => {
     b.onclick = () => {
       if (ctx.kunlun.letgoRecall && ctx.kunlun.letgoRecall(b.getAttribute('data-lg')))
         renderSpirits();

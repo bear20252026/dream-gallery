@@ -29,6 +29,7 @@ const CLAIM = {
   byIdEl: null,
   byIdInput: 'input',
   byIdCanvas: 'canvas',
+  byIdSelect: 'select',
   byIdBtn: 'button',
   qsEl: null,
   qsInput: 'input',
@@ -272,12 +273,28 @@ describe('dom-typed 助手本体与调用点', () => {
       'src/gate/settings.js',
       'src/gate/settings/sky-progress.js',
       'src/gate/settings/chat-room.js',
+      // 第八刀接上的四个(第五个 dialog-voice.mjs 走的是 VoiceButton typedef,另有一条测试管它)
+      'src/gate/settings/spirit-page.js',
+      'src/gate/settings/upload-import.js',
+      'src/kunlun/finale.js',
+      'src/gate/housecolor.js',
     ];
     for (const rel of converted) {
       const t = read(rel);
       expect(t.includes('@type {HTML'), `${rel} 还留着内联 DOM cast`).toBe(false);
       expect(t, `${rel} 没 import 助手`).toContain('dom-typed.js');
     }
+  });
+
+  it('静音钮那个"句柄挂在元素上"的说法只说一次(VoiceButton typedef ≡ 实际用量)', () => {
+    // dialog-voice.mjs 不走 dom-typed:它要的不是标签,而是"这只按钮上有一个私有键"这件事。
+    // 这一条管的是别让它漂回四个读数点各猜一次的形状(那条 `_langHandler` 在 Element 上的错
+    // 就是这么来的),也管住别人在别的文件里裸写 `el._langHandler`。
+    const src = read('src/core/dialog-voice.mjs');
+    expect(src).toMatch(/@typedef \{HTMLButtonElement & \{ _langHandler\?/);
+    expect((src.match(/@type \{VoiceButton/g) || []).length, '两处取用点各一次 cast').toBe(2);
+    const users = files.filter((rel) => read(rel).includes('_langHandler'));
+    expect(users, '这个私有键只许住在一个文件里').toEqual(['src/core/dialog-voice.mjs']);
   });
 
   it('全仓内联 DOM cast 是一笔记了名的债(新增一条就红,少一条也红)', () => {

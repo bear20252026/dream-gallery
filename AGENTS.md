@@ -525,6 +525,11 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
 - ⚠️**本刀纯注释 + 一个新测试文件**:`git diff -U0` 把注释行与空行滤掉之后**零残留**(四个源文件都是),
   `input.js` 那处是删掉一个惰 JSDoc 块(comm 双向 0 漂移)⇒ **没有动任何运行期语句,不需要重新构建或部署**。
   基线那行只影响 CI 的 checkJs 步骤;下次有真实运行期改动再一起发。
+  ⚠️**但"不进 bundle"这句要说准**(2026-10-16 实测,第七刀时撞清):构建会把 **git 短哈希打进产物**
+  (`vite.config.js` 的 `buildStamp()` → `__B612_BUILD__`),所以**纯注释改动也会换 chunk 文件名** ——
+  第六刀的树本地构建出 `entrygate-BXJAzoMB.js`,而线上(2592c7d 那次)是 `entrygate-zkhnb0oc.js`。
+  ⇒ 下次真部署时**别把"名字全变了"读成"代码变了"**;运行期行为没变,证据是当时线上 entrygate 里
+  grep 到的仍是 `2592c7d`。
 - **剩下的簇(129,重数过)**:按码 `TS2339 113 / TS2322 7 / TS2810 3 / TS2740 2 / TS2345 2 / TS2769 1 / TS2683 1`
   (TS2554 / TS1345 / TS2349 / TS2365 仍为 0)。按文件 `quizgate.js` 16 / `minimap.js` 10 / `ark-freeflight-hud.js` 10 /
   `scene7-tippler.js` 8 / `dialog-voice.mjs` 8 / `housecolor.js` 6 / `crash-site.js` 6 / `audio-manager.js` 5 /
@@ -627,6 +632,89 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   (`BASE_URL` / `PROBE_URL` 直测生产 bundle)+ 一次真机自由飞/答题门的手动确认(它们默认搁置,
   `ark-free-probe.js` 这条探针已经管不到了,见上一条)。
 
+
+
+## 2026-10-16 checkJs 第七刀的上线证据(PR #33 → merge `dd3f45d` → `DEPLOY_OK dd3f45d`)
+
+- required checks 双绿:`build-and-test` 44s / `smoke` 2m0s;CI 侧自己打句 **`checkJs errors: 78 (baseline 78, delta 0)`**,
+  vitest 在 CI 也是 **1126 项 / 99 文件**,三条构建断言照旧(47 prefetch / 入口不含 three / 无 importmap)。
+- 合并后核对 **CI 验的树 == main 的树**:`git rev-parse 7473d82^{tree}` = `dd3f45d^{tree}` = **`c94fbdfac9bfb05ad003f089ad2066f1816ffda1`**。
+- 部署快照六字段全给结论(`BACKEND=verified / FRONTEND=extracted / RESTART=online / MODELS=synced / VERIFY=ok / DRIFT=ok`);
+  第 3 步就打回「后端文件与服务器一致,无需上传」—— 本批确实零后端文件,这句是真判出来的;
+  漂移复核 **OK 201 DRIFT 0 MISSING 0**;`/healthz {"ok":true,"uptime":149}`(新进程);
+  线上 `assets/entrygate-D1hlyKlT.js` 里 grep 到本次短哈希 **`dd3f45d`**(看 mtime 不算证据)。
+- **生产 bundle 上被改动文件的正面证据**:`BASE_URL=https://cloudbear.cloud node scripts/probe/b612-prod-worlds.cjs`
+  **前六条全绿**,其中两条正是第七刀改的那个文件 ——「主世界小地图在场(data-world=main)」与
+  「非主世界小地图已隐藏」(`byIdCanvas('mc')` 交付的那块画布在生产里照常),另加 storybook / kingStoryScene 入景。
+  第 ⑦ 段 `waitForFunction 25000ms` 与探针头写明的「④ 星球原点出现返回钮」**逐字对上** ⇒ 判旧红,非回归。
+- ⚠️同日发现两条探针侧欠账(没顺手修,登记):`ark-free-probe.js` 是死夹具(`__arkFF` 全仓已不存在 + 不带 `?legacy=1`);
+  `minimap-probe.cjs` 只能自起本地服、**没有 `BASE_URL` 注入口**,所以"线上小地图"只能靠上面那条世界切换探针间接证。
+
+## 2026-10-16 checkJs 第八刀:再收 17 条(78 → 61),DOM 族归零
+
+第七刀末尾留下的 15 条(其实 17 条,见下面第 3 条)落在那五个当时不合排的文件里。第八刀前置那次纯排版
+(`29028cc`,五份文件 `esbuild --minify` 后字节与 HEAD 逐字相同)付清了排版债,这一刀就只剩类型本身。
+
+- **归因(comm 集合差,17 消失 / 0 新增 = 78 − 61)**:`spirit-page.js` 5 / `dialog-voice.mjs` 5 /
+  `upload-import.js` 3 / `finale.js` 2 / `housecolor.js` 2。**DOM 族现在归零**(按 `does not exist on type
+  '(HTMLElement|Element|GlobalEventHandlers)'` 数 = 0)。
+- **`this` 那三条不是靠 cast 收的**:`upload-import.js` 的复选框手柄写成 `lab.querySelector('input').onchange =
+  function () { … this.checked … }`,而 `onchange` 的 `this` 由 lib.dom 声明成 `GlobalEventHandlers`(它在
+  `Element` 和 `HTMLInputElement` **两边都没有** `checked`)⇒ 光给取用点加类型**治不了**这三条。
+  做法是取一次带类型的引用 `const cb = qsInput(lab, 'input')` 并把三处 `this` 换成 `cb` ——
+  运行期是同一个元素(手柄就挂在那只 input 上),所以等价;这条比 `/** @this {HTMLInputElement} */` 好,
+  后者能不能被 TS 采信我没有实测过,不写没验过的东西。
+- ⚠️**我上一条"按类数 DOM 族"的正则本身就少数**(这条要记住,否则下批又按一个偏小的数开工):
+  它只认 `'HTMLElement|Element|GlobalEventHandlers'` 三种接收者,漏了 `EventTarget`(`e.target.value`)与
+  `HTMLButtonElement`(挂在元素上的私有键)两种形状 ⇒ 第七刀记的"剩 15"实际是 17。
+  同一族的"归零"判定这次也顺手改成看 comm 明细,而不是只看我那个分类正则。
+- **`_langHandler` 走的是「类型化元素」,不是 WeakMap**:`dialog-voice.mjs` 的静音钮把换字监听句柄
+  **记在按钮元素身上**是原设计(`disposeMuteBtn(dialogEl)` 只拿得到那个对话框,要靠元素自己找回上一份监听才摘得掉;
+  与包 C 给视频墙建的 `TaggedVideo` 同一形)。所以补一个 `@typedef {HTMLButtonElement & { _langHandler?: … }} VoiceButton`,
+  两处取用点各 cast 一次。**没有**改去 WeakMap —— 那是行为重构,不属于类型批次(308 那批早就把这条定性成
+  "要的是 WeakMap **或类型化元素**",两个都合法,选不动行为的那个)。
+- **`housecolor.js` 顺手收了另一半**:`document.getElementById('hcCustom').oninput = (e) => apply(…, e.target.value, true)`
+  里 `e.target` 的静态类型是 `EventTarget`,与取用点没标类型是同一个病的另一半 ⇒ 改成模块顶层取一次的
+  `hcCustom`,`oninput` 里直接读它的 `.value`(同一元素,`e.target` 在这个手柄里恒等于它)。
+  ⚠️声明位置必须放在 `function refreshSwatch()` 之前:文件末尾有一句顶层 `refreshSwatch()`,
+  放它后面就是 TDZ —— 这条是写完回头读调用顺序才发现的,不是推出来的。
+- **助手加了 `byIdSelect`**(#spPrefix 是 `<select>`),并按本仓自己的规矩**同时**改了
+  `dom-typed-sites.test.js` 的 CLAIM 表 —— 那条"CLAIM ≡ 助手 @returns"的闸会替你记得这件事:
+  只改模块不改表,测试立刻红(这次是先红后补,不是补完再跑)。
+- **闸门从 6 项涨到 7 项**:新增"本批改过的文件零内联 cast + 必须 import 助手"(覆盖清单从 7 个文件扩到 11),
+  以及一条 **`VoiceButton` typedef ≡ 实际用量** 的钉子(cast 两处、typedef 在、`_langHandler` 这个私有键
+  只许住在一个文件里 —— 别的文件裸写它就红)。**反向验证 5 条注射全部打红 / 0 锚点未命中 / 0 还原不一致**
+  (`.tmp/rv8-a.sh`):I8 `byIdSelect('spPrefix')` 换成 `byIdInput`(新助手的声称要咬人)· I9 `qsBtn(d,'#tcOk')`
+  换成 `qsArea` · I10 拆掉一处 VoiceButton cast(说法漂回散读点)· I11 已改文件塞回内联 cast(两条同时红:
+  逐文件那条 + 全仓账本那条)· I12 收了助手却不 import。
+  ⚠️I12 第一次写法是 `repl … "import {…}\n" ""` —— bash 里 `\n` 不是换行,会误报"断点没打上";
+  改成整行替换成注释才对(与已有的"perl 必须带 /m"同族:锚点写错的表现是**假失败**,不是假通过)。
+- **实机(这次跑了真浏览器,因为 `dialog-voice` / `housecolor` / `settings` 都是默认加载链上的)**:
+  `.tmp/mute-voice-check.cjs` **8/8 通过、零未捕获异常**,走的是 smoke-gate 同一套入世流程 ——
+  ①静音钮真的被 `installMuteBtn` 装上、它是 `<button>`、`b._langHandler` 是函数( typedef 的声称现场成立);
+  ②点它一次(真走 `b.onclick` + `sync`)零异常;③`#hcCustom` 是 `<input type=color>`,给它 dispatch
+  `input` 事件把新的 `oninput` 那条路径跑过一次,零异常;④`#nickInput` 是 `<input>`。
+  脚本第一版把 console 与 pageerror 混在一个数组里 ⇒ 被本机缺媒体/贴图的 404(实测
+  `/music/story/turnaround.mp3`、`/textures/paper.jpg`、`/textures/perlin.jpg`、`/textures/terrain1.webp`,
+  都是不入 git 的本机资产)和那条**已知 dev-only JSON-module** 干扰,一度报"1 失败";
+  分开计数后才看见真数是**零未捕获异常**。⇒ 又一条"判据混类就会自己造红"的实例。
+  ⚠️**没在浏览器里跑到的**:`finale.js`(2 条)在 `LEGACY_MODULE_IDS` 里默认不加载;`spirit-page` /
+  `upload-import` 的这两处是**打开面板才执行**(入世不经过),所以它们仍只有等价构造 + 单测 + markup 反查兜着。
+- 门禁(全在这棵树):eslint 0 / `tsc --noEmit` 0 / depcruise 0(**399 modules, 1377 deps**)/
+  **checkJs 61 = 新基线** / vitest **1127 项 / 99 文件**(1126 + 本刀 1)/ `npm test` exit 0 且 209 项照旧 /
+  `npm run build` 0 且三条断言照旧(prefetch 仍 47,没新增模块进核心链)/ 四条 CI 守卫全 exit 0。
+- ⚠️本刀动的是运行期取用写法(`this`→具名引用、`e.target`→具名引用、加 import)⇒ **要重新构建并部署**。
+- **剩下的簇(61,重数过)**:按码 `TS2339 45 / TS2322 7 / TS2810 3 / TS2740 2 / TS2345 2 / TS2769 1 / TS2683 1`
+  (TS2554 / TS1345 / TS2349 / TS2365 仍为 0)。按文件 `scene7-tippler.js` 8 / `crash-site.js` 6 /
+  `audio-manager.js` 5 / `planets.js` 5 / `mode.js` 5 / **`housecolor.js` 4**(还剩的是 `_t` / `_spoke` 那族
+  —— 往**函数对象**上挂私有计时器句柄,与 `_langHandler` 同一个病,只是宿主是 function 不是元素)/
+  `dispose-object3d.mjs` 3 / `finale.js` 3 / `scene2-draw.js` 3 / `paintings.js` 3 / `dialog-voice.mjs` 3。
+  ⇒ 下一刀两条路:**"往对象/函数上挂私有键"这一族**(housecolor 4 + `music-canvas` 的 `greeted` 2 +
+  `audio-manager` 的 `userData/playHint` 等,统一走 typedef 或 WeakMap,第八刀已在 `VoiceButton` 上做过一次样板),
+  和 **catch 变量那一族**(`message` on unknown 9 条)。后者有机械写法(`useUnknownInCatchVariables` 已关,
+  `e.message` 换 `String(e)` 或加窄守卫),但**别为了数字换写法** —— 先回读每一处,分清它是真想表达
+  "错误消息"还是在掩盖非 Error 抛出;另:`hot.js:218` 的 TS2683、把 `plane-physics.mjs` /
+  `chapter-map-logic.mjs` 纳进检查图、`audioManager` 那条"声明 ≡ 写入方"的钉子,各自单独一批。
 
 
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
@@ -809,6 +897,7 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   | 2026-10-13 | 0 | 形状回环修好后的第一次;`visits 源 1003 / 表 1034`(表只受保留期约束,判 0 不判错) |
   | 2026-10-14 | 0 | 第二次(在 `2739e3b` 后端上线后跑)+ **同日第三次(`e39e480` 的 CSP 发布之后再跑,仍 0)**;若干条"表多出行"仍是保留期内的历史行,按设计不判失败。**同日重跑不加天数** —— 这张表按"每天一次"计,明天(10-15)那次才算第 3 天 |
   | 2026-10-15 | 0 | **第 3 天**。`结果: 一致(退出码 0)`,末尾仍有一批"表多出行"(vid 与时间戳都是保留期内的历史行 / 读到的那一瞬在途写入),按设计不判失败。距"连续 7 天"还差 4 天 |
+  | 2026-10-16 | 0 | **第 4 天**。`结果: 一致(退出码 0)`,245 条"表多出行"同前按设计不判失败 ⇒ 距"连续 7 天"还差 3 天。⚠️第一次跑**只把 `tail -12` 的输出看了**,里面没有结论行也没有 `EXIT=`,差点当成跑过;重跑时把远端输出整份落到 `.tmp/parity-1016.log` 再 grep,才亲眼读到 `结果: 一致(退出码 0)` 与 `EXIT=0`。与"`cmd | tail` 的 `$?` 属于 tail"同族:**结论要读脚本自己打的那一行,不是它后面剩几行** |
   往后每跑一天就在此表加一行;**中间出现 1 或 2 则天数归零重计**(那说明影子写又漏了形状或有新写入点没接线)。
 - 🔴**发布阻断级缺陷(本轮自己造出来的,已修 + 已上守卫)**:`backend-sync.sh` 的后端清单原本是 `FILES=$(echo server.js lib/*.js …)`,而 **glob 不递归** —— R1/R2 拆出的 `lib/repo/*`(5)、`lib/upload/*`(8)、`lib/migrations/*.sql`(1)共 **14 个文件一个都不会被上传**。照那份清单发布:线上 `server.js → lib/store → lib/shadow → lib/repo/chat` 直接 `Cannot find module`,pm2 反复重启 = **全站 502**;而 md5 差集、上传、复核会**全部绿灯**,因为清单从没往那些子目录看一眼。这是"静默的成功比响亮的失败危险得多"的第 N 个实例,且这次由重构本身引入。
   - 修法:清单收成唯一出处 **`scripts/backend-files.sh`**(`backend_files()` = server.js + `find lib -type f \( -name '*.js' -o -mjs -o -cjs -o -sql \)` + `src/shared/mediarules.mjs`),`backend-sync.sh` 与 `verify-drift.sh` **共用**它(以前后者也写死 `lib/*.js`,于是"线上根本没有这些模块"会被复核报成一致)。清单条目 **37 → 52**(51 个后端源码 + 唯一被点名带上服务器的只读对账脚本 `scripts/admin/table-parity.cjs` —— 它按 `__dirname/../..` 解析仓库根,不在 `<根>/scripts/admin/` 就跑不起来,而"能不能切读"必须在有那块盘的盒子上判定)。扩展名是**写死的白名单**而不用 `find lib -type f`:将来 `lib/` 里落出 `.db`/`.json`/`.env` 之类不该进 web root 的文件时,默认不跟着传。公网侧 `lib/security.js` 的 `staticDenied()` 按**首个路径段**放行/拒绝(`lib` 与 `scripts` 都在拒绝集里,`*.cjs` 后缀再挡一次),所以新建子目录不构成新暴露。
