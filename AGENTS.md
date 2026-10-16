@@ -844,7 +844,29 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   `npm test` exit 0 且 **209 项**照旧(7/22/108/46/20/6)/ `npm run build` 0 且三条断言照旧(47 prefetch /
   入口不含 three / dist 无 importmap)/ 四条 CI 守卫全 exit 0。
 - **本刀动的是运行期写法**(`export`、两处 `String()`、批次1-4 的 `instanceof` 收窄与 `errText` 取文本)
-  ⇒ **要重新构建并部署**才算上线;目前只在本地(main 上四个提交,未推送)。
+  ⇒ **要重新构建并部署**才算上线。✅ 已发(见下一条)。
+- **已上线并线上复验(PR #35 → merge `02e1054` → `DEPLOY_OK 02e1054` / `RELEASE_OK 02e1054`,2026-10-16)**:
+  这个 PR 装七个提交(`a786be2` / `f350b35` / `26d7fb2` / `d4c79df` / `a4ec13a` / `802efd0` / `67ca6a4`,head `67ca6a43`)。
+  required checks `build-and-test` + `smoke` 双绿,**CI 自己打的结论行是 `checkJs errors: 0 (baseline 0, delta 0)`**
+  (CI run `38863079648`),vitest `101 文件`、depcruise `0 违规(402 modules, 1393 dependencies)`;
+  合并后核对 **"CI 验的树 == 要部署的树" = `6f4606dee46ba06e360b6ac763f7c1da8933d420`**;
+  部署快照六字段全给结论(`BACKEND=verified / FRONTEND=extracted / RESTART=online / MODELS=synced / VERIFY=ok / DRIFT=ok`),
+  **后端这次没有变化**(第 3 步 `BACKEND_SYNC_RESULT=consistent` 直接免上传,第 6/9 步复检 `OK 53 DRIFT 0 MISSING 0`)⇒ 纯前端发布;
+  前端漂移 **OK 202 DRIFT 0 MISSING 0 TOTAL 202**,`/healthz {"ok":true,"uptime":29}`(新进程 pm2 `gallery` online),
+  线上首页引用的 chunk 与本地 dist **逐名一致**(`main-Bzz3sr4y.js` / `main-hwXhbbPT.js` 都 200),
+  版本戳 grep 在 **`assets/entrygate-BzMcwExJ.js`** 里的 **`02e1054`**(旧的 `entrygate-wyje7ytC.js` 已被差集清理删除)。
+  `BASE_URL=https://cloudbear.cloud node scripts/probe/b612-prod-worlds.cjs` **前六条全绿**
+  (主世界 / 小地图在场 / 进 B612 / 小地图隐藏 / storybook 入景 / 国王星球 + kingStoryScene),
+  第 ⑦ 段 `waitForFunction 25000ms` 与探针头写明的既有欠账逐字一致 ⇒ 判旧红;
+  **同一份结论在本地同一棵树上也这么出**(发布前跑过一次),A/B 对照成立 ⇒ 这条红不是这一刀带出来的。
+- ⚠️**prefetch 从 47 变 48,原因核过才写**:批次2 新增的 `src/shared/err-text.mjs` 被九个文件共享 ⇒ 构建给它切出
+  独立 chunk(实见 `dist/assets/err-text-DCwQ_cVZ.js`),core-preload 因此多预取一条。三条构建断言管的是
+  "全部 prefetch 带 crossorigin / 入口不含 three / dist 无 importmap",**不管条数**,所以这不是回归;
+  但第八刀那句"prefetch 仍 47"到这一刀已经**是旧数**了 —— 不核就抄,下一个 47 会变成第 N 条假结论。
+- ⚠️**线上没有证到的,继续记成未证**(与第八刀同口径):本地那次真浏览器量到的 `audioManager` 键集、
+  `playHint` 三分支、`scrollLink.redraw.length === 2`、切换实际载荷 `{from,to}` **生产上没有对应探针**,
+  线上证据只有"六条世界链全绿 + 版本戳对得上"⇒ "跑进去了"不等于"点过了"。
+  要补的是把这几项做成 `scripts/probe/` 里的常驻探针(挂在待办,不属于类型批次)。
 - **还剩的 unknown**:`planeApi` / `foxApi` / `loopManager` 三条 ctx.d.ts 成员仍是 `unknown`
   —— 它们这轮没被任何读数点咬住(0 条错),按第八刀那条口径,**要收它们得连"声明 ≡ 写入方"的钉子一起写**,
   属于独立一批,不为了"看起来更严"先动声明。
