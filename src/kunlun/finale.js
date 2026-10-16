@@ -166,6 +166,11 @@ function playProjection() {
   requestAnimationFrame(() => {
     ov.style.opacity = '1';
   });
+  /**
+   * 换一张落版卡并等 ms 毫秒。写成 `Promise<void>` 是为了让里面那句裸 `r()` 成立
+   * (没有上下文类型时 TS 推成 Promise<unknown>,要求 resolve 必须带参数 ⇒ TS2810)。
+   * @type {(html: string, ms: number, ch?: number) => Promise<void>}
+   */
   const T = (html, ms, ch) =>
     new Promise((r) =>
       setTimeout(() => {

@@ -20,6 +20,7 @@ import {
 } from '../shared/planet-logic.mjs';
 import { createStoryTicket } from '../shared/story-ticket.mjs';
 import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
+import { errText } from '../shared/err-text.mjs';
 
 let arrivalDone = false; // 本次进 327 的入梦链已启动
 let sceneDone = false; // 全链+拾星完成(章节已推进)
@@ -95,7 +96,7 @@ function mountTipplerSet() {
       console.debug('[scene7] 酒瓶上岛:', props.length, '组(贴身', Math.min(3, hero.length), ')');
     },
     undefined,
-    (e) => console.warn('[scene7] 酒瓶组加载失败(台词照常):', e.message)
+    (e) => console.warn('[scene7] 酒瓶组加载失败(台词照常):', errText(e))
   );
   // 易拉罐套装(8 罐):侧前方一堆,部分躺倒
   loader.load(
@@ -116,7 +117,7 @@ function mountTipplerSet() {
       console.debug('[scene7] 易拉罐上岛:', props.length, '只');
     },
     undefined,
-    (e) => console.warn('[scene7] 易拉罐加载失败(台词照常):', e.message)
+    (e) => console.warn('[scene7] 易拉罐加载失败(台词照常):', errText(e))
   );
   // 酒鬼本人:根节点 Sketchfab_model 已带 -90°X(源 Z-up 尺寸 1.29×0.91×1.89 → 立正 ~1.8m),
   // 故**不再**额外旋转(2026-09-30:多转一次会直接躺平)。面朝出生点(+Z),微倾 0.16 读作"醉"
@@ -130,7 +131,7 @@ function mountTipplerSet() {
       w.scene.add(m);
     },
     undefined,
-    (e) => console.warn('[scene7] 酒鬼加载失败(台词照常):', e.message)
+    (e) => console.warn('[scene7] 酒鬼加载失败(台词照常):', errText(e))
   );
   // 银河天幕:包住整岛的夜空(源球体内法线未知,DoubleSide 保底;fog 关)
   loader.load(
@@ -140,16 +141,23 @@ function mountTipplerSet() {
       m.scale.setScalar(50);
       m.position.set(0, ISLE_TOP_Y, 0);
       m.traverse((o) => {
-        if (o.isMesh && o.material) {
-          o.material.side = THREE.DoubleSide;
-          o.material.fog = false;
-        }
+        if (!(o instanceof THREE.Mesh)) return;
+        // 单材质前提**实测过**:tippler-sky / bottles2 / man / cans 四个 GLB 里没有一个 mesh 带多 primitive
+        // (查法 .tmp/glb-prims.cjs;隔壁 chibi-prince 有 4 个多 primitive 的 mesh,GLTFLoader 也是拆成
+        // Group + 每 primitive 一个 Mesh)⇒ 走到这里的 Mesh.material 恒为一个材质,今天这句
+        // `o.material.side` 本来就建立在这个前提上。**没有**顺手改成"数组也遍历" —— 那会改变行为
+        // (数组情况今天是给数组挂属性 = 静默 no-op)。
+        // 类型写成这两种具体材质而不是基类 `Material`:基类没有 `fog`(@types 只在 MeshStandard/:292
+        // 与 MeshBasic/:170 上声明),而 GLTFLoader 对 pbr / unlit 正好只产这两种。
+        const mat = /** @type {THREE.MeshStandardMaterial|THREE.MeshBasicMaterial} */ (o.material);
+        mat.side = THREE.DoubleSide;
+        mat.fog = false;
       });
       m.name = 'tipplerSky';
       w.scene.add(m);
     },
     undefined,
-    (e) => console.warn('[scene7] 天幕加载失败(星空点阵兜底):', e.message)
+    (e) => console.warn('[scene7] 天幕加载失败(星空点阵兜底):', errText(e))
   );
 }
 

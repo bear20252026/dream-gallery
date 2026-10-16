@@ -8,6 +8,7 @@
 //   资产为 glTF(/assets/wise_zzz.glb),由 GLTFLoader 加载;缺失时回退到程序化轮滑小人。
 import * as THREE from 'three';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
+import { errText } from '../shared/err-text.mjs'; // loader 的 onError 形参由 three 声明成 unknown
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import './room.css';
 
@@ -70,7 +71,12 @@ scene.add(grid);
 // 中央光环,作为聚会焦点
 const ring = new THREE.Mesh(
   new THREE.RingGeometry(2.4, 3.0, 48),
-  new THREE.MeshBasicMaterial({ color: '#ff9a9e', transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+  new THREE.MeshBasicMaterial({
+    color: '#ff9a9e',
+    transparent: true,
+    opacity: 0.5,
+    side: THREE.DoubleSide,
+  })
 );
 ring.rotation.x = -Math.PI / 2;
 ring.position.y = 0.02;
@@ -82,7 +88,8 @@ function addAmbiance() {
   for (let i = 0; i < posts; i++) {
     const a = (i / posts) * Math.PI * 2;
     const r = 8;
-    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    const x = Math.cos(a) * r,
+      z = Math.sin(a) * r;
     const post = new THREE.Mesh(
       new THREE.CylinderGeometry(0.12, 0.16, 2.2, 8),
       new THREE.MeshStandardMaterial({ color: '#2a1c34', roughness: 0.8 })
@@ -91,14 +98,23 @@ function addAmbiance() {
     scene.add(post);
     const orb = new THREE.Mesh(
       new THREE.SphereGeometry(0.34, 16, 16),
-      new THREE.MeshStandardMaterial({ color: '#ffd9a0', emissive: '#ffb347', emissiveIntensity: 1.5 })
+      new THREE.MeshStandardMaterial({
+        color: '#ffd9a0',
+        emissive: '#ffb347',
+        emissiveIntensity: 1.5,
+      })
     );
     orb.position.set(x, 2.6, z);
     scene.add(orb);
   }
   const beam = new THREE.Mesh(
     new THREE.CylinderGeometry(0.5, 0.95, 6, 24, 1, true),
-    new THREE.MeshBasicMaterial({ color: '#ff9a9e', transparent: true, opacity: 0.12, side: THREE.DoubleSide })
+    new THREE.MeshBasicMaterial({
+      color: '#ff9a9e',
+      transparent: true,
+      opacity: 0.12,
+      side: THREE.DoubleSide,
+    })
   );
   beam.position.y = 3;
   scene.add(beam);
@@ -108,7 +124,12 @@ function addAmbiance() {
     const r = 5 + (i % 2);
     const cry = new THREE.Mesh(
       new THREE.IcosahedronGeometry(0.5, 0),
-      new THREE.MeshStandardMaterial({ color: '#bff', emissive: '#88c', emissiveIntensity: 0.5, roughness: 0.3 })
+      new THREE.MeshStandardMaterial({
+        color: '#bff',
+        emissive: '#88c',
+        emissiveIntensity: 0.5,
+        roughness: 0.3,
+      })
     );
     cry.position.set(Math.cos(a) * r, 1.4 + (i % 3) * 0.5, Math.sin(a) * r);
     scene.add(cry);
@@ -119,11 +140,13 @@ addAmbiance();
 // ---------- 头像 ----------
 function makeTag(text, bg) {
   const cv = document.createElement('canvas');
-  cv.width = 256; cv.height = 64;
+  cv.width = 256;
+  cv.height = 64;
   const g = cv.getContext('2d');
   if (bg) {
     g.fillStyle = bg;
-    roundRect(g, 4, 4, 248, 56, 14); g.fill();
+    roundRect(g, 4, 4, 248, 56, 14);
+    g.fill();
   }
   g.fillStyle = '#fff';
   g.font = '600 30px "PingFang SC", sans-serif';
@@ -132,7 +155,9 @@ function makeTag(text, bg) {
   g.fillText(text, 128, 34);
   const tex = new THREE.CanvasTexture(cv);
   tex.anisotropy = 4;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  const sp = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true })
+  );
   sp.scale.set(bg ? 2.2 : 1.4, bg ? 0.55 : 0.35, 1);
   sp.renderOrder = 999;
   return sp;
@@ -170,14 +195,33 @@ function makeAvatar(color, name) {
   emote.visible = false;
   group.add(emote);
 
-  const avatar = { group, rollPivot, skater, wheels, tag, emote, emoteTimer: 0, color, model: null, mixer: null, action: null, isModel: false, rollAngle: 0 };
+  const avatar = {
+    group,
+    rollPivot,
+    skater,
+    wheels,
+    tag,
+    emote,
+    emoteTimer: 0,
+    color,
+    model: null,
+    mixer: null,
+    action: null,
+    isModel: false,
+    rollAngle: 0,
+  };
   loadRollerblade(avatar);
   return avatar;
 }
 
 // 程序化生成一个站在轮滑鞋上的小人(占位用,真实角色 glb 加载后整体替换)。
 function buildSkater(parent, wheels, color) {
-  const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.6, emissive: color, emissiveIntensity: 0.15 });
+  const mat = new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.6,
+    emissive: color,
+    emissiveIntensity: 0.15,
+  });
   const skin = new THREE.MeshStandardMaterial({ color: '#fff3ea', roughness: 0.5 });
   const shoeMat = new THREE.MeshStandardMaterial({ color: '#ff5a7a', roughness: 0.5 });
   const wheelMat = new THREE.MeshStandardMaterial({ color: '#222', roughness: 0.4 });
@@ -246,7 +290,7 @@ function loadRollerblade(avatar) {
     undefined,
     (err) => {
       // 资源缺失/加载失败:保留胶囊占位,不影响房间可用性
-      console.warn('[room] wise_zzz 角色加载失败,使用占位胶囊:', err && (err.message || err));
+      console.warn('[room] wise_zzz 角色加载失败,使用占位胶囊:', errText(err));
     }
   );
 }
@@ -270,17 +314,23 @@ let lastSent = 0;
 function setCount() {
   const n = remotes.size + (me ? 1 : 0);
   hudCount.textContent = String(n);
-  if (me && n <= 1) showHint(`房间暂时只有你 · 房间码 ${hudCode.textContent} · 把链接发给朋友,他们进来就能看到你`);
+  if (me && n <= 1)
+    showHint(`房间暂时只有你 · 房间码 ${hudCode.textContent} · 把链接发给朋友,他们进来就能看到你`);
   else hideHint();
 }
-function showHint(text) { roomHint.textContent = text; roomHint.style.display = 'block'; }
-function hideHint() { roomHint.style.display = 'none'; }
+function showHint(text) {
+  roomHint.textContent = text;
+  roomHint.style.display = 'block';
+}
+function hideHint() {
+  roomHint.style.display = 'none';
+}
 
 // ---------- 小地图 ----------
 // 把房间世界坐标(XZ,范围约 ±29)投影成右下角小地图上的圆点:自身 + 所有远端玩家。
 const MINI_SIZE = 132; // 与 room.css 中 #minimap 尺寸一致
 const MINI_PAD = 12;
-const MINI_R = 29;     // 世界半径(与移动 clamp 一致)
+const MINI_R = 29; // 世界半径(与移动 clamp 一致)
 function worldToMini(x, z) {
   const u = MINI_SIZE / 2 + (x / MINI_R) * (MINI_SIZE / 2 - MINI_PAD);
   const v = MINI_SIZE / 2 + (z / MINI_R) * (MINI_SIZE / 2 - MINI_PAD);
@@ -304,13 +354,19 @@ function updateMinimap() {
   miniSelf.style.top = sz + 'px';
   for (const [id, r] of remotes) {
     let d = miniDots.get(id);
-    if (!d) { d = makeDot(r.avatar.color, false); miniDots.set(id, d); }
+    if (!d) {
+      d = makeDot(r.avatar.color, false);
+      miniDots.set(id, d);
+    }
     const [x, z] = worldToMini(r.avatar.group.position.x, r.avatar.group.position.z);
     d.style.left = x + 'px';
     d.style.top = z + 'px';
   }
   for (const [id, d] of miniDots) {
-    if (!remotes.has(id)) { d.remove(); miniDots.delete(id); }
+    if (!remotes.has(id)) {
+      d.remove();
+      miniDots.delete(id);
+    }
   }
 }
 
@@ -327,12 +383,20 @@ function connect() {
   };
   ws.onmessage = (ev) => {
     let m;
-    try { m = JSON.parse(ev.data); } catch (e) { return; }
+    try {
+      m = JSON.parse(ev.data);
+    } catch (e) {
+      return;
+    }
     handle(m);
   };
   ws.onclose = () => {
     showBanner('连接断开，重连中…', true);
-    if (!reconnectTimer) reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, 2000);
+    if (!reconnectTimer)
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        connect();
+      }, 2000);
   };
   ws.onerror = () => {};
 }
@@ -352,13 +416,25 @@ function handle(m) {
     sendMove(true);
     return;
   }
-  if (m.t === 'join') { addRemote(m); setCount(); return; }
-  if (m.t === 'move') {
-    const r = remotes.get(m.id);
-    if (r) { r.tx = m.x; r.ty = m.y; r.tz = m.z; r.try = m.ry; }
+  if (m.t === 'join') {
+    addRemote(m);
+    setCount();
     return;
   }
-  if (m.t === 'chat') { addChat(m.name, m.text); return; }
+  if (m.t === 'move') {
+    const r = remotes.get(m.id);
+    if (r) {
+      r.tx = m.x;
+      r.ty = m.y;
+      r.tz = m.z;
+      r.try = m.ry;
+    }
+    return;
+  }
+  if (m.t === 'chat') {
+    addChat(m.name, m.text);
+    return;
+  }
   if (m.t === 'emote') {
     const r = remotes.get(m.id);
     if (r) showEmote(r, m.e);
@@ -366,11 +442,21 @@ function handle(m) {
   }
   if (m.t === 'leave') {
     const r = remotes.get(m.id);
-    if (r) { scene.remove(r.avatar.group); remotes.delete(m.id); setCount(); }
+    if (r) {
+      scene.remove(r.avatar.group);
+      remotes.delete(m.id);
+      setCount();
+    }
     return;
   }
-  if (m.t === 'full') { showBanner('房间已满（上限 8 人）', true); return; }
-  if (m.t === 'err') { showBanner('错误：' + m.msg, true); return; }
+  if (m.t === 'full') {
+    showBanner('房间已满（上限 8 人）', true);
+    return;
+  }
+  if (m.t === 'err') {
+    showBanner('错误：' + m.msg, true);
+    return;
+  }
 }
 
 function addRemote(p) {
@@ -383,7 +469,8 @@ function addRemote(p) {
 }
 function emojiTexture(e) {
   const cv = document.createElement('canvas');
-  cv.width = 128; cv.height = 128;
+  cv.width = 128;
+  cv.height = 128;
   const g = cv.getContext('2d');
   g.font = '96px serif';
   g.textAlign = 'center';
@@ -428,7 +515,9 @@ function sendChat() {
   chatInput.value = '';
 }
 chatSend.onclick = sendChat;
-chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendChat();
+});
 
 document.querySelectorAll('.emote-btn').forEach((b) => {
   b.onclick = () => {
@@ -437,7 +526,10 @@ document.querySelectorAll('.emote-btn').forEach((b) => {
     if (me) showEmote(me.avatar, e);
   };
 });
-leaveBtn.onclick = () => { if (ws) ws.close(); location.href = '/lobby.html'; };
+leaveBtn.onclick = () => {
+  if (ws) ws.close();
+  location.href = '/lobby.html';
+};
 
 // 复制邀请链接(房间码已在 URL 里,朋友打开即可进同一房间)
 if (inviteBtn) {
@@ -449,7 +541,9 @@ if (inviteBtn) {
     } catch (e) {
       inviteBtn.textContent = link;
     }
-    setTimeout(() => { inviteBtn.textContent = '复制邀请链接'; }, 2000);
+    setTimeout(() => {
+      inviteBtn.textContent = '复制邀请链接';
+    }, 2000);
   };
 }
 
@@ -467,27 +561,47 @@ addEventListener('keyup', (e) => {
 });
 
 // 鼠标/触摸拖拽看视角(在画布上)
-let dragging = false, lx = 0, ly = 0;
-renderer.domElement.addEventListener('pointerdown', (e) => { dragging = true; lx = e.clientX; ly = e.clientY; });
-addEventListener('pointerup', () => { dragging = false; });
+let dragging = false,
+  lx = 0,
+  ly = 0;
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  dragging = true;
+  lx = e.clientX;
+  ly = e.clientY;
+});
+addEventListener('pointerup', () => {
+  dragging = false;
+});
 addEventListener('pointermove', (e) => {
   if (!dragging) return;
   cam.yaw -= (e.clientX - lx) * 0.005;
   cam.pitch = Math.max(0.05, Math.min(1.2, cam.pitch + (e.clientY - ly) * 0.004));
-  lx = e.clientX; ly = e.clientY;
+  lx = e.clientX;
+  ly = e.clientY;
 });
 // 滚轮缩放
-renderer.domElement.addEventListener('wheel', (e) => {
-  camDist = Math.max(4, Math.min(14, camDist + e.deltaY * 0.01));
-}, { passive: true });
+renderer.domElement.addEventListener(
+  'wheel',
+  (e) => {
+    camDist = Math.max(4, Math.min(14, camDist + e.deltaY * 0.01));
+  },
+  { passive: true }
+);
 
 // 移动端方向键
 let camDist = 8;
 document.querySelectorAll('.move-pad button').forEach((b) => {
   const d = b.dataset.dir;
-  b.addEventListener('pointerdown', (e) => { e.preventDefault(); padDir[d] = true; });
-  b.addEventListener('pointerup', () => { padDir[d] = false; });
-  b.addEventListener('pointerleave', () => { padDir[d] = false; });
+  b.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    padDir[d] = true;
+  });
+  b.addEventListener('pointerup', () => {
+    padDir[d] = false;
+  });
+  b.addEventListener('pointerleave', () => {
+    padDir[d] = false;
+  });
 });
 
 // ---------- 主循环(独立场景循环) ----------
@@ -501,16 +615,20 @@ function tick() {
     const av = me.avatar;
     if (av.mixer) av.mixer.update(dt);
     // 移动意图(相对相机朝向)
-    let fx = 0, fz = 0;
+    let fx = 0,
+      fz = 0;
     if (keys['w'] || padDir.f) fz += 1;
     if (keys['s'] || padDir.b) fz -= 1;
     if (keys['a'] || padDir.l) fx -= 1;
     if (keys['d'] || padDir.r) fx += 1;
-    const px = me.x, pz = me.z;
+    const px = me.x,
+      pz = me.z;
     if (fx || fz) {
       const len = Math.hypot(fx, fz);
-      fx /= len; fz /= len;
-      const sin = Math.sin(cam.yaw), cos = Math.cos(cam.yaw);
+      fx /= len;
+      fz /= len;
+      const sin = Math.sin(cam.yaw),
+        cos = Math.cos(cam.yaw);
       // 相机朝向在世界 XZ 的投影
       const wx = fx * cos + fz * sin;
       const wz = -fx * sin + fz * cos;
@@ -524,7 +642,10 @@ function tick() {
     }
     // 滚动:本帧位移换算成轮子绕 X 轴自转,模拟轮滑滑行
     const moved = Math.hypot(me.x - px, me.z - pz);
-    if (moved > 1e-4) { av.rollAngle += moved / 0.12; av.wheels.rotation.x = av.rollAngle; }
+    if (moved > 1e-4) {
+      av.rollAngle += moved / 0.12;
+      av.wheels.rotation.x = av.rollAngle;
+    }
     // 相机跟随
     const cx = me.x - Math.sin(cam.yaw) * Math.cos(cam.pitch) * camDist;
     const cz = me.z - Math.cos(cam.yaw) * Math.cos(cam.pitch) * camDist;
@@ -535,7 +656,8 @@ function tick() {
   // 远端插值
   for (const r of remotes.values()) {
     const g = r.avatar.group;
-    const pgx = g.position.x, pgz = g.position.z;
+    const pgx = g.position.x,
+      pgz = g.position.z;
     g.position.x += (r.tx - g.position.x) * 0.18;
     g.position.y += (r.ty - g.position.y) * 0.18;
     g.position.z += (r.tz - g.position.z) * 0.18;
@@ -545,7 +667,10 @@ function tick() {
     g.rotation.y += dr * 0.18;
     if (r.avatar.mixer) r.avatar.mixer.update(dt);
     const moved = Math.hypot(g.position.x - pgx, g.position.z - pgz);
-    if (moved > 1e-4) { r.avatar.rollAngle += moved / 0.12; r.avatar.wheels.rotation.x = r.avatar.rollAngle; }
+    if (moved > 1e-4) {
+      r.avatar.rollAngle += moved / 0.12;
+      r.avatar.wheels.rotation.x = r.avatar.rollAngle;
+    }
     if (r.avatar.emoteTimer > 0) {
       r.avatar.emoteTimer -= dt;
       if (r.avatar.emoteTimer <= 0) r.avatar.emote.visible = false;

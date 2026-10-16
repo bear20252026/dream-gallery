@@ -207,7 +207,9 @@ window.__v45El = ctx.media.v45El;
 const hintQueueCtl = createHintQueue({
   onError: (e) => console.warn('[audio] 挤出旧提示音,其 onEnd 回调失败', e),
 });
-const audioManager = {
+// 导出**只为给类型指路**:types/ctx.d.ts 的 `audioManager` 写成 `typeof import('./audio-manager.js').audioManager`,
+// 让形状始终由唯一写入方自己声明(运行期没有任何新调用者)。
+export const audioManager = {
   videoSound: null,
   hintSound: null,
   isHintPlaying: false,
@@ -269,6 +271,15 @@ function playOneHint(item) {
     }
   }, 9000);
 }
+/**
+ * @param {{
+ *   audio?: HTMLAudioElement,
+ *   onEnd?: () => void,
+ *   bypassSwitch?: boolean
+ * }} [item] 三个键都可缺(默认 `{}` 就是这条约定的证据):`onEnd` 由
+ *   shared/hint-queue.mjs:36 `typeof item.onEnd === 'function'` 测过才调,
+ *   `bypassSwitch` 只有对白/TTS 路径传(下面的 `!avAllowed() && !bypassSwitch`)。
+ */
 audioManager.playOne = function ({ audio, onEnd, bypassSwitch } = {}) {
   if (!avAllowed() && !bypassSwitch) {
     if (onEnd) onEnd(); // 总闸关闭(且非对白豁免):不播,回调照发(上传/TTS 流程不受阻)
@@ -279,6 +290,12 @@ audioManager.playOne = function ({ audio, onEnd, bypassSwitch } = {}) {
   playOneHint(item);
   return 'play';
 };
+/**
+ * 位置参数版入口(两个外部调用者都用它:gate/upload.js:219、本文件 :48 的昆仑对白)。
+ * @param {HTMLAudioElement} audio
+ * @param {() => void} [onEnd]
+ * @param {boolean} [bypassSwitch]
+ */
 audioManager.playHint = function (audio, onEnd, bypassSwitch) {
   return audioManager.playOne({ audio, onEnd, bypassSwitch });
 };

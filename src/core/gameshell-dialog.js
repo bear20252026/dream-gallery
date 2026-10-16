@@ -17,6 +17,15 @@ import { dwellFor } from '../shared/typing-rhythm.mjs';
 import { tt, GLOBAL, retranslate } from '../shared/story-text.mjs';
 import { allowJourneyDialog } from '../shared/journey-guidance.mjs';
 
+/**
+ * @param {{
+ *   getWorld?: () => string,
+ *   isStoryBusy?: () => boolean,
+ * }} [deps] 注入的两个读数回调。**必须写成 () => string / () => boolean**:
+ *   不标注时 TS 拿默认值 `() => 'main'` 与 `() => false` 推出**字面量类型**,
+ *   于是调用方返回真实世界名(string)反而"不能赋给 'main'"(第九刀那两条 TS2322 的成因)。
+ *   默认值本身一个字没改。
+ */
 export function createDialogSystem({ getWorld = () => 'main', isStoryBusy = () => false } = {}) {
   let dlg = null; // {speaker, lines, idx, choices, onDone, typeTimer, hideTimer, typing}
   let dialogEl = null;

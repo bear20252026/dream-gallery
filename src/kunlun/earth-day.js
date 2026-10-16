@@ -14,6 +14,7 @@ import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
 import { shiftDayTo } from '../scene/time-shift.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { earthDue, EARTH_STOPS, EARTH_DONE } from '../shared/earth-day-logic.mjs';
+import { errText } from '../shared/err-text.mjs';
 
 const OWNER = 'earth-day';
 const REACH = 4; // 走到站点 4m 内开讲
@@ -244,7 +245,7 @@ function loadRealRoses(sc) {
       props.roses = meshes[0];
     },
     undefined,
-    (err) => console.warn('[earth-day] 玫瑰模型未载入,保留低模:', err && err.message)
+    (err) => console.warn('[earth-day] 玫瑰模型未载入,保留低模:', errText(err))
   );
   // 园心:玻璃罩 + 罩里的那一朵(第二次来才现身)
   const hero = new THREE.Group();

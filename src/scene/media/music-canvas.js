@@ -212,6 +212,9 @@ export function drawMusicCanvas() {
 
 // 点击音乐平面
 const mxTouches = new Map();
+// 「B612 会唱歌」那句初见提示只说一次。原来写成 `onMusicClick.greeted`(挂在函数身上的私有键,
+// 编译器看不懂 ⇒ TS2339);`onMusicClick` 是本模块唯一实例且从不被重新赋值,所以模块级 let 逐字等价。
+let greetedOnce = false;
 function onMusicClick(cx, cy, isStart) {
   // 多世界切割(2026-09-06):音乐平面属主世界,小世界里不再隔空发声
   if ((ctx.scene.activeWorld || 'main') !== 'main') return false;
@@ -228,8 +231,8 @@ function onMusicClick(cx, cy, isStart) {
   if (isStart) {
     const id = startMusicNote(ux, uy);
     mxTouches.set(cx + '_' + cy, id);
-    if (!onMusicClick.greeted) {
-      onMusicClick.greeted = true;
+    if (!greetedOnce) {
+      greetedOnce = true;
       ctx.ui.modeToast &&
         ctx.ui.modeToast(
           tt({ en: 'B612 can sing. Can you hear it?', zh: 'B612 会唱歌。你听到了吗？' })

@@ -83,6 +83,12 @@ function saveOriginals() {
   for (const [g] of GROUPS) originals[g] = matsOf(g).map((m) => '#' + m.color.getHexString());
   originalsSaved = true;
 }
+// 换色心象提示的节流状态。原来挂在 `apply` 这个函数对象上(`apply._t` / `apply._spoke`)——
+// 而 `apply` 是本模块唯一实例、从不被重新赋值(全仓只有调用,没有别名或改写),
+// 所以"函数的属性"与"模块的 let"在这里逐字等价,后者不需要 typedef 或 cast 就能被编译器看懂
+// (第九刀:私有键那一族的两种收法之一;另一种见 dialog-voice 的 SpeakingAudio —— 那个宿主是每行一个新 Audio,搬不进模块变量)。
+let lastToastAt = 0;
+let moodSpoke = false;
 function apply(group, hex, save) {
   saveOriginals();
   const c = new THREE.Color(hex);
@@ -91,11 +97,11 @@ function apply(group, hex, save) {
   // 昆仑灵鉴:换色=心象外显(节流 1.5s,自定义取色拖动不刷屏)
   if (save) {
     const now = Date.now();
-    if (now - (apply._t || 0) > 1500) {
-      apply._t = now;
+    if (now - lastToastAt > 1500) {
+      lastToastAt = now;
       ctx.ui.modeToast && ctx.ui.modeToast('你换上的不是颜色，是你此刻的心境。');
-      if (!apply._spoke) {
-        apply._spoke = true;
+      if (!moodSpoke) {
+        moodSpoke = true;
         ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('你换上的不是颜色，是你此刻的心境。');
       }
     }

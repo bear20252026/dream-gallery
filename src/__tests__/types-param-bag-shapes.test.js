@@ -272,10 +272,17 @@ describe('chime 的选项包与 hot.register 的 opts', () => {
     expect(src).toMatch(
       /shared\?:Set\|WeakSet\|Array\|\(\(res:object, kind:string\)=>boolean\)\|null/
     );
-    // disposeObject3D 自己那份声明仍是唯一出处:hot 的写法不许比它窄
-    expect(read('src/shared/dispose-object3d.mjs')).toMatch(
-      /@param \{Set\|WeakSet\|Array\|Function\|null\|undefined\} shared/
+    // disposeObject3D 自己那份声明仍是唯一出处:hot 的写法不许比它窄。
+    // ⚠️第六刀当时把这条写成"必须等于那一串字面量",于是钉住的其实是**当天的写法**(里面还带着
+    // 裸 `Function` 这个谎)—— 第九刀把谓词收成 `SharedTest` typedef 就把它撞红了。
+    // 改成钉不变量:①四种都认;②谓词不许再退回裸 `Function`;③typedef 与kind枚举还得成对存在。
+    const dsp = read('src/shared/dispose-object3d.mjs');
+    expect(dsp).toMatch(/@param \{Set\|WeakSet\|Array\|SharedTest\|null\|undefined\} shared/);
+    expect(dsp, 'shared 的谓词又不写签名了').not.toMatch(
+      /@param \{[^}]*\bFunction\b[^}]*\} shared/
     );
+    expect(dsp).toMatch(/@typedef \{\(res: \*, kind: DisposeKind\) => boolean\} SharedTest/);
+    expect(dsp).toMatch(/@typedef \{"geometry"\|"material"\|"texture"\} DisposeKind/);
   });
 });
 

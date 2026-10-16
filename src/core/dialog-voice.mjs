@@ -71,7 +71,22 @@ export function speakDecision(text, voiceOff) {
   return { speak: true, reason: 'ok' };
 }
 
-let cur = null; // 当前台词朗读(替换语义:新行顶旧行)
+/**
+ * 一行台词的朗读实例 + 挂在它身上的三个私有键。
+ * 为什么"挂在元素上"而不是收进模块变量(与 `housecolor` 的 `apply._t` 处理方式相反):
+ * **每说一行就 `new Audio()` 一个实例**,而行切换是异步的 —— 旧行的 `play()` reject、旧守卫、
+ * 旧回调都会晚到,状态必须跟着**那一个** audio 走才能识别"cur 已被替换"(全文件靠 `cur !== audio`
+ * 这一判据防串音)。所以键属于实例,不属于模块。
+ * 与 `src/scene/media/video-wall.js` 的 `TaggedVideo`、本文件的 `VoiceButton` 同一形。
+ * @typedef {HTMLAudioElement & {
+ *   _statText?: string,
+ *   _statVoice?: string,
+ *   _started?: boolean,
+  _fellBack?: boolean,
+ * }} SpeakingAudio
+ */
+/** @type {SpeakingAudio|null} 当前台词朗读(替换语义:新行顶旧行) */
+let cur = null;
 const warmed = new Set(); // 本会话已预取过的台词 URL(防重复 load)
 
 // ============ 播放追踪(2026-09-26 主人令:「播放过/播放错误/播放条数全部记录」) ============
@@ -123,7 +138,7 @@ export function speakLine(text, spk) {
   stat('speak', text, voice); // 发起朗读(主人要的「播放条数」)
   stopSpeaking();
   try {
-    const audio = new Audio();
+    const audio = /** @type {SpeakingAudio} */ (new Audio());
     audio._statText = String(text || '').slice(0, 24);
     audio._statVoice = voice;
     cur = audio;
@@ -155,6 +170,13 @@ export function speakLine(text, spk) {
  *  AbortError(行切换竞态)且未被替换 → 120ms 后重试一次(缓存命中即秒开);
  *  NotSupportedError(.mp3 未煮 404 / 网络失败)→ 回退经典 /api/tts 触发合成,只回退一次
  *  (合成落盘后同一行下次走 /tts-audio 直接命中边缘缓存)。 */
+/**
+ * @param {SpeakingAudio} audio 失败的那一行朗读实例(私有键按 SpeakingAudio 说一次)
+ * @param {string} url
+ * @param {string} text
+ * @param {string} voice
+ * @param {{ name?: string }} [e] 播放失败的返回值:本函数只读它的 .name,所以类型也只说到这一层
+ */
 function playFail(audio, url, text, voice, e) {
   const name = (e && e.name) || 'unknown';
   stat('fail', text, voice, { err: name });

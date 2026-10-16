@@ -30,6 +30,7 @@ import {
 } from '../shared/fox-ground-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
 import { tt, SCENE_FOX, FOX_UI } from '../shared/story-text.mjs';
+import { errText } from '../shared/err-text.mjs';
 
 const OWNER = 'fox-scene';
 const MODEL = '/models/hall/b612-world/fox-scene.glb'; // 0.42MB(源 1.37MB,meshopt+webp)
@@ -131,7 +132,12 @@ function groundDiorama(m) {
   const stage = m.getObjectByName(STAGE);
   if (stage) {
     const b = box(stage);
-    const low = lowestGround(groundH, { minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z });
+    const low = lowestGround(groundH, {
+      minX: b.min.x,
+      maxX: b.max.x,
+      minZ: b.min.z,
+      maxZ: b.max.z,
+    });
     liftWorld(m, groundShift(b.min.y, low, -STAGE_SINK));
   }
   // 2) the fox, the prince, the grass and the wheat stand on the sand under each of them
@@ -168,7 +174,10 @@ function addMeadow(cx, cz) {
     // a little deterministic variation so the patch is not a flat colour
     const wobble = 0.5 + 0.5 * Math.sin(v.x * 2.3 + v.z * 1.7) * Math.cos(v.z * 1.9 - v.x * 0.8);
     c.copy(inner).lerp(outer, Math.min(1, v.t * 0.9 + wobble * 0.15));
-    pos.set([wx - root.position.x, groundH(wx, wz) - root.position.y + MEADOW_LIFT, wz - root.position.z], i * 3);
+    pos.set(
+      [wx - root.position.x, groundH(wx, wz) - root.position.y + MEADOW_LIFT, wz - root.position.z],
+      i * 3
+    );
     col.set([c.r, c.g, c.b, v.a * 0.92], i * 4);
   });
   const g = new THREE.BufferGeometry();
@@ -225,7 +234,7 @@ function build() {
       placeSeat();
     },
     undefined,
-    (e) => console.error('[fox-scene] 布景模型加载失败:', e.message)
+    (e) => console.error('[fox-scene] 布景模型加载失败:', errText(e))
   );
 
   // 当前坐席光点

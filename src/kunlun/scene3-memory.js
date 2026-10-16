@@ -303,6 +303,8 @@ let chainBusy = false;
 let wd = null;
 // 书页分界哨兵(2026-10-03):不是台词,是"读到书页二末尾"的进度标记。
 // speakSeq 见到它只写 store 不开对话框,玩家看不到任何提示。
+/** 上面那句"不是台词"的类型化说法:它只有这一个键,speakSeq 用 `item.__pageMark` 认它(第 317 行)。 */
+/** @typedef {{ __pageMark: string }} PageMark */
 const PAGE_TWO_MARK = { __pageMark: 'page2done' };
 function speakSeq(seq, i, done, ticket = visit) {
   if (ticket !== visit || ctx.scene.activeWorld !== 'b612') return;
@@ -468,7 +470,14 @@ function doStep(stepIdx) {
     // 再进原有的相见/追悔/离别(此前从"你多美啊"开场,开篇整段缺失)
     // 2026-10-03:在 regret(追悔)前插 mark —— 剧本书页二=玫瑰相见,书页三=离别,
     // 分界正是这里。此前整段共用一个 page1 标记,玩家永远看不到书页二/三(见 story-progress.mjs)。
-    SCENE4.interrogation.concat(
+    // 2026-10-16 第九刀:这行 concat 原先报 TS2769。收方 `interrogation` 那 7 句全带 who,
+    // 于是推断出的元素类型是「who 必填」,而 `[tearsCaption]`(纯字幕,没有 who)和
+    // `[PAGE_TWO_MARK]`(进度哨兵,连 en/zh 都没有)都进不去。把收方按**本用法**读成
+    // `StoryLine | PageMark` 数组:台词形状归写入方 story-text.mjs 的 StoryLine,
+    // 哨兵形状归本页第 307 行的 PageMark,消费点一个形状都不重抄。
+    /** @type {Array<import('../shared/story-text.mjs').StoryLine | PageMark>} */ (
+      SCENE4.interrogation
+    ).concat(
       [SCENE4.tearsCaption],
       SCENE4.arrival,
       [PAGE_TWO_MARK],

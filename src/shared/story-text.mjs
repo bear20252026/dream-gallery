@@ -7,6 +7,16 @@
 //   (入口:主进程按 ctx.store 载入;切换钮 src/ui/lang-toggle.js 翻转并发 'script:lang' 事件)。
 // 版权口径:英文照 Woods 英译公版底本(中国法 2019 起 PD);中文为文学自译;羊台词原创。
 
+/**
+ * 台词数组里的一条 = 文件头那句「每条 = {en, zh}」的类型化版本,加一项可选的说话人:
+ * 对话行带 `who`(值是 PRINCE/SHEEP 这类 `{en, zh, spk}` 条目,`whoSpk()` 读它的 spk),
+ * 纯字幕/提示行没有(本文件的 `SCENE4.tearsCaption`、`FILM.*` 就是这一类)。
+ * `spk` 写成可选照 whoSpk 自己的注释(第 188 行「who 缺 spk 时回退空串」)。
+ * 需要它的原因是消费方:scene3-memory.js:463 那份 seqs 把两种行 + 一个进度哨兵放进同一个数组,
+ * 2026-10-16 第九刀核实,原先 `SCENE4.interrogation.concat([tearsCaption], …)` 报 TS2769
+ * 就是因为推断出的元素类型是「who 必填」那种,字幕行进不去。
+ * @typedef {{ en: string, zh: string, who?: { en: string, zh: string, spk?: string } }} StoryLine
+ */
 let _lang = 'en';
 export function setScriptLang(l) {
   _lang = l === 'zh' ? 'zh' : 'en';
