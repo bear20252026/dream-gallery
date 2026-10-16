@@ -405,8 +405,10 @@ describe('批次6-7 地板(第十刀·批次0 起改成了"上限"而不是"等�
    * 里一个都不存在,旧图内文件的新增数为 0)。
    * 这条钉子换写法之后**作用没变**:想让上限再往上抬,必须动这个文件,
    * 而且 `--limit` 只许**降**不许升 —— 每切完一族就把这个数字往下压到实测值。
+   * 批次1(裸 object 族:plane-physics 22 + chapter-map-logic 7)压到 **116**,判据钉在
+   * src/__tests__/plane-and-save-shapes.test.js,那里测的是"声明与写入方同一份事实",不是条数。
    */
-  const CEILING = 145;
+  const CEILING = 116;
   it(`checkJs 基线不得超过 ${CEILING}:想抬上限必须同时改这里`, () => {
     const raw = read('scripts/checkjs-baseline.txt').trim();
     if (!/^\d+$/.test(raw)) throw new Error(`基线文件不是一个数:${raw}`);

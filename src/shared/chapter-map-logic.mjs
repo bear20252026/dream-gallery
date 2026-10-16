@@ -83,6 +83,26 @@ export function canTravel(state) {
 }
 
 // —— 存档码 ——
+
+/**
+ * 本模块向 store 要的两个面,分开声明,因为**每个函数只用到其中一个**:
+ * collectSave/encodeSave 只读、applySave/restoreSave 只写、importSave 两个都要。
+ * 写成"整个 StoreAPI"会把"本模块不碰 getSpirits/addSpirit/houseColor…"假装成碰,
+ * 而单测里的 fakeStore 恰恰只提供被真调到的那几个 —— 窄面才是可验的那一面。
+ *
+ * 写入方唯一:`src/state/store-api.js:211 storeApi`,挂载 `src/state/store.js:13 ctx.ui.store = storeApi`,
+ * 调用点 `src/ui/chapter-map.js:213/:233/:265`(三处都传 ctx.store)。
+ * 返回值按写入方的真实契约写:五枚 setter/mark 都透传"这次到底落盘没有"(DG-STATE-002),所以是 boolean;
+ * 下方 applySave 只认严格 `=== false` 的理由见它自己的注释,两者是一套。
+ * 钉子:src/__tests__/plane-and-save-shapes.test.js(声明的键 ≡ 文件里真调用的键,且都在 storeApi 上存在)。
+ *
+ * @typedef {{ flag:(name:string)=>boolean, num:(name:string)=>number, str:(name:string)=>string, json:(name:string, def:*)=>* }} SaveReader
+ */
+
+/**
+ * @typedef {{ mark:(name:string)=>boolean, unmark:(name:string)=>boolean, setNum:(name:string, value:number)=>boolean, setStr:(name:string, value:string)=>boolean, setJson:(name:string, value:*)=>boolean }} SaveWriter
+ */
+
 export const SAVE_FIELDS = {
   scene2: 'flag',
   page1: 'flag',
@@ -118,7 +138,9 @@ function b64decode(s) {
   return Buffer.from(s, 'base64').toString('utf8');
 }
 
-/** 读出当前剧情存档的字段值(存档码与"载入前快照"共用这一份采集逻辑,不各写一遍) */
+/** 读出当前剧情存档的字段值(存档码与"载入前快照"共用这一份采集逻辑,不各写一遍)
+ * @param {SaveReader} store
+ */
 export function collectSave(store) {
   const data = {};
   for (const [k, type] of Object.entries(SAVE_FIELDS)) {
@@ -130,7 +152,9 @@ export function collectSave(store) {
   return data;
 }
 
-/** 从 store 读出剧情存档 → 存档码字符串 */
+/** 从 store 读出剧情存档 → 存档码字符串
+ * @param {SaveReader} store
+ */
 export function encodeSave(store) {
   return PREFIX + b64encode(JSON.stringify(collectSave(store)));
 }
@@ -169,7 +193,7 @@ export function decodeSave(code) {
  * 但别处(含单测里的 fakeStore)的 setter 常把赋值表达式的值当返回值 —— `setNum(k, 0)` 返回 0、
  * `unmark` 返回 `delete` 的布尔。用 `!ok` 判失败会把"正常写入了一个假值"当成写失败。
  *
- * @param {object} store
+ * @param {SaveWriter} store
  * @param {Object<string, *>} data decodeSave 或快照里的字段值
  * @returns {{ok: boolean, failed: string[]}} failed = 没能落盘的 SAVE_FIELDS 键名
  */
@@ -198,6 +222,8 @@ export function applySave(store, data) {
  *   ② 快照存好了才覆盖字段;有项没落盘 ⇒ 不 reload。缺项的新进度立刻刷页会把提示一起冲走,
  *      停下来说清楚,玩家才能自己选「重开看看实际存下了什么」还是「撤销退回载入前」。
  *
+ * @param {SaveReader & SaveWriter} store 读旧值做快照、写快照与新字段,两个面都要
+ * @param {Object<string, *>} data decodeSave 的结果
  * @returns {{action: 'noBackup'|'partial'|'reload', failed: string[]}}
  */
 export function importSave(store, data) {
@@ -208,8 +234,19 @@ export function importSave(store, data) {
 }
 
 /**
+ * "载入前快照"的形状(存进 `saveBackup` 的那个对象)。
+ * 写入方唯一:本文件 `importSave` 里 `const snap = { at: Date.now(), data: collectSave(store) }`。
+ * 读出方:`src/ui/chapter-map.js:194 ctx.store.json('saveBackup', null)`,守卫过 `backup.data` 才摆撤销按钮。
+ * `data` 是**字段值本身**而不是存档码 —— 这点写在 chapter-map.js:212 与 store-api.js:43 两处注释里,
+ * 因为走 decodeSave 会被它的钳位(str 截 40、num 夹 0-99)悄悄改写,那是另一条事故线。
+ * @typedef {{ at:number, data:Object<string, *> }} SaveBackup
+ */
+
+/**
  * 「撤销上一次载入」:把快照写回。
  * 只有**全部存下**才清掉 saveBackup —— 撤到一半就清快照,等于把唯一的重试依据也删了。
+ * @param {SaveWriter} store
+ * @param {?SaveBackup} backup importSave 写进去的那份快照(调用方已守卫过 .data 存在)
  * @returns {{action: 'partial'|'reload', failed: string[]}}
  */
 export function restoreSave(store, backup) {
