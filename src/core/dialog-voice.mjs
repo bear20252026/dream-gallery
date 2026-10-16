@@ -100,7 +100,6 @@ function flushStats() {
   } catch (e) {}
 }
 
-
 export function stopSpeaking() {
   if (cur) {
     try {
@@ -133,17 +132,19 @@ export function speakLine(text, spk) {
     // 修复:①失败留痕(admin 错误追踪可见,不再是黑洞);②若 cur 未被替换(非正常换行)且是
     // AbortError,重试一次 —— 缓存命中后重试即秒开;③冷台词 404 回退经典通道(见 playFail)。
     const t0 = performance.now();
-    ttsUrl(text, voice).then((url) => {
-      if (cur !== audio) return; // 行已切换:废播,别让旧台词开口
-      audio.src = url;
-      audio.play().then(
-        () => {
-          audio._started = true; // 真实出声(加载提示/兜底语义依赖此标记)
-          stat('ok', text, voice, { ms: Math.round(performance.now() - t0) }); // 真实开播(「播放过」)
-        },
-        (e) => playFail(audio, url, text, voice, e),
-      );
-    }).catch(() => {});
+    ttsUrl(text, voice)
+      .then((url) => {
+        if (cur !== audio) return; // 行已切换:废播,别让旧台词开口
+        audio.src = url;
+        audio.play().then(
+          () => {
+            audio._started = true; // 真实出声(加载提示/兜底语义依赖此标记)
+            stat('ok', text, voice, { ms: Math.round(performance.now() - t0) }); // 真实开播(「播放过」)
+          },
+          (e) => playFail(audio, url, text, voice, e)
+        );
+      })
+      .catch(() => {});
   } catch (e) {
     cur = null;
   }
@@ -174,7 +175,7 @@ function playFail(audio, url, text, voice, e) {
         audio._started = true; // 回退通道出声同样算(加载提示熄灭/兜底按 duration 重置)
         stat('ok', text, voice); // 回退通道播响也算「真的响了」(audibleRate 口径一致)
       },
-      () => {},
+      () => {}
     );
   }
 }
@@ -182,10 +183,7 @@ function playFail(audio, url, text, voice, e) {
 /** 组经典 TTS 请求 URL(回退通道;截断与 lib/tts.js MAX_LEN 对齐) */
 function legacyTtsUrl(text, voice) {
   return (
-    '/api/tts?text=' +
-    encodeURIComponent(normTtsText(text)) +
-    '&voice=' +
-    encodeURIComponent(voice)
+    '/api/tts?text=' + encodeURIComponent(normTtsText(text)) + '&voice=' + encodeURIComponent(voice)
   );
 }
 
@@ -207,7 +205,9 @@ const KEY_VER = 'tts1';
 const R2_BASE = 'https://cdn.cloudbear.cloud';
 async function sha256hex(s) {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
-  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, '0')).join('');
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 // ============ blob 内存常驻(2026-09-26 终验定案) ============
 // 终验实锤:预热 Audio load 在拥塞下不可靠(浏览器可节流/逐出,HTTP 缓存复用不保证),
@@ -277,7 +277,9 @@ export async function ttsUrl(text, voice) {
       if (b) return b;
       return R2_BASE + '/tts-audio/' + key + '.mp3';
     }
-  } catch (e) { /* 落回经典 URL */ }
+  } catch (e) {
+    /* 落回经典 URL */
+  }
   return legacyTtsUrl(text, voice);
 }
 
@@ -304,7 +306,9 @@ export function prefetchLine(text, spk) {
           a.load();
         })
         .catch(() => {});
-    } catch (e) { /* 无 Audio 环境(测试/异常)静默 */ }
+    } catch (e) {
+      /* 无 Audio 环境(测试/异常)静默 */
+    }
   });
   return d;
 }
@@ -333,7 +337,8 @@ export function isVoiceOff() {
 export function toggleVoiceOff() {
   const next = !isVoiceOff();
   try {
-    if (next) sessionStorage.setItem(OFF_KEY, String(Date.now())); // 存时间戳供 24h 过期
+    if (next)
+      sessionStorage.setItem(OFF_KEY, String(Date.now())); // 存时间戳供 24h 过期
     else sessionStorage.removeItem(OFF_KEY);
   } catch (e) {
     // 隐私模式/配额下 setItem 真会抛:无兜底会"按了静音只静一句"(读回 false 又出声)
@@ -374,13 +379,17 @@ export function onVoiceStart(cb) {
     }
     return;
   }
-  a.addEventListener('playing', () => {
-    try {
-      cb();
-    } catch (e) {
-      console.warn('[dialog-voice] 播放回调异常', e);
-    }
-  }, { once: true });
+  a.addEventListener(
+    'playing',
+    () => {
+      try {
+        cb();
+      } catch (e) {
+        console.warn('[dialog-voice] 播放回调异常', e);
+      }
+    },
+    { once: true }
+  );
 }
 
 /** 台词语音结束回调(一次性);never 情形(无语音在播)立即执行。
@@ -411,15 +420,22 @@ export function onVoiceEnd(cb) {
   let guard = setTimeout(() => {
     if (cur === a) fin(); // 已被新行替换/已停止 → 新生命周期接管,旧守卫静默退出
   }, 30000);
-  a.addEventListener('playing', () => {
-    a._started = true;
-    if (done) return;
-    clearTimeout(guard);
-    const d = Number.isFinite(a.duration) ? a.duration : 60;
-    guard = setTimeout(() => {
-      if (cur === a) fin(); // 防挂死:正常由 ended 先行;网络中断 stall 到底也放行
-    }, d * 1000 + 20000);
-  }, { once: true });
+  a.addEventListener(
+    'playing',
+    () => {
+      a._started = true;
+      if (done) return;
+      clearTimeout(guard);
+      const d = Number.isFinite(a.duration) ? a.duration : 60;
+      guard = setTimeout(
+        () => {
+          if (cur === a) fin(); // 防挂死:正常由 ended 先行;网络中断 stall 到底也放行
+        },
+        d * 1000 + 20000
+      );
+    },
+    { once: true }
+  );
 }
 
 /** 对话框挂静音钮(gameshell-dialog attach 时调用;防重复安装) */
@@ -465,7 +481,8 @@ export function disposeMuteBtn(dialogEl) {
   if (!dialogEl || !dialogEl.querySelector) return false;
   const b = dialogEl.querySelector('.gs-voice');
   if (!b) return false;
-  if (b._langHandler && typeof window !== 'undefined') window.removeEventListener('script:lang', b._langHandler);
+  if (b._langHandler && typeof window !== 'undefined')
+    window.removeEventListener('script:lang', b._langHandler);
   b._langHandler = null;
   b.onclick = null;
   b.remove();

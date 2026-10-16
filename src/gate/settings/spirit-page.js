@@ -7,7 +7,9 @@ import { expose } from '../../debug-hooks.js';
 const spOv = document.createElement('div');
 spOv.id = 'spOv';
 spOv.style.cssText =
-  'position:fixed;inset:0;z-index:' + Z.modal + ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
+  'position:fixed;inset:0;z-index:' +
+  Z.modal +
+  ';display:none;align-items:center;justify-content:center;background:rgba(12,6,12,0.62);font-family:inherit';
 const spCard = document.createElement('div');
 spCard.style.cssText =
   'width:min(460px,92vw);max-height:82vh;overflow-y:auto;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)';
