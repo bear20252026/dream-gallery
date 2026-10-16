@@ -704,6 +704,23 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   **checkJs 61 = 新基线** / vitest **1127 项 / 99 文件**(1126 + 本刀 1)/ `npm test` exit 0 且 209 项照旧 /
   `npm run build` 0 且三条断言照旧(prefetch 仍 47,没新增模块进核心链)/ 四条 CI 守卫全 exit 0。
 - ⚠️本刀动的是运行期取用写法(`this`→具名引用、`e.target`→具名引用、加 import)⇒ **要重新构建并部署**。
+- **已上线并线上复验(PR #34 → merge `c43dd1b` → `DEPLOY_OK c43dd1b`)**:这个 PR 装了三个提交
+  (`29028cc` 纯排版 / `b3877eb` 第八刀 / `9a94005` 台账)。required checks `build-and-test` 59s、`smoke` 1m30s 双绿,
+  CI 自己打句 **`checkJs errors: 61 (baseline 61, delta 0)`**、vitest 99 文件全绿;合并后核对
+  **CI 验的树 == main 的树** = **`93b9295f0be45da671e45b08ee8f7fb09b3a5928`**;
+  部署快照六字段全给结论(`BACKEND=verified / FRONTEND=extracted / RESTART=online / MODELS=synced / VERIFY=ok / DRIFT=ok`),
+  漂移 **OK 201 DRIFT 0 MISSING 0**,`/healthz {"ok":true,"uptime":131}`(新进程),
+  线上 `assets/entrygate-wyje7ytC.js` 里 grep 到本次短哈希 **`c43dd1b`**;
+  `BASE_URL=https://cloudbear.cloud node scripts/probe/b612-prod-worlds.cjs` **前六条全绿**
+  (含「主世界小地图在场 / 非主世界小地图已隐藏」与 storybook + kingStoryScene 入景),第 ⑦ 段
+  `waitForFunction 25000ms` 仍与探针头写明的「④ 星球原点返回钮」逐字一致 ⇒ 判旧红。
+  ⚠️**生产上被真跑到的只有默认加载链的"启动"那一半**(世界切换 + 小地图在场/隐藏 + 模型入景,全绿);
+  **静音钮被装上、`#hcCustom` 的 `oninput` 真路径这两件事只有本地那次 8/8 证过**,线上没有对应探针,
+  所以线上这两条**不能说已验**——它们随 `dialog-voice` / `housecolor` 进了生产 bundle 是确定的(短哈希对得上),
+  但"点一下不炸"这句话的证据在本地。
+  ⚠️发布过程里我自己差点并发第二个 deploy(前一条命令已 `nohup` 拉起一次,我确认状态时又想发一次)——
+  是 `mkdir .tmp/deploy.lock` 那道闸 + 先读日志再决定救回来的:查到日志已到 3/8 步、锁内 epoch/pid 都在,
+  于是改为**等它自己打结论**。这正是 10-14 那次事故立的闸门在起作用,不是我又聪明了一次。
 - **剩下的簇(61,重数过)**:按码 `TS2339 45 / TS2322 7 / TS2810 3 / TS2740 2 / TS2345 2 / TS2769 1 / TS2683 1`
   (TS2554 / TS1345 / TS2349 / TS2365 仍为 0)。按文件 `scene7-tippler.js` 8 / `crash-site.js` 6 /
   `audio-manager.js` 5 / `planets.js` 5 / `mode.js` 5 / **`housecolor.js` 4**(还剩的是 `_t` / `_spoke` 那族
