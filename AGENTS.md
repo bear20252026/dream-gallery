@@ -734,6 +734,122 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   `chapter-map-logic.mjs` 纳进检查图、`audioManager` 那条"声明 ≡ 写入方"的钉子,各自单独一批。
 
 
+## 2026-10-16 checkJs 第九刀:61 → **0**(基线归零),这一刀按「机制」分,不按文件分
+
+第八刀留下的 61 条按"同一族同一个判据能不能一次收干净"分成六批。批次1-4 的提交是
+`f350b35`(61→36)与 `26d7fb2`(36→24),批次5+6 在这次:`a4ec13a`(quiz.js 纯排版)之后一次落地,
+**基线 `scripts/checkjs-baseline.txt` = 0**。每批的账都由 comm 集合差核过,新增为 0。
+
+- **消失的账(逐批)**:61 → 54 批次1「JSDoc 层 7 条」(缺 `@returns` / `@param` 写歪 / 元组)→
+  45 批次2「loader `onError` 一族 14 个读数点收成 `src/shared/err-text.mjs` 一个 `errText(e)`」(9 条)→
+  36 批次3「往函数对象上挂私有键」(housecolor 的 `lastToastAt/moodSpoke`、music-canvas 的 `greetedOnce`
+  改模块级 `let`;dialog-voice 的 `SpeakingAudio` typedef,9 条)→
+  24 批次4「Object3D 那一族 12 条」(`isBone/isMesh` 改 `instanceof`、`children[3]` 按 hangOn 的
+  add 顺序 cast 成带材质的 Mesh、tippler 的 material 按 GLB 普查收成两种具体材质)→
+  14 批次5 → 0 批次6。
+- **批次5 的 10 条**(`.tmp/cj-9k.txt` 与 `.tmp/cj-9l.txt` 的集合差,不是回忆):
+  `gameshell-system.js` 2(`Type 'boolean' is not assignable to type 'false'` —— 病根在
+  `gameshell-dialog.js` 的**默认参数被当成字面量类型**,给 deps 补 `@param {{getWorld?: …, isStoryBusy?: …}}` 才对)、
+  `mode.js` 2(`LINK_MODEL_TYPES` / `MOUNTABLE_ICONS` 在 ctx.d.ts 写成 `string[]`,而写入方给的是对象字面量 ⇒ 声明改 `Record`)、
+  `quiz.js` 2 + `scene2-draw.js` 3(值写法:`textContent`/`setAttribute`/`style.opacity` 收 `USVString`,
+  把隐式转换写成 `String(…)`)、`minimap.js` 1(元组解构缺注解)。
+- ⚠️**批次5 那两处 `quiz.js` 现在玩家走不到**(见下面"顺带撞出的既有缺陷"一条),所以它们**没有真浏览器证据**。
+
+### 批次6 的六个机制(14 → 0)
+
+1. **`audioManager`(一家 5 条)**:`audio-manager.js:212` 的 `const audioManager` 加 `export`,
+   ctx.d.ts 成员写成 `typeof import('../src/scene/media/audio-manager.js').audioManager`。
+   `playOne` 的入参形状由**写入方自己**声明,三个键全可选,证据是它自己的默认值 `= {}` 与
+   `hint-queue.mjs:36` 的 `typeof item.onEnd === 'function'`;`playHint` 补三个 `@param`。
+2. **`scrollLink`(2 条)**:指不回写入方 —— links.js 的 `redraw` 定义在建造函数体内,不是模块级绑定,
+   `typeof import()` 够不着 ⇒ 只能在 ctx.d.ts 手写形状,**于是必须配钉子**:参数名/顺序/可选性由
+   `dom…` 之外的第二份测试逐项比对 links.js 那行 `function redraw(title, sub)`,
+   可选性另由函数体自己裁决(`title.length` 直读 ⇒ 必填;`sub || ''` ⇒ 可缺)。
+3. **`world:changed` 载荷(2 条)**:`@typedef {{from: string, to: string}} WorldChangedPayload` 写在
+   scene-manager.js,并且**给唯一那行 emit 打上 `@type` cast** ⇒ 以后改名/加键在写入方当场炸,
+   而不是让消费者各自猜 `d.to`。ctx.d.ts 的 `worldChanged` 指回这份 typedef。
+4. **`eternalHandlers`(2 条)**:值签名 `(cg: Object3D) => void` 照**派发契约**写
+   (eternal.js:704 `const h = …[act]; if (h) h(cg)`),不是照某个 handler 猜;五个注册者里只有
+   finale.js 的 `spiritmark` 收 1 参,其余四个 0 参 —— 0 参可赋 1 参签名,TS 本来就这么判,
+   所以这条声明不逼那四个改形状。
+5. **`navigator.deviceMemory`(1 条)**:新增 `types/browser-globals.d.ts`(`interface Navigator` 全局合并,
+   `readonly deviceMemory?: number`)。2026-10-16 核实 TS 7.0.2 的
+   `node_modules/@typescript/typescript-win32-x64/lib/lib.dom.d.ts` 里**没有**这一项(同段 `hardwareConcurrency` 在 :25928)。
+   ⚠️**承重的是配置那一行**:`tsconfig.checkjs.json` 的 `include` 必须带 `types/**/*.d.ts` ——
+   `ctx.d.ts` 靠 `src/ctx.js:124` 的 `import('../types/ctx')` 进程序,而全局脚本没人 import,
+   不列进 include 就根本不在程序里(J10 注射实测:拿掉它 checkJs 立刻回 1 条)。
+   这条债之前不在基线里,不是因为它不存在,是因为**当时没有任何文件声明过 deviceMemory**。
+6. **玫瑰站 concat(1 条)**:`SCENE4.interrogation.concat([tearsCaption], …, [PAGE_TWO_MARK], …)` 报 TS2769 ——
+   7 句诘问全带 `who`,推断出的元素类型是「who 必填」,纯字幕行和进度哨兵进不去。
+   做法是把**收方**读成 `Array<StoryLine | PageMark>`:台词形状归 story-text.mjs 新增的 `StoryLine`
+   (`en/zh` 必填 + `who?` 可选,`who` 的子形状按 PRINCE 那批常量与 `whoSpk` 的回退注释裁决),
+   哨兵形状归 scene3-memory.js 自己的 `PageMark`。消费点一个形状都不重抄。
+
+- ⚠️**这一刀最该记的一条:`typeof import()` 指空是静默的,比 `unknown` 更坏**。
+  把 `audio-manager.js` 的 `export` 摘掉而声明不动 ⇒ `npx tsc -p tsconfig.checkjs.json` 输出**整段为空**,
+  连 `ctx.media.audioManager.这个键不存在(1)` 都不报(实测,`.tmp/rv9c.sh` K2b)。原因是 TS2694 落在
+  `types/ctx.d.ts` 这个 **.d.ts** 里,而 `skipLibCheck: true` 只跳"检查"不跳"使用" ⇒ 那条 import 指空后
+  成员退化成 `any`,所有读数点同时失去检查。所以"能指回写入方"这条路**必须**配一条
+  "绑定确实在导出位"的钉子(`ctx-writer-shapes.test.js` 批次6-1 第 2 条)。
+- ⚠️**工具级两条(都会造成假结论)**:
+  ① `grep -qF "$旧串"` 在旧串跨行时不可用 —— GNU grep 把含换行的模式**按行拆成多个 pattern**,
+  于是 rv9c.sh 的 K2 误报"旧文本还在"、跳过还原,把注入**留在了树里**(下一条 K3 数出 4 条 = 它自己的 2 + K2 的 2 才暴露)。
+  rv9d.sh 改成写完立刻在 node 里复读同一个字符串。**跨行注入的"打上没打上"必须由写入侧判定。**
+  ② 注释里复述代码形态会被判据当真:scene-manager.js 的注释原话含 `eventBus.emit('world:changed', …)`,
+  被"全仓只有一个 emit"数成两条 ⇒ 注释改成"commit() 里那行 `eventBus.emit`"。
+- **新闸门 `src/__tests__/ctx-writer-shapes.test.js`(7 个 describe / 21 项)**,判据全是"声明 ≡ 写入方"的比对:
+  typeof import 那类钉"不许出现手写形状 + 绑定在导出位 + 挂载点唯一";
+  手写那类(scrollLink)钉"参数名/顺序/可选性逐项相等,且可选性由函数体裁决";
+  载荷那类钉"typedef 键 ≡ emit 字面量键,且 emit 带着 cast";还有一条地板:
+  **基线往上抬必须同时改这条测试**。
+- **反向验证两轮**:钉子级 14 条注射(`.tmp/rv9b.sh` J1…J14)**全部打红 / 全部还原 md5 一致 / 收尾 21 项回到全绿**;
+  编译级 6 条(`.tmp/rv9c.sh` K1…K5 + `.tmp/rv9d.sh` K2/K2b),每条红的具体条目与这一刀当初归因的那几条**逐字对得上**
+  (audioManager 退回 unknown ⇒ 恰好 upload.js:219 与 audio-manager.js:48 两条 `playHint`;
+  worldChanged 退回 `(...a: unknown[])` ⇒ 恰好 planets.js:464 与 audio-manager.js:193 两条 `d.to`;
+  eternalHandlers 退回 ⇒ 恰好 finale 两条 `userData` + 那两条 `d.to`;
+  拿掉 include ⇒ 恰好 deviceMemory 那条;摘掉 concat 的 cast ⇒ 恰好 TS2769 那条)。
+- **压缩等价表(`.tmp/min-eq.cjs`,esbuild `--minify-whitespace --minify-syntax` 不压扁标识符)**:
+  `scene-manager.js` 6645B / `scene3-memory.js` 13085B / `story-text.mjs` 95150B / `minimap.js` 11609B /
+  `gameshell-dialog.js` 5526B / `planets.js` —— 这六份与 HEAD **逐字节相同** ⇒ 运行期零变化。
+  `audio-manager.js` 的唯一差异是 `export` 这个关键字本身(它让 `audioManager` 这个名在压缩后从 3 处保留变成 31 处,
+  所以 `--minify` 的字节数才会 +321);`quiz.js` / `scene2-draw.js` 确实多了 `String(...)` / 字符串字面量。
+  控制组两条都过:改一个字母 ⇒ md5 立刻不同;只加注释 ⇒ md5 不动。
+- **实机(真浏览器,且走的是"未构建模式"—— server.js 发源码 + importmap,所以跑的就是这批改过的文件)**:
+  `.tmp/n9-inworld.cjs` 主世界 → 石门 → B612 全走通,**0 个未捕获异常**。抓到的现场:
+  `audioManager` 运行期键集 = `hintQueue,hintSound,isHintPlaying,pauseAll,playHint,playOne,registerVideo,resumeAll,unregisterVideo,videoSound`
+  (正是 typeof import 指的那份);`playHint.length === 3`、`playOne.length === 0`
+  (有默认值的形参不计入 length ⇒ 恰好印证 `[item]` 那条可选性);
+  `playHint(a, cb)` → `'skipped'` 且回调恰好一次,`playHint(a, cb, true)` → `'play'`,`playOne()` 空参 → `'skipped'` 不抛;
+  `scrollLink.redraw` 是函数且 `.length === 2`;
+  世界切换时订阅者抓到的**实际载荷 = `{from:'main', to:'b612'}`,键集合与 typedef 逐项一致**(这条不是推理);
+  `navigator.deviceMemory` 在无头 Edge 上是 `16`,`|| 0` 守卫照旧成立;
+  B612 进场使 `planets.js:586 refreshGate()`(顶层 :610/:655 两处调用)真跑过那条 canvas 链,没报错。
+  `scripts/probe/b612-prod-worlds.cjs` 在这份树上**前六条全绿**(含「主世界小地图在场 / 非主世界小地图已隐藏」,
+  正是批次5 那个 minimap 所在的世界链),第 ⑦ 段超时与探针头写明的「④ 星球原点返回钮」既有欠账逐字一致 ⇒ 判旧红。
+  控制台 9 条 error 全部归因,没有一条是新的:6 个 404 是本地缺文件(`icons/icon-192.png` 是 10-13 已记的那条,
+  另加 `music/story/salvation.mp3`、`music/story/turnaround.mp3`、`textures/paper.jpg`、`textures/perlin.jpg`、
+  `textures/terrain1.webp` —— 本机没有这些媒体目录)+ 2 条 `gallery-v2*/rose-gallery*` 的
+  `import … from './x.json'`(浏览器要求 JSON 模块带 import attribute,只有 Vite 构建会转 ⇒ 源码模式独有的现象)。
+  ⚠️**没在浏览器走到的,记成未测而不是通过**:玫瑰站那段 concat(要剧情推进到第 3+4 场,而该文件压缩后与 HEAD 相同,
+  本来就没有可回归的运行期差异)、`quiz.js` 的两处 `String()`(见下)、批次1-3 里 `plane-flight` / `earth-day`
+  这些非默认链上的 onError 分支。
+- ⚠️**顺带撞出一个既有缺陷(不是本批引入,已挂待办)**:温柔度面板 `#gtP` 在 index.html 里三个按钮写的是**裸全局名**
+  (`onclick="startGentleTest()"` / `selectGentleO(…)` / `closeGentleTest()`),而 `quiz.js` 现在经
+  `debug-hooks.js` 的 `expose()` 注册 ⇒ 落在 window 上的名字带 `__` 前缀。实测(`.tmp/n9-gentle.cjs`):
+  `#gtP` 计算样式 `display:none`、rect 0×0、全仓(含全部 HTML)**没有任何地方打开它**,五个裸名在 window 上全是 `undefined`。
+  对照 `quizgate.js:374` 用的是 `window.startQuiz = function(){}`(裸名)才让 `debug-browser --quiz` 那条流程活着 ——
+  **两边口径不一致**就是这个现场的成因。要修的是"面板入口谁给",属于 UI 决定,不并进类型批次。
+- **门禁(全在这棵树)**:eslint 0 / `tsc --noEmit` 0 / depcruise 0(**402 modules, 1393 deps**)/
+  **checkJs 0 = 新基线** / vitest **1154 项 / 101 文件**(第八刀记的 1127/99,中间 +err-text 6 项 +本批 21 项)/
+  `npm test` exit 0 且 **209 项**照旧(7/22/108/46/20/6)/ `npm run build` 0 且三条断言照旧(47 prefetch /
+  入口不含 three / dist 无 importmap)/ 四条 CI 守卫全 exit 0。
+- **本刀动的是运行期写法**(`export`、两处 `String()`、批次1-4 的 `instanceof` 收窄与 `errText` 取文本)
+  ⇒ **要重新构建并部署**才算上线;目前只在本地(main 上四个提交,未推送)。
+- **还剩的 unknown**:`planeApi` / `foxApi` / `loopManager` 三条 ctx.d.ts 成员仍是 `unknown`
+  —— 它们这轮没被任何读数点咬住(0 条错),按第八刀那条口径,**要收它们得连"声明 ≡ 写入方"的钉子一起写**,
+  属于独立一批,不为了"看起来更严"先动声明。
+
+
 ## 2026-10-14 第五轮外部审计(针对 `82d1129`;含游戏内容维度)——先核实再动手
 
 审计方只读源码、未跑测试,并明确「不把此前已修复的问题重复计为缺陷」。6 条工程断言逐条回读后:**4 条成立(其中 1 条比审计说得更严重)、2 条部分成立、1 条误报**;素材版权与译本授权两条按主人指示不处理。
