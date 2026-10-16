@@ -391,7 +391,9 @@ export interface KunlunNamespace {
   flyAudio: HTMLAudioElement | null;
   spiritsGot: () => number;
   isDone: () => boolean;
-  spiritMark: () => { x: number; z: number } | null;
+  // 形状按**两个写入方**裁决:spirits.js:490 返回 {x,z,name,color},星球模式转交 planetsMark(同形状,见 :421)。
+  // 原声明只有 {x,z} ⇒ 小地图读 mk.color / mk.name 各被判成"字段不存在"(2026-10-16 第七刀,同一批 desert 那案的形状)。
+  spiritMark: () => { x: number; z: number; name: string; color: string } | null;
   spiritsTTS: string[];
   /**
    * 2026-10-15 从 `unknown[]` 改成函数:它和上一行 `isDone: () => boolean` 出自**同一个**

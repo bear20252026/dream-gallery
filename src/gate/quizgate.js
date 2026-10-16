@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { getGameState } from '../core/game-state.js'; // 阶段4:quizPassed 运行期写路径收归 gameState.set(写回经 set 陷阱发事件)
+import { qsArea, qsBtn, qsEl, qsaBtn } from '../shared/dom-typed.js'; // 取用点一次定标签(.qz-opt/#qzSubmit 都是 button,#qzTa 是 textarea)
 const gs = getGameState();
 // 热更新:先销毁旧实例(围墙/答题屏/定时器/DOM/iG/碰撞体见文末 custom),再执行新代码
 // 注意:onTick 必须在 hotBegin 之后解构,拿到的才是被捕获包装的版本
@@ -382,7 +383,7 @@ window.startQuiz = function () {
 <button data-t="wen">文 科 卷<small>语文 · 数学 · 英语 · 历史 · 政治 · 地理</small></button>
 </div>`;
   quizOvApi.open();
-  box.querySelectorAll('.qz-track button').forEach((b) => {
+  qsaBtn(box, '.qz-track button').forEach((b) => {
     b.addEventListener('click', () => beginQuiz(b.dataset.t));
   });
 };
@@ -429,15 +430,13 @@ function renderQuiz(d) {
 <button class="qz-main-btn" id="qzSubmit" disabled>提交试卷</button>`;
   box.innerHTML = html;
   box.scrollTop = 0;
-  box.querySelectorAll('.qz-opt').forEach((btn) => {
+  qsaBtn(box, '.qz-opt').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const q = +btn.dataset.q;
       if (judgedQ[q]) return; // 已批改,锁定不可改
       judgedQ[q] = true;
       chosen[q] = btn.dataset.l;
-      box
-        .querySelectorAll(`.qz-opt[data-q="${q}"]`)
-        .forEach((b) => b.classList.toggle('sel', b === btn));
+      qsaBtn(box, `.qz-opt[data-q="${q}"]`).forEach((b) => b.classList.toggle('sel', b === btn));
       checkReady();
       // 逐题批改:服务端判定,只回对错;答对一题,裂纹亮一丝
       try {
@@ -453,7 +452,7 @@ function renderQuiz(d) {
         if (d.correctLetter) {
           const qBox = btn.closest('.qz-q');
           if (qBox) {
-            qBox.querySelectorAll('.qz-opt').forEach((b) => {
+            qsaBtn(qBox, '.qz-opt').forEach((b) => {
               if (b.dataset.l === d.correctLetter) b.classList.add('right');
             });
             if (d.explain) {
@@ -479,7 +478,7 @@ function renderQuiz(d) {
       } // 网络异常:解锁允许重判
     });
   });
-  const ta = box.querySelector('#qzTa');
+  const ta = qsArea(box, '#qzTa');
   // 禁止复制/粘贴/剪切(问答题必须手打)
   ['paste', 'copy', 'cut', 'drop', 'contextmenu'].forEach((ev) =>
     ta.addEventListener(ev, (e) => e.preventDefault())
@@ -493,19 +492,19 @@ function renderQuiz(d) {
   ta.addEventListener('input', () => {
     window._qzTaVal = ta.value; // 实时保存作答,防止 DOM 变化导致提交时取空
     const len = [...ta.value].length;
-    const cnt = box.querySelector('#qzCount');
+    const cnt = qsEl(box, '#qzCount');
     cnt.textContent = len + ' / 200 字';
     cnt.className = len >= qaMinLen ? 'ok' : '';
     cnt.id = 'qzCount';
     checkReady();
   });
-  box.querySelector('#qzSubmit').addEventListener('click', submitQuiz);
+  qsBtn(box, '#qzSubmit').addEventListener('click', submitQuiz);
 }
 
 function checkReady() {
-  const ta = box.querySelector('#qzTa');
+  const ta = qsArea(box, '#qzTa');
   const ready = chosen.every((c) => c) && ta && [...ta.value].length >= qaMinLen;
-  box.querySelector('#qzSubmit').disabled = !ready;
+  qsBtn(box, '#qzSubmit').disabled = !ready;
 }
 
 async function submitQuiz() {
@@ -518,8 +517,7 @@ async function submitQuiz() {
         sessionId,
         track: quizTrack,
         answers: chosen,
-        qaText:
-          (box.querySelector('#qzTa') && box.querySelector('#qzTa').value) || window._qzTaVal || '',
+        qaText: (qsArea(box, '#qzTa') && qsArea(box, '#qzTa').value) || window._qzTaVal || '',
       }),
     });
     const d = await r.json();
@@ -598,11 +596,11 @@ function renderResult(d) {
   else if (d.passed) ctx.ui.kunlunSpeak && ctx.ui.kunlunSpeak('十问过其六，星屑已生。推门进去吧。'); // ≥60:B612放行
   if (d.passed) {
     unlockGallery(true);
-    box.querySelector('#qzEnter').addEventListener('click', () => {
+    qsBtn(box, '#qzEnter').addEventListener('click', () => {
       quizOvApi.close();
     });
   } else if (d.invite) {
-    const btn = box.querySelector('#qzInvite');
+    const btn = qsBtn(box, '#qzInvite');
     if (btn)
       btn.addEventListener('click', async () => {
         btn.disabled = true;

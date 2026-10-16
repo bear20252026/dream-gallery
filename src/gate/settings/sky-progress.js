@@ -1,6 +1,7 @@
 import { Z } from '../../shared/z-layers.mjs';
 // sky-progress.js — 天穹进度系统:星屑收集、里程碑、天穹画布、选择对话框
 import { ctx } from '../../ctx.js';
+import { qsBtn, byIdCanvas } from '../../shared/dom-typed.js'; // #sfStay / #sfLeave 是上面那段模板里的 <button>,#skyCv 是 <canvas>
 
 // ===== 天穹 100 制与里程碑文案系统(2026-07-26 主人定) =====
 // 2026-09-04:一念接入——每写一念=星屑+5(零门槛参与,与上传照片同权重)
@@ -189,12 +190,12 @@ function skyFullDialog() {
     '<button id="sfLeave" style="padding:10px 18px;margin:0 6px;border:1px solid rgba(255,255,255,.3);border-radius:12px;background:transparent;color:#dcc;cursor:pointer">带着新的记忆回来看看</button></div>';
   document.body.appendChild(d);
   const sfApi = ctx.overlay.register(d, { touchOnly: true });
-  d.querySelector('#sfStay').onclick = () => {
+  qsBtn(d, '#sfStay').onclick = () => {
     sfApi.unregister();
     d.remove();
     ctx.ui.modeToast && ctx.ui.modeToast('B612谢过你。');
   };
-  d.querySelector('#sfLeave').onclick = () => {
+  qsBtn(d, '#sfLeave').onclick = () => {
     sfApi.unregister();
     d.remove();
     ctx.ui.modeToast && ctx.ui.modeToast('B612留着你的光。');
@@ -223,7 +224,7 @@ if ((ctx.store.num('skyMs') >= 100 || skyVal() >= 100) && ctx.scene.kintsugiOn)
 
 // ===== 天穹画布 =====
 function drawSky() {
-  const cv = document.getElementById('skyCv');
+  const cv = byIdCanvas('skyCv');
   if (!cv) return;
   const c = cv.getContext('2d'),
     W = 150,

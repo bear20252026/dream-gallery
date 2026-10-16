@@ -2,6 +2,7 @@ import { Z } from '../../shared/z-layers.mjs';
 // chat-room.js — 聊天室·B612回声壁(全员共壁,最近 100 条,@B612之灵 召唤机器人)
 import { ctx } from '../../ctx.js';
 import { askConsent } from '../consent-session.js';
+import { byIdInput } from '../../shared/dom-typed.js'; // #chatInput 是 <input>(index.html),.value 只在 HTMLInputElement 上
 
 const chatOv = document.createElement('div');
 chatOv.id = 'chatOv';
@@ -87,7 +88,7 @@ async function loadChat() {
 }
 
 async function sendChat() {
-  const inp = document.getElementById('chatInput');
+  const inp = byIdInput('chatInput');
   const text = (inp.value || '').trim();
   if (!text) return;
   try {

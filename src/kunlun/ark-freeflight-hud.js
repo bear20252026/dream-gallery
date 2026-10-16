@@ -1,4 +1,5 @@
 import { ctx } from '../ctx.js';
+import { qsEl, qsBtn } from '../shared/dom-typed.js'; // 上面那段模板里 #ffStats/#ffEnergyBar/#ffBoost/#ffJoy/#ffKnob 都是 <div>,两个按钮是 <button>
 // kunlun/ark-freeflight-hud.js — 自由飞 HUD/虚拟摇杆/冲刺钮(2026-08-30 B-d 从 ark.js 外迁)
 // 纯表现层:DOM 创建、overlay 注册、触摸/鼠标输入采集。
 // 物理状态(freeFlight)留在 ark.js,经回调回传;joy 摇杆状态由本模块持有、经 joyGetter 读取。
@@ -25,14 +26,14 @@ export function createFlightHUD({ onNav, onHome, onBoostPress, onBoostRelease })
   document.body.appendChild(hud);
   const overlayApi = ctx.overlay.register(hud, { touchOnly: true }); // 飞行 HUD:只进触摸白名单;Esc 是飞行逻辑(返回地面),不是关弹层
 
-  const stats = hud.querySelector('#ffStats');
-  const energyBar = hud.querySelector('#ffEnergyBar');
-  const boost = hud.querySelector('#ffBoost');
-  const joyEl = hud.querySelector('#ffJoy');
-  const knob = hud.querySelector('#ffKnob');
+  const stats = qsEl(hud, '#ffStats');
+  const energyBar = qsEl(hud, '#ffEnergyBar');
+  const boost = qsEl(hud, '#ffBoost');
+  const joyEl = qsEl(hud, '#ffJoy');
+  const knob = qsEl(hud, '#ffKnob');
 
-  hud.querySelector('#ffNavBtn').onclick = () => onNav();
-  hud.querySelector('#ffHomeBtn').onclick = () => onHome();
+  qsBtn(hud, '#ffNavBtn').onclick = () => onNav();
+  qsBtn(hud, '#ffHomeBtn').onclick = () => onHome();
 
   // 冲刺钮(按住):样式本模块自理,状态经回调回传
   function boostOn(e) {
