@@ -396,8 +396,23 @@ describe('批次6-6 玫瑰站 concat:形状归写入方,消费点一个都不重
   });
 });
 
-describe('批次6-7 地板', () => {
-  it('checkJs 基线是 0:往上抬必须同时改这里,不许悄悄抬', () => {
-    expect(read('scripts/checkjs-baseline.txt').trim()).toBe('0');
+describe('批次6-7 地板(第十刀·批次0 起改成了"上限"而不是"等于 0")', () => {
+  /**
+   * 第九刀把被检图内的 checkJs 压到 0,当时基线钉成 0。
+   * 第十刀把 `tsconfig.checkjs.json` 的 include 从"三个根 + import 闭包(实测 149 个 src 文件)"
+   * 扩成**产品源码全量**(排除 `src/__tests__`),罩进来的都是**先前没人看过**的文件,
+   * 于是基线一次性跳到 145 —— 那是覆盖面,不是新债(证据:这 24 个文件在旧配置的 `--listFiles`
+   * 里一个都不存在,旧图内文件的新增数为 0)。
+   * 这条钉子换写法之后**作用没变**:想让上限再往上抬,必须动这个文件,
+   * 而且 `--limit` 只许**降**不许升 —— 每切完一族就把这个数字往下压到实测值。
+   */
+  const CEILING = 145;
+  it(`checkJs 基线不得超过 ${CEILING}:想抬上限必须同时改这里`, () => {
+    const raw = read('scripts/checkjs-baseline.txt').trim();
+    if (!/^\d+$/.test(raw)) throw new Error(`基线文件不是一个数:${raw}`);
+    const n = Number(raw);
+    if (n > CEILING)
+      throw new Error(`基线被抬到 ${n} > 上限 ${CEILING} —— 新增的类型债要修,不是把数字改大`);
+    expect(n).toBeLessThanOrEqual(CEILING);
   });
 });
