@@ -890,6 +890,16 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
     ② `.tmp/rv9e.sh` 把 `run()` 三个参数写串了位(签名 `tag expect br`,调用传成 `tag br expect`),
     于是四遍全只走到探针头部"PROBE_BREAK 取值不认识 ⇒ fail-closed exit 2"那道守卫:**四遍齐刷刷 rc=2、红=0**
     —— 这种"整齐得不像话"的结果就是判据没在工作的形状(与"我什么都没找到"不许当成没有问题同一条)。
+- **补记(#30 的溯源,2026-10-16 夜里)**:上面那句"onclick 裸名对不上 expose()"只讲了一半,查完历史要改成更准的说法:
+  **`e4be70d` 那次把 `window.startGentleTest=…` 换成 `expose('startGentleTest',…)`(名字变成 `__startGentleTest`)
+  确实切断了 index.html:162/175/194 那几个裸名 onclick,但它切的是一个本来就没人能打开的面板** ——
+  `git grep gtP 3999ae9`(2026-07-28 基线)在 `src/` 里只有 quiz.js 自己的**拆卸**两行
+  (`gtP.classList.remove('show')` / `gtP.style.display='none'`),全仓(含全部 HTML/CSS)**从来没有一处给它加过 `.show`**;
+  而基线 CSS 第 38 行就是 `#gtP{…display:none…}`、第 39 行 `#gtP.show{display:flex}` ⇒ **这块 UI 从基线起就是死的,
+  不是哪次重构弄坏的**(措辞要按这个改,不然下一个人会去回滚 `e4be70d`,那是一次什么也修不到的回滚)。
+  另一条决定成本的实测:`src/gate/quiz.js` 里 **`store.` 出现 0 次** ⇒ 温柔度既不落库也不进星屑
+  (星屑读的是 `ctx.store.num('quiz')`,那是**答题门** `quizgate.js:571` 写的),所以"退役"没有下游破坏;
+  "接回来"则要给谁按、结果给谁看、要不要存 —— 三个都是产品问题,等主人定,不属于类型批次。
 - **还剩的 unknown**:`planeApi` / `foxApi` / `loopManager` 三条 ctx.d.ts 成员仍是 `unknown`
   —— 它们这轮没被任何读数点咬住(0 条错),按第八刀那条口径,**要收它们得连"声明 ≡ 写入方"的钉子一起写**,
   属于独立一批,不为了"看起来更严"先动声明。
