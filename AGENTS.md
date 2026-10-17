@@ -1059,6 +1059,44 @@ prettier：本轮改动文件全部合排（HEAD 本就不合排的三个按既�
   `tools/backup-gallery.sh` 要 **scp 到 `/opt/backups/`** 才轮到 cron 跑（cron 执行的是服务器上那份，改仓库不算）。
   三件都等主人点名；在那之前线上仍是"照 `@B612之灵` 打字不召唤 + CDN 抖动时在途模型静默缺席 + 备份吞失败"的原状。
 
+## 2026-10-17 部署:`02e1054` → `0b7f501`(32 个提交一次上线,DEPLOY_OK)
+
+主人在 PR #44 合并后点名「部署」⇒ `bash scripts/deploy.sh --yes`。**这是这批积压第一次真的落到玩家面前** —— 之前每一批都按 `--no-deploy` 收在 main 上。
+
+### 发的是哪棵树
+
+`0b7f501`(= `main` = `origin/main`)。它是 PR #44 的 merge,而 PR #44 的 required checks(`build-and-test` + `smoke`)是在 head `67f1524` 的树上绿的,合并时**树哈希一致 `5a30ffce`** ⇒ 部署内容与 CI 验过的内容是同一棵树。
+⚠️ deploy.sh 自己打的 `本次部署 commit: 0b7f501   CI run: <未提供,本地直接部署>` 那行**不代表绕过了闸门** —— 它只是没带 run id(闸门在合并前那一跳就走完了,`release.sh` 第 7 步)。下次想让这行有值,走 `bash scripts/release.sh --yes` 一条龙。
+
+### 生效清单(按批次)
+
+1. **C4 三颗星「每一趟进入是一颗独立世代」**(`shared/visit-timers.mjs` + `late-planets.js`):328/329/330 的计时器归世代所有;中途走掉路灯控制权归还、旧世的尾巴不再拆掉新一世的面板、同世界快返不会两条链同时讲。
+2. **第七轮审计第一批**:`lib/chat.js` + 新增 `src/shared/chat-words.mjs`(**后端**,照 `@B612之灵` 打字召唤这条从此有效)、`src/scene/gltf-loader.js` + `chat-room.js`(CDN 在途重试)、`scripts/test/test-backup.js` 的响亮失败、eslint 盲区治理。
+3. **温柔度面板**:接线死 UI + 两份题库收成一份 + ✕ 换成 button。**默认仍不对玩家开放**(那条拍板没变,自测仍走 `?legacy=1`)。
+4. **checkJs 第九/十刀**(纯类型声明与基线,运行期零影响)。
+
+### 部署自己的读数(不看"脚本没报错")
+
+- 后端:**2 个文件已上传,md5 一致(`BACKEND_SYNC_RESULT=uploaded`)**;第 6 步 `--check` 复检 `BACKEND_SYNC_RESULT=consistent` ⇒ 前后端同源。
+- 前端:构建 → 打包上传 → 解压 → 差集清理;`/healthz` 回 `{"ok":true,"uptime":61}`(新进程),pm2 `online`;**漂移复核 OK 203 / DRIFT 0 / MISSING 0 / TOTAL 203**;模型「已全部一致,无需上传」。
+
+### 内容级取证(这次用对了方法)
+
+1. 线上首页实际引用的 **50 个 `/assets/*` 与本地 `dist/index.html` 逐名相同**(`diff` 两边列表 = 空)。
+2. 线上入口 chunk `main-C1FXC7Gr.js` == 本地刚构建的那个名字。
+3. ⭐ 线上 `GET /assets/late-planets-D1lvn5SW.js` **200 / 12,576 B**,里面 `visit-timers] teardown` 与 `__latePlanets` 各命中 1 处,**md5 与本地 `dist/assets/` 同文件逐字节相同(`76017bb97b0f…`)** ⇒ C4 的代码确实在服务端下发的那份里,而不是"应该是"。
+4. ⚠️ 反面教训补齐上一节那句更正:**部署前**我拿"线上 `main-Bzz3sr4y.js` ≠ 本地 `main-MXioe8gV.js`"当过"线上没动"的证据 —— 那只能说明**不是同一次构建**(产物带构建戳),什么都证明不了。要证明"上线了/没上线"用上面第 3 条那种**内容级同值**读数,或 healthz 同进程。
+
+### 线上只读复验(全过)
+
+`admin-credential-hygiene-probe` **23 通过 / 0 失败 / 0 WARN**(取 `PROBE_URL=https://cloudbear.cloud` + `ADMIN_TOKEN` 走环境变量,值不进输出)、`sw-admin-bypass-probe` **14 / 0 / 0**、`boot-cost-probe` 沙箱首屏 **677KB / 资源 58 / 48 条 prefetch 全带 crossorigin**、`csp-stage-probe --prod` **CSP_STAGE_OK**、`b612-prod-worlds`(`BASE_URL=` 指生产)前六条全 ✓ 之后停在**探针文件头第 4 行自己写明"还没修好"的第 ④ 段**:`FATAL page.waitForFunction: Timeout 25000ms exceeded`(等「返回 B612」那颗钮,因为它把人摆在垫子中心)—— 失败点与 10-15 那次部署的记录**逐字相同** ⇒ **判旧红,不是这次上线带来的**。
+C4 专项探针 `late-planets-visit-probe` **没有指线上跑**:它会真切换世界、在访客档案上留剧情 checkpoint。按 2026-10-15 定下的分级,行为类验证只在"自起服 + 数据根隔离到系统临时目录"里做(19/19 就是这么来的),线上只取只读探针 + 上面第 3 条那种内容级读数。
+
+### 部署之后仍然差一件事(deploy.sh 管不到)
+
+⚠️ **`tools/backup-gallery.sh` 还没 scp 到 `/opt/backups/`** —— cron 每天 03:17 / 周日 04:23 执行的是**服务器上那一份**,改仓库不算落地。所以"备份不再吞 tar 失败"这条**今晚仍未生效**,明早跑的仍是旧版。
+发它是一条会动生产 cron 行为的独立动作(且第一次跑最好当场看产物),**等主人点头**:`scp -i ~/.ssh/gk-deploy.pem tools/backup-gallery.sh root@<host>:/opt/backups/backup-gallery.sh`,随后 `ssh -i ~/.ssh/gk-deploy.pem root@<host> 'bash /opt/backups/backup-gallery.sh'` 看它自己打的结论行与 `/opt/backups/daily/` 里的新档。
+
 ## 2026-10-17 C4 欠账批:给探针自己装注射口 + 330 真走到(顺带抓到探针自身两处缺陷;不部署)
 
 上一节「本批未做」的第 2 条就是这批的开工单 —— **"这条探针会不会恒绿"当时没有直接证据**,而 330 的玩法一次没真走过。第 1 条(`earth-day.js:90` 同形状)仍归主人定,本批没碰。
