@@ -927,7 +927,107 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   属于独立一批,不为了"看起来更严"先动声明。
 
 
+## 2026-10-17 第七轮外部审计（基线 `main@fa873cd`）复查 + 第一批落地：四条改掉，三条降级，一条推翻
+
+⚠️**报告原文这台机器读不到**（`sandbox:/workspace/scratch/…/dream-gallery-audit-2026-10-17.md`，工作区/Downloads/Desktop 全搜过）。
+⇒ 十条论断一律按摘要里那句现象**自己回读代码定位**，按本仓规矩走：先核实、再动手、每条配可失败的判据与反向验证。
+规模基线（回读前先量的）：真实源码 ≈ **12.9 万行 / 650+ 个源文件**（已排除 `public/hill` 产物、`dist`、`vendor`、`models`、图片音视频），
+分布 `src` 330 / `scripts` 259 / `hill-src/src` 46 / `lib` 50。**分区并行四个只读核实代理 + 主代理逐条回读 P1/P2**（沿用既有审计复查协议）。
+
+### 裁决表（保留 / 降级 / 推翻 + 证据行）
+
+| 论断 | 裁决 | 关键证据（回读所得，不是报告原话） |
+|---|---|---|
+| **C1 P1** 每日备份吞掉打包失败、恢复集不完整 | **保留 P1**（两条都属实） | `tools/backup-gallery.sh:18` 结尾正是 `2>/dev/null \|\| true`，:19 无条件轮转 ⇒ 残缺档照样印 `backup daily done` 并顶掉第 14 份；清单里**没有 `gate_data.db`**（2026-09-01 起才是权威）、没有 `.r2-outbox.json`、没有根级 `data.js`、没有 `scripts/` |
+| **C9 P2** 聊天机器人召唤词不一致 | **保留 P2，但性质要改**：不是"世界观文案旧"，是**功能契约断裂** | 界面 `chat-room.js:17` 教 `@B612之灵`，后端 `chat.js:66` 只认 `@(昆仑之灵\|机器人\|bot)` ⇒ 照屏幕打字**永不召唤**，前端还照样 `setTimeout(loadChat,6000)` 空等一次。文案那半句（人格 prompt 里的女娲/灵蕴、署名 `昆仑之灵`）**归主人**，见 M-09 同口径 |
+| **C3 P2** CDN 失联只有第一个请求回退 | **保留 P2，措辞改准** | `gltf-loader.js:68` 的旧条件是 `viaCdn && !window.__modelCdnDown` ⇒ 旗是"第一次失败"立的，**此后新请求确实全部走源站**（`resolveURL` 每次都重新求值，`three.core.js:44587` 实证）；真的是**同一批在途请求**里除第一个外都落进 `else if (onError)`，而调用点的 onError 基本只 `console.warn`（`planets.js:194/525/551`、`dome-towers.js:69`、`fountains.js:284`、`crash-site.js:214`、`scene.js:588）⇒ 一轮抖动 = 当轮多数模型静默缺席 |
+| **C5 P2** CI 证明不了可完整通关 | **保留，但要写清"能不能做"** | `test.yml` 只有 `smoke-gate` + `scene-visual-regression`（像素仅警告）；`b612-journey-probe` 不在任何作业里。**结构上并不是做不了**：32 个剧情 GLB **已入 git**（`.gitignore:51` 只挡 `models/showcase/`，与 AGENTS 里"模型不入 git"那句旧话相反）；真门槛是时长（SwiftShader 全书数十分钟 vs job 上限）+ 那条**至今还红的 E 键断言**（10-10 已记）⇒ 接进 CI 之前得先修探针，否则造一条常驻假红 |
+| **C4 P2** 小游戏延迟回调缺每次进入的隔离 | **保留（定 P2，玩家可达）** | `late-planets.js`：`begin()` 的 1400ms（:452-453）只有在场判定没有代次，离场清理块（:514-523）只 `clearTimeout(speakTimer)` ⇒ 快返**双播 chainA**；329 的 `setInterval(flip,2400)`（:401）以**全局** `gameEl` 判活 ⇒ 新旧两个循环争抢同一 `lampHead`，且 `head.userData.manual`（:344）唯一复位点在完成路径 :386，被打断就**永久残留**；`pick()` 的 1600ms（:494）连守卫都没写。包 B"只补守卫不上票据"那条记档**只覆盖 `speakSeq`**，玩法内部计时器不在册 ⇒ 属"部分闭环"，不是已定性取舍 |
+| **C7 P2** 核心阶段提前构建全部星球 | **推翻**（另有一条真的） | 六颗星现在**全部 `built:true`**（328-330 于 2026-10-04 建成，报告前提过期）；"构建星球"= 注册 world + 体块/画布精灵，**零网络**；重模型确实到章节才取（`scene7-tippler.js:303-304` 判 `active==='king327'`）。真的一条是 `planets.js:649,654 → :512`：`loadPortalPad` 被调两次、各起一个 loader 拉**同一个** `portal-platform.glb`（760KB），而 `THREE.Cache.enabled` 默认 false ⇒ 首访白下一遍 |
+| **C2 P1** 语音预热缺容量/去重/释放 | **降级 P3**（并拆成四件） | 客户端 `dialog-voice.mjs:239` 的 `blobUrls` 确实无上限/无 `revokeObjectURL`/无在途去重（只判"已完成"），但**是有界的**：未命中 404 即 return false，键只能来自已煮语料 ⇒ 常驻约 7–14MB，不是 P1；发布脚本 `warm-all-voices.mjs` 串行 60 条/块、尊重服务端 400 上限、跑完就退出，**没有"长会话"可言**（报告把两个对象合成一条了）。服务端真缺的是 `.tts-cache/` **没有保留期**（`lib/retention.js` 不覆盖它，任意文本都能煮 ⇒ 每个唯一串永久落一个 mp3；10-16 记的 388 个孤儿键至今没人清） |
+| **C6 P2** 保存队列仍在主线程同步双写 | **降级 P3：已量过、已记档的刻意决定** | `lib/store.js:136-157` 字面属实，但"合并写盘"是 2026-08 起**刻意不做**、10-15 又写了一遍；成本已量化（整库 2.37MB、单次 p50≈87ms/p95≈94ms，夜里与白天两次复采同量级）。写放大侧：aiusage/r2outbox/track/retention/client-errors **都已收口**，只剩 geoip 的"每个变化标签一次快照"（10-15 那条，判据 `saves===GEO_MAX+5` 在测） |
+| **C8 P2** 山丘源码与已提交产物缺自动一致性 | **部分闭环**（措辞过强） | `hill-artifacts.cjs check`（:106-139）**证的是**14 个产物字节≡清单、清单外置、`index.html` 引用全在清单内，且 CI 里有 BLOCKING 的 `hill-solo-guard`；**不证**"hill-src 改了但没重跑 build"（`gitInfo()` 只在 record 调用，清单里的 `hillSrcCommit` 测试文件 :11-12 逐字写明"是给人看的线索，不是断言对象"）——**这条限制在包 C 的「本批未做、已记档」④ 早就在册**。补强要往产物里注版本戳 ⇒ 触碰线上产物，**归主人** |
+| **C10 P3** 域边界与类型检查仍有债 | **拆成三条，其中一条报告没说中而更值钱** | ①**`eslint.config.mjs` 的 `files` 只写 `*.js`** ⇒ `src/**/*.mjs` 42 个（含媒体可见性单一源 `mediarules.mjs`、1617 行的 `story-text.mjs`）、`scripts/**` 的 130 个 mjs/cjs、`public/sw.js`（**后台凭据落盘事故就出在这文件**）、根级 `landing-server.js` 等**一条规则都收不到**；注射实测：同样内容 `.mjs` ⇒ exit 0，`.js` ⇒ 1 error。②`tsconfig.checkjs.json` 的 include 只有 `src/**`+`types/**` ⇒ `--listFiles` 实测 **`lib/` 49 个后端文件 0 个在图内**（与测试那 460 条同属"缺 node 类型环境"那条已立的线）。③depcruise 只有 3 条规则，`gallery→kunlun` 还是 **warn** 级，且**没有** src↔lib 边界；`checkJs 116` 那条则是**同于既有账**（第十刀批次0/批次1 逐字对上，地板钉子 `CEILING=116` 有效） |
+
+### 本轮落地（四件，都配可失败判据）
+
+1. **eslint 盲区**（C10-①，报告没指名）：`files` 补 `src/**/*.mjs`、`src/core/**/*.mjs`、`src/__tests__/**/*.mjs`、`lib/**/*.mjs`、`scripts/**/*.{js,mjs,cjs}`，
+   并给根级散件（`landing-server.js`/`live-verify.cjs`/`vitest.config.js`/`.dependency-cruiser.cjs`/`tools/*.js`）与 **`public/sw.js` 单独一块**
+   （serviceworker globals，不是 browser globals）；`ignores` 补 `public/basis/**`（三方 vendored 转码器）。覆盖面从 ~470 → **602 个文件**，
+   第一次跑就报出 **9 条**，逐条都真：探针里 `sessionStorage.setItem('1' && k,…)`（常量真值）、`dialog-audio-truth3-probe` 有一行 `console.log` 写在 `return` **之后**
+   （⇒ 那条"全量 playLog"诊断从来没打印过，已挪到 return 前）、`global-setup.mjs` 的 `let names=[]` 是被覆盖的死赋值、
+   `dialog-voice.mjs` 三个空 catch（`src/core/**` 的 `allowEmptyCatch:false` 之前管不到它，因为是 .mjs）、
+   `build-info.mjs` 与配置里重复声明 `__B612_BUILD__`（删配置那份，留文件内联那句，理由写在配置里）、
+   `chapter-map-logic.mjs` 的 `Buffer`（Node 回退分支专用 ⇒ 按 `types/node-fallback-globals.d.ts` 同口径写文件级 `/* global Buffer */`，**不在浏览器块放开整个 node 环境**）。
+2. **备份脚本**（C1，P1）：改成 `.part` → `tar tzf` **验完成员清单** → `mv` 上位 → **上位成功才轮转**；`2>/dev/null || true` 摘掉，
+   失败一律 `BACKUP_FAILED mode=… reason=…` + 非零退出并删掉半截 `.part`（留着只会让下一次更容易 ENOSPC）；
+   恢复集补 `gate_data.db`/`-wal`/`-shm`、`.r2-outbox.json`、根级 `data.js`、`scripts/`；`.env`/`models/`/`dist/` **写在注释里说明是决定不是漏做**；
+   七个注入口（`GALLERY_DIR`/`BACKUP_DIR`/`TAR_BIN`/`SQLITE_BIN`/`KEEP_*`/`REQUIRED`/`REQUIRE_DB`）——**旧版一个注入口都没有，这才是它测不了的成因**。
+3. **召唤词单一源**（C9-1）：新增 `src/shared/chat-words.mjs`（`BOT_TRIGGERS`/`triggerRe()`/`stripTriggers()`/`BOT_NAME`/`BOT_RATE_*`），
+   两侧正则一起删掉；`triggerRe()` **每次返回新实例**（共享带 `g` 的正则会被 `lastIndex` 带偏）；
+   旧词 `昆仑之灵` 留在表里（摘它等于破坏既有输入）；**显示名与人格 prompt 一个字没改**——那是主人的文学决定。
+   ⚠️新模块被后端 require ⇒ **必须进 `scripts/backend-files.sh`**，已加；`check-backend-manifest` 从"可达 51/清单 53"变"可达 52/**清单 54**"就是它在管这件事
+   （`find lib …` 只覆盖 lib 目录树，跨到 `src/` 的后端依赖一条都不会自动进清单——这正是 2026-10-12 那次 502 的形状）。
+4. **CDN 在途重试**（C3-1）：`gltf-loader.js` 把"**旗**"（此后新请求直接走源站）与"**这一条请求要不要重试**"分开——
+   每个 `viaCdn` 的请求都拿到它那一次源站重试，重试只有一次、第二次失败照旧交调用方（不转圈）。
+
+### 我自己在本轮造出来的两条（都属"跑一遍才知道"，写下来免得下批重踩）
+
+1. **checkpoint 与采清单的顺序自伤**：新脚本先 `pick` 出文件清单、再在 `take()` 里跑 `wal_checkpoint(TRUNCATE)`
+   ⇒ SQLite 把 `-wal`/`-shm` 并回主库后**直接删掉这两个临时文件**，清单里躺着两个随后消失的名字 ⇒ `tar` 退 2、备份被自己搞红。
+   修法是把 checkpoint 挪到**采清单之前**，并把它做成一条**顺序判据**（`wal_checkpoint` 的源码位置必须早于 `$(pick`）,
+   配一条调换版反证：谓词在真脚本上判真、在调换版上必须判假 ⇒ 否则这条钉子是空转。
+2. **测试桩装晚于 `require`**：`lib/chat.js` 顶层是 `const { chatText } = require('./aichannels')`，
+   解构发生在它自己被加载那一刻 ⇒ 先 require 再往 `require.cache` 打桩，桩永远接不上，
+   表面看就是"召唤没生效"（**红得像是被测出了缺陷，其实是夹具没生效**）。三条同类口径已在本文件出现过，这是第四次。
+3. **对照目录必须在仓库内**：把 HEAD 版拷到 `$TMP` 再 `prettier --check` 会得到全部 warn —— 出了仓库根就读不到本仓 `.prettierrc`。
+   换成仓库内未被忽略的 `rfvtmp/` + 一条 `CTRL.js` 后：`dialog-voice.mjs`/`global-setup.mjs`/`chapter-map-logic.mjs` 的 **HEAD 版是干净的**（⇒ 不合排是我引入的，已 `--write` 修回），
+   而 `eslint.config.mjs` 与那两个探针 **HEAD 本来就不合排**（⇒ 按 `.prettierignore` 头部口径不顺手重排；但它们落在 `scripts/**` 的 lint-staged glob 里，pre-commit 会整份重排,读 diff 时认得出）。
+
+### 判据与反向验证
+
+- 新增 **`scripts/test/test-backup.js`**（26 项，进 `npm test` 与 CI 的 `build-and-test` 新 step；只加 step 不加 job）：
+  正常路径含权威三件、失败必响亮**且不轮转**（12 份旧档一份没动）、残缺档被 `tar tzf` 拦下、
+  `gate_data.db` 缺席 ⇒ `REQUIRE_DB=1` 拒跑 exit 8（`REQUIRE_DB=0` 才照跑）、必检成员 exit 5、weekly 同套、checkpointed 分支仍成功、
+  **两条 A/B 对照**：同一份"少文件"夹具下 **HEAD 版 exit 0 并报 `backup daily done`、新版非零并报 `BACKUP_FAILED`**；
+  HEAD 版即使打包成功，归档里也没有 `gate_data.db`/`.r2-outbox.json`/`data.js`（⇒ 旧版不是"没测到"，是**测了也不会红**）。
+  ⚠️Windows 侧两条环境坑已写进文件：bsdtar 把 `C:/…` 读成 remote host:path ⇒ fs 用 Windows 路径、bash 用 `/c/…`；
+  bsdtar 对"文件不存在"可能 exit 0 而列 0 条 ⇒ 判据同时接受 `archive-unreadable` 与 `archive-empty`，否则 CI（GNU tar）会变假红。
+- 新增 **`src/__tests__/lib-chat-trigger.test.js`**（16 项）+ **`src/__tests__/gltf-cdn-fallback.test.js`**（4 项）。
+  前者四组：两侧不许再自带正则、界面教的词从**真实导出**比、端到端 `handleChatPost('@B612之灵 …')` 必须真的调用 AI 且正文已剥词、
+  后台手册口径同步。后者四件：并发三个 CDN 请求失败 ⇒ **三次**源站重试（旧形状只有 1 次）、没有请求被静默判死、
+  源站也失败时每个 URL 恰好一次 onError（不转圈）、旗立起后的新请求不再无谓重试。
+  `LoadingManager` 与 `resolveURL` 用**真 three**，只替网络边界（`GLTFLoader`）—— 否则测的是我自己的桩。
+- **反向验证**：`.tmp/rv-chat-words.cjs` 4 条注射 ⇒ 3/2/2/1 红，锚点未命中 0、NO_RED 0、还原 md5 逐字一致；
+  `.tmp/rv-gltf-fallback.cjs` 3 条（含"漂回旧形状"）⇒ 各 4 红、还原一致、收尾 4/4；
+  eslint 盲区用注射证明（同样内容 `.mjs` exit 0 → 现在报 1 error；`.cjs` 同）；备份那条调换顺序的反证在 test-backup 里（判据本身必须能假）。
+
+### 门禁（全在这棵树上）
+
+eslint **0**（覆盖面 602 文件）/ `tsc --noEmit` 0 / checkJs **116 = 基线**（一字未动，本轮没新增也没有少）/
+vitest **1239 项 / 106 文件**（+20 项 +2 文件全来自本批判据，独跑 `AssertionError` 0、`timed out` 0）/
+`npm test` **七条** 7/22/**26**/108/46/20/6 = **235 项 exit 0**（新增 `test-backup`）/ `vite build` 0 且三条构建断言照旧
+（48 prefetch / 入口不含 three / 无 importmap）/ `npm run depcruise` 0 违规（**409 modules / 1412 deps**）/
+四条 CI 闸门全 exit 0（hill-solo / `CSP_REGISTRY_OK` 4 条 / 后端清单 **52 可达 · 54 清单** / 探针隔离扫 149 脚本·豁免 8）/
+prettier：本轮改动文件全部合排（HEAD 本就不合排的三个按既有口径不动，见上面第三条自犯）。
+
+### 本轮没做、登记清楚（不装成已完）
+
+1. **C4 `late-planets` 的每世隔离**（本轮定性完，改在下一批）：`st[world].visit++` + 各回调入口比代次、`flip` 判活改"本轮面板引用"、
+   `pick()` 的 toast 补守卫；同型出口 `earth-day.js:90` 属包 B 已定性取舍（信息项）。
+2. **C7-② `portal-platform.glb` 重复加载 760KB**：修法是一次 load + `clone` 挂两世界，或工厂内 per-URL 在飞去重；**要实测**（`boot-cost-probe` 测不到，它不点 ENTER 且沙箱 `models` 是空目录）。
+3. **C2 那四件**：客户端 blob LRU + `revokeObjectURL` + 在途去重；`tts-audio-v1` Cache Storage 无 LRU；**`.tts-cache/` 没有保留期**（该进 `lib/retention.js` 那张表）；
+   服务端"同键已在队列中仍重复入队"。
+4. **C5 通关探针进 CI**：先修 `b612-journey-probe` 那条 E 键旧断言，再在非 `build-and-test` job 里以**非阻断**跑熟（新 job 会让分支保护的 required context 永远 pending）。
+5. **归主人的**：`.zcodeignore` 那个未跟踪文件怎么处理；`backup-gallery.sh` 改完**必须 scp 到 `/opt/backups/`** 才生效（服务器上的 cron 才跑它，本机改的不算）；
+   C8-② 给山丘产物注入版本戳（要重跑 `pnpm build` 覆写 14 个已入库产物）；机器人署名与人格 prompt 的 B612 化（cfe50a9 重题令的 lib/ 半边）；
+   C9-2 AI 回复语言与界面语言联动（`POST /api/chat` 现在不带 `lang`，英文站拿到中文回帖）。
+6. **本轮改动里有运行期行为**（`lib/chat.js`、`chat-room.js`、`gltf-loader.js`、`src/shared/chat-words.mjs`、`tools/backup-gallery.sh`）
+   ⇒ **要 deploy 才对线上生效**；本批按主人的口径**只合并不部署**，生效时间由他点。
+
 ## 2026-10-16 温柔度面板·收尾批：剩余四问按拍板落地 + ✕ 换成 button（不部署）
+
+
 
 上一批登记末尾留了五件"本批没做的"。主人把这四问一次性拍板（都选了推荐档），逐条记来源，免得下一个人再问一遍：
 
