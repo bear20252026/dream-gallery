@@ -1045,6 +1045,20 @@ prettier：本轮改动文件全部合排（HEAD 本就不合排的三个按既�
 6. **本轮改动里有运行期行为**（`lib/chat.js`、`chat-room.js`、`gltf-loader.js`、`src/shared/chat-words.mjs`、`tools/backup-gallery.sh`）
    ⇒ **要 deploy 才对线上生效**；本批按主人的口径**只合并不部署**，生效时间由他点。
 
+### 发布证据（PR #40 → merge `9b3fb5d`，按 `--no-deploy` 收，线上未动）
+
+- **这条链发了三次才对**，前两次的红都出在**我自己的测试依赖"本机有、CI 没有"的东西**（见上面第 5 条），不是业务代码：
+  第 1 次 `ENOENT …/.tmp/tar-fail.sh`（桩写进 gitignored 目录，CI 检出里没有那个目录）；
+  第 2 次 `reason=tar-exit=126` —— Linux 上 `writeFileSync` 出来的 `.sh` 是 `0o666`，`"$TAR"` 直接执行退 126，
+  **而 126 也 >1，于是"tar 致命失败"那条判据当时照样是绿的 ⇒ 那是假通过，比红危险**（第三道收紧：断言点名 `reason=tar-exit=2`）。
+  第三次 head `35d5816` ⇒ required checks `build-and-test`/`smoke` 全绿 ⇒ merge `9b3fb5d35318542581ab414499cf415d5d4643c7`，
+  **树哈希一致 `0846e8317e7e743a83eac07aeaaa8d9be672c308`**。三次都**复用同一个 `rel/20261017-000424` 分支**
+  （脚本认出分支上已有 PR #40 就不开第二个）⇒ 中途修 CI 红不需要重开 PR、也不会留下三条废 PR。
+- "线上没动"有独立证据：`.tmp/deploy-state.env` 仍是上一次真 deploy 的快照（`COMMIT=02e1054 / TS=2026-10-15T23:51:37-07:00`），本次没往里写。
+- ⚠️**合进 main ≠ 生效**：`lib/chat.js` + `src/shared/chat-words.mjs` 要 deploy 后端、`src/scene/gltf-loader.js` + `chat-room.js` 要 deploy 前端、
+  `tools/backup-gallery.sh` 要 **scp 到 `/opt/backups/`** 才轮到 cron 跑（cron 执行的是服务器上那份，改仓库不算）。
+  三件都等主人点名；在那之前线上仍是"照 `@B612之灵` 打字不召唤 + CDN 抖动时在途模型静默缺席 + 备份吞失败"的原状。
+
 ## 2026-10-16 温柔度面板·收尾批：剩余四问按拍板落地 + ✕ 换成 button（不部署）
 
 
