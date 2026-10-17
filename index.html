@@ -156,10 +156,11 @@
       </div>
     </div>
 
-    <!-- 温柔度测试面板 -->
+    <!-- 温柔度测试面板(接线在 src/gate/quiz.js;开关/关/答题都由模块挂监听,这里不再写内联 onclick。
+         2026-10-16 之前这四个 onclick 写的是裸全局名,而实现只经 expose() 落了 __ 前缀 ⇒ 全链是死的) -->
     <div id="gtP">
       <div class="gtC" id="gtC">
-        <div class="gtClose" onclick="closeGentleTest()">&times;</div>
+        <button type="button" class="gtClose" id="gtCloseBtn" aria-label="Close">&#215;</button>
         <div id="gtStart">
           <div class="gtH">&#10084; 温柔度测试</div>
           <div class="gtS">GENTLENESS TEST</div>
@@ -172,16 +173,14 @@
               共5题 &middot; 测出你的温柔指数
             </div>
           </div>
-          <button class="gtB" onclick="startGentleTest()">开始测试</button>
+          <button class="gtB" id="gtStartBtn">开始测试</button>
         </div>
         <div id="gtQuiz" style="display: none">
           <div class="gtH">&#10084; 温柔度测试</div>
           <div class="gtS">GENTLENESS TEST</div>
           <div class="gtProg"><div class="gtProgF" id="gtProgF"></div></div>
           <div id="gtQD"></div>
-          <button class="gtB" id="gtNext" onclick="nextGentleQ()" style="display: none">
-            下一题
-          </button>
+          <button class="gtB" id="gtNext" style="display: none">下一题</button>
         </div>
         <div class="gtR" id="gtResult">
           <div style="font-size: 14px; color: rgba(255, 180, 200, 0.6); letter-spacing: 3px">
@@ -191,9 +190,7 @@
           <div class="gtScore" id="gtScore">0</div>
           <div class="gtRT" id="gtRT"></div>
           <div class="gtRD" id="gtRD"></div>
-          <button class="gtB" onclick="restartGentleTest()" style="margin-top: 20px">
-            再测一次
-          </button>
+          <button class="gtB" id="gtAgainBtn" style="margin-top: 20px">再测一次</button>
         </div>
       </div>
     </div>
