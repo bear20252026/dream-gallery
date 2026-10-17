@@ -971,7 +971,7 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
 4. **CDN 在途重试**（C3-1）：`gltf-loader.js` 把"**旗**"（此后新请求直接走源站）与"**这一条请求要不要重试**"分开——
    每个 `viaCdn` 的请求都拿到它那一次源站重试，重试只有一次、第二次失败照旧交调用方（不转圈）。
 
-### 我自己在本轮造出来的两条（都属"跑一遍才知道"，写下来免得下批重踩）
+### 我自己在本轮造出来的三条（都属"跑一遍才知道"，写下来免得下批重踩）
 
 1. **checkpoint 与采清单的顺序自伤**：新脚本先 `pick` 出文件清单、再在 `take()` 里跑 `wal_checkpoint(TRUNCATE)`
    ⇒ SQLite 把 `-wal`/`-shm` 并回主库后**直接删掉这两个临时文件**，清单里躺着两个随后消失的名字 ⇒ `tar` 退 2、备份被自己搞红。
@@ -983,10 +983,16 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
 3. **对照目录必须在仓库内**：把 HEAD 版拷到 `$TMP` 再 `prettier --check` 会得到全部 warn —— 出了仓库根就读不到本仓 `.prettierrc`。
    换成仓库内未被忽略的 `rfvtmp/` + 一条 `CTRL.js` 后：`dialog-voice.mjs`/`global-setup.mjs`/`chapter-map-logic.mjs` 的 **HEAD 版是干净的**（⇒ 不合排是我引入的，已 `--write` 修回），
    而 `eslint.config.mjs` 与那两个探针 **HEAD 本来就不合排**（⇒ 按 `.prettierignore` 头部口径不顺手重排；但它们落在 `scripts/**` 的 lint-staged glob 里，pre-commit 会整份重排,读 diff 时认得出）。
+4. **对照组绑在 `HEAD` 上 ⇒ 一提交就自己和自己比**：`test-backup.js` 那条 A/B 写的是 `git show HEAD:tools/backup-gallery.sh`,
+   而测试与修复**同批入仓** ⇒ 提交后 HEAD 上已经是**修好的那份**,对照静默退化成"新脚本 vs 新脚本"
+   （表现:两条 A/B 一起红,`旧 status=1`、`members=` 空 —— 报的其实是"旧版不失败",而不是"旧版假成功"）。
+   改成**顺着 `git log -- <该文件>` 往回扫,取第一份"含 `|| true` 且不含 `BACKUP_FAILED`"的旧形状**,并**断言找得到**
+   （找不到就判失败,不许"跳过当通过"）。钉死某个 SHA 也是错的:历史一长/一 rebase 就失效。
+   ⇒ 口径:**写 A/B 对照时先问"对照组一年后还成立吗"** —— 凡是用 `HEAD`/`HEAD~1` 当"修复前"的地方,同批入仓即失效。
 
 ### 判据与反向验证
 
-- 新增 **`scripts/test/test-backup.js`**（26 项，进 `npm test` 与 CI 的 `build-and-test` 新 step；只加 step 不加 job）：
+- 新增 **`scripts/test/test-backup.js`**（27 项，进 `npm test` 与 CI 的 `build-and-test` 新 step；只加 step 不加 job）：
   正常路径含权威三件、失败必响亮**且不轮转**（12 份旧档一份没动）、残缺档被 `tar tzf` 拦下、
   `gate_data.db` 缺席 ⇒ `REQUIRE_DB=1` 拒跑 exit 8（`REQUIRE_DB=0` 才照跑）、必检成员 exit 5、weekly 同套、checkpointed 分支仍成功、
   **两条 A/B 对照**：同一份"少文件"夹具下 **HEAD 版 exit 0 并报 `backup daily done`、新版非零并报 `BACKUP_FAILED`**；

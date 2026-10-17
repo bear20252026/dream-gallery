@@ -251,17 +251,36 @@ seedOldArchives(12, 'data', 'daily');
   );
 }
 
-// ---------- ⑥ 对照组:HEAD 版在同一夹具下的表现(证明旧版是假成功) ----------
+// ---------- ⑥ 对照组:**修复之前那一版**在同一夹具下的表现(证明旧版是假成功) ----------
 {
-  const show = spawnSync('git', ['show', 'HEAD:tools/backup-gallery.sh'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-  });
-  if (show.status !== 0) {
-    console.log('  ⚠ 取不到 HEAD 版脚本,对照跳过(不当成通过)');
-  } else {
+  // ⚠️不能写 `HEAD:` —— 本测试与修复同批入仓,一提交 HEAD 上的 backup-gallery.sh 就**已经是修好的那份**,
+  // 对照会静默退化成"新脚本和自己比"(实测:提交后这两条立刻变红,旧 status=1、归档 members 空)。
+  // 也不许钉死某个 SHA(历史一长就失效)。做法:顺着改过这个文件的提交往回找,取**第一份"含 || true 且不含 BACKUP_FAILED"**的旧形状,
+  // 找不到就判失败 —— 这条 A/B 是"旧版不是没测到,而是测了也永不红"的唯一正证,不能悄悄跳。
+  const isOldShape = (t) => /\|\|\s*true/.test(t) && !/BACKUP_FAILED/.test(t);
+  let old = null;
+  {
+    const hist = sh('git log --format=%H -- tools/backup-gallery.sh');
+    const revs = (hist.stdout || '').split(/\r?\n/).filter(Boolean);
+    for (const rev of revs) {
+      const s = spawnSync('git', ['show', rev + ':tools/backup-gallery.sh'], {
+        cwd: ROOT,
+        encoding: 'utf8',
+      });
+      if (s.status === 0 && isOldShape(s.stdout)) {
+        old = { rev, text: s.stdout };
+        break;
+      }
+    }
+    ok(
+      `找得到"吞失败"那一版作对照(扫了 ${revs.length} 个提交)`,
+      !!old,
+      old ? '用 ' + old.rev : '没有任何一版含 "|| true" ⇒ 对照失效,这条 A/B 等于没测'
+    );
+  }
+  if (old) {
     // 旧版把 G/B 写死(这正是它测不了的原因)——对照实验里只改这两行,其余一字不动
-    const patched = show.stdout
+    const patched = old.text
       .replace(/^G=\/opt\/gallery$/m, 'G=' + TMP)
       .replace(/^B=\/opt\/backups$/m, 'B=' + BAK);
     fs.writeFileSync(OLD, patched);
