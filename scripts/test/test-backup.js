@@ -19,11 +19,19 @@ const SCRIPT = path.join(ROOT, 'tools', 'backup-gallery.sh');
 // "远端 host:path"(报 Cannot connect to C:),只认 `/c/…`;Linux(CI)本来就是后者,转换在 Linux 上是 no-op。
 const FS_TMP = path.join(os.tmpdir(), 'dg-backup-test');
 const FS_BAK = path.join(os.tmpdir(), 'dg-backup-test-bk');
+// ⚠️桩脚本一律落在系统临时目录,**不放仓库 .tmp/**:.tmp/ 被 .gitignore 挡着 ⇒ CI 的检出里根本没有这个目录,
+// 2026-10-17 CI 就是这么炸的(ENOENT: no such file or directory, open '…/.tmp/tar-fail.sh')。
+const FS_STUB = path.join(os.tmpdir(), 'dg-backup-stubs');
 const msys = (p) =>
   p.replace(/\\/g, '/').replace(/^([A-Za-z]):\//, (m, d) => '/' + d.toLowerCase() + '/');
 const TMP = msys(FS_TMP);
 const BAK = msys(FS_BAK);
-const OLD = path.join(ROOT, '.tmp', 'backup-gallery.head.sh');
+// 对照组取的是**入库夹具**,不是 git 历史:`actions/checkout@v5` 默认 fetch-depth=1(浅检出),
+// `git log -- <文件>` 在 CI 里只会剩一条提交 ⇒ "扫历史找吞失败那一版"必然假红
+// (与本仓「产物溯源测试不要断 git」同一条纪律)。夹具本身由下面第一条断言验明正身。
+const FIXTURE_OLD = path.join(ROOT, 'scripts', 'test', 'fixtures', 'backup-gallery.pre-fix.sh');
+fs.mkdirSync(FS_STUB, { recursive: true });
+const OLD = path.join(FS_STUB, 'old-copy.sh'); // 夹具的临时副本(只改 G/B 两行,不改内容)
 const SCRIPT_SH = msys(SCRIPT);
 const OLD_SH = msys(OLD);
 
@@ -163,7 +171,7 @@ resetFixture(false);
 seedOldArchives(12, 'data', 'daily');
 {
   // 替身 tar:写个空文件然后按 2 退出(模拟致命打包错误)
-  const stubWin = path.join(ROOT, '.tmp', 'tar-fail.sh');
+  const stubWin = path.join(FS_STUB, 'tar-fail.sh');
   const stub = msys(stubWin);
   fs.writeFileSync(stubWin, '#!/bin/bash\nexit 2\n');
   const r = runNew({ TAR_BIN: stub, KEEP_DAILY: '2' });
@@ -190,7 +198,7 @@ seedOldArchives(12, 'data', 'daily');
 {
   resetFixture(false);
   seedOldArchives(12, 'data', 'daily');
-  const stubWin = path.join(ROOT, '.tmp', 'tar-garbage.sh');
+  const stubWin = path.join(FS_STUB, 'tar-garbage.sh');
   const stub = msys(stubWin);
   // 替身:"打包成功"(exit 0)但产物不是合法 gzip —— 这正是 tar 中途被 ENOSPC 咬断的形状
   fs.writeFileSync(
@@ -253,31 +261,29 @@ seedOldArchives(12, 'data', 'daily');
 
 // ---------- ⑥ 对照组:**修复之前那一版**在同一夹具下的表现(证明旧版是假成功) ----------
 {
-  // ⚠️不能写 `HEAD:` —— 本测试与修复同批入仓,一提交 HEAD 上的 backup-gallery.sh 就**已经是修好的那份**,
-  // 对照会静默退化成"新脚本和自己比"(实测:提交后这两条立刻变红,旧 status=1、归档 members 空)。
-  // 也不许钉死某个 SHA(历史一长就失效)。做法:顺着改过这个文件的提交往回找,取**第一份"含 || true 且不含 BACKUP_FAILED"**的旧形状,
-  // 找不到就判失败 —— 这条 A/B 是"旧版不是没测到,而是测了也永不红"的唯一正证,不能悄悄跳。
+  // 三条纪律,都是本轮踩出来的:
+  //  ①**不能取 `HEAD:`** —— 本测试与修复同批入仓,一提交 HEAD 上的脚本就已经是修好的那份,
+  //    对照会静默退化成"新脚本和自己比"(实测:提交后这两条立刻变红,旧 status=1、归档 members 空)。
+  //  ②**不能扫 git 历史** —— `actions/checkout@v5` 默认 fetch-depth=1,CI 里 `git log -- <文件>` 只剩一条提交
+  //    (与本仓「山丘产物溯源不要断 git」同一条纪律)。⇒ 对照版本**入库成夹具**。
+  //  ③**夹具必须验明正身** —— 拿一份"其实已经是新版"的文件当"旧版"跑,A/B 会漂亮地通过而什么也没证明。
   const isOldShape = (t) => /\|\|\s*true/.test(t) && !/BACKUP_FAILED/.test(t);
-  let old = null;
-  {
-    const hist = sh('git log --format=%H -- tools/backup-gallery.sh');
-    const revs = (hist.stdout || '').split(/\r?\n/).filter(Boolean);
-    for (const rev of revs) {
-      const s = spawnSync('git', ['show', rev + ':tools/backup-gallery.sh'], {
-        cwd: ROOT,
-        encoding: 'utf8',
-      });
-      if (s.status === 0 && isOldShape(s.stdout)) {
-        old = { rev, text: s.stdout };
-        break;
-      }
-    }
-    ok(
-      `找得到"吞失败"那一版作对照(扫了 ${revs.length} 个提交)`,
-      !!old,
-      old ? '用 ' + old.rev : '没有任何一版含 "|| true" ⇒ 对照失效,这条 A/B 等于没测'
-    );
-  }
+  const oldText = fs.existsSync(FIXTURE_OLD)
+    ? // 归一行尾:仓库在 Windows 上按 core.autocrlf 会把 .sh 检出成 CRLF ⇒ ①`^B=…$` 这类锚点全部失配
+      // (patch G/B 两行会静默失败,对照就变成"旧版去打包 /opt/gallery");②bash 也会把 `\r` 带进命令里。
+      // 与仓库里"凡拿正则读源码就先归一 CRLF"是同一条纪律(第四/九刀各记过一次)。
+      fs.readFileSync(FIXTURE_OLD, 'utf8').replace(/\r\n/g, '\n')
+    : '';
+  ok(
+    `对照夹具存在且确实是"吞失败"那一版(${path.relative(ROOT, FIXTURE_OLD)})`,
+    isOldShape(oldText),
+    oldText ? '夹具里没有 "|| true" 或已含 BACKUP_FAILED ⇒ 对照失效' : '夹具文件不存在'
+  );
+  ok(
+    '对照夹具 ≠ 在跑的脚本(否则 A/B 就是自己跟自己比)',
+    oldText.length > 0 && oldText !== fs.readFileSync(SCRIPT, 'utf8')
+  );
+  const old = isOldShape(oldText) ? { rev: 'fixture', text: oldText } : null;
   if (old) {
     // 旧版把 G/B 写死(这正是它测不了的原因)——对照实验里只改这两行,其余一字不动
     const patched = old.text
@@ -356,7 +362,7 @@ seedOldArchives(12, 'data', 'daily');
 // ---------- ⑧ checkpoint 会"吃掉"-wal/-shm ⇒ 清单必须在它之后采(2026-10-17 写测试时当场撞出的自伤) ----------
 {
   resetFixture(false);
-  const stubWin = path.join(ROOT, '.tmp', 'sqlite-eats-wal.sh');
+  const stubWin = path.join(FS_STUB, 'sqlite-eats-wal.sh');
   fs.writeFileSync(
     stubWin,
     '#!/bin/bash\n# 真 sqlite3 的 wal_checkpoint(TRUNCATE) 之后,SQLite 会把 -wal / -shm 一并删掉(它们是临时文件)\nrm -f "$(dirname "$1")/gate_data.db-wal" "$(dirname "$1")/gate_data.db-shm"\nexit 0\n'
@@ -393,6 +399,30 @@ seedOldArchives(12, 'data', 'daily');
     '★ 顺序判据在调换版上必须判假(证明它会咬人)',
     orderOf(swapped) === false,
     '调换版判定=' + orderOf(swapped)
+  );
+}
+
+// ---------- ⑨ 结构自检:两类"本地绿、CI 红"的写法不许再回到本文件 ----------
+{
+  // 本轮 CI 就是死在这两件事上(两次不同的失败,同一个根源:CI 的检出比本机干净):
+  //  ① 桩脚本写进 `<仓库>/.tmp/` —— 那目录被 .gitignore 挡着,CI 检出里**不存在** ⇒ ENOENT,测试直接崩;
+  //  ② 对照组去 `git log/show` 取历史版本 —— `actions/checkout@v5` 默认 fetch-depth=1 ⇒ 浅检出里没有旧提交。
+  // 判据读自己的源码,并且**在一份合成样本上证明它会红**(不然又是"看起来在判,其实没判")。
+  const ciHostile = (src) => {
+    const hits = [];
+    if (/path\.join\(\s*ROOT\s*,\s*['"]\.tmp['"]/.test(src))
+      hits.push('写进 gitignored 的仓库 .tmp/');
+    if (/spawnSync\(\s*['"]git['"]/.test(src)) hits.push('断 git 历史(浅检出下必红)');
+    return hits;
+  };
+  // 扫描边界:只扫**本块之前**的源码 —— 否则下面两条合成样本(故意写成违规形状)会被自己的谓词抓到,
+  // 报出"本文件违规"这种假红(第一轮就是这么红的:谓词读到了它自己的测试数据)。
+  const me = fs.readFileSync(__filename, 'utf8').split('⑨ 结构自检')[0];
+  ok('本测试不写仓库 .tmp/、也不断 git 历史', ciHostile(me).length === 0, ciHostile(me).join(','));
+  ok(
+    '★ 这条自检在合成样本上必须判红(证明它会咬人)',
+    ciHostile("x = path.join(ROOT, '.tmp', 'a.sh')").length === 1 &&
+      ciHostile("spawnSync('git', ['log'])").length === 1
   );
 }
 

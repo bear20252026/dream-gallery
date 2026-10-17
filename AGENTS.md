@@ -971,7 +971,7 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
 4. **CDN 在途重试**（C3-1）：`gltf-loader.js` 把"**旗**"（此后新请求直接走源站）与"**这一条请求要不要重试**"分开——
    每个 `viaCdn` 的请求都拿到它那一次源站重试，重试只有一次、第二次失败照旧交调用方（不转圈）。
 
-### 我自己在本轮造出来的三条（都属"跑一遍才知道"，写下来免得下批重踩）
+### 我自己在本轮造出来的五条（都属"跑一遍才知道"，写下来免得下批重踩）
 
 1. **checkpoint 与采清单的顺序自伤**：新脚本先 `pick` 出文件清单、再在 `take()` 里跑 `wal_checkpoint(TRUNCATE)`
    ⇒ SQLite 把 `-wal`/`-shm` 并回主库后**直接删掉这两个临时文件**，清单里躺着两个随后消失的名字 ⇒ `tar` 退 2、备份被自己搞红。
@@ -989,10 +989,24 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
    改成**顺着 `git log -- <该文件>` 往回扫,取第一份"含 `|| true` 且不含 `BACKUP_FAILED`"的旧形状**,并**断言找得到**
    （找不到就判失败,不许"跳过当通过"）。钉死某个 SHA 也是错的:历史一长/一 rebase 就失效。
    ⇒ 口径:**写 A/B 对照时先问"对照组一年后还成立吗"** —— 凡是用 `HEAD`/`HEAD~1` 当"修复前"的地方,同批入仓即失效。
+5. **CI 形状的两次连炸（PR #40 因此红、未合并）**：同一条测试里两处默认"本机有、CI 没有"的前提
+   ①**桩脚本写进仓库 `.tmp/`** —— 那目录被 `.gitignore` 挡着 ⇒ CI 检出里根本没有它,第一步就 `ENOENT …/.tmp/tar-fail.sh`；
+   ②**对照组扫 git 历史** —— `.github/workflows/test.yml:43,202` 两处 `actions/checkout@v5` **都没写 `fetch-depth`**
+   ⇒ 默认浅检出一条提交,`git log -- <文件>` 只剩自己(这条我提交前也没走到,因为先炸在 ①)。
+   两条各自收口:桩一律落系统临时目录(`os.tmpdir()/dg-backup-stubs`,跑完自己 mkdir 保证存在);
+   对照版本**入库成夹具** `scripts/test/fixtures/backup-gallery.pre-fix.sh`(取 `fa873cd` 那一版,内容一字未改),
+   并加两条断言:**夹具必须真是"吞失败"那一版**(`|| true` 在、`BACKUP_FAILED` 不在)且**必须 ≠ 在跑的脚本**
+   —— 拿一份"其实已经是新版"的文件当旧版跑,A/B 会漂亮地通过而什么也没证明,这比红更糟。
+   ⚠️还有一条新的**自指坑**:自检谓词第一次扫的是"整个文件",于是它把**自己那两行合成样本**当成了违规,
+   报出"本测试违规"的假红 ⇒ 判据要显式给扫描边界(这里用 `split('⑨ 结构自检')[0]`)。
+   **验收姿势**:不猜 CI 环境,直接造一份 CI 形状的树再跑
+   (最小导出:只 copy 测试读的四个文件,`ls -a` 确认没有 `.git`/`.tmp` ⇒ 30/30 通过),比在本地凭想象安全得多。
+   ⇒ 升级本仓那条既有纪律:**"产物溯源测试不要断 git"不止——任何测试都不要依赖 git 历史、任何测试都不许往 gitignored 目录写东西**;
+   需要"上一版"就把它做成入库夹具。
 
 ### 判据与反向验证
 
-- 新增 **`scripts/test/test-backup.js`**（27 项，进 `npm test` 与 CI 的 `build-and-test` 新 step；只加 step 不加 job）：
+- 新增 **`scripts/test/test-backup.js`**（30 项，进 `npm test` 与 CI 的 `build-and-test` 新 step；只加 step 不加 job）：
   正常路径含权威三件、失败必响亮**且不轮转**（12 份旧档一份没动）、残缺档被 `tar tzf` 拦下、
   `gate_data.db` 缺席 ⇒ `REQUIRE_DB=1` 拒跑 exit 8（`REQUIRE_DB=0` 才照跑）、必检成员 exit 5、weekly 同套、checkpointed 分支仍成功、
   **两条 A/B 对照**：同一份"少文件"夹具下 **HEAD 版 exit 0 并报 `backup daily done`、新版非零并报 `BACKUP_FAILED`**；
@@ -1012,7 +1026,7 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
 
 eslint **0**（覆盖面 602 文件）/ `tsc --noEmit` 0 / checkJs **116 = 基线**（一字未动，本轮没新增也没有少）/
 vitest **1239 项 / 106 文件**（+20 项 +2 文件全来自本批判据，独跑 `AssertionError` 0、`timed out` 0）/
-`npm test` **七条** 7/22/**26**/108/46/20/6 = **235 项 exit 0**（新增 `test-backup`）/ `vite build` 0 且三条构建断言照旧
+`npm test` **七条** 7/22/**30**/108/46/20/6 = **239 项 exit 0**（新增 `test-backup`）/ `vite build` 0 且三条构建断言照旧
 （48 prefetch / 入口不含 three / 无 importmap）/ `npm run depcruise` 0 违规（**409 modules / 1412 deps**）/
 四条 CI 闸门全 exit 0（hill-solo / `CSP_REGISTRY_OK` 4 条 / 后端清单 **52 可达 · 54 清单** / 探针隔离扫 149 脚本·豁免 8）/
 prettier：本轮改动文件全部合排（HEAD 本就不合排的三个按既有口径不动，见上面第三条自犯）。
