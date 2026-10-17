@@ -14,6 +14,7 @@ import { SCENE8_BUSINESS, SCENE8_LAMP, SCENE9_GEO } from '../shared/story-text.m
 import { PLANETS, PICK_RADIUS, DOOR_RADIUS } from '../shared/planet-logic.mjs';
 import { Z } from '../shared/z-layers.mjs';
 import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
+import { createVisitClock } from '../shared/visit-timers.mjs';
 import { setLampLit } from './planet-props.js';
 
 const STAGES = {
@@ -48,37 +49,53 @@ function obj(world, name) {
 }
 
 // —— 台词队列(与 scene7-vanity 同规:lock 互斥 + spent 幂等 + 心跳守护) ——
-let speakTimer = null;
-// M-03:加 home 判定。心跳守护只看 `dialogOpen() === false`,而离开这颗星时 cancelWorld
-// 关对话框同样满足它,老写法会把下一句台词弹在新场景里(链子还会顺带推进章节)。
+//
+// 每次"进入这颗星"是一条**世代**(2026-10-17 外部审计 C4)。原来只有 `activeWorld !== home` 这一道闸,
+// 它挡得住"台词漏白到新场景",挡不住**同世界快返**:离开再走回来,那句话照样成立 ——
+// 而离场时 `s.arrival` 被复位、重进又 `begin()` 一次 ⇒ 上一世的心跳与新世那一条同时在讲,
+// 同一段 chainA 播两遍。机制与三条契约在 `shared/visit-timers.mjs`(单测钉死,不靠字符串)。
+// 顺带:旧版这里是一只模块级 `speakTimer`,三颗星共用 ⇒ A 星的心跳会被 B 星的 finish 摘掉
+// (形态同 2026-10-14 PR2 在 hot.js 抓到的那只单槽缺陷)。计时器现在归世代所有,bump 一并掐掉。
+const visits = createVisitClock((w) => (ctx.scene.activeWorld || '') === w);
+// M-03:心跳守护只看 `dialogOpen() === false`,而离开这颗星时 cancelWorld 关对话框同样满足它
+// ⇒ 老写法会把下一句弹在新场景里(链子还顺带推进章节)。世代判定把这层一并堵死。
 function speakSeq(seq, i, done, home) {
-  if (ctx.scene.activeWorld !== home) return;
-  if (i >= seq.length) {
-    if (done) done();
-    return;
-  }
-  const item = seq[i];
-  let spent = false;
-  const finish = function () {
-    if (spent) return;
-    spent = true;
-    clearTimeout(speakTimer);
-    speakSeq(seq, i + 1, done, home);
+  const gen = visits.gen(home);
+  let beat = null; // 先声明再赋值:openDialog 若同步回调 onDone,直接引用 const beat 会撞 TDZ
+  const advance = () => {
+    if (!visits.alive(home, gen)) return;
+    if (i >= seq.length) {
+      if (done) done();
+      return;
+    }
+    const item = seq[i];
+    let spent = false;
+    const finish = function () {
+      if (spent) return;
+      spent = true;
+      clearTimeout(beat);
+      i++;
+      advance();
+    };
+    const hold = Math.max(4600, ((item.en || '').length * 65) | 0);
+    ctx.openDialog({
+      speaker: tt(item.who),
+      speakerType: whoSpk(item.who),
+      lines: [tt(item)],
+      autoHide: hold,
+      lock: true,
+      onDone: finish,
+    });
+    beat = visits.later(
+      home,
+      gen,
+      function () {
+        if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
+      },
+      hold + 2600
+    );
   };
-  const hold = Math.max(4600, ((item.en || '').length * 65) | 0);
-  ctx.openDialog({
-    speaker: tt(item.who),
-    speakerType: whoSpk(item.who),
-    lines: [tt(item)],
-    autoHide: hold,
-    lock: true,
-    onDone: finish,
-  });
-  clearTimeout(speakTimer);
-  speakTimer = setTimeout(function () {
-    if (ctx.scene.activeWorld !== home) return;
-    if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
-  }, hold + 2600);
+  advance();
 }
 
 // —— 光柱信标:几何/材质/拆/呼吸都在 shared/beacon-manager.js(零 PointLight 铁律在那儿唯一表达)。
@@ -287,6 +304,7 @@ const STAR_SPOTS = [
 ];
 function businessGame(world, done) {
   const g = SCENE8_BUSINESS.game;
+  const gen = visits.gen(world); // 本世的号:完成延时只在这一世里有效
   const el = openPanel(g.title, g.hint);
   const sky = div('pg-sky', el);
   const sum = div('pg-sum', el);
@@ -317,10 +335,15 @@ function businessGame(world, done) {
       window.__late[world] = 'game:' + got;
       if (got === STAR_SPOTS.length) {
         sum.textContent = tt(g.done) + ' · ' + total.toLocaleString('en-US') + ' 🔒';
-        setTimeout(() => {
-          closePanel();
-          done();
-        }, 1800);
+        visits.later(
+          world,
+          gen,
+          () => {
+            closePanel();
+            done();
+          },
+          1800
+        );
       }
     };
     sky.appendChild(b);
@@ -330,6 +353,7 @@ function businessGame(world, done) {
 // —— 329 陪点灯人点灯:2.4 秒一个白天/黑夜;天黑点灯、天亮熄灯,跟上六次 ——
 function lampGame(world, done) {
   const g = SCENE8_LAMP.game;
+  const gen = visits.gen(world);
   const el = openPanel(g.title, g.hint);
   const sky = div('pg-sky', el);
   const phaseEl = div('pg-phase', sky);
@@ -342,6 +366,12 @@ function lampGame(world, done) {
   el.appendChild(btn);
   const head = obj(world, 'lampHead');
   if (head) head.userData.manual = true;
+  // 路灯控制权的**唯一**归还路径。旧写法只在"亲手跟上六次"那条通关分支里置回 false,
+  // 中途离开这颗星就永久残留 true ⇒ 点灯人自己的开熄灯行为被接管(他不再跟着天亮天黑动)。
+  if (head)
+    visits.onLeave(world, gen, () => {
+      head.userData.manual = false;
+    });
   let night = false,
     lit = false,
     good = 0,
@@ -382,15 +412,23 @@ function lampGame(world, done) {
     if (good >= NEED) {
       finished = true;
       clearInterval(timer);
-      setTimeout(() => {
-        if (head) head.userData.manual = false;
-        closePanel();
-        done();
-      }, 1400);
+      visits.later(
+        world,
+        gen,
+        () => {
+          if (head) head.userData.manual = false;
+          closePanel();
+          done();
+        },
+        1400
+      );
     }
   };
   const flip = () => {
-    if (finished || !gameEl) return clearInterval(timer);
+    // 判活看**本轮那块面板**还在不在 DOM 里,不是看模块级的全局 `gameEl`:
+    // 旧写法离开再重进时 `gameEl` 已经被新面板重新赋值 ⇒ 这个 interval 永远停不下来,
+    // 和新那一轮的 flip 一起 paint、一起 setLampLit(head) ⇒ 路灯双频乱闪、玩家跟不上(2026-10-17 C4)。
+    if (finished || !el.isConnected) return clearInterval(timer);
     if (ctx.ui.dialogOpen?.()) return; // 对白中天不动
     night = !night;
     answered = false; // 每个白天/黑夜各算一次,要亲手按
@@ -398,13 +436,14 @@ function lampGame(world, done) {
     paint();
   };
   paint();
-  const timer = setInterval(flip, 2400);
+  const timer = visits.every(world, gen, flip, 2400);
   flip();
 }
 
 // —— 330 给地理学家讲 B612:火山都记下;讲到花,他不录,接「朝生暮死」 ——
 function geoGame(world, done) {
   const g = SCENE9_GEO.game;
+  const gen = visits.gen(world);
   const el = openPanel(g.title, g.hint);
   const list = document.createElement('ul');
   list.className = 'pg-ledger';
@@ -429,10 +468,15 @@ function geoGame(world, done) {
       window.__late[world] = 'game:' + (g.items.length - left);
       const next = () => {
         if (left > 0) return;
-        setTimeout(() => {
-          closePanel();
-          done();
-        }, 1200);
+        visits.later(
+          world,
+          gen,
+          () => {
+            closePanel();
+            done();
+          },
+          1200
+        );
       };
       if (it.ok) next();
       else {
@@ -447,36 +491,41 @@ function geoGame(world, done) {
 function begin(world) {
   const cfg = STAGES[world];
   const s = S(world);
+  const gen = visits.gen(world); // 本次进入的世代号
   placeFigure(world, cfg.figure);
   window.__late[world] = 'chainA';
-  setTimeout(function () {
-    if (ctx.scene.activeWorld !== world) return;
-    speakSeq(
-      cfg.text.chainA,
-      0,
-      function () {
-        if (ctx.scene.activeWorld !== world) return;
-        window.__late[world] = 'game';
-        cfg.game(world, function () {
+  visits.later(
+    world,
+    gen,
+    function () {
+      speakSeq(
+        cfg.text.chainA,
+        0,
+        function () {
           if (ctx.scene.activeWorld !== world) return;
-          window.__late[world] = 'chainB';
-          speakSeq(
-            cfg.text.chainB,
-            0,
-            function () {
-              window.__late[world] = 'pickup';
-              s.pickupArmed = true;
-              ctx.ui.journey?.clearGoal?.('late-planets'); // 罗盘改指星屑(planets.js 目标解析的兜底)
-              armBeacon(world, 'beacon', 'sproutMote', 3.0);
-              ctx.ui.modeToast?.(tt(PICKUP_TOAST), 6000);
-            },
-            world
-          );
-        });
-      },
-      world
-    );
-  }, 1400);
+          window.__late[world] = 'game';
+          cfg.game(world, function () {
+            if (ctx.scene.activeWorld !== world) return;
+            window.__late[world] = 'chainB';
+            speakSeq(
+              cfg.text.chainB,
+              0,
+              function () {
+                window.__late[world] = 'pickup';
+                s.pickupArmed = true;
+                ctx.ui.journey?.clearGoal?.('late-planets'); // 罗盘改指星屑(planets.js 目标解析的兜底)
+                armBeacon(world, 'beacon', 'sproutMote', 3.0);
+                ctx.ui.modeToast?.(tt(PICKUP_TOAST), 6000);
+              },
+              world
+            );
+          });
+        },
+        world
+      );
+    },
+    1400
+  );
 }
 function pick(world) {
   const cfg = STAGES[world];
@@ -491,10 +540,15 @@ function pick(world) {
   ctx.kunlun.setChapter && ctx.kunlun.setChapter(cfg.idx + 1);
   ctx.ui.journey?.clearGoal?.('late-planets');
   window.__late[world] = 'done';
-  setTimeout(function () {
-    ctx.ui.modeToast?.(tt(DONE_TOAST[world]));
-    armBeacon(world, 'doorBeacon', 'sproutDoor', 3.4);
-  }, 1600);
+  visits.later(
+    world,
+    visits.gen(world),
+    function () {
+      ctx.ui.modeToast?.(tt(DONE_TOAST[world]));
+      armBeacon(world, 'doorBeacon', 'sproutDoor', 3.4);
+    },
+    1600
+  );
   if (ctx.ui.voyage) ctx.ui.voyage.offer(3600);
 }
 function near(world, name, r2) {
@@ -513,13 +567,16 @@ ctx.onTick(function latePlanetsTick() {
   const active = ctx.scene.activeWorld || '';
   if (prevWorld !== active && STAGES[prevWorld]) {
     const s = S(prevWorld);
+    // **离开这颗星 = 换一世**:掐掉它所有还在飞的计时器并跑 teardown(交还路灯控制权)。
+    // 无条件做,不管这颗星是否已完成 —— 已完成那颗也可能有上一世的尾巴(如 pick 的 1600ms toast)。
+    // 旧写法只有 `clearTimeout(speakTimer)` 一只全局槽,既管不了玩法内部的计时器,也会误摘别的星的心跳。
+    visits.bump(prevWorld);
     if (!s.done) {
       // 中途离开:下次进来从头讲(短场,不存档)
       s.arrival = false;
       s.pickupArmed = false;
       dropBeacon(prevWorld, 'beacon');
       closePanel();
-      clearTimeout(speakTimer);
     }
     dropBeacon(prevWorld, 'doorBeacon');
     chapterCached = -1;
@@ -581,5 +638,9 @@ ctx.onTick(function latePlanetsTick() {
 
 // 探针钩子(只读 + 测试用跳步)
 window.__latePlanets = {
-  state: (w) => Object.assign({ stage: window.__late[w] }, S(w)),
+  state: (w) =>
+    Object.assign(
+      { stage: window.__late[w], gen: visits.gen(w), pending: visits.pending(w) },
+      S(w)
+    ),
 };
