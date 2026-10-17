@@ -970,6 +970,13 @@ eslint 0 / `tsc --noEmit` 0 / checkJs **116 = 基线**（一字未动）/ vitest
 
 ①3D 墙面「墙在画廊里点得中」还是没有射线拾取证据（要模型在场 + 剧情夹具）；②墙面那盏 `PointLight('#ff8fab',2,4,1.5)` 与「零 PointLight / 手机灯光账」相冲，动它要重算手机灯光预算；③面板文案英文译本（归他定）；④默认模式对全部玩家开放（归他一句话）；⑤**新增**：跳跃键在按钮/弹层焦点下无条件 `preventDefault` 这一族（本批已定性到 `player.js:200-205`）。
 
+### 发布证据（PR #38 → merge `74147e3`，按 `--no-deploy` 收，线上未动）
+
+- 分支 `rel/20261016-205452` ⇒ **PR #38**（head `22b7236`）⇒ required checks `build-and-test` / `smoke` **双 SUCCESS**（读的是 `gh pr view --json statusCheckRollup` 的 `conclusion` 字段，不是 `--watch` 的退出码）⇒ merge `74147e3d5d155f20fe2c2364806dedd15d876ddb`，**树哈希一致 `558c35b0d3c34ecc9679da661d10c618df4c1629`** ⇒ CI 验的那份内容就是 main 上这份。
+- **云端自己打的结论行**（run `39000711479`，step「Type-health baseline (checkJs tiers, BLOCKING)」）：**`checkJs errors: 116 (baseline 116, delta 0)`**；Vitest 步骤 **`Test Files 104 passed (104)`**；后端五条脚本在 CI 侧同样逐条打 `结果: 7 / 22 / 108 / 46 / 20 通过, 0 失败`;三条构建断言在 CI 的 build 步骤里逐字复现(48 prefetch / 入口不含 three / 无 importmap);四条 BLOCKING 闸门(hill-solo / `CSP_REGISTRY_OK` / 后端清单 51 可达·53 清单 / 探针隔离 149 脚本·豁免 8)全过。
+- **"没部署"这件事有两条独立证据,不是靠"脚本没报错"**:`.tmp/deploy-state.env` 仍是上一次 deploy 的快照(`COMMIT=02e1054 / TS=2026-10-15T23:51:37-07:00`,本次没往里写);线上 `/healthz` 回 `{"ok":true,"uptime":76362}` ⇒ 倒推 21.2 小时 ≈ 正是 `02e1054` 那次重启,首页 200。**进程没被本次动过。**
+- ⚠️**这条链上我自己犯过一次"解释器弄错"**:第一次把 bash 脚本交给 node —— `node scripts/release.sh --no-deploy` ⇒ 当场 `SyntaxError: Invalid or unexpected token`,**而后台任务通知照旧报 exit 0**(我的命令尾巴接的是 `tail`,退出码属于 tail —— 与本机已记的那条同型第三次)。三条口径:①`scripts/*.sh` 一律 `bash` 起;②判"跑没跑过"读脚本自己打的结论行(`PR #N` / `RELEASE_OK` / `RELEASE_FAILED`),不读外层通知的退出码;③怀疑跑错时先 `git rev-parse main origin/main` + `git branch -r` 实证"远端有没有被动过"(那次实测 main 仍在 `87e2b22`、一个分支没推、PR 没开)——**回滚之前必须知道损伤是零**,而不是猜。
+
 
 
 ## 2026-10-16 温柔度面板接线：死 UI 给了入口，顺手把两份题库收成一份
