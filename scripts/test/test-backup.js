@@ -166,20 +166,45 @@ const strays = () => {
     : [];
 };
 
+// 替身脚本必须**真的可执行**:Windows/Git Bash 上执行位是虚的,Linux CI 上没 chmod 就是 exit 126
+// ("command found but not executable")。而 126 也 >1 ⇒ 脚本照样打 BACKUP_FAILED,
+// 于是"tar 致命失败"那条会在**桩根本没跑起来**的情况下通过 —— 那是假通过,比红危险。
+const writeStub = (name, body) => {
+  const win = path.join(FS_STUB, name);
+  fs.writeFileSync(win, body);
+  fs.chmodSync(win, 0o755);
+  // 只在 POSIX 上真探活:Windows 既没有执行位(Node 报的 mode 永远不含 0o111),又不能直接 exec 一个 .sh
+  // (EFTYPE),在那里判这件事是伪命题;Linux CI 上缺执行位会退 126 并伪装成"备份失败",所以那里必须判。
+  if (process.platform !== 'win32') {
+    const probe = spawnSync(win, [], { encoding: 'utf8' });
+    ok(
+      `替身 ${name} 真的可执行(126/127 会伪装成"备份失败")`,
+      !(probe.status === 126 || probe.status === 127 || probe.error),
+      'status=' + probe.status + ' err=' + ((probe.error && probe.error.code) || '')
+    );
+  }
+  return msys(win);
+};
+
 // ---------- ② tar 真失败:要响亮,且**不许轮转** ----------
 resetFixture(false);
 seedOldArchives(12, 'data', 'daily');
 {
-  // 替身 tar:写个空文件然后按 2 退出(模拟致命打包错误)
-  const stubWin = path.join(FS_STUB, 'tar-fail.sh');
-  const stub = msys(stubWin);
-  fs.writeFileSync(stubWin, '#!/bin/bash\nexit 2\n');
+  // 替身 tar:直接以 2 退出(模拟致命打包错误)
+  const stub = writeStub('tar-fail.sh', '#!/bin/bash\nexit 2\n');
   const r = runNew({ TAR_BIN: stub, KEEP_DAILY: '2' });
   const line = (r.stdout || '') + (r.stderr || '');
   ok(
     'tar 致命失败 ⇒ BACKUP_FAILED + 非零退出',
     r.status !== 0 && /BACKUP_FAILED/.test(line),
     'status=' + r.status + ' out=' + line.slice(0, 120)
+  );
+  // 必须点名"为什么红":只判"非零 + 有 BACKUP_FAILED"的话,126(替身没有执行位)/ 127(缺解释器)
+  // 都会冒充通过 —— CI 上第一次就是这么个假通过,真因是 chmod,不是备份脚本。
+  ok(
+    '失败原因确实是 tar 退 2(不是替身自己跑不起来)',
+    /reason=tar-exit=2/.test(line),
+    line.slice(0, 160)
   );
   const n = fs.readdirSync(path.join(FS_BAK, 'daily')).filter((f) => f.endsWith('.tar.gz')).length;
   ok('失败时**没有**轮转(12 份完好旧档一份没被顶掉)', n === 12, '实际=' + n);
@@ -198,12 +223,12 @@ seedOldArchives(12, 'data', 'daily');
 {
   resetFixture(false);
   seedOldArchives(12, 'data', 'daily');
-  const stubWin = path.join(FS_STUB, 'tar-garbage.sh');
-  const stub = msys(stubWin);
-  // 替身:"打包成功"(exit 0)但产物不是合法 gzip —— 这正是 tar 中途被 ENOSPC 咬断的形状
-  fs.writeFileSync(
-    stubWin,
-    '#!/bin/bash\nfor ((i=1;i<$#;i++)); do a="${@:i:1}"; [[ "$a" == czf ]] && { printf NOTGZIP > "${@:((i+1)):1}"; break; }; done\nexit 0\n'
+  // 替身:"打包成功"(exit 0)但产物不是合法 gzip —— 这正是 tar 中途被 ENOSPC 咬断的形状。
+  // 写法要可移植:参数由替身自己在 argv 里找(不再套一层 bash,不再用 `$#`/`${@:i:1}` 这类
+  // 在 Windows 的旧 bash 与 Linux 的 bash 之间行为不一致的展开)。
+  const stub = writeStub(
+    'tar-garbage.sh',
+    '#!/bin/bash\nprev=""\nfor a in "$@"; do\n  if [ "$prev" = czf ]; then printf NOTGZIP > "$a"; break; fi\n  prev="$a"\ndone\nexit 0\n'
   );
   const r = runNew({ TAR_BIN: stub, KEEP_DAILY: '2' });
   const line = (r.stdout || '') + (r.stderr || '');
@@ -362,12 +387,12 @@ seedOldArchives(12, 'data', 'daily');
 // ---------- ⑧ checkpoint 会"吃掉"-wal/-shm ⇒ 清单必须在它之后采(2026-10-17 写测试时当场撞出的自伤) ----------
 {
   resetFixture(false);
-  const stubWin = path.join(FS_STUB, 'sqlite-eats-wal.sh');
-  fs.writeFileSync(
-    stubWin,
-    '#!/bin/bash\n# 真 sqlite3 的 wal_checkpoint(TRUNCATE) 之后,SQLite 会把 -wal / -shm 一并删掉(它们是临时文件)\nrm -f "$(dirname "$1")/gate_data.db-wal" "$(dirname "$1")/gate_data.db-shm"\nexit 0\n'
+  const stub = writeStub(
+    'sqlite-eats-wal.sh',
+    // 真 sqlite3 的 wal_checkpoint(TRUNCATE) 之后,SQLite 会把 -wal / -shm 一并删掉(它们是临时文件)
+    '#!/bin/bash\nrm -f "$1-wal" "$1-shm"\nexit 0\n'
   );
-  const r = runNew({ SQLITE_BIN: msys(stubWin), REQUIRED: 'gate_data.db' });
+  const r = runNew({ SQLITE_BIN: stub, REQUIRED: 'gate_data.db' });
   const line = (r.stdout || '') + (r.stderr || '');
   ok(
     'checkpoint 之后 -wal 消失 ⇒ 备份仍须成功(清单在它之后采)',
