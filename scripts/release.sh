@@ -149,7 +149,15 @@ if [ "$PRE_RC" = "0" ]; then
   echo "✅ 后端与服务器一致,本次发布不涉及后端"
 elif [ "$PRE_RC" = "5" ]; then
   echo "ℹ️ 后端有文件与服务器不同(名单见 .tmp/backend-precheck.log),部署时会先同步后端再上传前端。"
-  if [ "$YES" != "1" ] && [ ! -t 0 ]; then
+  # 2026-10-17 修正判据的**口径**:这条闸门管的是"这次会不会碰服务器",不是"本机有没有终端"。
+  # --no-deploy 走的是「分支 → PR → 绿 → 合并」,第 8/9 步整体跳过 ⇒ 后端同步**根本不发生**,
+  # 所以"部署阶段会 exit 4"这个理由对它不成立。旧写法把一次正常归档拦成了 RELEASE_FAILED
+  # (第七轮 C4 批次:上一批 lib/chat.js 只合未发,后端差异一直悬着,于是每次 --no-deploy 都被拦)。
+  # 真部署那一路一字未动:没给 --yes 又是非交互,照旧在此停下。
+  if [ "$NO_DEPLOY" = "1" ]; then
+    echo "ℹ️ 本次是 --no-deploy(只建分支/PR/合并,**不碰服务器**)⇒ 后端同步不会发生,继续发布。"
+    echo "   但这些后端差异仍悬在线上之外,等真部署那一次一起同步(名单见 .tmp/backend-precheck.log)。"
+  elif [ "$YES" != "1" ] && [ ! -t 0 ]; then
     echo "❌ 但当前 stdin 不是交互终端,又没给 --yes —— 后端同步会在部署阶段硬失败(exit 4)。"
     echo "   与其跑完构建再失败,现在就把话说明:整套非交互发布请用  bash scripts/release.sh --yes"
     echo "   人工交互发布请在 Git Bash 终端里直接运行   bash scripts/release.sh"
