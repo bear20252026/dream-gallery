@@ -1124,6 +1124,15 @@ eslint **0** / `tsc --noEmit` **0** / **checkJs 116 = 基线**(一字未动,且�
 4. ⚠ **这批有运行期行为**(三颗星的计时器全部换了归属)⇒ **要 deploy 才对玩家生效**。按 `--no-deploy` 收:代码先存档到 main,生效时间由主人点。
 5. 上一批留的 `.zcodeignore`(未跟踪)仍归主人处置,本批没碰。
 
+### 发布证据(PR #41 → merge `11cbe96`,按 `--no-deploy` 收,线上未动)
+
+- 分支 `rel/20261017-043841` ⇒ **PR #41**(head `0988631`)⇒ required checks `build-and-test` / `smoke` 双 **SUCCESS**(读的是 `statusCheckRollup[].conclusion` 字段)⇒ merge `11cbe96b43333f70ff2501df07fff4cd7b319059`,**树哈希一致 `a4c51c76649a52e3dce713a47e8cdeda45da44a7`**;合并后 `git rev-parse main origin/main` 同为 `11cbe96` —— 这一步正是上一批漏掉的(见上面「登记完不等于存档完」)。
+- **这个 PR 装了 4 个提交**:`84bc474`(上一批 PR #40 的登记,**此前从未推上 GitHub**)/ `d52713f`(C4 代码+判据+探针)/ `8aca8c3`(本批登记)/ `0988631`(`release.sh` 预检口径 + 那条登记)。
+- **云端自己打的结论行**(run `39029931798`):`checkJs errors: 116 (baseline 116, delta 0)`、`✔ no dependency violations found (412 modules, 1418 dependencies)`、`CSP_REGISTRY_OK 4 条登记全部符合`、`✅ 后端清单覆盖真实依赖(从 server.js 可达 52 个,清单 54 个)`、`✓ 探针数据根隔离闸:扫 150 个脚本…豁免 8 个`、`[core-preload] 已注入 48 个 prefetch`、`Test Files 108 passed (108)`;后端各条在 CI 侧逐条打 `结果: 7 / 22 / 34 / 108 / 46 / 20 通过, 0 失败`。
+  ⚠️**CI 的 `test-backup` 是 34 项、本机是 31 项**,差的正是那三条「替身脚本必须真的可执行」—— `scripts/test/test-backup.js:178` 用 `process.platform !== 'win32'` 门控(Windows 既没有执行位、又不能直接 exec `.sh`,在那里判是伪命题;而 Linux 上缺执行位退 126 会伪装成"备份失败")。⇒ 这不是两边数字漂了,是**刻意按平台分档**;以后登记这类数,按各自平台各写各的,别抄成一个。
+- **「线上没动」有两条独立证据**:`.tmp/deploy-state.env` 仍是上一次真 deploy 的快照(`COMMIT=02e1054 / TS=2026-10-15T23:51:37-07:00`,本次没往里写);线上 `/healthz` 回 `{"ok":true,"uptime":104388}` —— 由响应自己的 `ts` 减出来 ≈ **28h59m**,正落在 `02e1054` 那次重启上 ⇒ 进程没被本次动过。
+- ⚠️**合进 main ≠ 生效**:C4 改的是前端运行期(`src/kunlun/late-planets.js` + 新模块 `src/shared/visit-timers.mjs`)⇒ 要 deploy 才轮到玩家。加上上一批还悬着的 `lib/chat.js`+`src/shared/chat-words.mjs`(后端)、`gltf-loader.js`+`chat-room.js`(前端)、`tools/backup-gallery.sh`(**要 scp 到 `/opt/backups/`**,cron 执行的是服务器上那份)——**下一次真 deploy 会把这些一起带上线**,发之前请先确认召唤词那半(机器人署名与人格 prompt)要不要照旧。
+
 ## 2026-10-16 温柔度面板·收尾批：剩余四问按拍板落地 + ✕ 换成 button（不部署）
 
 
