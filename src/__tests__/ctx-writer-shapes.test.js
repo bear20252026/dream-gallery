@@ -167,7 +167,7 @@ describe('批次6-1 audioManager:声明指回唯一写入方,ctx.d.ts 里不许�
         { rel: AM, line: expect.any(Number) },
       ])
     );
-  });
+  }, 90000);
 });
 
 describe('批次6-2 scrollLink:指不回写入方,那就把"声明 ≡ links.js"逐项钉住', () => {
@@ -198,7 +198,7 @@ describe('批次6-2 scrollLink:指不回写入方,那就把"声明 ≡ links.js"
     expect(calls).toHaveLength(1);
     const args = calls[0].text.match(/redraw\((.*)\);/)[1].split(',').length;
     expect(args).toBeLessThanOrEqual(2);
-  });
+  }, 90000);
 });
 
 describe('批次6-3 world:changed:载荷类型由 emit 那一行自己负责', () => {

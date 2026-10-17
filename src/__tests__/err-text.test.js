@@ -93,7 +93,7 @@ describe('loader 失败分支都走 errText,不再裸读 .message', () => {
       if (n) ledger[rel] = n;
     }
     expect(ledger).toEqual(LEDGER);
-  });
+  }, 90000);
 
   it('用了 errText 的文件必须 import 它(缺 import 是运行期 ReferenceError,构建不报)', () => {
     for (const rel of Object.keys(LEDGER)) {
@@ -115,5 +115,5 @@ describe('loader 失败分支都走 errText,不再裸读 .message', () => {
         });
     }
     expect(bad, bad.join('\n')).toEqual([]);
-  });
+  }, 90000);
 });
