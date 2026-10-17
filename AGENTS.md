@@ -1105,6 +1105,13 @@ prettier：本轮改动文件全部合排（HEAD 本就不合排的三个按既�
 `scripts/probe/README.md` 的索引表里**一直没有 `b612-chain-leak-probe.cjs`**(2026-10-14 包 B 建它时就没登记,而"不在表外的探针等于没人知道它存在"是 README 自己的规矩)—— 这批把它与 C4 新探针一起入列(端口、断言数、判据出处都按文件实际内容核过才写)。
 ⚠ 本批改的两个 js/mjs 文件 prettier `--check` 全绿;`README.md` 报 warn **不是本批引入**:把 HEAD 版放进**未被 `.gitignore` 忽略**的目录 `pc4/` 再 check,并同放一条故意打坏的 `CTRL.js` 证明检测器在那儿真在跑 ⇒ HEAD 的 README 本来就不合排,按 `.prettierignore` 头部口径不顺手重排(它也不在 `lint-staged` 的 glob 里,pre-commit 不会动它)。
 
+### 顺带修的一条发布脚本口径(`scripts/release.sh` 第 2 步后端预检)
+
+- **现场**:第一次 `bash scripts/release.sh --no-deploy` 停在 **2/9 ⇒ `RELEASE_FAILED`**。预检查出后端有差异(上一批 C9 的 `lib/chat.js` / `src/shared/chat-words.mjs` **只合未发**,差异一直悬着),然后用「stdin 非交互又没 `--yes` ⇒ 后端同步会在部署阶段 exit 4」这条理由**无条件**拦下了一次本来零风险的归档。可 `--no-deploy` 的第 8/9 步整体跳过,**后端同步根本不发生**。
+- **改法**:判据按「这次会不会碰服务器」分档 —— `NO_DEPLOY=1` 时打印"本次不碰服务器 ⇒ 继续",并**照样提醒**这些后端差异仍悬在线外、等真部署那次一起同步;真部署那一路(没给 `--yes` 且非交互)**一字未动**。
+- **反向验证**(`.tmp/rv-precheck.cjs`;手法是**把真文件里那一段逐字切出来跑**,只替换 `backend-sync.sh` 的调用路径为桩,切片前先断言"新判据确实在这段里"):五个场景 5/5 与期望一致 —— A `--no-deploy`+差异+非交互 ⇒ 继续 / **B 真部署无 `--yes`+差异+非交互 ⇒ 照旧 exit 1(这条是"放宽有没有放宽过头"的正证)** / C `--yes` ⇒ 继续 / D 一致 ⇒ 继续 / E 判不了 ⇒ 继续;另加一条 **CTRL 桩自证**(桩 `exit 9` 必须原样出现在结论里,否则报 `STUB_NOT_WIRED` 而不是报"通过")。
+- **这次拦停顺带查出来的一件事**:上一批那条 docs 登记 `84bc474`(PR #40 的发布证据)**从来没推上 GitHub** —— `git merge-base --is-ancestor 84bc474 origin/main` 实测 **rc=1**,而 `origin/main..HEAD` 数出 **3 个提交**才是这次要发的内容。⇒ 也就是"证据写进了本地 main,但本地 main 已经不再与远端同源"。本批的 PR 会把那条 docs 一起带进去(它不改任何运行期代码)。**口径:登记完不等于存档完 —— 只有 `origin/main` 上有才算。**
+
 ### 门禁(全在这棵树上)
 
 eslint **0** / `tsc --noEmit` **0** / **checkJs 116 = 基线**(一字未动,且按文件数了一遍:`late-planets.js` 与 `visit-timers.mjs` **零条**;报错榜前八名与第十刀之后那张表逐字相同 ⇒ 不是"减一条又长一条")/ vitest **1257 项 / 108 文件**(上一批 1239/106,+18 项 +2 文件全来自本批判据;全量跑 `×` 行 0 条)/ `npm test` 七条 **7/22/31/108/46/20/6 = 240 项 0 失败**(test-backup 从 30 涨到 31 是上一批自己补的那条执行位断言,与本批无关)/ `vite build` 0 且三条构建断言照旧(**48 prefetch** / 入口不含 three / 无 importmap)/ `npm run depcruise` 0 违规(**412 modules / 1418 deps**,较上批 +3/+6 = 新模块 + 两个判据文件及其 import 边)/ 四条 CI 闸门全 exit 0(hill-solo 通过、`CSP_REGISTRY_OK` 4 条、后端清单 **52 可达 · 54 清单**、探针隔离扫 **150** 脚本·豁免 8 —— 新探针自带 `GATE_DATA_FILE`,是被扫到的第 150 个)。
