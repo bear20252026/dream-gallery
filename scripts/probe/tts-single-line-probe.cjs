@@ -13,7 +13,7 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
   const page = await (await b.newContext({ viewport: { width: 1280, height: 800 } })).newPage();
   await page.addInitScript(() => {
     for (const k of ['agreementConsented', 'privacyConsented', 'communityConsented'])
-      sessionStorage.setItem('1' && k, '1');
+      sessionStorage.setItem(k, '1');
     window.__playLog = [];
     window.__samples = [];
     const origPlay = Audio.prototype.play;

@@ -99,7 +99,9 @@ function stat(ev, text, voice, extra) {
     if (!statTimer) {
       statTimer = setTimeout(flushStats, 10000);
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[dialog-voice] 统计入队异常(不扰播放,但这条取证就丢了)', e);
+  }
 }
 function flushStats() {
   statTimer = null;
@@ -112,7 +114,9 @@ function flushStats() {
       body: JSON.stringify({ events }),
       keepalive: true,
     }).catch(() => {});
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[dialog-voice] 统计上报组装异常(埋点通道,不影响语音)', e);
+  }
 }
 
 export function stopSpeaking() {
@@ -121,7 +125,9 @@ export function stopSpeaking() {
       // 掐断统计(2026-09-26):正在播的行被顶 = 主人只听到半句(直接量化「放太快」)
       if (!cur.paused && cur._statText) stat('cut', cur._statText, cur._statVoice);
       cur.pause();
-    } catch (e) {}
+    } catch (e) {
+      console.warn('[dialog-voice] 顶断旧行时 pause() 异常(不拦断,置空照做)', e);
+    }
     cur = null; // 置空:被顶掉的旧行其 AbortError 不再触发重试(重试仅限"未替换"场景)
   }
 }

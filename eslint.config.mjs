@@ -12,14 +12,19 @@ export default [
       'three.mjs', 'scripts/artifacts/**', '**/*.min.js',
       // 远方山丘:独立的 TypeScript 子项目(自带 tsc/vitest),产物在 public/hill/
       'hill-src/**', 'public/hill/**',
+      // basis 转码器是三方 vendored 产物(emscripten 生成,几 MB,不该由本仓的查错器负责)
+      'public/basis/**',
     ],
   },
   // 前端浏览器模块
   {
-    files: ['src/**/*.js', 'data.js'],
+    files: ['src/**/*.js', 'src/**/*.mjs', 'data.js'],
     languageOptions: {
       ecmaVersion: 2022, sourceType: 'module',
-      globals: { ...globals.browser, Sentry: 'readonly', __B612_BUILD__: 'readonly' },
+      // __B612_BUILD__ 不在这里声明:唯一的读数点 src/shared/build-info.mjs 自己在文件头写了
+      // `/* global __B612_BUILD__ */`,两处都写会撞 no-redeclare(而 no-redeclare 报的是"声明重复",
+      // 不是"谁对"—— 留着内联那句更能说明"这常量由 vite define 注入、不经构建跑源码时是 undefined")
+      globals: { ...globals.browser, Sentry: 'readonly' },
     },
     rules: {
       ...js.configs.recommended.rules,
@@ -35,14 +40,26 @@ export default [
   // 禁止静默吞错——排障要有迹可循(9-10 对话链断链排障成本高的教训)。
   // 其余目录维持 allowEmptyCatch:true,待后续分批治理;新增空 catch 一律先写 debug 日志。
   {
-    files: ['src/core/**/*.js'],
+    files: ['src/core/**/*.js', 'src/core/**/*.mjs'],
     rules: {
       'no-empty': ['error', { allowEmptyCatch: false }],
     },
   },
   // 后端与脚本(CommonJS;探针/测试里有 page.evaluate 浏览器代码,故同时放行浏览器全局)
   {
-    files: ['server.js', 'lib/**/*.js', 'scripts/**/*.js', 'vite.config.js'],
+    files: [
+      'server.js',
+      'landing-server.js',
+      'live-verify.cjs',
+      'vitest.config.js',
+      'eslint.config.mjs',
+      '.dependency-cruiser.cjs',
+      'lib/**/*.js',
+      'lib/**/*.mjs',
+      'scripts/**/*.{js,mjs,cjs}',
+      'tools/*.js',
+      'vite.config.js',
+    ],
     languageOptions: {
       ecmaVersion: 2022,
       // 2026-08-31:scripts/ 下探针混用 ESM(import)与 CJS(require),统一按 module 解析;
@@ -60,7 +77,7 @@ export default [
   },
   // 单元测试(src/__tests__):vitest + Node 环境,需要 process/setImmediate/require 等
   {
-    files: ['src/__tests__/**/*.js'],
+    files: ['src/__tests__/**/*.js', 'src/__tests__/**/*.mjs'],
     languageOptions: {
       ecmaVersion: 2022, sourceType: 'module',
       globals: { ...globals.node, ...globals.browser },
@@ -71,5 +88,20 @@ export default [
   {
     files: ['vite.config.js'],
     languageOptions: { sourceType: 'module' },
+  },
+  // 服务工作线程:global 是 serviceworker,不是 browser(它没有 window/document)。
+  // 这条不是补风格 —— 后台凭据落盘事故(sw.js 的 /admin-media 漏拦)就出在这个文件,而它此前一条规则都没收到。
+  {
+    files: ['public/sw.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: { ...globals.serviceworker },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      'no-unused-vars': 'off',
+      'no-empty': ['error', { allowEmptyCatch: true }],
+    },
   },
 ];

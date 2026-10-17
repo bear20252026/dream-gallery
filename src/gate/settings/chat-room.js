@@ -3,6 +3,9 @@ import { Z } from '../../shared/z-layers.mjs';
 import { ctx } from '../../ctx.js';
 import { askConsent } from '../consent-session.js';
 import { byIdInput } from '../../shared/dom-typed.js'; // #chatInput 是 <input>(index.html),.value 只在 HTMLInputElement 上
+// 召唤词与后端同源(2026-10-17 审计 C9):界面教的词必须就是后端认的词,否则"照屏幕打字=死按钮"
+import * as CHAT_WORDS from '../../shared/chat-words.mjs';
+const BOT_HINT = '@' + CHAT_WORDS.BOT_TRIGGERS[0] + ' 可召唤它回答';
 
 const chatOv = document.createElement('div');
 chatOv.id = 'chatOv';
@@ -14,7 +17,9 @@ const chatCard = document.createElement('div');
 chatCard.style.cssText =
   'width:min(520px,92vw);max-height:82vh;display:flex;flex-direction:column;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:16px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)';
 chatCard.innerHTML =
-  '<div style="display:flex;align-items:center;margin-bottom:8px"><b style="letter-spacing:2px;font-size:15px">B612回声壁</b><span style="font-size:10px;color:rgba(255,217,168,.55);margin-left:8px">全员共壁 · 留最近 100 条 · @B612之灵 可召唤它回答</span><span id="chatX" style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.55);padding:2px 8px;font-size:14px">✕</span></div>' +
+  '<div style="display:flex;align-items:center;margin-bottom:8px"><b style="letter-spacing:2px;font-size:15px">B612回声壁</b><span style="font-size:10px;color:rgba(255,217,168,.55);margin-left:8px">全员共壁 · 留最近 100 条 · ' +
+  BOT_HINT +
+  '</span><span id="chatX" style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.55);padding:2px 8px;font-size:14px">✕</span></div>' +
   '<div id="chatMsgs" style="flex:1;min-height:220px;max-height:54vh;overflow-y:auto;padding:8px;background:rgba(0,0,0,.25);border-radius:12px"></div>' +
   '<div style="display:flex;gap:6px;margin-top:8px"><input id="chatInput" maxlength="140" placeholder="说一句…(140字内)" style="flex:1;min-width:0;padding:9px 13px;border-radius:16px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff;font-size:13px;outline:none">' +
   '<button id="chatSend" style="padding:9px 16px;border:none;border-radius:16px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;font-size:13px;cursor:pointer">发</button></div>';
@@ -104,7 +109,7 @@ async function sendChat() {
     }
     inp.value = '';
     loadChat();
-    if (/@(B612之灵|机器人|bot)/i.test(text)) setTimeout(loadChat, 6000);
+    if (CHAT_WORDS.triggerRe().test(text)) setTimeout(loadChat, 6000);
   } catch (e) {
     ctx.ui.modeToast && ctx.ui.modeToast('网络开了个小差');
   }

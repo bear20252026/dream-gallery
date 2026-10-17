@@ -1,0 +1,381 @@
+// test-backup.js — 备份脚本的离线演练(2026-10-17,外部审计 C1 整改)
+//
+// 为什么必须有这条:旧版 tools/backup-gallery.sh 把 tar 失败用 `2>/dev/null || true` 整个吞掉,下一行
+// **无条件轮转** —— 于是"今天没备成"与"备成了"在 cron 日志里长成同一句话,而第 14 份完好备份照删。
+// 而且旧版把 G/B 写死在脚本里,**没有任何注入口**,所以这类失败当年根本没法离线验证(这才是它活到今天的成因)。
+// 新版加了 GALLERY_DIR/BACKUP_DIR/TAR_BIN/SQLITE_BIN/KEEP_*/REQUIRED/REQUIRE_DB 七个注入口,本文件就用它们
+// 把"必须响亮的六条路径"逐条打红,并用 **HEAD 版当对照组**证明"旧版在这些条件下会报成功"。
+//
+// 全程不碰生产:夹具落在系统临时目录,不联网、不起 server.js、不读 /opt。
+// 跑法:node scripts/test/test-backup.js
+const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+const ROOT = path.resolve(__dirname, '..', '..');
+const SCRIPT = path.join(ROOT, 'tools', 'backup-gallery.sh');
+// 两套路径:**fs 用 Windows 原路径,bash/tar 用 MSYS 路径** —— Git Bash 自带的 bsdtar 把 `C:/…` 读成
+// "远端 host:path"(报 Cannot connect to C:),只认 `/c/…`;Linux(CI)本来就是后者,转换在 Linux 上是 no-op。
+const FS_TMP = path.join(os.tmpdir(), 'dg-backup-test');
+const FS_BAK = path.join(os.tmpdir(), 'dg-backup-test-bk');
+const msys = (p) =>
+  p.replace(/\\/g, '/').replace(/^([A-Za-z]):\//, (m, d) => '/' + d.toLowerCase() + '/');
+const TMP = msys(FS_TMP);
+const BAK = msys(FS_BAK);
+const OLD = path.join(ROOT, '.tmp', 'backup-gallery.head.sh');
+const SCRIPT_SH = msys(SCRIPT);
+const OLD_SH = msys(OLD);
+
+let pass = 0;
+let fail = 0;
+const ok = (name, cond, extra) => {
+  if (cond) {
+    pass++;
+    console.log('  ✓ ' + name);
+  } else {
+    fail++;
+    console.log('  ✗ ' + name + (extra === undefined ? '' : '  → ' + extra));
+  }
+};
+
+const sh = (cmd, env) =>
+  spawnSync('bash', ['-c', cmd], {
+    encoding: 'utf8',
+    cwd: ROOT,
+    env: Object.assign({}, process.env, env || {}),
+    timeout: 180000,
+  });
+
+const DAY = sh('date +%Y%m%d').stdout.trim();
+
+function resetFixture(keepOldBackups) {
+  fs.rmSync(FS_TMP, { recursive: true, force: true });
+  if (!keepOldBackups) fs.rmSync(FS_BAK, { recursive: true, force: true });
+  const w = (rel, text) => {
+    const p = path.join(FS_TMP, rel);
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p, text);
+  };
+  fs.mkdirSync(path.join(FS_TMP, 'photos'), { recursive: true });
+  fs.mkdirSync(path.join(FS_TMP, 'music'), { recursive: true });
+  w('gate_data.json', '{"applicants":{}}');
+  w('gate_data.db', 'SQLITE-DUMMY');
+  w('gate_data.db-wal', 'WAL');
+  w('gate_data.db-shm', 'SHM');
+  w('.r2-outbox.json', '{"entries":[]}');
+  w('data.js', 'window.P=[];');
+  w('server.js', '//');
+  w('package.json', '{}');
+  w('index.html', '<html></html>');
+  w('admin.html', '<html></html>');
+  w('guide.html', '<html></html>');
+  w('whiteboard.html', '<html></html>');
+  w('music.html', '<html></html>');
+  w('agreement.html', '<html></html>');
+  w('privacy.html', '<html></html>');
+  w('community.html', '<html></html>');
+  w('docs.html', '<html></html>');
+  w('ADMIN_GUIDE.md', '#');
+  w('AGENTS.md', '#');
+  w('lib/store.js', '//');
+  w('scripts/admin/table-parity.cjs', '//');
+  w('src/state/store-api.js', '//');
+  w('photos/p.txt', 'x');
+  w('music/m.txt', 'x');
+  fs.mkdirSync(path.join(FS_TMP, 'questions'), { recursive: true });
+  fs.mkdirSync(path.join(FS_TMP, 'videos'), { recursive: true });
+  w('videos/v.txt', 'x');
+  fs.mkdirSync(path.join(FS_BAK, 'daily'), { recursive: true });
+  fs.mkdirSync(path.join(FS_BAK, 'weekly'), { recursive: true });
+}
+
+function seedOldArchives(n, mid, sub) {
+  for (let i = 1; i <= n; i++) {
+    fs.writeFileSync(path.join(FS_BAK, sub, `gallery-${mid}-2026010${i}.tar.gz`), 'OLD' + i);
+  }
+}
+
+const runNew = (extraEnv) =>
+  sh(
+    `bash '${SCRIPT_SH}' daily`,
+    Object.assign({ GALLERY_DIR: TMP, BACKUP_DIR: BAK }, extraEnv || {})
+  );
+
+const members = () => {
+  const f = path.join(FS_BAK, 'daily', `gallery-data-${DAY}.tar.gz`);
+  if (!fs.existsSync(f)) return null;
+  const r = sh(`tar tzf '${msys(f)}'`);
+  return r.status === 0 ? r.stdout.split(/\r?\n/).filter(Boolean) : { unreadable: true };
+};
+
+console.log('=== 备份脚本离线演练(夹具在临时目录,不碰生产)===' + DAY);
+
+// ---------- ① 正常路径 ----------
+resetFixture(false);
+seedOldArchives(3, 'data', 'daily');
+{
+  // 这条走 **hot-copy 分支**(SQLITE_BIN 指到不存在的程序 ⇒ 不收口,wal/shm 原样进档)。
+  // checkpointed 分支由 ⑧ 单独覆盖:那边 sqlite3 把 WAL 并回主库并删掉 -wal/-shm,归档里没有它们才是对的。
+  const r = runNew({ KEEP_DAILY: '2', SQLITE_BIN: 'no-such-sqlite-on-this-box' });
+  const line = (r.stdout || '') + (r.stderr || '');
+  ok(
+    '正常备份 BACKUP_OK',
+    r.status === 0 && /BACKUP_OK/.test(line),
+    'status=' + r.status + ' out=' + line.slice(0, 160)
+  );
+  ok('不收口时结论行如实报 dbmode=hot-copy', /dbmode=hot-copy/.test(line), line.slice(0, 120));
+  const m = members() || [];
+  const need = [
+    'gate_data.db',
+    'gate_data.db-wal',
+    'gate_data.db-shm',
+    'gate_data.json',
+    '.r2-outbox.json',
+    'data.js',
+    'scripts/admin/table-parity.cjs',
+  ];
+  const miss = need.filter((x) => !m.includes(x));
+  ok(
+    '恢复集含权威 SQLite 三件 + 镜像 + R2 台账 + data.js + scripts',
+    miss.length === 0,
+    '缺:' + miss.join(',')
+  );
+  const kept = fs
+    .readdirSync(path.join(FS_BAK, 'daily'))
+    .filter((f) => f.endsWith('.tar.gz')).length;
+  ok('轮转按 KEEP_DAILY=2 收(新档 + 1 份旧的)', kept === 2, '实际份数=' + kept);
+  ok(
+    '.part 不留在盘上',
+    !fs.existsSync(path.join(FS_BAK, 'daily', `gallery-data-${DAY}.tar.gz.part`))
+  );
+}
+
+const strays = () => {
+  const d = path.join(FS_BAK, 'daily');
+  return fs.existsSync(d)
+    ? fs.readdirSync(d).filter((f) => f.endsWith('.part') || f.endsWith('.err'))
+    : [];
+};
+
+// ---------- ② tar 真失败:要响亮,且**不许轮转** ----------
+resetFixture(false);
+seedOldArchives(12, 'data', 'daily');
+{
+  // 替身 tar:写个空文件然后按 2 退出(模拟致命打包错误)
+  const stubWin = path.join(ROOT, '.tmp', 'tar-fail.sh');
+  const stub = msys(stubWin);
+  fs.writeFileSync(stubWin, '#!/bin/bash\nexit 2\n');
+  const r = runNew({ TAR_BIN: stub, KEEP_DAILY: '2' });
+  const line = (r.stdout || '') + (r.stderr || '');
+  ok(
+    'tar 致命失败 ⇒ BACKUP_FAILED + 非零退出',
+    r.status !== 0 && /BACKUP_FAILED/.test(line),
+    'status=' + r.status + ' out=' + line.slice(0, 120)
+  );
+  const n = fs.readdirSync(path.join(FS_BAK, 'daily')).filter((f) => f.endsWith('.tar.gz')).length;
+  ok('失败时**没有**轮转(12 份完好旧档一份没被顶掉)', n === 12, '实际=' + n);
+  ok(
+    '失败时没有当日档冒充成功',
+    !fs.existsSync(path.join(FS_BAK, 'daily', `gallery-data-${DAY}.tar.gz`))
+  );
+  ok(
+    '失败路径不留半截 .part / .err 在盘上(残骸会让下一次 ENOSPC 更容易发生)',
+    strays().length === 0,
+    strays().join(',')
+  );
+}
+
+// ---------- ③ 残缺/读不了的归档:验看必须拦住 ----------
+{
+  resetFixture(false);
+  seedOldArchives(12, 'data', 'daily');
+  const stubWin = path.join(ROOT, '.tmp', 'tar-garbage.sh');
+  const stub = msys(stubWin);
+  // 替身:"打包成功"(exit 0)但产物不是合法 gzip —— 这正是 tar 中途被 ENOSPC 咬断的形状
+  fs.writeFileSync(
+    stubWin,
+    '#!/bin/bash\nfor ((i=1;i<$#;i++)); do a="${@:i:1}"; [[ "$a" == czf ]] && { printf NOTGZIP > "${@:((i+1)):1}"; break; }; done\nexit 0\n'
+  );
+  const r = runNew({ TAR_BIN: stub, KEEP_DAILY: '2' });
+  const line = (r.stdout || '') + (r.stderr || '');
+  // 原因允许 archive-unreadable 或 archive-empty 二选一:Windows 的 bsdtar 对"文件存在但不是 gzip"
+  // 有时 exit 0 且列出 0 条(实测),Linux 的 GNU tar 会 exit≠0 —— **两种都能被接住才是这条判据的意义**
+  // (判据不能只认本机的工具行为,否则 CI 上会变成假红)。
+  ok(
+    '产物是残缺档 ⇒ BACKUP_FAILED(unreadable 或 empty 都算接住)',
+    r.status !== 0 && /archive-(unreadable|empty)/.test(line),
+    'status=' + r.status + ' out=' + line.slice(0, 140)
+  );
+  ok(
+    '残缺档没有上位成当日档',
+    !fs.existsSync(path.join(FS_BAK, 'daily', `gallery-data-${DAY}.tar.gz`))
+  );
+  ok(
+    '残缺档同样不轮转旧档',
+    fs.readdirSync(path.join(FS_BAK, 'daily')).filter((f) => f.endsWith('.tar.gz')).length === 12
+  );
+}
+
+// ---------- ④ 权威 DB 缺席:宁可不备也不用好档去换 ----------
+{
+  resetFixture(false);
+  fs.rmSync(path.join(FS_TMP, 'gate_data.db'));
+  seedOldArchives(5, 'data', 'daily');
+  const r = runNew({});
+  ok(
+    'gate_data.db 缺席 ⇒ REQUIRE_DB=1 拒跑(exit 8)',
+    r.status === 8 && /authoritative-db-missing/.test((r.stdout || '') + (r.stderr || '')),
+    'status=' + r.status
+  );
+  ok(
+    '拒跑时旧档一份没动',
+    fs.readdirSync(path.join(FS_BAK, 'daily')).filter((f) => f.endsWith('.tar.gz')).length === 5
+  );
+  const r2 = runNew({ REQUIRE_DB: '0' });
+  ok(
+    '纯 JSON 部署显式 REQUIRE_DB=0 才照跑',
+    r2.status === 0 && /BACKUP_OK/.test(r2.stdout || ''),
+    'status=' + r2.status
+  );
+}
+
+// ---------- ⑤ 必检成员这条判据确实咬人 ----------
+{
+  resetFixture(false);
+  const r = runNew({ REQUIRED: 'never-looked-like-this.txt' });
+  ok(
+    '必检成员不在归档里 ⇒ exit 5 点名',
+    r.status === 5 && /archive-missing-required/.test((r.stdout || '') + (r.stderr || '')),
+    'status=' + r.status
+  );
+}
+
+// ---------- ⑥ 对照组:HEAD 版在同一夹具下的表现(证明旧版是假成功) ----------
+{
+  const show = spawnSync('git', ['show', 'HEAD:tools/backup-gallery.sh'], {
+    cwd: ROOT,
+    encoding: 'utf8',
+  });
+  if (show.status !== 0) {
+    console.log('  ⚠ 取不到 HEAD 版脚本,对照跳过(不当成通过)');
+  } else {
+    // 旧版把 G/B 写死(这正是它测不了的原因)——对照实验里只改这两行,其余一字不动
+    const patched = show.stdout
+      .replace(/^G=\/opt\/gallery$/m, 'G=' + TMP)
+      .replace(/^B=\/opt\/backups$/m, 'B=' + BAK);
+    fs.writeFileSync(OLD, patched);
+    // a) 夹具里删掉一批旧版硬编码会打包的路径 ⇒ tar 必然致命失败
+    resetFixture(false);
+    seedOldArchives(12, 'data', 'daily');
+    fs.rmSync(path.join(FS_TMP, 'photos'), { recursive: true });
+    fs.rmSync(path.join(FS_TMP, 'music'), { recursive: true });
+    fs.rmSync(path.join(FS_TMP, 'gate_data.json'));
+    fs.rmSync(path.join(FS_TMP, 'src'), { recursive: true });
+    const oldRun = sh(`bash '${OLD_SH}' daily`);
+    const oldLine = (oldRun.stdout || '') + (oldRun.stderr || '');
+    const newRun = sh(`bash '${SCRIPT_SH}' daily`, {
+      GALLERY_DIR: TMP,
+      BACKUP_DIR: BAK,
+      REQUIRE_DB: '0',
+    });
+    ok(
+      '★ A/B 决定性一条:同一夹具下旧版报"成功"(exit 0),新版报 BACKUP_FAILED',
+      oldRun.status === 0 &&
+        /backup daily done/.test(oldLine) &&
+        newRun.status !== 0 &&
+        /BACKUP_FAILED/.test((newRun.stdout || '') + (newRun.stderr || '')),
+      '旧 status=' + oldRun.status + ' 新 status=' + newRun.status
+    );
+    // b) 旧版归档里没有 SQLite 权威库(即使它跑成功的那次)
+    resetFixture(false);
+    const oldOk = sh(`bash '${OLD_SH}' daily`);
+    const f = path.join(FS_BAK, 'daily', `gallery-data-${DAY}.tar.gz`);
+    const m = fs.existsSync(f) ? sh(`tar tzf '${msys(f)}'`).stdout.split(/\r?\n/) : [];
+    ok(
+      '★ A/B 第二条:旧版即使打包成功,归档里也没有 gate_data.db(R2 台账/data.js 同样没有)',
+      oldOk.status === 0 &&
+        !m.includes('gate_data.db') &&
+        !m.includes('.r2-outbox.json') &&
+        !m.includes('data.js'),
+      'members=' + m.slice(0, 6).join(',')
+    );
+    const newOk = sh(`bash '${SCRIPT_SH}' daily`, { GALLERY_DIR: TMP, BACKUP_DIR: BAK });
+    const nm = members() || [];
+    ok(
+      '新版同夹具包含这三件',
+      newOk.status === 0 &&
+        nm.includes('gate_data.db') &&
+        nm.includes('.r2-outbox.json') &&
+        nm.includes('data.js')
+    );
+  }
+}
+
+// ---------- ⑦ weekly 路径也走同一套判定 ----------
+{
+  resetFixture(false);
+  seedOldArchives(4, 'videos', 'weekly');
+  const r = sh(`bash '${SCRIPT}' weekly`, {
+    GALLERY_DIR: TMP,
+    BACKUP_DIR: BAK,
+    KEEP_WEEKLY: '2',
+    REQUIRED: 'videos',
+  });
+  const line = (r.stdout || '') + (r.stderr || '');
+  ok(
+    'weekly 成功并收拢到 2 份',
+    r.status === 0 && /BACKUP_OK mode=videos/.test(line),
+    'status=' + r.status + ' out=' + line.slice(0, 140)
+  );
+  ok(
+    'weekly 轮转后剩 KEEP_WEEKLY=2',
+    fs.readdirSync(path.join(FS_BAK, 'weekly')).filter((f) => f.endsWith('.tar.gz')).length === 2
+  );
+}
+
+// ---------- ⑧ checkpoint 会"吃掉"-wal/-shm ⇒ 清单必须在它之后采(2026-10-17 写测试时当场撞出的自伤) ----------
+{
+  resetFixture(false);
+  const stubWin = path.join(ROOT, '.tmp', 'sqlite-eats-wal.sh');
+  fs.writeFileSync(
+    stubWin,
+    '#!/bin/bash\n# 真 sqlite3 的 wal_checkpoint(TRUNCATE) 之后,SQLite 会把 -wal / -shm 一并删掉(它们是临时文件)\nrm -f "$(dirname "$1")/gate_data.db-wal" "$(dirname "$1")/gate_data.db-shm"\nexit 0\n'
+  );
+  const r = runNew({ SQLITE_BIN: msys(stubWin), REQUIRED: 'gate_data.db' });
+  const line = (r.stdout || '') + (r.stderr || '');
+  ok(
+    'checkpoint 之后 -wal 消失 ⇒ 备份仍须成功(清单在它之后采)',
+    r.status === 0 && /BACKUP_OK/.test(line),
+    'status=' + r.status + ' out=' + line.slice(0, 200)
+  );
+  ok(
+    '结论行报 dbmode=checkpointed(而不是偷偷说 hot-copy)',
+    /dbmode=checkpointed/.test(line),
+    line.slice(0, 120)
+  );
+  const m = members() || [];
+  ok('归档里仍有主库 gate_data.db', m.includes('gate_data.db'), m.slice(0, 6).join(','));
+  // 反向验证:这条"checkpoint 必须在采清单之前"的顺序判据必须有可能失败。
+  // 做法不是改脚本(那会碰运行期),而是把同一个谓词喂给一份**故意把两个标记调换**的副本 ——
+  // 谓词在真脚本上判"顺序正确",在调换版上必须判"顺序错误",否则它就是在空转。
+  const orderOf = (src) => {
+    const a = src.indexOf('wal_checkpoint(TRUNCATE)');
+    const b = src.indexOf('$(pick');
+    return a >= 0 && b >= 0 && a < b;
+  };
+  const src = fs.readFileSync(SCRIPT, 'utf8');
+  const swapped = src
+    .replace('wal_checkpoint(TRUNCATE)', '\u0000CHK\u0000')
+    .replace('$(pick', 'wal_checkpoint(TRUNCATE)')
+    .replace('\u0000CHK\u0000', '$(pick');
+  ok('顺序判据在真脚本上成立(checkpoint 早于采清单)', orderOf(src) === true);
+  ok(
+    '★ 顺序判据在调换版上必须判假(证明它会咬人)',
+    orderOf(swapped) === false,
+    '调换版判定=' + orderOf(swapped)
+  );
+}
+
+console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
+process.exit(fail === 0 ? 0 : 1);

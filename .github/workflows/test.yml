@@ -131,6 +131,15 @@ jobs:
         # 前置断言红、旧的那句"从 SQLite 完整恢复"照样绿(正是审计说的"看起来在判,其实没判")。
         run: node scripts/test/test-store-sqlite.js
 
+      - name: Backup script rehearsal (BLOCKING — 备份失败必须响亮,恢复集必须含权威存储)
+        # 2026-10-17 外部审计 C1:旧 backup-gallery.sh 用 `2>/dev/null || true` 吞掉 tar 失败,下一行无条件轮转
+        # ⇒ "今天没备成"和"备成了"在 cron 日志里同一句话,还会顶掉第 14 份完好备份;而且恢复集只有
+        # gate_data.json,**2026-09-01 起权威存储是 SQLite gate_data.db(WAL)。**
+        # 这条演练走 GALLERY_DIR/BACKUP_DIR/TAR_BIN/SQLITE_BIN 注入口在临时目录里跑,不碰生产;
+        # 两个分支(hot-copy / checkpointed)都覆盖,并带一条**调换顺序的副本反证**证明顺序判据会咬人。
+        # 只加 step 不加 job(同上条纪律)。
+        run: node scripts/test/test-backup.js
+
       - name: Backend API regression (127 assertions - data validation / security boundaries / quiz gate / approval gate)
         run: node scripts/test/test.js
 

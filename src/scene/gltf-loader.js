@@ -65,13 +65,22 @@ export function createGLTFLoader() {
     const resolved = manager.resolveURL(url);
     const viaCdn = resolved !== url;
     origLoad(resolved, onLoad, onProgress, (err) => {
-      if (viaCdn && !window.__modelCdnDown) {
-        window.__modelCdnDown = true; // 本会话后续请求全部直连源站
-        console.warn('[gltf] CDN 模型失联,本会话回退源站:', url);
-        origLoad(url, onLoad, onProgress, onError);
-      } else if (onError) {
-        onError(err);
+      if (!viaCdn) {
+        if (onError) onError(err);
+        return;
       }
+      // ⚠️2026-10-17 审计 C3:重试曾经绑在 `!window.__modelCdnDown`(旗**刚**被这次失败立起来)上。
+      // 开机是一批请求并发飞的:第一个失败者立旗并重试成功,**其余在途的请求**失败时旗已经是 true,
+      // 于是直接落进 onError —— 而绝大多数调用点的 onError 只 console.warn(planets.js:194/525/551、
+      // dome-towers.js:69、fountains.js:284、crash-site.js:214、scene.js:588)⇒ **一轮 CDN 抖动 =
+      // 当轮 9/10 个模型静默缺席**,重载还复现(旗随刷新重置,而 THREE.Cache 是关的)。
+      // 现在把两件事分开:旗只管"此后新建的请求直接走源站",而"每个经 CDN 的请求都拿到它那一次源站重试"
+      // 与旗的新旧无关。重试只有一次(origLoad 第二次的失败一律交给调用方),不会自己转圈。
+      if (!window.__modelCdnDown) {
+        window.__modelCdnDown = true;
+        console.warn('[gltf] CDN 模型失联,本会话回退源站:', url);
+      }
+      origLoad(url, onLoad, onProgress, onError);
     });
   };
   return loader;
