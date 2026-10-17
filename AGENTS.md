@@ -927,6 +927,174 @@ PR4 = **已落地(见上一节)**:M-19(`deps`/`depcruise` 入口补上 `server.j
   属于独立一批,不为了"看起来更严"先动声明。
 
 
+## 2026-10-16 温柔度面板·收尾批：剩余四问按拍板落地 + ✕ 换成 button（不部署）
+
+上一批登记末尾留了五件"本批没做的"。主人把这四问一次性拍板（都选了推荐档），逐条记来源，免得下一个人再问一遍：
+
+- **本批未提交的代码** ⇒ 建分支走 PR 合入 main，**不部署**（默认模式玩家看不到这面板，上线零收益；但代码必须先存档，否则下一刀会盖掉这棵树）。
+- **默认模式可见性** ⇒ **不动**。`LEGACY_MODULE_IDS` 里 `'quiz'` 仍在，他自己先用 `?legacy=1` 走一遍再谈。那两行改动仍然候着，仍然**等一句话**。
+- **英文译本** ⇒ **本批不译**（默认模式没读者；译本选哪一版是他的文学决定，M-09 同口径）。
+- **三笔小账** ⇒ 只做 `.gtClose` 无障碍这一笔。
+
+### 落地（四处，只有一处是运行期行为变更）
+
+- `index.html`：`<div class="gtClose">&times;</div>` ⇒ `<button type="button" class="gtClose" id="gtCloseBtn" aria-label="Close">`。
+- `src/styles/main.css` 的 `.gtClose`：补 `background:none / border:0 / padding:0 / font-family:inherit / line-height:1` —— **`<button>` 不吃这些默认值**，不摘就会凭空长出一层按钮外观（实测摘干净后计算样式是 `rgba(0, 0, 0, 0)` + `0px none`，几何 12×20 仍在面板内）。
+  ⚠️**焦点环不是我新写的**：`main.css:610` 那条 `button:focus-visible`（2026-08-22 无障碍层 P3-4）**本来就管不到这个 ✕**，正因为它当时是 div。这笔改动的全部意义在这条既有规则能不能命中。
+- `src/ui/i18n-dom.js`：给 `#gtCloseBtn` 登记 `aria-label` 双语。这是**新增界面文字**，按 2026-10-03「以后加界面文字一律走 tt / i18nText」必须双语；**没有借机代拟面板判词的英文**（上一条拍板是不译）。
+- `src/gate/quiz.js` 的 `x: '.gtClose'` **一字未动**：`overlay.js:74` 用 `e.target.closest(cfg.x)` 委托，按钮一样命中。
+
+### 判据 +2（`gentle-panel-wiring.test.js` 20 ⇒ 22 项）
+
+①✕ 必须是 `BUTTON` + `type="button"` + `id="gtCloseBtn"` + 非空 `aria-label`，且 overlay 的 `x` 仍指 `.gtClose`（改名等于拆掉 ✕）；②`aria-label` 的双语必须住在 `i18n-dom.js`，en/zh 两边都在 —— 防"只写在 markup 里的死字串"（换语言时读屏仍念旧语言）。
+
+### 反向验证 4 条（`.tmp/rv-gentle-a11y.cjs`）
+
+A1 漂回裸 `<div>` ⇒ **1 红** · A2 留着 id 摘掉 `aria-label` ⇒ **1 红** · A3 `x: '.gtClose'` 指错选择器 ⇒ **1 红** · A4 删掉 `i18n-dom.js` 那段双语登记 ⇒ **1 红**。**锚点未命中 0 / NO_RED 0 / 三份还原 md5 逐字一致**，收尾 22 项复绿。
+
+### 真浏览器实测（`.tmp/gt-close-a11y-check.cjs`，自起 :3319、数据根落临时目录）13/14
+
+过：`BUTTON/type=button/id/aria` · 默认英文站下读屏拿到英文名 · `.focus()` 后 `activeElement` 真的是它 · `tabIndex=0` · 零按钮外观 · 几何在面板内 · 鼠标点 ✕ 关得掉 · **焦点在 ✕ 上按 Enter 关得掉** · 点真语言钮后 `aria-label` 换成「关闭温柔度测试」· 零未捕获异常。
+
+🔴**唯一那条红（Space 关不掉）经对照组定性：是全站性的既有缺陷，不是本批引入。**
+`.tmp/gt-space-control.cjs` 拿**早就存在的** `#hudLang` 做对照：聚焦后按 Space ⇒ 语言**没翻**，按 Enter ⇒ 翻了。成因在 `src/scene/player.js:200-205` —— 跳跃绑定是 `if (e.code === 'Space' && !e.repeat) { jumpPressed = true; jumpHold = true; e.preventDefault(); }`，**无条件**取消默认，而按钮的 Space 激活按规范发生在 keyup 且要求 keydown 默认未被取消 ⇒ 全站按钮都按不动 Space，与这块面板无关。
+⚠️同一条绑定还量到第二个后果：**面板开着、焦点在 ✕ 上按 Space，玩家照样跳**（`pl.p.y` 0.044 ⇒ 1.164）⇒ 跳跃键不看"焦点是否在按钮/弹层里"。修法要在输入承重点上加一道焦点判断，**单独一批**，不在 a11y 收尾里顺手做。
+⇒ 所以这句话现在**能说且有实测背书**：这块面板给键盘用户的路是 **Enter 与 Esc 两条**，Space 不在内。
+
+### 门禁（全在这棵树上）
+
+eslint 0 / `tsc --noEmit` 0 / checkJs **116 = 基线**（一字未动）/ vitest **1219 项 / 104 文件**（+2 全来自本批判据，独跑零红、`AssertionError` 0、`timed out` 0）/ `npm test` 六条 7/22/108/46/20/6 = **209 项 exit 0** / `vite build` 0 且三条构建断言照旧（48 prefetch / 入口不含 three / 无 importmap）/ depcruise 0 违规 / 四条 CI 闸门全 exit 0（hill-solo 通过 / `CSP_REGISTRY_OK` 4 条 / 后端清单 51 可达·53 清单 / 探针隔离扫 149 脚本·豁免 8）/ prettier 四个改动文件 `--check` 全绿。
+⚠️**一条争用假崩按口径记**：`gentle-panel-probe` 第一次 **exit 2**，崩在第二遍（默认模式 `?legacy=0`）的 `enterWorld` 等 `getFPS()>0` 150s 超时；把 `PROBE_WAIT_MS=60000` 加上独跑复跑 **29/29 全绿**，且**崩之前第一遍 17 条断言（含「点 ✕ 关得掉」「Esc 也关得掉」）全过** ⇒ 判为争用不是回归（本机当时挂着约 19 个 node 进程，含 Qoder 自己的 MCP 服务，命令行读不到 ⇒ 不盲杀）。**崩与红是两种结论**，这次靠"同一棵树独跑复现绿"定的案，不是靠"我觉得机器慢"。
+
+### 这批仍然没做的（继续记账，不装成已完）
+
+①3D 墙面「墙在画廊里点得中」还是没有射线拾取证据（要模型在场 + 剧情夹具）；②墙面那盏 `PointLight('#ff8fab',2,4,1.5)` 与「零 PointLight / 手机灯光账」相冲，动它要重算手机灯光预算；③面板文案英文译本（归他定）；④默认模式对全部玩家开放（归他一句话）；⑤**新增**：跳跃键在按钮/弹层焦点下无条件 `preventDefault` 这一族（本批已定性到 `player.js:200-205`）。
+
+
+
+## 2026-10-16 温柔度面板接线：死 UI 给了入口，顺手把两份题库收成一份
+
+第九刀补记把这块 UI 定性成"从 2026-07-28 基线起就是死的"，并留下三个产品问题（谁按 / 结果给谁看 / 要不要存）。
+主人说「温柔度面板 接线 继续」= 三个问题按建议档自决并做完。**决定与理由**：
+
+- **谁按** = 菜单卡（`#gameMenu`）新增条目 `data-act="gentle"`，与星图 / 章节地图 / 作品集同一套入口口径。
+- **要不要存** = 存，但**只记录不分支**：新登记 store 键 `gentleTest` → `b612GentleTest`（json），形状 `{at,score,pct,answers}`，
+  照 `witness` 的先例（2026-10-04「答案只记录，眼下没有任何玩法读它」）。**不是**剧情检查点，所以刻意**不进** `STORY_CHECKPOINT_KEYS`
+  （写失败继续静默，不该为一个趣味测试弹"进度没存上"）。
+- **结果给谁看** = 只给玩家自己在结果页看；没有下发到服务端、不进后台报表（后台要读它得另开端点，属新功能）。
+- ⚠️**默认模式仍然不给玩家**：`LEGACY_MODULE_IDS` 里的 `'quiz'` 一字未动 ⇒ 默认连 `gate/quiz.js` 都不加载，
+  菜单条目也就不显示（2026-10-03「旧玩法先放一边」那条令是主人的，不由工程侧推翻）。
+  **要转默认对所有人可见 = 两行**：从 `src/shared/legacy.mjs` 的名单里摘掉 `'quiz'`，并把 `gameshell-system.js`
+  里 `gentleBtn.style.display = ctx.ui.gentleTest ? '' : 'none'` 这条按事实收敛的判据一起去掉。**等一句话，不顺手做。**
+
+### 先核实（读了才动）
+
+- 死因有两半，缺一半都修不好：①全仓（含 HTML/CSS）没有任何一处给 `#gtP` 加 `.show`，CSS `#gtP{display:none}` 是终态；
+  ②`index.html` 四个按钮写**裸全局名**（`startGentleTest()` / `nextGentleQ()` / `restartGentleTest()` / `closeGentleTest()`）
+  加选项里的 `selectGentleO(idx,score)`，而实现只经 `expose()` ⇒ window 上是 `__startGentleTest` ⇒ 五个名字全 undefined。
+  对照 `quizgate.js:374` 写的是 `window.startQuiz = …`（裸名），所以答题门那条链活着 —— **两边口径不一致就是成因**。
+- 🔴**旧写法里有一条比"点了没反应"更坏**：`closeGentleTest` 的收尾写的是 `expose('restartGentleTest')()` ——
+  `expose(key, val)` 只传一个参数时会**先把 `window.__restartGentleTest` 写成 undefined**，然后调用 undefined ⇒ TypeError。
+  这条不是推测，是 `expose` 的签名决定的（`debug-hooks.js:14`）。
+- 五题 × 四选项与分值在 DOM 半区与 3D 墙面半区**逐字相同**（对过：20/15/8/0、20/15/10/5、20/18/15/10、20/16/12/8、20/18/12/2），
+  五档标题与花也相同，只有判词长度不同 ⇒ 唯一真实的差别是"画布 1024px 宽，长判词会被 wrapText 拆到选项区外"。
+
+### 落地
+
+- 新增 **`src/shared/gentle-logic.mjs`**：`GENTLE_QUESTIONS`（`o:[{t,s}]`）、`GENTLE_MAX_SCORE`（**由表算出**，不是抄的 100）、
+  `GENTLE_TIERS`（`{min,title,desc,descShort,mark}`，`desc`=DOM 长版 / `descShort`=画布短版，**文案逐字未动**）、
+  `gentleScore / gentlePct / gentleTier / gentleRecord`。两边一起改：
+  `gentlePct` 收成 clamp 的那一份（旧 DOM 版不 clamp、旧画布版 `Math.min(...,100)`）；`gentleTier` 表按 `min` 递减、末条 0 兜住。
+- `src/gate/quiz.js` DOM 半区重写为**普通模块接线**：`ctx.overlay.register(#gtP,{x:'.gtClose',onOpen/onClose})`
+  （✕ / 点外圈 / Esc 三条由弹层单一源给，不再手写 `setTimeout` 摘 `.show`），选项按钮 = 每次渲染 `qsaBtn(gtQD,'.gtO')` 挂监听，
+  服务挂 `ctx.ui.gentleTest = {open,close,isOpen}`；取用点走 `dom-typed` 助手（**没有新增一条内联 DOM cast**，
+  所以 `dom-typed-sites` 那笔 16 条的账一字未变）。`expose()` 那五个注册随之删除（它们的消费者就是被我删掉的裸名 onclick）。
+- `index.html`：`#gtP` 整块**四个内联 onclick 清零** + 补两个 id（`gtStartBtn` / `gtAgainBtn`）。
+  ⇒ 顺带推进了 R7「index.html 的内联事件属性迁成 addEventListener」，但**没登记进 `CSP_INLINE_FREE_PAGES`**：
+  那页还有 `#gtP` 之外的内联块，登记表那条 CI 守卫会当场拦（不猜，交给闸）。
+- 登记三处：`ctx-ui.js` properties + `types/ctx.d.ts` 的 `UINamespace.gentleTest` + `store-api.js` SCHEMA（`types-ctx-drift` 双向对账跟着过）。
+- 🐞**实机量出来的一条真缺陷（当场改，不是我顺手美化）**：结果页的指数计数原写法是 `setInterval(30ms)` 里 `n+=2`，
+  本机 SwiftShader 下实测 **21090ms** 才数到 100 —— 主线程被渲染循环占住时 tick 会饿，"数得慢"与"数不完"在玩家看来是同一件事。
+  改成按**墙钟**算（`Math.min(pct,(Date.now()-t0)/12)`），同一台机器同一场景复跑 **2762ms**，且拿到第一次 tick 就直接收敛。
+- 🔧**探针入列**：新增 `scripts/probe/gentle-panel-probe.cjs`（自起 :3318 / `GENTLE_PORT`，数据根落系统临时目录；
+  `BASE_URL=` 可直测线上，线上按只读纪律跑：只点菜单与面板按钮，写的全是浏览器自己的 localStorage，不发写请求、不切世界）。
+  **29/29 全绿**：DOM 那条全选 A ⇒ 记录 `{score:100,pct:100,answers:[0,0,0,0,0]}`；
+  第 1.5 遍直接喂 `mesh.userData.handleClick(uv)` 走 3D 墙面那条（**不是射线拾取**，只证明同一个 handleClick 与同一份表），
+  全选 D ⇒ `{score:25,pct:25,answers:[3,3,3,3,3]}` —— 用答案把两条路的归属分开；
+  第二遍 `?legacy=0` 断言默认模式：服务不存在、菜单条目不显示、面板仍 `display:none`、零未捕获异常。
+
+### 判据（两个新文件，共 36 项；每条都由源码裁决）
+
+- `src/__tests__/gentle-logic.test.js`（16 项）：把**接线前那两份字面量抄回测试**做全量比对（题库 5×4 + 五档 title/desc/descShort/mark）
+  ⇒ 文案是主人的文学内容，工程这边只有搬拢的权限，改一个字这里就红，红的是"有人动了文案"。
+  外加数学：满分由表算出且=100、边界 90/75/55/35 inclusive、脏输入（120/-5）落首尾两档、`min` 严格递减末条为 0、
+  `descShort` 必须短于 `desc`（两个字段存在的唯一理由）、花的码位保持原有跳号（🌸🌹🌺🌼🌻 里第四档是 1F33C、末档 1F33B，不是笔误）。
+- `src/__tests__/gentle-panel-wiring.test.js`（20 项，六组）：①`#gtP` 整块按 div 深度配对切出来判"零内联事件属性" + 三个 id +
+  **五个裸全局名在全仓（含 HTML）一个字都不剩**；②写入点唯一 + **声明 ≡ 写入方**（ctx.d.ts 的成员集合 ≡ quiz.js 那个字面量的成员集合）
+  + ctx-ui properties 里有它 + 菜单真的调 `ctx.ui.gentleTest?.open()`；③SCHEMA 登记与 59 个 localStorage 键**不撞车**、
+  落库调用恰好两处、quiz.js 不直写 localStorage；④题面/判词/`pct >= 90` 只住在 shared（**防的就是"两边各一份"**）；
+  ⑤菜单 markup ≡ labels 键集合（整张表级，加一件忘另一件即红）+ 双语文案 + 可见性判据写法；
+  ⑥**搁置令不许被顺手改掉**：`LEGACY_MODULE_IDS` 仍含 `'quiz'` 且名单仍是 12 条、world-loader 那条槽位还在。
+
+### 反向验证 12 条（`.tmp/rv-gentle.cjs`，node 纯字符串替换，基线与收尾各跑一遍全绿）
+
+R1 面板塞回内联 onclick ⇒ **2 红** · R2 ctx-ui 漏登记 ⇒ **2 红**（wiring + drift）· R3 声明少一个成员 ⇒ 1 红 ·
+R4 写入方改名（反方向）⇒ 1 红 · R5 SCHEMA 取消登记 ⇒ 2 红 · R6 长出第二处写入 ⇒ 1 红 · R7 题库在 quiz.js 再抄一份 ⇒ **2 红** ·
+R8 加了按钮没加文案 ⇒ 2 红 · R9 按钮接错服务 ⇒ 1 红 · R10 摘掉 legacy 名单里的 quiz ⇒ **4 红**（wiring + `world-loader-shelving`）·
+R11 动了一个字/一分 ⇒ **5 红** · R12 分档下限 90→95 ⇒ 2 红。
+**锚点未命中 0 / 没红 0 / 还原 md5 不一致 0**；还原后整对判据复跑仍 36 项全绿。
+
+### 我自己判据的三个 bug（都属"跑一遍才知道"，记下来免得下批复踩）
+
+1. **注释里复述旧契约，被自己的"旧契约清零"判据读了出来** —— quiz.js 文件头那段历史说明必然要写出 `startGentleTest()` 这些名字，
+   于是判据红、代码没错。这是第九刀 `emit('world:changed')` 那条、第十刀 `@param {object}` 那条的**同族第三次**：
+   判据读的是文本，不是读它自己的想象。修法按第四刀既有的口径 —— **判据侧剥注释再扫**（沿用 `types-param-bag-shapes.test.js:123` 那个写法），
+   不改注释措辞、不放松判据。
+2. **labels 表的尾锚用"下一个 `\n  };`"** ⇒ 多吃了后面的 `ctx.overlay.register(...)` 配置对象，把 `display`/`escapable` 数成菜单条目。
+   ⇒ 尾锚必须来自结构（花括号配对），不能来自缩进猜。
+3. **全仓扫描在 vitest 并发下飘过默认 20s 超时**（第六刀记过同一条）：读结果 memo 化 + 先用便宜的 `includes` 粗筛、
+   命中才付剥注释的正则代价 + 给这两条单独 60_000。当天空照出两条 `hill-solo-guard` 与两条 `scene-manager-*` 的超时红，
+   独跑复验 **104 文件 / 1217 项全绿** ⇒ 是争用不是回归（判据是"独跑复现不了红"，不是"我以为不是回归"）。
+   ⚠️**这条今天复发并且更成规模，把方法记全**：晚些时候机器上积了约 15 个 node 进程（含 Qoder 自己的 MCP 服务，
+   命令行读不到 ⇒ **不能盲杀**），此时全量 vitest 报 **11 文件红 / 14 项红**，但逐行分类实测是
+   **`AssertionError` 0 条、`timed out` 17 行、只收了 68/104 个文件**，而且本批两个新判据在同一场争用里**照样过了**
+   （`gentle-panel-wiring` 20 项用了 49987ms —— 慢，但没红）。⇒ 三条口径：
+   ①**先分类再定性**（读输出数 `AssertionError` 与 `timed out` 的行数，"很多红"不等于"有回归"）；
+   ②判"争用"要有正向证据 = **同一棵树在安静时刻独跑全绿**（本批就是靠那次 104/1217 定的案），
+   不是"我觉得是机器慢"；③本仓这类"扫全仓"的用例天然顶到 20s 默认超时，
+   **新写这类判据时就该带上 `60_000` + 便宜粗筛**，别等它哪天在并发里假红（`dom-typed-sites`、
+   `types-ctx-writer-agreement` 这两条今天的超时红属既有债，没顺手改它们的 timeout）。
+
+### 门禁（全在这棵树上）
+
+eslint 0 / `tsc --noEmit` 0 / **checkJs 116 = 基线**（与开工前的**集合差双向 0 条**：不增也不减，
+`quiz.js`/`gentle-logic.mjs` 零报错）/ vitest **1217 项 / 104 文件**（批次1 记的 1181/102，+36 项 +2 文件全来自本批判据）/
+`npm test` 六个脚本 7/22/108/46/20/6 = **209 项 exit 0** / `npm run build` 0 且三条构建断言照旧（48 prefetch / 入口不含 three / 无 importmap）/
+`npm run depcruise` 0 违规（**406 modules / 1402 deps**，较批次1 +3/+6 = 新模块 + 两个判据文件及其 import 边）/
+四条 CI 闸门全 exit 0（hill-solo / `CSP_REGISTRY_OK` 4 条 / 后端清单 51 可达·53 清单 / 探针隔离扫 **149** 脚本·豁免 8）。
+prettier：`quiz.js` 与 `ctx-ui.js` 的不合排是**我引入的**（HEAD 版在未被 `.gitignore` 忽略的临时目录里实测合排，
+控制组一条故意打坏的探针同步被标 ⇒ 检测器确实在跑），已 `--write` 修回后复 `--check` 全绿。
+⚠️**顺带查清一条新的假红副作用**：那一场争用超时的全量 vitest 在 `photos/` 里留下了一个
+`whiteboard-20261016-092736-b6fc9d00.png`（120 字节，内容是一串 `3`，即测试夹具本体，仓库数据根里**没有**它的归属记录）。
+成因不是"测试写脏"而是**超时把用例杀死在 `afterEach`/`afterAll` 之前** ——
+`lib-whiteboard-overwrite.test.js:124` 明写"服务端签发名不带 TAG，必须逐条登记才能扫干净（绝不在仓库 photos/ 里留测试产物）"，
+清理钩子没跑到就会留。⇒ 口径：跑完见到 `photos/whiteboard-<今天时间戳>-*.png` 的未跟踪文件，
+先确认 ①名字是服务端签发形态 ②`gate_data.json` 里没有它的 `uploads` 条目，再删（本批已删）；
+**别**把它当成"谁传了张真图"，也别不看归属就扫荡 `photos/`（那目录里有主人的历史件）。
+
+### 本批没做的（登记，不装成已完）
+
+- **文案仍是单语中文**（五题题面/选项/五档判词 + 面板封面小字）。2026-10-03 的规矩是"以后加界面文字一律走 tt / i18nText"，
+  但这不是"新加"是"存量"，而且**译本选哪一版是主人的文学决定**（M-09 同一条口径）⇒ 没擅自代拟英文。要出英文版按 `tt({zh,en})` 改造，
+  菜单标签已经双语，面板内容待拍板。
+- **默认模式可见性**没动（见上文两行）。
+- 3D 墙面那条只验到 `handleClick` 本身；**"墙在画廊里点得中"没有新证据**（要射线拾取 + 模型在场，属剧情夹具那一族欠账）。
+- `.gtClose` 还是个没有 `role`/`tabindex` 的 `<div>`（键盘用户走 Esc，overlay 已覆盖）。改成按钮是 a11y 决定，不混进这次接线。
+- 3D 墙面面板自带一盏 `PointLight('#ff8fab',2,4,1.5)`（`quiz.js` 尾部，旧有），与"零 PointLight / 手机灯光账"那条规矩相冲；
+  它只在 legacy 模式加载，所以今天打不着玩家 —— **记在这里，不在本批动**（动了要重算手机灯光预算）。
+
+
+
 ## 2026-10-16 第十刀·批次1:裸 `object` 输入包(145 → **116**,不部署)
 
 批次0 撑开图之后剩下的第一族,两个文件 29 条,机制同一条:`@param {object}` 让编译器把
@@ -1039,6 +1207,19 @@ probe-isolation)退出码全 0。checkJs = **116**,与 `scripts/checkjs-baseline
 - `types-param-bag-shapes.test.js` 那条"还剩两处不是漏做"到期:两处都补全后**账清空**,
   现在全仓产品代码 0 处裸 `{object}` 的 `@param`(I8 实测会红)。
 - `ctx-writer-shapes.test.js` 的 `CEILING` 145 → **116**(I9 实测咬得住)。
+
+### 发布证据(批次1)
+
+本地两提交 `1b5aeb8`(代码/判据/基线)+ `020bc5e`(本条登记)→ **PR #37** → required checks 全绿 →
+合并 `87e2b22`,**树哈希一致 `fa8efff4…`**(CI 绿的那份内容就是这份),
+云端那一行读的是:**`checkJs errors: 116 (baseline 116, delta 0)`**(run 38903072800,
+step「Type-health baseline (checkJs tiers, BLOCKING)」)。
+按 `--no-deploy` 收,**线上仍是第九刀的 `02e1054`** —— 依据是本批两个产品文件的
+`esbuild --minify` 输出与 HEAD 逐字节相同(见上面那张 SAME 表),没有要 ship 的行为。
+线上没动这件事读了两条独立证据,不是靠"脚本没报错":`.tmp/deploy-state.env` 里
+`COMMIT=02e1054 / TS=2026-10-15T23:51:37-07:00`(上一次 deploy 的快照),而
+`https://cloudbear.cloud/healthz` 回 `{"ok":true,"uptime":22538,…}` —— 22538s ≈ 6 小时 15 分,
+倒推正好落在那次重启上(不是本机时钟,是 `ts` 字段自己减出来的)。
 
 ### 下一刀顺手能捡的一条(本轮已核实,没动)
 
