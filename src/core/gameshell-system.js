@@ -294,6 +294,8 @@ function createGameShellSystem() {
       stars: { zh: '✦ 星 图', en: '✦ Star map' },
       map: { zh: '章 节 地 图', en: 'Chapter map' },
       portfolio: { zh: '作 品 集 · ' + n + '/4', en: 'Portfolio · ' + n + '/4' },
+      // 温柔度测试(gate/quiz.js)—— 旧玩法,默认搁置,只在 ?legacy=1 时挂得进来(见下方 display)
+      gentle: { zh: '温 柔 度 测 试', en: 'Gentleness test' },
       help: { zh: '操 作 指 引', en: 'How to play' },
       quest: { zh: '任 务 册', en: 'Story progress' },
       notebook: { zh: '旅 途 手 札', en: 'Travel notebook' },
@@ -312,6 +314,10 @@ function createGameShellSystem() {
     // 回忆世界里才有「离开」(取代原先屏幕中央常驻的「返回沙漠」大按钮,防新玩家误点)
     const leaveBtn = /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="leave"]'));
     leaveBtn.style.display = (ctx.scene.activeWorld || 'main') === 'main' ? 'none' : '';
+    // 温柔度是搁置的旧玩法(2026-10-03 令「先放一边」):默认不加载 gate/quiz.js ⇒ 没有服务可开。
+    // 条目显不显示按「服务在不在」判,不按「我以为 legacy 开着」判 —— 读数与现场同一来源。
+    const gentleBtn = menuEl.querySelector('[data-act="gentle"]');
+    gentleBtn.style.display = ctx.ui.gentleTest ? '' : 'none';
   }
   function buildMenu() {
     menuEl = document.createElement('div');
@@ -325,6 +331,7 @@ function createGameShellSystem() {
         <button class="m-btn m-star" data-act="stars">✦ 星 图</button>
         <button class="m-btn" data-act="map">章 节 地 图</button>
         <button class="m-btn" data-act="portfolio">作 品 集</button>
+        <button class="m-btn" data-act="gentle">温 柔 度 测 试</button>
         <button class="m-btn" data-act="help">操 作 指 引</button>
         <button class="m-btn" data-act="quest">任 务 册</button>
         <button class="m-btn" data-act="notebook">旅 途 手 札</button>
@@ -351,6 +358,10 @@ function createGameShellSystem() {
     /** @type {HTMLElement} */ (menuEl.querySelector('[data-act="portfolio"]')).onclick = () => {
       menuApi.close();
       ctx.ui.portfolio?.open();
+    };
+    menuEl.querySelector('[data-act="gentle"]').onclick = () => {
+      menuApi.close();
+      ctx.ui.gentleTest?.open();
     };
     menuEl.querySelector('[data-act="help"]').onclick = () => {
       menuApi.close();

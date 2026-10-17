@@ -106,6 +106,9 @@ const SCHEMA = {
   witness: { key: 'b612Witness', type: 'json' },
   // 玩家关掉了剧情背景音乐(右下「音乐」钮;ui/story-music.js)
   musicOff: { key: 'b612MusicOff', type: 'flag' },
+  // 温柔度测试最近一次作答(gate/quiz.js 的两条路共用:DOM 面板与 3D 墙面面板)。
+  // 只记录、不分支(与 witness 同一口径 —— 眼下没有玩法读它,读它之前先想清楚给谁看)。
+  gentleTest: { key: 'b612GentleTest', type: 'json' },
   // 2026-10-04 剧本补全:地球的一天(第 10 场)走到第几站;earthDay = 地球一天走完(之后才去找井)
   earthStep: { key: 'b612EarthStep', type: 'num' },
   earthDay: { key: 'b612EarthDay', type: 'flag' },

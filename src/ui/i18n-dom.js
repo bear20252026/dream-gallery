@@ -57,6 +57,10 @@ export function bindStaticDom() {
     zh: '关闭面板，返回画廊',
   });
   i18nAttr($('#panelFrame'), 'title', { en: 'Panel content', zh: '面板内容' });
+  i18nAttr($('#gtCloseBtn'), 'aria-label', {
+    en: 'Close the gentleness test',
+    zh: '关闭温柔度测试',
+  });
   i18nAttr($('#c'), 'aria-label', { en: 'B612 3D scene', zh: 'B612 3D 场景' });
   i18nAttr($('#m'), 'aria-label', { en: 'Minimap', zh: '小地图' });
   i18nText($('#ab'), { en: 'Play music', zh: '开启音乐' });

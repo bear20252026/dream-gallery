@@ -35,6 +35,9 @@ export function createUINamespace(vault) {
     'voyage',
     // 2026-10-04:星图(ui/star-map.js)
     'starMap',
+    // 2026-10-16 接线:温柔度面板(gate/quiz.js)的开关入口 —— 菜单条目调 open(),
+    // 判据在 src/__tests__/gentle-panel-wiring.test.js(声明 ≡ 写入方)
+    'gentleTest',
   ];
   const proxy = {};
 

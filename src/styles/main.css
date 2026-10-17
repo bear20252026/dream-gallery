@@ -536,6 +536,12 @@ body {
   font-size: 20px;
   cursor: pointer;
   transition: color 0.2s;
+  /* 摘掉 <button> 的默认外观;它是按钮才拿得到上面那条 button:focus-visible */
+  background: none;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+  line-height: 1;
 }
 .gtClose:hover {
   color: #ff6b8a;

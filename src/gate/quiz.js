@@ -1,206 +1,172 @@
 // quiz.js — 温柔度测试（DOM弹窗逻辑 + 3D墙面测试面板）
 import * as THREE from 'three';
 import { ctx } from '../ctx.js';
-import { expose } from '../debug-hooks.js';
+import { byIdEl, byIdBtn, qsaBtn } from '../shared/dom-typed.js';
+import {
+  GENTLE_QUESTIONS,
+  gentlePct,
+  gentleRecord,
+  gentleScore,
+  gentleTier,
+} from '../shared/gentle-logic.mjs';
 const { s, iG } = ctx;
 
-// ===== 温柔度测试逻辑 =====
-const gentleQ = [
-  {
-    q: '看到小猫在阳光下打盹，你会？',
-    o: [
-      { t: '静静看着，不想打扰它', s: 20 },
-      { t: '轻轻摸一摸它的小脑袋', s: 15 },
-      { t: '拍照发朋友圈', s: 8 },
-      { t: '把它叫醒陪自己玩', s: 0 },
-    ],
-  },
-  {
-    q: '朋友难过时默默流泪，你会？',
-    o: [
-      { t: '静静陪在身边，递上纸巾', s: 20 },
-      { t: '讲笑话逗她开心', s: 15 },
-      { t: '帮她分析问题找办法', s: 10 },
-      { t: '让她自己冷静一会儿', s: 5 },
-    ],
-  },
-  {
-    q: '你最喜欢的天气是？',
-    o: [
-      { t: '微风拂面的温暖春日', s: 20 },
-      { t: '细雨绵绵的安静黄昏', s: 18 },
-      { t: '大雪纷飞的浪漫夜晚', s: 15 },
-      { t: '阳光明媚的晴朗早晨', s: 10 },
-    ],
-  },
-  {
-    q: '收到一份手工制作的礼物，你会？',
-    o: [
-      { t: '感动得眼眶湿润', s: 20 },
-      { t: '仔细珍藏起来', s: 16 },
-      { t: '马上回赠一份礼物', s: 12 },
-      { t: '开心地说谢谢', s: 8 },
-    ],
-  },
-  {
-    q: '看到樱花缓缓飘落，你会想到？',
-    o: [
-      { t: '美好总是短暂，要珍惜当下', s: 20 },
-      { t: '好美，想永远记住这一刻', s: 18 },
-      { t: '明年樱花还会再开的', s: 12 },
-      { t: '落在地上打扫起来好麻烦', s: 2 },
-    ],
-  },
-];
-let gCur = 0,
-  gScore = 0,
-  gAns = [];
+// ===== 温柔度测试（DOM 弹窗）=====
+// 2026-10-16 接线。这块面板从 2026-07-28 基线起就是死的,原因有两半,都在这儿:
+// ① **没有入口** —— 全仓（含全部 HTML/CSS）没有一处给 #gtP 加过 `.show`,CSS 第 386 行写死
+//    `display:none`,所以它从来没有出现过;
+// ② **按钮点了必炸** —— index.html 的四个按钮写的是**裸全局名**（startGentleTest() /
+//    nextGentleQ() / restartGentleTest() / closeGentleTest()）加选项里的 selectGentleO(),
+//    而本模块只经 debug-hooks 的 expose() 注册 ⇒ window 上的名字带 `__` 前缀,那五个是 undefined。
+//    （对照 `quizgate.js:374` 写的是 `window.startQuiz = …` 裸名,所以答题门那条链活着 ——
+//    两边口径不一致就是成因。第九刀补记里还查出旧写法一处更坏的:closeGentleTest 里
+//    `expose('restartGentleTest')()` 第一参数就把钩子**写成 undefined** 再去调用它。）
+// 现在三件事各归其位:开 = `ctx.ui.gentleTest.open()`（菜单条目调它）;
+// 关 = ctx.overlay 的 ✕ 委托（.gtClose）+ 点外圈 + Esc（弹层三铁律不再手写）;
+// 答题 = 每次渲染挂在选项按钮上的监听。结果落 store 键 gentleTest,**只记录、不分支**（同 witness）。
 
-expose('startGentleTest', function () {
-  document.getElementById('gtStart').style.display = 'none';
-  document.getElementById('gtQuiz').style.display = 'block';
-  document.getElementById('gtResult').style.display = 'none';
-  gCur = 0;
-  gScore = 0;
-  gAns = [];
-  renderGQ();
-});
-expose('nextGentleQ', function () {
-  if (gAns[gCur] === undefined) return;
-  gCur++;
-  if (gCur >= gentleQ.length) {
-    showGentleResult();
-  } else {
-    renderGQ();
+let gCur = 0;
+/** @type {Array<number|undefined>} */
+let gAns = [];
+/** @type {ReturnType<typeof setInterval>|null} 指数动画计数的句柄,关闭与重开都必须摘掉 */
+let countTimer = null;
+
+const gtPanel = byIdEl('gtP');
+const gtStart = byIdEl('gtStart');
+const gtQuiz = byIdEl('gtQuiz');
+const gtResult = byIdEl('gtResult');
+const gtQD = byIdEl('gtQD');
+const gtProgF = byIdEl('gtProgF');
+const gtScoreEl = byIdEl('gtScore');
+const gtRT = byIdEl('gtRT');
+const gtRD = byIdEl('gtRD');
+const gtRH = byIdEl('gtRH');
+const gtStartBtn = byIdBtn('gtStartBtn');
+const gtNextBtn = byIdBtn('gtNext');
+const gtAgainBtn = byIdBtn('gtAgainBtn');
+
+function stopCount() {
+  if (countTimer) {
+    clearInterval(countTimer);
+    countTimer = null;
   }
-});
-function renderGQ() {
-  const qd = document.getElementById('gtQD');
-  const q = gentleQ[gCur];
+}
+
+/** 三段屏（封面 / 作答 / 结果）的互斥显示,display 值与 CSS 原本写死的保持一致 */
+function showScreen(which) {
+  gtStart.style.display = which === 'start' ? 'block' : 'none';
+  gtQuiz.style.display = which === 'quiz' ? 'block' : 'none';
+  gtResult.style.display = which === 'result' ? 'block' : 'none';
+}
+
+function renderQuestion() {
+  const q = GENTLE_QUESTIONS[gCur];
   let h = '<div class="gtQ"><div class="gtQL">' + (gCur + 1) + '. ' + q.q + '</div>';
   q.o.forEach((opt, idx) => {
-    const sel = gAns[gCur] === idx ? 'sel' : '';
     h +=
-      '<button class="gtO ' +
-      sel +
-      '" onclick="selectGentleO(' +
+      '<button class="gtO" data-i="' +
       idx +
-      ',' +
-      opt.s +
-      ')">' +
+      '">' +
       String.fromCharCode(65 + idx) +
       '. ' +
       opt.t +
       '</button>';
   });
   h += '</div>';
-  qd.innerHTML = h;
-  document.getElementById('gtProgF').style.width = (gCur / gentleQ.length) * 100 + '%';
-  document.getElementById('gtNext').style.display = gAns[gCur] !== undefined ? 'block' : 'none';
+  gtQD.innerHTML = h;
+  // 选中态由 JS 补 class,不写进模板里:模板要留一条静态的 `class="gtO"`,
+  // 否则 `dom-typed-sites` 那条「助手声称的标签 ≡ markup 真实标签」的反查认不出这个类。
+  qsaBtn(gtQD, '.gtO').forEach((btn) => {
+    if (Number(btn.dataset.i) === gAns[gCur]) btn.classList.add('sel');
+    btn.onclick = () => {
+      gAns[gCur] = Number(btn.dataset.i);
+      renderQuestion();
+    };
+  });
+  gtProgF.style.width = (gCur / GENTLE_QUESTIONS.length) * 100 + '%';
+  gtNextBtn.style.display = gAns[gCur] === undefined ? 'none' : 'block';
 }
-expose('selectGentleO', function (idx, score) {
-  gAns[gCur] = idx;
-  gScore += score;
-  renderGQ();
-});
-function showGentleResult() {
-  document.getElementById('gtQuiz').style.display = 'none';
-  const rE = document.getElementById('gtResult');
-  rE.style.display = 'block';
-  const pct = Math.round((gScore / 100) * 100);
-  document.getElementById('gtScore').textContent = String(pct); // textContent 只收 string|null;DOM 侧本来就把数字转成文本,显式写出来不再靠隐式转换
-  const rt = document.getElementById('gtRT'),
-    rd = document.getElementById('gtRD');
-  if (pct >= 90) {
-    rt.textContent = '你是温柔本身';
-    rd.textContent =
-      '像春风化雨，像暖阳拂面，你的一言一行都浸润着令人心安的温柔。与你相识的人，都会被这份柔软深深治愈。你的温柔不是刻意，而是本能。';
-    document.getElementById('gtRH').textContent = '\u{1F338}';
-  } else if (pct >= 75) {
-    rt.textContent = '你很温柔，像一杯温热的奶茶';
-    rd.textContent =
-      '你的温柔藏在细节里，一句关心的问候，一个体贴的举动，都让人倍感温暖。你是那种会让人想靠近的人。';
-    document.getElementById('gtRH').textContent = '\u{1F339}';
-  } else if (pct >= 55) {
-    rt.textContent = '你有温柔的一面，像秋天的阳光';
-    rd.textContent =
-      '你的温柔不会时时展露，但在重要时刻，你总能给人恰到好处的温暖。学会多表达，你的温柔会更动人。';
-    document.getElementById('gtRH').textContent = '\u{1F33A}';
-  } else if (pct >= 35) {
-    rt.textContent = '你的温柔藏在心底，等待被发现';
-    rd.textContent =
-      '你有柔软的心，只是习惯用坚强包裹自己。试着对身边的人多一些表达，你会发现温柔的力量。';
-    document.getElementById('gtRH').textContent = '\u{1F33C}';
-  } else {
-    rt.textContent = '你是个酷酷的人，温柔是你的另一面';
-    rd.textContent =
-      '你的表达方式与众不同，但内心深处同样有柔软。偶尔展露温柔，会让人觉得你更加真实可爱。';
-    document.getElementById('gtRH').textContent = '\u{1F33B}';
-  }
-  // 动画计数
-  let n = 0;
-  const t = setInterval(() => {
-    n += 2;
-    if (n >= pct) {
-      n = pct;
-      clearInterval(t);
-    }
-    document.getElementById('gtScore').textContent = String(n);
+
+function beginTest() {
+  stopCount();
+  gCur = 0;
+  gAns = [];
+  showScreen('quiz');
+  renderQuestion();
+}
+
+function nextQuestion() {
+  if (gAns[gCur] === undefined) return;
+  gCur++;
+  if (gCur >= GENTLE_QUESTIONS.length) showResult();
+  else renderQuestion();
+}
+
+function showResult() {
+  stopCount();
+  showScreen('result');
+  const score = gentleScore(gAns);
+  const pct = gentlePct(score);
+  const tier = gentleTier(pct);
+  gtRH.textContent = tier.mark;
+  gtRT.textContent = tier.title;
+  gtRD.textContent = tier.desc;
+  ctx.store.setJson('gentleTest', gentleRecord(gAns, Date.now()));
+  // 指数计数动画:按**墙钟**算,不按"每 tick +2"算。
+  // 2026-10-16 实机量过:旧写法(setInterval 30ms / n+=2)在本机 SwiftShader 下要 21 秒才数到 100
+  // —— 主线程被渲染循环占住时 tick 会饿,而"数得慢"与"数不完"在玩家看来是同一件事。
+  // 现在无论隔多久才拿到一次 tick,第一次就落在 1.2s 之后的真值上(即直接收敛)。
+  gtScoreEl.textContent = '0';
+  const t0 = Date.now();
+  countTimer = setInterval(() => {
+    const shown = Math.min(pct, Math.round((Date.now() - t0) / 12)); // 12ms/分 ⇒ 1.2s 数完 100
+    gtScoreEl.textContent = String(shown);
+    if (shown >= pct) stopCount();
   }, 30);
 }
-expose('restartGentleTest', function () {
-  document.getElementById('gtResult').style.display = 'none';
-  document.getElementById('gtStart').style.display = 'block';
+
+const gtOverlay = ctx.overlay.register(gtPanel, {
+  display: 'flex',
+  x: '.gtClose',
+  onOpen: () => gtPanel.classList.add('show'),
+  onClose: () => {
+    gtPanel.classList.remove('show');
+    stopCount();
+  },
 });
-expose('closeGentleTest', function () {
-  const gtP = document.getElementById('gtP');
-  gtP.classList.remove('show');
-  setTimeout(() => {
-    gtP.style.display = 'none';
-    expose('restartGentleTest')();
-  }, 500);
-});
+gtStartBtn.onclick = beginTest;
+gtNextBtn.onclick = nextQuestion;
+gtAgainBtn.onclick = () => {
+  stopCount();
+  showScreen('start');
+};
+ctx.ui.gentleTest = {
+  open() {
+    stopCount();
+    showScreen('start');
+    gtOverlay.open();
+    // 面板要鼠标:与章节地图同一口径,否则指针锁着点不到选项
+    if (document.pointerLockElement) document.exitPointerLock();
+  },
+  close() {
+    gtOverlay.close();
+  },
+  isOpen() {
+    return gtOverlay.isOpen();
+  },
+};
 
 // ===== 3D墙面温柔度测试面板（E厅西墙 x=-8, z=-7.5，面朝东）=====
 (function () {
-  // 问卷数据
-  const qs = [
-    {
-      q: '看到小猫在阳光下打盹，你会？',
-      o: ['静静看着，不想打扰它', '轻轻摸一摸它的小脑袋', '拍照发朋友圈', '把它叫醒陪自己玩'],
-      s: [20, 15, 8, 0],
-    },
-    {
-      q: '朋友难过时默默流泪，你会？',
-      o: ['静静陪在身边，递上纸巾', '讲笑话逗她开心', '帮她分析问题找办法', '让她自己冷静一会儿'],
-      s: [20, 15, 10, 5],
-    },
-    {
-      q: '你最喜欢的天气是？',
-      o: ['微风拂面的温暖春日', '细雨绵绵的安静黄昏', '大雪纷飞的浪漫夜晚', '阳光明媚的晴朗早晨'],
-      s: [20, 18, 15, 10],
-    },
-    {
-      q: '收到一份手工制作的礼物，你会？',
-      o: ['感动得眼眶湿润', '仔细珍藏起来', '马上回赠一份礼物', '开心地说谢谢'],
-      s: [20, 16, 12, 8],
-    },
-    {
-      q: '看到樱花缓缓飘落，你会想到？',
-      o: [
-        '美好总是短暂，要珍惜当下',
-        '好美，想永远记住这一刻',
-        '明年樱花还会再开的',
-        '落在地上打扫起来好麻烦',
-      ],
-      s: [20, 18, 12, 2],
-    },
-  ];
+  // 问卷数据 = shared/gentle-logic.mjs 那一份(与上面的 DOM 弹窗同源,免得题面/分值两边漂)。
+  const qs = GENTLE_QUESTIONS;
   const W = 1024,
     H = 1536;
   let curQ = -1,
     totalS = 0,
     selIdx = -1;
+  /** @type {number[]} 记下选中的选项下标,收卷时交给 gentleRecord(与 DOM 那条落同一行记录) */
+  let picked = [];
 
   // Canvas（高分辨率）
   const c = document.createElement('canvas');
@@ -278,7 +244,7 @@ expose('closeGentleTest', function () {
           x.fillText(String.fromCharCode(65 + i), 110, y + 50);
           x.fillStyle = selIdx === i ? '#ffe8f0' : '#ffe0e8';
           x.font = '30px serif';
-          wrapText(x, q.o[i], 180, y + 16, W - 280, 44);
+          wrapText(x, q.o[i].t, 180, y + 16, W - 280, 44);
         }
         // 下一题按钮
         if (selIdx >= 0) {
@@ -294,7 +260,7 @@ expose('closeGentleTest', function () {
         }
       } else {
         // 结果页
-        const pct = Math.min(Math.round((totalS / 100) * 100), 100);
+        const pct = gentlePct(totalS);
         x.fillStyle = 'rgba(255,180,200,0.5)';
         x.font = '24px Arial';
         x.textAlign = 'center';
@@ -307,30 +273,12 @@ expose('closeGentleTest', function () {
         x.fillText('分', W / 2 + 100, 320);
         x.fillStyle = '#ffd0d8';
         x.font = 'bold 40px serif';
-        let ev = '',
-          ed = '',
-          eh = '';
-        if (pct >= 90) {
-          ev = '你是温柔本身';
-          ed = '像春风化雨，像暖阳拂面，你的一言一行都浸润着令人心安的温柔。';
-          eh = '\u{1F338}';
-        } else if (pct >= 75) {
-          ev = '你很温柔，像一杯温热的奶茶';
-          ed = '你的温柔藏在细节里，一句关心的问候，一个体贴的举动，都让人倍感温暖。';
-          eh = '\u{1F339}';
-        } else if (pct >= 55) {
-          ev = '你有温柔的一面，像秋天的阳光';
-          ed = '你的温柔不会时时展露，但在重要时刻，你总能给人恰到好处的温暖。';
-          eh = '\u{1F33A}';
-        } else if (pct >= 35) {
-          ev = '你的温柔藏在心底，等待被发现';
-          ed = '你有柔软的心，只是习惯用坚强包裹自己。试着对身边的人多一些表达。';
-          eh = '\u{1F33C}';
-        } else {
-          ev = '你是个酷酷的人，温柔是你的另一面';
-          ed = '你的表达方式与众不同，但内心深处同样有柔软。偶尔展露温柔，会更可爱。';
-          eh = '\u{1F33B}';
-        }
+        // 判词表在 shared/gentle-logic.mjs;画布这一路取短版(descShort),
+        // 因为画布只有 1024px 宽,长版会被 wrapText 拆到选项区外面 —— 这是两边唯一的真实差别
+        const tier = gentleTier(pct);
+        const ev = tier.title,
+          ed = tier.descShort,
+          eh = tier.mark;
         x.fillText(eh, W / 2, 400);
         x.fillStyle = '#ffb6c8';
         x.font = 'bold 36px serif';
@@ -387,6 +335,7 @@ expose('closeGentleTest', function () {
         curQ = 0;
         selIdx = -1;
         totalS = 0;
+        picked = [];
         drawPanel();
       }
     } else if (curQ < qs.length) {
@@ -396,7 +345,8 @@ expose('closeGentleTest', function () {
           const y = 480 + i * 230;
           if (cx > 70 && cx < W - 70 && cy > y - 20 && cy < y + 160) {
             selIdx = i;
-            totalS += qs[curQ].s[i];
+            picked[curQ] = i;
+            totalS += qs[curQ].o[i].s;
             drawPanel();
             return;
           }
@@ -406,6 +356,9 @@ expose('closeGentleTest', function () {
       if (selIdx >= 0 && cx > 320 && cx < 704 && cy > 1420 && cy < 1508) {
         curQ++;
         selIdx = -1;
+        // 收卷写在「进入结果页」这一次转换上,不写在 drawPanel 里
+        // (drawPanel 会被每次点击重跑,把落库塞进渲染就等于每画一次写一次)
+        if (curQ >= qs.length) ctx.store.setJson('gentleTest', gentleRecord(picked, Date.now()));
         drawPanel();
       }
     } else {
@@ -414,6 +367,7 @@ expose('closeGentleTest', function () {
         curQ = -1;
         selIdx = -1;
         totalS = 0;
+        picked = [];
         drawPanel();
       }
     }
