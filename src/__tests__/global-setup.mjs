@@ -19,7 +19,7 @@ export default function sweepStaleTempDataRoots() {
   let removed = 0;
   let kept = 0;
   let failed = 0;
-  let names = [];
+  let names; // 不预赋 []:旧写法在这里写 `= []`,而 try 里立刻整体覆盖 ⇒ 那次赋值永远读不到
   try {
     names = fs.readdirSync(dir);
   } catch {

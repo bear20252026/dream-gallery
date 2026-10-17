@@ -17,7 +17,11 @@
 #   它按 __dirname/../.. 解析仓库根,只有放在 <根>/scripts/admin/ 才跑得起来,而线上读的是
 #   服务器上的 gate_data.db —— 不在盒子上就没法判"能不能切读"。它只读(readonly + fileMustExist),
 #   不写不锁;公网侧 `scripts` 首段与 `*.cjs` 后缀被 staticDenied() 各挡一次,双重。
+# ⚠️ src/shared/*.mjs 里**被后端 require 的每一个**都必须点名在这里(2026-10-17 加 chat-words.mjs:
+#   lib/chat.js 与前端 chat-room.js 共用那张召唤词表)。`find lib …` 只覆盖 lib 目录树,
+#   跨到 src/ 的依赖一条都不会自动进清单 —— 这条由 scripts/admin/check-backend-manifest.cjs
+#   按 depcruise 的可达集反查清单,漏一个就 exit 1(2026-10-12 那次 502 事故立的闸,正好管住这种新形态)。
 backend_files() {
-  printf '%s\n' server.js src/shared/mediarules.mjs scripts/admin/table-parity.cjs
+  printf '%s\n' server.js src/shared/mediarules.mjs src/shared/chat-words.mjs scripts/admin/table-parity.cjs
   find lib -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.sql' \) 2>/dev/null | sort
 }

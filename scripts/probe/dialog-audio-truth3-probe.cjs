@@ -71,6 +71,9 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
   }
   await page.waitForTimeout(4000);
   const report = await page.evaluate(() => {
+    // 全量 playLog(诊断用)——原来这行写在 return **之后**,在这个页作用域里永远走不到,
+    // 所以"全量 playLog"这条诊断从来没打印过;挪到 return 之前才真的打印。
+    console.log('全量 playLog:', JSON.stringify(window.__playLog_full || 'skip'));
     return window.__playLog
       .filter((r) => r.src.includes('tts') && !r.src.includes('batch'))
       .map((r) => ({
@@ -82,8 +85,6 @@ const pw = (() => { try { return require('playwright'); } catch (e) { return req
         currentTime: r.el ? +r.el.currentTime.toFixed(2) : null, // >0 = 真的在播
         paused: r.el ? r.el.paused : null,
       }));
-  // 全量 playLog(诊断用)
-  console.log('全量 playLog:', JSON.stringify(window.__playLog_full || 'skip'));
   });
   console.log('逐行真实播放取证:', JSON.stringify(report, null, 1));
   console.log('网络层 tts 响应(近 10 条):', JSON.stringify(netlog.slice(-10), null, 1));

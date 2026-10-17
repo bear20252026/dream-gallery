@@ -129,6 +129,8 @@ const PREFIX = 'B612-1-';
 // 判超长一律**在解码之前**:先长度后内容,顺序本身就是这道闸的意义。
 export const MAX_CODE_CHARS = 4096;
 
+/* global Buffer */ // 只给下面两个函数的 **Node 回退分支**用(浏览器一律走 btoa/atob,这条兜底实测打不着)。
+// 与 types/node-fallback-globals.d.ts 同一口径:缺哪块补哪块,不在 eslint 的浏览器块里放开整个 node 环境。
 function b64encode(s) {
   if (typeof btoa === 'function') return btoa(unescape(encodeURIComponent(s)));
   return Buffer.from(s, 'utf8').toString('base64');
