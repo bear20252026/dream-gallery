@@ -1174,9 +1174,76 @@ vitest **109 文件 / 1264 项**(上一批 108/1257,+1 文件 +7 项全来自本
 
 ### 没做与别读成"已做完"
 
-1. **没有真浏览器证据**。地球之日七站要走到沙漠且 `earthDue(flags())`(page1 ∧ chapter ∧ 未完成 ending),而**全仓从来没有 earth-day 探针**(`scripts/probe/` 只有 `fox-ground-probe` / `verify-fox`,量的是狐狸摆景)。所以"跳过一站"这句是**逐行回读 `advance()` 的算术**(`setNum('earthStep', step() + 1)` 被走两遍)得出的机制结论,**不是实测到的症状** —— 写在这里免得下一个人把它当成已验收。补法:新建 `earth-day-visit-probe`,`earthDayApi.jump(n)` 直接落到某站 → 开讲 → 中途 `leaveWorld()` → 回来重新到站 → 断言 `earthStep` 只 +1、`state().pending === 0`、同一时刻只有一条链在讲。
+1. **没有真浏览器证据**。〔✅ 同日夜里已补:新探针 `earth-day-visit-probe` **12 项全绿** + 四条注射各咬一条,见下面「地球之日浏览器探针」那一节。当时写的那段"补法"里有三处设想与实测不同(`jump()` 落站 / 预设章节 / `pending===0` 的含义),已按实测改,不要照抄那段开工单动手。〕地球之日七站要走到沙漠且 `earthDue(flags())`(page1 ∧ chapter ∧ 未完成 ending),而**全仓从来没有 earth-day 探针**(`scripts/probe/` 只有 `fox-ground-probe` / `verify-fox`,量的是狐狸摆景)。所以"跳过一站"这句是**逐行回读 `advance()` 的算术**(`setNum('earthStep', step() + 1)` 被走两遍)得出的机制结论,**不是实测到的症状** —— 写在这里免得下一个人把它当成已验收。补法:新建 `earth-day-visit-probe`,`earthDayApi.jump(n)` 直接落到某站 → 开讲 → 中途 `leaveWorld()` → 回来重新到站 → 断言 `earthStep` 只 +1、`state().pending === 0`、同一时刻只有一条链在讲。
 2. `mode === 'done'` 那条离场路**不换世**(已完成就没有在飞的链)—— 这是判断不是遗漏;哪天 `finish()` 之后又长出延时,这条要重看。
 3. `scene10-fox.js` 自持的计时器仍在它自己名下(本批只加"旧世收尾不进门"这道闸,没把狐狸那章票据化 —— 独立一批)。
+
+## 2026-10-18 地球之日浏览器探针:12 项全绿、四条注射各咬一条,顺手抓到 `pending` 读数说谎(改了运行期,不部署)
+
+上面那节「没做」第 1 条的工单。补完全仓第一支 earth-day 探针,而它第一次真正被测出来的东西**是探针自己的两条缺陷加一条读数缺陷**,不是产品代码的第四次翻案。
+
+### 这支探针必须制造的那段时间窗(与 late-planets 那一族不同,值得先读再写)
+
+旧写法翻车的**前提**是"旧那一拍到期那一刻没有对话框开着",而这句话反过来也意味着:走一条"离场→立刻回站"的直线是撞不到它的(新链一句开着屏,旧心跳白跑一趟)。⇒ **必须故意留一段"人已回沙漠、但还没走进站点"的空档**:
+
+- 走进 flower 站讲上第 0 句 → **先把人挪到 44m 外,再离开沙漠**。挪必须发生在离场**之前**:回程是 `restore`(离开那一刻的快照),反过来写(先离场、回来再挪)会被 restore 按回 4m 内,新链 0.1s 就开讲,窗口根本不存在 —— 第一版就是这么写的,那次 `③` 恒绿是**假绿**。
+- 空档 9500ms:旧心跳到期时刻 = arm + `hold=max(4600,18*65)` + 2600 = **7200ms**,判据不依赖这个毫秒是否成立,它只问"空档里上屏了几句"。
+- 再把人摆回站点 → 看这一站走完 `earthStep` 是不是**恰好 +1**、下一站是不是 `echo`。
+
+### 模型级推演:同一条时间线跑旧/新两种 `speakSeq`(`.tmp/earth-old-new-model.mjs`)
+
+为什么"旧写法会跳两站"这句话需要单独证:探针跑在**已修好**的产品代码上,它只能证明"现在不跳"。所以把两版 `speakSeq` + `arrive/advance/update` 逐行搬进一个假 ctx,对话管理器照 `gameshell-dialog.js` 的**三条真实语义**建模 —— ①`:32` lock 占用时新对话**排队**而不是顶掉,②`:232-243` 先跑 onDone、锁空才补播,③`:326` cancelWorld 走 `closeDialog(true)` **不调 onDone**(整条缺陷的前提就是这第三条)。`new` 那支 import 的是**真产品机制** `shared/visit-timers.mjs`:
+
+| 写法 | 空档窗内上屏 | `advance()` 落几次 | 走完这一站 |
+|---|---|---|---|
+| old | `L1@7218ms`(旧世尾巴正是在空档里冒头) | **2 次**(20980ms / 34782ms) | `earthStep=3`,下一站 **roses**(echo 被跳过) |
+| new | 空 | 1 次(30808ms) | `earthStep=2`,下一站 echo |
+
+⇒ 上一节写下的"两条链各 advance 一次"**成立,而且只有靠 lockQueue 才成立**:旧世那句在锁期间不被顶掉,它自己 autoHide 之后落地 `onDone` 才多走一格;如果我当时按"新对话直接替换旧的"建模(第一版就是这么写的),旧链会被截断、只 advance 一次,那条主张就是错的。**这就是"逐行回读"和"建模跑一遍"的差别。**
+
+### 落地:新探针 `scripts/probe/earth-day-visit-probe.cjs`(自起 :3298 + 数据根隔离,**12 项全绿 ×2**)
+
+(两次独立跑:`.tmp/earth-probe4.log` 与判据改过收尾余量之后的复跑 `.tmp/earth-probe5.log`,都是 `结果: 12 通过, 0 失败`;
+按本仓那条"单次全绿不算证据"的纪律,没有只交一次绿。)
+
+路线与判据:开机预设只给 `page1/scene2`(**章节必须留 0**,见下面第 4 条)→ 石门跳板进 B612 → 在那里 `setChapter(6)` + `setNum('earthStep',1)` → 点「返回沙漠」→ `earthDue` 成立且 `stop=flower` → **①** 走进站点第 0 句真上屏 → **②** 讲到一半离开沙漠:当场换世(`gen` 变大)且在飞计时器清空(`pending=0`)→ **③** 空档 9500ms 内本站一句都不许上屏 → **④** 重返从第 0 句重讲、整段索引严格 +1 → **⑤** 走完这一站 `earthStep` 恰好 +1、下一站 `echo`。四条注射 `PROBE_BREAK=pending|gap|double|skip` 各钉一条,退出码三态(0=目标红 / 1=判据不咬 / 3=注射没打进去)与 `late-planets-visit-probe` 同一套口径。
+
+**没有用 `earthDayApi.jump(n)`**:那一句会把 `started=false; mode='idle'` 一起写进去,等于让探针自己把被测模块的状态机拨到它想测的那一格;直接落 `earthStep` 存档、让 `begin()` 自己跑,测的才是玩家真会走的那条路。
+
+### 四条注射实测(各只红目标那一条,归因干净)
+
+| 注射 | 级别 | 实测读数 | 结论 |
+|---|---|---|---|
+| `pending` | 读数级(把 `state().pending` 改成 1) | `✗ ② gen 0→1 pending=1 mode=idle` | INJECT_OK |
+| `gap` | 现象级(往 `#gameDialog` 写本站第 1 句) | 第 1 遍 **INJECT_DEAD** → 修判据后 `✗ ③ 窗内=["1@main"]` | INJECT_OK(见下面第 2 条) |
+| `double` | 现象级(B 链讲到第 1 句后再打一次第 0 句) | `✗ ④ seq=[0,1,0] 长度=3` —— 正是"两条链同时在讲"的观测面 | INJECT_OK |
+| `skip` | 现象级(走完这一站时把存档多推一格) | `✗ ⑤ {"step":3,"stop":"roses"}` —— 与模型表里 old 那一行**同形** | INJECT_OK |
+
+### 它测出来的三件事(两条是探针自己的,一条是真的读数缺陷)
+
+1. 🔴 **真缺陷:`pending()` 报的不是"还有几个在飞",而是"登记过几个没到期"**。`later/every` 的句柄存在 `s.timers` 里,**只有它自己到期那一拍才从集合里删**;调用方拿裸 `clearTimeout(beat)` 提前摘掉时,句柄永久留在集合里。探针 ⑤ 第一次读到 `pending=2`(那两个心跳早被 `finish()` 摘了),而 ② 之所以照绿只是因为 `bump` 会整批 `clear()` —— 读数在"换代"那一刻恰好对,在"同一世内"一直是错的。⇒ 危害不是脏数字,是**验收时会照着它下结论**:一条断言 `pending===0` 的判据在同世内其实永远叫不红。
+   做法:机制加 `cancel(world, h)`(clearTimeout + clearInterval + 删集合),**三处调用方全部改走它** —— `earth-day.js:89` 心跳、`late-planets.js:76` 心跳、`:414` 通关与 `:431` 面板不在 DOM 那两处 329 循环;配 1 条机制单测(带**裸 clearTimeout 的对照组**,否则这条测试测不到病因)+ 2 条接线判据(两份测试文件里"机制仍在用"那句从 `clearTimeout(` 换成 `visits.cancel(`,并新增"摘本世代的登记不许漂回裸 clearTimeout")。**反向验证**:把 `earth-day.js` 改回裸 `clearTimeout(beat)` ⇒ 恰好 2 条红,按备份逐字还原后 26 项复绿(`.tmp/rv-cancel.mjs`,动手前 `cp` 到自己名下,不碰 checkout)。
+2. **判据自己漏了一拍(`gap` 第一遍 INJECT_DEAD)**:注射写进 DOM 之后**立刻**读采样器,而采样器 120ms 才看一次屏幕 ⇒ 那一句从来没被看见过,"判据不咬"是假的,真相是"判据来不及咬"。修法是读数前留 600ms 收尾余量(并让窗口右界取在余量之后),不是放宽判据。**与"改成不等时间"那条同族**:注射没红先按顺序排"没打进去 / 没来得及看 / 判据不咬",三者必须在出口码与措辞上分得开。
+3. **路线不等式(第 3 跑 ②③④ 连红、⑤ 反而绿)**:`waitForFunction(activeWorld==='b612')` 在 `transition` 的 commit **中间**就成立,切换其实还没跑完;于是回程 `toMainWorld()` 被 `transitioning` 拒掉,整个"在外"窗口没让模块的收拾分支跑到(`update()` 的那一段在 `acc>=0.1` 的 10Hz 累加器上,不是每帧)⇒ **换世从未发生**,`gen 0→0`、`mode=talking`,旧世心跳照常在回到沙漠之后落地。修法:等 `!transitioning ∧ state().mode==='idle'`(后者是"离场分支真执行过"的**后果**),并且**读 `enterWorld` 的返回值打进结论行** —— 上一版没读返回值,才让这次看起来像"代码坏了"。另外裸 `enterWorld('b612')` 不带快照,已换成石门按钮/`world-travel` 那份 `spawnFor('b612')` 的形状,**坐标从 `shared/planet-logic.mjs` 现取**(与台词指纹同一条纪律:不在探针里抄常量)。
+4. **章节预设的顺序是硬的**:开机就把 `b612PlanetChapter` 设成 6 会**把探针自己的跳板拆掉** —— `scene3-night.js` 的 `armB612()` 在 `planetsChapter >= ENDING_GATE_CHAPTER(6)` 时直接 `removeB612()`(2026-10-03 起"327 之后石门不再是下一步")。首跑因此在 `✗ 跳板 … world=main / 0 通过 6 失败` 停住。⇒ 先留 0 走石门,进 B612 之后才 `setChapter(6)`。
+5. **探针不许点被测链自己的台词**:开局清场那个 600ms 节拍(选项式对话永不自动关,会把 lock 队列堵死)如果照旧点**所有**对话框,就会把本站每句的 `hold` 改短 —— 而这一支探针的全部判据都建立在"每句按 hold 那么久自己关"之上。改成按指纹跳过本链那句(`__isChain`),并在文件头写死这条理由。
+
+### 门禁(全在这棵树上)
+
+vitest **109 文件 / 1265 项全绿,`VITEST_RC=0`(113.14s)**(上一批 109/1264,+1 项来自 `visit-timers` 那条 cancel 单测;`earth-day-visit` 仍 7 项、内容改了 2 条)/ `eslint .` exit 0 且**输出 0 行** / `tsc --noEmit` exit 0 / **checkJs 116 = 基线** / `npm test` 七条 exit 0(**7/22/31/108/46/20/6**)/ `npm run depcruise` exit 0 / 四条 CI 守卫全 exit 0(山丘单人包 / `CSP_REGISTRY_OK 4 条` / 后端清单 **52 可达 · 54 清单** / 探针隔离**扫 151 个脚本**·豁免 8 —— 新探针是被扫到的第 151 个,它自带 `GATE_DATA_FILE`,不进豁免表)/ 七份改动文件 prettier `--check` 全绿。
+⚠️ **这一批门禁跑了两次,第一次的 8 条红不是结论**:
+- 第一次 `Test Files 6 failed | 100 passed (106)` / `Duration 236.94s`,红的 8 条**全是"扫全仓"那一族**(`beacon-manager` 第八份 makeBeacon / `visit-timers` 出处 / `err-text` 裸 `.message` / `dom-typed-sites` 内联 cast 账本 / `ctx-writer-shapes` 两条 / `types-ctx-writer-agreement` 静音钮 / `story-text-collision` `_shown`),单条耗时 22s~**172s**,而 `import 779s / tests 1052s` 对墙钟 236s —— 争用形状。
+- 正向证据两条:那 5 个文件**独跑 48/48 绿(8.93s)**;整仓在机器空下来后**复跑 109/1265 全绿**。残留进程查过:命令行里没有vitest / `server.js` / 探针残留(node 14 个全是 Qoder 自己的插件服务),负载在环境侧(浏览器 53 个)。
+- 🔴 **更该记的一条**:那场争用的汇总**只报了 106 个文件,而磁盘上是 109** —— 三个文件压根没进结论。⇒ 判"全量绿"要**同时**满足"输出整份落盘 + `Test Files` 的文件数等于磁盘数 + `VITEST_RC=0`";只 grep `Test Files` 那一行,会把"少跑了三个文件"读成"几乎全绿"。(与"`exit 0` 不等于跑过"同族,这次是"跑过了但少收了"。)
+⚠️ 本批改的是**运行期前端代码**(`visit-timers.mjs` + `earth-day.js` + `late-planets.js`)⇒ 要 deploy 才对玩家生效;生效时间主人点。与上一批的 earth-day 世代修复是同一类,可以一起发。
+
+### 本批没做(登记,不装成已完)
+
+1. **只测了 flower 一站**。蛇站 19 句(约 100s)、狐狸两站归 `scene10-fox.js` 自持计时器(只有"旧世收尾不进门"那道闸,上面第 3 节那条欠账没变)—— 空档窗的形状是通用的,但"多句链中途离场再回来"只在 2 句的站上实测过。
+2. **没指线上跑**(与 `late-planets-visit-probe` 同一纪律):它会真切换世界、在访客档案上写 `earthStep`。
+3. 探针的 12 项里 **`①/③a/④a/④b/路线` 五条没有各自注射名**(与已命名的四条共用 `state()`/采样器这几条读数路径)。哪天有条主张用上第 6 条读数,就得再加注射名。
+4. `release.sh` 第 3 步的静默死亡**这一批顺手收了**(裸 `npm test` / `npx vitest run` 在 `set -e` 下当场终止、不打结论行;现在接住退出码并各打一条 `RELEASE_FAILED(后端测试红)` / `(前端单测红)`),三种结局用 `.tmp/rehearse-step3.sh` 替身验过(pass→继续 / backred→响亮 exit 1 / vitestred→同样);`:173` 那行"5 个后端脚本"的过期注释一起改成七条实名。**没做的那半**:第 4 步之后仍有别的裸命令(`git fetch`/`git add -u`/`git commit -F`/`git push`)同族,逐个收口要另开一批,别在发布链上顺手改。
+5. `.zcodeignore` 照旧归主人处置。
 
 ## 2026-10-17 vitest 并发上限:把"本地恒红、CI 绿"从判据侧挪到源头(不改运行期,本半批不部署)
 
