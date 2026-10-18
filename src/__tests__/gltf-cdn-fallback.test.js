@@ -56,7 +56,18 @@ const h = vi.hoisted(() => {
 
 vi.mock('three/examples/jsm/loaders/GLTFLoader.js', () => ({ GLTFLoader: h.FakeGLTFLoader }));
 
-const settle = () => new Promise((r) => setTimeout(r, 25));
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ⚠️固定 25ms 会**先于「重试链的下一跳」到期**:桩里每一跳各是一个 setTimeout(0),
+//    CDN 失败 → 源站重试就是两跳,再叠上并发用例抢 CPU ⇒ loaded<3 / surfaced>0 变红而产品没错。
+//    所以主读数一律等**事件终态**;cap 只是防卡死,不构成通过(终态没到 ⇒ 后面的断言照样红)。
+async function until(cond, cap = 4000) {
+  const t0 = Date.now();
+  while (!cond() && Date.now() - t0 < cap) await sleep(10);
+}
+
+// 终态之后再多等一拍:任何「多送的一次」(③ 的第三次调用、② 的重复 onLoad)都要算进账
+const tail = () => sleep(250);
 
 async function freshLoader() {
   // 被测模块在**模块作用域**算 IS_LOCAL 并读 window ⇒ globals 必须在 import 之前装好
@@ -83,7 +94,8 @@ describe('CDN 失联的回退半边', () => {
         undefined,
         () => {}
       );
-    await settle();
+    await until(() => h.calls.filter((u) => u.startsWith('/models/')).length === 3);
+    await tail();
     const cdn = h.calls.filter((u) => /^https:\/\//.test(u));
     const origin = h.calls.filter((u) => u.startsWith('/models/'));
     expect(cdn.length, '第一轮该有三次经 CDN 的请求').toBe(3);
@@ -102,7 +114,8 @@ describe('CDN 失联的回退半边', () => {
         undefined,
         () => surfaced++
       );
-    await settle();
+    await until(() => loaded === 3 || surfaced > 0);
+    await tail();
     expect(loaded, '三个模型都该最终加载成功').toBe(3);
     // 判据只数**交给调用方的那一次**(不是桩内部"这一跳失败了几次":CDN 那一跳本来就注定失败)
     expect(
@@ -124,7 +137,8 @@ describe('CDN 失联的回退半边', () => {
         () => errs[k]++
       );
     });
-    await settle();
+    await until(() => errs.a === 1 && errs.b === 1);
+    await tail();
     expect(errs.a).toBe(1);
     expect(errs.b).toBe(1);
     // 每个 URL:1 次 CDN + 1 次源站 = 2 次调用,没有第三次
@@ -141,7 +155,8 @@ describe('CDN 失联的回退半边', () => {
       undefined,
       () => {}
     );
-    await settle();
+    await until(() => globalThis.window.__modelCdnDown === true);
+    await tail();
     expect(globalThis.window.__modelCdnDown, '第一条失败必须立旗(此后新请求直接源站)').toBe(true);
     const before = h.calls.length;
     let e = 0;
@@ -151,7 +166,8 @@ describe('CDN 失联的回退半边', () => {
       undefined,
       () => e++
     );
-    await settle();
+    await until(() => e === 1);
+    await tail();
     const added = h.calls.slice(before);
     expect(added.length, '旗立起后的新请求只该有一次调用(源站直连,失败就交给调用方)').toBe(1);
     expect(added[0]).toBe('/models/hall/second.glb');

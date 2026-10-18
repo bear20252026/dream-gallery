@@ -122,6 +122,16 @@ async function closeAll() {
   await new Promise((r) => setTimeout(r, 80)); // 让服务端的 close→连接计数归位
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// ⚠️固定 sleep 在 CPU 争用下会**先于「对端真的收到」到期**(消息还在 socket 缓冲区里就该计数了)
+//    ⇒ 判据红、产品没错(2026-10-17 本机争用下实测到两次 `expected 1 to be greater than 1`)。
+//    改成等事件本身;上限只是防卡死,不构成通过。
+async function until(cond, cap = 2000) {
+  const t0 = Date.now();
+  while (!cond() && Date.now() - t0 < cap) await sleep(10);
+}
+
 beforeAll(async () => {
   server = http.createServer((req, res) => {
     res.writeHead(404);
@@ -210,19 +220,26 @@ describe('ws 资源闸', () => {
     await joinRoom(a, { t: 'join', code: 'FLOOD', name: '甲' });
     await joinRoom(b, { t: 'join', code: 'FLOOD', name: '乙' });
     let moves = 0;
+    let barrier = 0;
     b.on('message', (raw) => {
       try {
-        if (JSON.parse(raw.toString()).t === 'move') moves++;
+        const m = JSON.parse(raw.toString());
+        if (m.t === 'move') moves++;
+        if (m.t === 'chat' && m.text === 'BAR') barrier++;
       } catch {}
     });
     a.send(JSON.stringify({ t: 'move', x: 1, y: 0, z: 1, ry: 0 })); // 先确认链路通
-    await new Promise((r) => setTimeout(r, 150));
-    expect(moves).toBe(1);
+    await until(() => moves >= 1);
+    expect(moves, '链路都没通的话,下面的「被限住」是空判').toBe(1);
     for (let i = 0; i < 300; i++)
       a.send(JSON.stringify({ t: 'move', x: i % 10, y: 0, z: i % 10, ry: 0 }));
-    await new Promise((r) => setTimeout(r, 250));
+    // 屏障:同一条 TCP 流上这条 chat 排在 300 条 move 之后 ⇒ b 收到它,就说明服务器已逐条判定完、
+    // b 也已把前面的都收完。chat 走自己那只桶(3/10s),不被 move 的洪水牵连 —— 读数不用猜毫秒。
+    a.send(JSON.stringify({ t: 'chat', text: 'BAR' }));
+    await until(() => barrier >= 1, 5000);
+    expect(barrier, '屏障 chat 都没到 ⇒ 下面两个读数是提前取的,不作数').toBe(1);
     expect(moves).toBeLessThan(60); // 令牌桶 move 20/s:300 条洪水只放行个位数~二十几条
-    expect(moves).toBeGreaterThan(1);
+    expect(moves, '一条都不放行 = 中继死了,不是限流生效').toBeGreaterThan(1);
   });
 
   it('join 洪水被限住:同一连接 5/min 之外静默丢弃', async () => {
