@@ -543,6 +543,9 @@ async function b612Spawn() {
   );
   await p.waitForTimeout(WAIT(GAP_MS));
   if (BREAK === 'gap') injected = await injectLine(1); // 造出"旧世心跳在空档里把第 1 句弹上屏"
+  // ⚠️ 读数前必须留**收尾余量**:采样器 120ms 才看一次屏幕,注射完立刻读 ⇒ 那一句根本没被看见过。
+  //   (2026-10-17 注射 `gap` 实测:注射打进去了而 ③ 照绿 ⇒ INJECT_DEAD,红的是这条判据自己。)
+  await p.waitForTimeout(WAIT(600));
   const gapEnd = Date.now();
   const gapSample = await sample();
   const inGap = (gapSample.full || []).filter((x) => x.t >= gapStart && x.t <= gapEnd);
