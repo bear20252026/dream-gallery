@@ -107,7 +107,7 @@ describe('山丘入库产物的溯源清单', () => {
     const out = String(red.stdout || '') + String(red.stderr || '');
     expect(out).toContain('内容变了但清单没更新');
     fs.rmSync(TMP, { recursive: true, force: true });
-  });
+  }, 60_000); // 起子进程 record/check 两份临时清单;独跑 2117ms,默认 18 worker + 主人浏览器常驻时实测 29109ms ⇒ 超默认 20s
 
   it('index.html 引到的 chunk/字体都在清单里(半包复制 ⇒ 红)', () => {
     const doc = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
@@ -135,5 +135,5 @@ describe('山丘入库产物的溯源清单', () => {
       };
     }
     expect(res.code, 'hill-solo-guard.cjs:\n' + res.out).toBe(0);
-  });
+  }, 60_000); // 同上:起子进程读 73KB minified 产物;独跑 3.9s,本机争用下实测 20.7s ⇒ 超默认 20s
 });
