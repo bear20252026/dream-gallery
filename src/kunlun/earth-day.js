@@ -15,6 +15,7 @@ import { shiftDayTo } from '../scene/time-shift.js';
 import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { earthDue, EARTH_STOPS, EARTH_DONE } from '../shared/earth-day-logic.mjs';
 import { errText } from '../shared/err-text.mjs';
+import { createVisitClock } from '../shared/visit-timers.mjs';
 
 const OWNER = 'earth-day';
 const REACH = 4; // 走到站点 4m 内开讲
@@ -34,7 +35,6 @@ let built = false;
 let arrow = null;
 let props = {}; // name → Object3D
 let globe = null;
-let speakTimer = null;
 let started = false;
 
 function scene() {
@@ -58,23 +58,35 @@ function posOf(key) {
 }
 
 // —— 台词(同 scene7 范式:autoHide 按长度 + 心跳 + spent 幂等) ——
-// M-03:地球之日在沙漠里,但链子此前不问"人还在不在沙漠"。心跳只看 `dialogOpen() === false`,
-// 而离开沙漠时 cancelWorld 关掉对话框同样满足它 ⇒ 下一句会弹在 B612/星球的场景里。
+// 两次治理叠在这一条链上,别把它们当同一件事:
+//  · M-03(2026-10-14 包 B)补的是**在场**这一半 —— 心跳只看 `dialogOpen() === false`,而离场时
+//    cancelWorld 关掉对话框同样满足它 ⇒ 下一句会弹在 B612/星球的场景里。
+//  · C4(2026-10-17)要的是**世代**这一半:离场时没人摘那只模块级 `speakTimer`(它只在自己那一拍里
+//    `inDesert()` 早退)⇒ 它成了条谁都不持有的孤儿。玩家回来重新到站,新世又开一条链;坏不坏取决于
+//    **旧那一拍到期那一刻有没有对话框开着**:开着 ⇒ 白跑一趟;没开 ⇒ 旧 `finish()` 落地 ——
+//    它先 `clearTimeout(speakTimer)` 把**新世**那条心跳摘掉(同一只单槽!),再 `speakSeq(i + 1)`
+//    替旧世把下一句开出来 ⇒ 同一站两条链同时在讲,`advance()` 走两遍 = **earthStep 一次跳两站**
+//    (`advance()` 写的是存档,不只是画面重播)。形态与 late-planets 那只单槽、与 2026-10-14 PR2
+//    在 hot.js 抓到的那四个单槽同源。
+// 机制与三条契约在 `shared/visit-timers.mjs`;沙漠只有一个世界,键就用 'main'。
 function inDesert() {
   return (ctx.scene.activeWorld || 'main') === 'main';
 }
+const visits = createVisitClock(inDesert);
 function speakSeq(seq, i, done) {
-  if (!inDesert()) return;
+  const gen = visits.gen('main');
+  if (!visits.alive('main', gen)) return;
   if (i >= seq.length) {
     done && done();
     return;
   }
   const item = seq[i];
   let spent = false;
+  let beat = null; // 先声明再赋值:openDialog 若同步回调 onDone,直接引用 const beat 会撞 TDZ
   const finish = () => {
     if (spent) return;
     spent = true;
-    clearTimeout(speakTimer);
+    clearTimeout(beat);
     speakSeq(seq, i + 1, done);
   };
   const hold = Math.max(4600, ((item.en || '').length * 65) | 0);
@@ -86,11 +98,14 @@ function speakSeq(seq, i, done) {
     lock: true,
     onDone: finish,
   });
-  clearTimeout(speakTimer);
-  speakTimer = setTimeout(() => {
-    if (!inDesert()) return;
-    if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
-  }, hold + 2600);
+  beat = visits.later(
+    'main',
+    gen,
+    () => {
+      if (!ctx.ui.dialogOpen || !ctx.ui.dialogOpen()) finish();
+    },
+    hold + 2600
+  );
 }
 
 // —— 布景(全部 MeshBasic/Lambert 低模,零新资产) ——
@@ -325,11 +340,15 @@ function advance() {
   guideTo(stopKey());
 }
 function arrive(key) {
+  const gen = visits.gen('main'); // 本次到站属于哪一世
   clearGuide();
   ctx.ui.journey?.clearGoal?.(OWNER);
   mode = 'talking';
   window.__earth = key;
-  const after = () => advance();
+  const after = () => {
+    if (!visits.alive('main', gen)) return; // 旧世的收尾(含 foxApi 那边)不许推进这一世的 earthStep
+    advance();
+  };
   switch (key) {
     case 'snake':
       return speakSeq(SCENE10.snake, 0, after);
@@ -405,7 +424,14 @@ export function createEarthDay() {
       ctx.events?.on?.('story:earthday', onStart);
       unsub.push(() => ctx.events?.off?.('story:earthday', onStart));
       ctx.scene.earthDayApi = {
-        state: () => ({ mode, step: step(), stop: stopKey(), due: earthDue(flags()) }),
+        state: () => ({
+          mode,
+          step: step(),
+          stop: stopKey(),
+          due: earthDue(flags()),
+          gen: visits.gen('main'),
+          pending: visits.pending('main'),
+        }),
         /** 探针:直接到某一站(不改存档以外的东西) */
         jump(n) {
           ctx.store.setNum('earthStep', n);
@@ -422,10 +448,10 @@ export function createEarthDay() {
       pulseBeacon(beacons.get('guide'), t); // 呼吸(自转对圆柱本身不可见,与各章同一份实现)
       if (acc < 0.1) return;
       acc = 0;
-      const inMain = (ctx.scene.activeWorld || 'main') === 'main';
-      if (!inMain) {
+      if (!inDesert()) {
         // 离开沙漠:收起指引,回来再接上(对白中断的那一站从头讲)
         if (mode === 'walking' || mode === 'talking' || mode === 'fox') {
+          visits.bump('main'); // 换世写在收拾之前:旧世在飞的延时当场作废,而不是"到点了先不动"
           clearGuide();
           started = false;
           mode = 'idle';
@@ -448,7 +474,7 @@ export function createEarthDay() {
       if (Math.hypot(pl.p.x - p.x, pl.p.z - p.z) < r) arrive(key);
     },
     dispose() {
-      clearTimeout(speakTimer);
+      visits.bump('main'); // dispose 之后不该还有沙漠那一世的回调在飞
       clearGuide();
       unsub.forEach((f) => f());
       ctx.scene.earthDayApi = null;
