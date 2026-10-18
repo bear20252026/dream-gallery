@@ -1112,6 +1112,14 @@ prettier：本轮改动文件全部合排（HEAD 本就不合排的三个按既�
 
 两轮复跑 4/4 符合预期;收尾两份从 `.tmp/*.newshape.js` **逐字节**还原(不看 git、不 checkout)。
 
+另一半同样要做,否则"判据没松"只是我说的:`.tmp/ab-product-regression.cjs` 把**产品代码**打回真回归,新判据必须红 ——
+
+- `src/scene/gltf-loader.js` 退回审计 C3 的旧形状(重试绑在"旗刚被这次失败立起来")⇒ gltf **3/4 红**:
+  ① `每个失败请求都该有一次源站重试: expected 1 to be 3`、② `三个模型都该最终加载成功: expected 1 to be 3`、③ `expected 3 to be 4`。
+- `lib/multiplayer.js` 的 `move` 桶收到 `limit: 1`(中继"限过头",一条洪水都不放行)⇒ 洪水那条红在
+  **`一条都不放行 = 中继死了,不是限流生效: expected 1 to be greater than 1`** —— 这句判据词就是为这一条写的。
+- 两份 prod 文件跑完 **md5 与跑前逐字节相同**,`git status` 只剩 `.zcodeignore`(主人的决定,不动)。
+
 ⚠️ **一条没能复现的事实,记下来免得下次再赌机器**:先试"24 个 CPU 死循环"与"双开整仓 vitest"两种机器级争用,**旧形状各 2-3 轮全绿** —— 当初那批红需要比这更狠的争用(`.tmp/vitest-quiet.log` / `vitest-final3.log` 那两轮是挂着 6-8 个 vitest 进程时跑的)。所以证明靠上面那张**确定性注射**表,不是"再压一次机器复现运气"。**教训:"改成不等时间"这类修法,必须用注入延迟来验,用复跑验不出来。**
 
 ⚠️ 读数纪律又踩一次:grep `.tmp/*.log` 找 `FAIL  src/...` 命中 0 次,不是"没有红",是** ANSI 夹在中间**。剥掉 `\u001b[..m` 再数。
