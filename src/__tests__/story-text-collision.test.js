@@ -112,15 +112,25 @@ describe('撞键的机制性代价:_shown 后写覆盖(合成用例,不依赖具
 });
 
 describe('反查表只允许一张(第二张会把 8 组撞键变成乘二)', () => {
+  // 扫的是**整个仓库的源码**而不是只有 src/:这张反查表如果长在 lib/、scripts/ 或某个 html 里,
+  // 只扫 src/ 就完全放过它(2026-10-17 实测这一条独跑 25s 冲破 vitest 默认 20s 预算 ⇒ 显式给预算;
+  // 扩大范围不是因为慢,是因为原来那份**扫漏了**)。测试自己住在 __tests__/,那里的命中不算。
+  const SCAN_ROOTS = ['src', 'lib', 'scripts', 'public', 'types', 'hill-src/src'];
   it('`_shown` 只住在 story-text.mjs,别处不得再建 text→条目 的反查表', () => {
-    const hits = [];
-    for (const rel of fs
-      .readdirSync(path.join(ROOT, 'src'), { recursive: true })
-      .filter((f) => typeof f === 'string' && /\.(js|mjs)$/.test(f))
-      .map((f) => String(f).replace(/\\/g, '/'))
-      .filter((f) => !f.startsWith('__tests__/'))) {
-      if (fs.readFileSync(path.join(ROOT, 'src', rel), 'utf8').includes('_shown')) hits.push(rel);
+    const hits = new Set();
+    for (const d of SCAN_ROOTS) {
+      const base = path.join(ROOT, d);
+      if (!fs.existsSync(base)) continue;
+      for (const f of fs.readdirSync(base, { recursive: true })) {
+        const inside = String(f).replace(/\\/g, '/');
+        if (!/\.(js|mjs|html)$/.test(inside)) continue;
+        if (inside.includes('__tests__/')) continue;
+        const rel = d + '/' + inside;
+        const abs = path.join(base, inside);
+        if (!fs.statSync(abs).isFile()) continue;
+        if (fs.readFileSync(abs, 'utf8').includes('_shown')) hits.add(rel);
+      }
     }
-    expect(hits).toEqual(['shared/story-text.mjs']);
-  });
+    expect([...hits].sort()).toEqual(['src/shared/story-text.mjs']);
+  }, 60_000);
 });

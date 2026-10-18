@@ -214,7 +214,7 @@ describe('dom-typed 助手本体与调用点', () => {
       }
     }
     expect(bad, bad.join('\n')).toEqual([]);
-  });
+  }, 120000);
 
   it('助手不改变对象、不改选择器字符串(qsa* 唯一真实差别是数组)', () => {
     const node = { kind: 'the-same-node' };

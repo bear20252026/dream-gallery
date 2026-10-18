@@ -376,7 +376,7 @@ describe('2026-10-15 第五刀:被写成 `() => void` 的成员,参数表 ≡ �
       }
     }
     expect(bad, '这些调用点传得比 modeToast 的声明还多').toEqual([]);
-  });
+  }, 90000);
 
   /** 从 `(` 之后扫到配对的 `)`,数顶层逗号(空参算 0) */
   function countArgs(src, openAt) {
