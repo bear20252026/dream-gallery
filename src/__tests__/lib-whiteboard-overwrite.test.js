@@ -323,7 +323,7 @@ describe('DG-SEC-001 他人覆盖被拒(判定在写入之前)', () => {
     expect(res.code).toBe(409);
     expect(fs.readFileSync(p, 'utf8')).toBe('MASTERS-OLD-PICTURE');
     expect(gateData.uploads[legacy]).toBeUndefined();
-  });
+  }, 60_000); // 预算按实测给:本机独跑 366ms,8 worker + 浏览器常驻的负载下实测 21983ms(超默认 20s)。贵的那一下不是这段断言,是 save() 里那次整库快照落盘在与同批 worker 抢盘(2026-10-15 量过:快照 2.3MB、一次 p95≈94ms)。判据说什么一个字没动。
 
   it('匿名侧不许借白板名写别的目录:dir=videos|music → 403,一个文件都不碰', async () => {
     for (const dir of ['videos', 'music']) {

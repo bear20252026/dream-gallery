@@ -55,7 +55,13 @@ describe('late-planets 的世代接线', () => {
       }
     };
     walk('src');
-    expect(users.sort()).toEqual(['src/kunlun/late-planets.js', 'src/shared/visit-timers.mjs']);
+    // 2026-10-17 收掉地球之日那处同形状(AGENTS 记的最后一处欠账)⇒ 使用者从两份变三份。
+    // 这张名单就是"延时只有一个出处"的正面半边:多一条 = 长出第二份世代实现,少一条 = 有处漂回了裸计时器。
+    expect(users.sort()).toEqual([
+      'src/kunlun/earth-day.js',
+      'src/kunlun/late-planets.js',
+      'src/shared/visit-timers.mjs',
+    ]);
   }, 60_000);
 
   it('每个会异步收尾的作用域都取了自己的世代号', () => {
