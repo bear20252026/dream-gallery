@@ -37,7 +37,9 @@ describe('地球之日的世代接线', () => {
   it('全流程零裸计时器:setTimeout / setInterval 一律不许出现在代码里', () => {
     const hits = [...code.matchAll(/\bset(Timeout|Interval)\s*\(/g)].map((m) => m[0]);
     expect(hits, '漂回了裸计时器 ⇒ 旧世那条心跳没人摘:' + hits.join(',')).toEqual([]);
-    expect(code).toMatch(/clearTimeout\(/); // 机制仍在用(这句收完就摘自己的心跳),防"恒空的假断言"
+    expect(code, '机制仍在用(这句收完就收回自己的心跳),防"恒空的假断言"').toMatch(
+      /visits\.cancel\(/
+    );
   });
 
   it('台词链取世、判世、心跳归这一世(不再共用模块级单槽)', () => {
@@ -48,7 +50,14 @@ describe('地球之日的世代接线', () => {
     expect(
       b,
       '心跳又漂回模块级 speakTimer:同一条链的上一拍会被下一拍摘掉,而离场时谁都不摘'
-    ).toMatch(/clearTimeout\(beat\)/);
+    ).toMatch(/visits\.cancel\(\s*\n?\s*'main',\s*beat\s*\)/);
+    // ★单独钉这一条,因为它红过一次(2026-10-17 探针 ⑤ 实测走完一站后 `pending=2`):
+    //   裸 `clearTimeout(beat)` 确实让回调不跑了,但**不摘 `s.timers` 里的句柄** ⇒ `pending()`
+    //   从"还有几个在飞"退化成"登记过几个没到期的",一长条链(蛇站 19 句)能把集合越填越满,
+    //   而探针与 `earthDayApi.state()` 的读数就是给验收用的,读数说谎等于没有读数。
+    expect(b, '摘本世代的登记一律走 visits.cancel;裸 clearTimeout 不摘集合').not.toMatch(
+      /clearTimeout\(/
+    );
     expect(code, '模块级单槽不许回来').not.toMatch(/let speakTimer\b/);
   });
 

@@ -170,8 +170,24 @@ else
 fi
 
 echo "=== 3/9 Backend tests + unit tests ==="
-npm test       # 5 个后端脚本:test-store(原子写) / test(后端 API) / test-session(会话与吊销) / test-upload-security(上传门禁) / test-mobile
-npx vitest run # frontend unit tests
+# 2026-10-17 发布 #11 就死在这一步,而且**一句结论都没打**:脚本头是 `set -e -o pipefail`,而这两条
+# 是裸命令 ⇒ 任一非零退出当场终止脚本,`RELEASE_FAILED` 那行永远轮不到。事后读日志只能看见"断在半截",
+# 于是"测试红了"和"我手动中断了"长得一模一样(那次实测:13 条超时红 + 67 个浏览器进程抢 CPU)。
+# ⇒ 收成第 4 步已有的写法:接住退出码、打真实结论行、再 exit。
+TEST_RC=0
+npm test || TEST_RC=$? # 7 个后端脚本:test-store(原子写) / test-store-sqlite / test-backup / test(后端 API) / test-session(会话与吊销) / test-upload-security(上传门禁) / test-mobile
+if [ "$TEST_RC" != "0" ]; then
+  echo "❌ 后端测试红(exit $TEST_RC),已停止 —— 未构建、未开 PR、未部署"
+  echo "RELEASE_FAILED(后端测试红)"
+  exit 1
+fi
+VITEST_RC=0
+npx vitest run || VITEST_RC=$? # frontend unit tests
+if [ "$VITEST_RC" != "0" ]; then
+  echo "❌ 前端单测红(exit $VITEST_RC),已停止 —— 未构建、未开 PR、未部署"
+  echo "RELEASE_FAILED(前端单测红)"
+  exit 1
+fi
 
 echo "=== 4/9 Production build (trial) ==="
 # 不能写成 `npm run build 2>&1 | tail -5`:`-o pipefail` 在 `set -e` 下让整条管道的状态成为脚本状态,
