@@ -93,6 +93,23 @@ export function createVisitClock(isHere) {
     return true;
   }
 
+  /**
+   * 主动收回本世代登记的一次延时/循环。
+   * ⚠️ 这一条是给**调用方**用的,不是装饰:`later/every` 登记的句柄存在 `s.timers` 里,
+   * 句柄自己到期时才从集合里删 —— 调用方若拿裸 `clearTimeout(beat)` 提前摘掉它,那个句柄就**永远留在集合里**,
+   * 于是 `pending()` 报的不再是“还有几个在飞”而是“本世代登记过几个没到期的”,且一长一条链就把集合越填越满
+   * (2026-10-17 探针 ⑤ 实测:走完一站后 `pending=2`,而那两个心跳早就被 finish() 摘掉了)。
+   * 摘本世代的计时器请一律走这里;裸 clearTimeout 只留给“不是本世代登记的”句柄。
+   */
+  function cancel(world, h) {
+    if (h === null || h === undefined) return false;
+    const s = st(world);
+    clearTimeout(h);
+    clearInterval(h);
+    s.timers.delete(h);
+    return true;
+  }
+
   return {
     /** 当前世代号(登记回调时先取一次,之后一路带着比) */
     gen: (world) => st(world).gen,
@@ -101,6 +118,7 @@ export function createVisitClock(isHere) {
     later,
     every,
     onLeave,
+    cancel,
     /** 测试/探针用:本世代还有几个在飞计时器 */
     pending: (world) => st(world).timers.size,
   };

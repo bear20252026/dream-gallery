@@ -73,7 +73,7 @@ function speakSeq(seq, i, done, home) {
     const finish = function () {
       if (spent) return;
       spent = true;
-      clearTimeout(beat);
+      visits.cancel(home, beat); // 同 earth-day:摘本世代的心跳要走 cancel,否则 pending 虚高(裸 clearTimeout 不摘集合)
       i++;
       advance();
     };
@@ -411,7 +411,7 @@ function lampGame(world, done) {
     paint();
     if (good >= NEED) {
       finished = true;
-      clearInterval(timer);
+      visits.cancel(world, timer); // 通关了:这一轮的循环当场收回(走 cancel,不是裸 clearInterval)
       visits.later(
         world,
         gen,
@@ -428,7 +428,7 @@ function lampGame(world, done) {
     // 判活看**本轮那块面板**还在不在 DOM 里,不是看模块级的全局 `gameEl`:
     // 旧写法离开再重进时 `gameEl` 已经被新面板重新赋值 ⇒ 这个 interval 永远停不下来,
     // 和新那一轮的 flip 一起 paint、一起 setLampLit(head) ⇒ 路灯双频乱闪、玩家跟不上(2026-10-17 C4)。
-    if (finished || !el.isConnected) return clearInterval(timer);
+    if (finished || !el.isConnected) return visits.cancel(world, timer); // 这块面板已经不在 DOM 里 ⇒ 本轮循环收回
     if (ctx.ui.dialogOpen?.()) return; // 对白中天不动
     night = !night;
     answered = false; // 每个白天/黑夜各算一次,要亲手按

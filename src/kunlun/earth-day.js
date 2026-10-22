@@ -86,7 +86,7 @@ function speakSeq(seq, i, done) {
   const finish = () => {
     if (spent) return;
     spent = true;
-    clearTimeout(beat);
+    visits.cancel('main', beat); // 摘心跳必须走 cancel:裸 clearTimeout 会把句柄留在集合里,pending 从此虚高(2026-10-17 探针 ⑤ 实测 2)
     speakSeq(seq, i + 1, done);
   };
   const hold = Math.max(4600, ((item.en || '').length * 65) | 0);

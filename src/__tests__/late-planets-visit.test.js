@@ -29,7 +29,7 @@ describe('late-planets 的世代接线', () => {
   it('全流程零裸计时器:setTimeout / setInterval 一律不许出现在代码里', () => {
     const hits = [...code.matchAll(/\bset(Timeout|Interval)\s*\(/g)].map((m) => m[0]);
     expect(hits, '漂回了裸计时器(旧世代的尾巴会拆新面板/推双份剧情):' + hits.join(',')).toEqual([]);
-    expect(code).toMatch(/clearTimeout\(/); // 机制仍在用(换世即清),不判假空断言
+    expect(code).toMatch(/visits\.cancel\(/); // 收回登记走 cancel(裸 clearTimeout 不摘在飞集合 ⇒ pending 虚高,2026-10-17 探针 ⑤ 实测)
   });
 
   // 扫全仓的用例天然顶到 vitest 默认 20s 超时(并发时更明显)——本仓记过三次,新写就带上预算

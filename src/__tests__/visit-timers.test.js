@@ -21,6 +21,25 @@ describe('世代时钟', () => {
     expect(clock.pending('w1')).toBe(0);
   });
 
+  it('★ cancel 收回登记:回调不再跑,且 pending 归零(裸 clearTimeout 会留一个虚高的"在飞"数)', () => {
+    const clock = createVisitClock(() => true);
+    const g = clock.gen('w1');
+    const fn = vi.fn();
+    const h = clock.later('w1', g, fn, 100);
+    const t = clock.every('w1', g, fn, 50);
+    expect(clock.pending('w1')).toBe(2);
+    clock.cancel('w1', h);
+    clock.cancel('w1', t);
+    expect(clock.pending('w1'), '摘掉的两只不该还算在飞').toBe(0);
+    vi.advanceTimersByTime(300);
+    expect(fn, 'cancel 之后延时与循环都不该再来').not.toHaveBeenCalled();
+    // 对照组:同一件事用裸 clearTimeout —— 句柄就从集合里留下来了。
+    // 这条不是凑数:2026-10-17 探针 ⑤ 就是靠 `pending=2` 这个读数发现三处调用方全在裸摘的。
+    const h2 = clock.later('w1', g, fn, 100);
+    clearTimeout(h2);
+    expect(clock.pending('w1'), '裸 clearTimeout 不摘集合:pending 虚高的来源就此钉死').toBe(1);
+  });
+
   it('★ 换世之后,上一世的 later 一律不执行(同世界快返的现场)', () => {
     const here = { v: true };
     const clock = createVisitClock(() => here.v);

@@ -61,6 +61,18 @@ export function byIdBtn(id) {
 }
 
 /**
+ * 按 id 取内联框架(`<iframe>`)。第十刀·批次2 需要:后台的协议编辑器
+ * (`src/admin/admin-docs.js` 读它的 `srcdoc` / `contentDocument` / `onload`,三个都只在
+ * `HTMLIFrameElement` 上)。同源时才拿得到 contentDocument,所以那里照旧包在 try/catch 里
+ * —— 类型不许替运行期做保证,这条与文件头边界 1 同一口径。
+ * @param {string} id
+ * @returns {HTMLIFrameElement|null}
+ */
+export function byIdFrame(id) {
+  return /** @type {HTMLIFrameElement|null} */ (document.getElementById(id));
+}
+
+/**
  * 在 root 范围内取一个普通元素。
  * @param {ParentNode} root
  * @param {string} sel

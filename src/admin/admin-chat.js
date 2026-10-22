@@ -2,6 +2,10 @@
 // 状态自持(chatCurDk/chatSse/chatPoll/chatDevices);switchTab 经 stopChatLive() 清理。
 
 import { adminFetch, $, esc, toast } from './admin-core.js';
+// 类型化取用(第十刀·批次2):`#chatMsgInput` 是 <input>、`#chatSendBtn` 是 <button>(admin.html:1012/1028),
+// `disabled`·`placeholder`·`value` 只在这两类元素上,裸 `$()` 返回的 HTMLElement 上没有 ⇒ 逐点 TS2339。
+// 助手本体只有 cast、不校验标签,所以运行期与 `$('…')` 逐字相同(判据见 src/__tests__/dom-typed-sites.test.js)。
+import { byIdBtn, byIdInput } from '../shared/dom-typed.js';
 
 // SSE/轮询清理(原散在 admin.js switchTab 内;2026-10-09 随对话分区一起切出封装)
 export function stopChatLive() {
@@ -40,10 +44,10 @@ export async function startChat() {
   loadPublicRoom();
   if (chatPoll) clearInterval(chatPoll);
   chatPoll = setInterval(loadPublicRoom, 3000);
-  if (!$('chatMsgInput').disabled) return;
-  $('chatMsgInput').disabled = false;
-  $('chatSendBtn').disabled = false;
-  $('chatMsgInput').placeholder = '回话到聊天室(以「管理员」身份)…';
+  if (!byIdInput('chatMsgInput').disabled) return;
+  byIdInput('chatMsgInput').disabled = false;
+  byIdBtn('chatSendBtn').disabled = false;
+  byIdInput('chatMsgInput').placeholder = '回话到聊天室(以「管理员」身份)…';
   return;
 }
 function renderChatDevices() {
@@ -127,9 +131,9 @@ export function chatSelect(dk) {
   renderChatDevices();
   const d = chatDevices.find((x) => x.dk === dk);
   $('chatSubTitle').textContent = '点对点 · ' + esc(d ? d.name : dk);
-  $('chatMsgInput').disabled = false;
-  $('chatSendBtn').disabled = false;
-  $('chatMsgInput').placeholder = '回话到聊天室(以「管理员」身份)…';
+  byIdInput('chatMsgInput').disabled = false;
+  byIdBtn('chatSendBtn').disabled = false;
+  byIdInput('chatMsgInput').placeholder = '回话到聊天室(以「管理员」身份)…';
   loadPublicRoom();
   if (chatPoll) clearInterval(chatPoll);
   chatPoll = setInterval(loadChatMsgs, 2500);
@@ -184,10 +188,10 @@ async function loadChatMsgs() {
   }
 }
 export async function chatSend() {
-  const t = $('chatMsgInput').value.trim();
+  const t = byIdInput('chatMsgInput').value.trim();
   if (!t) return; // 2026-10-10 改公开聊天室回话:不再要求先点选设备(点对点端点未实现)
-  $('chatMsgInput').value = '';
-  $('chatSendBtn').disabled = true;
+  byIdInput('chatMsgInput').value = '';
+  byIdBtn('chatSendBtn').disabled = true;
   try {
     // 2026-10-10:改走公开聊天室(以「管理员」身份,服务端按 x-token 识别);原点对点端点从未实现
     const r = await adminFetch('/api/chat', {
@@ -200,5 +204,5 @@ export async function chatSend() {
   } catch (e) {
     toast('发送失败', 1);
   }
-  $('chatSendBtn').disabled = false;
+  byIdBtn('chatSendBtn').disabled = false;
 }

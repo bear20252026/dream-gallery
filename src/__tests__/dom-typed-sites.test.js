@@ -15,6 +15,12 @@
 //     同样的成员顺序(qsa* 唯一真实的差别是 NodeList → Array)。
 //  4. 全仓残留的**内联 DOM cast** 是一笔记了名的债:表外新增一条就红,少一条也红。
 //
+//  ⚠️另有两条是**第十刀·批次2**(后台 admin 那一族 41 条)加的:一条盯 `$` 本身
+//    (`admin-core.js` 那行只许继续交回 HTMLElement —— 给它写 `any` 会一次抹掉 39 条错,
+//    代价是整个 admin 目录从此没人检查),一条盯"`$(…).标签专属成员` 的直接读数归零 +
+//    唯一那处拼接 id 的例外必须点名"(`$('up-' + dir)`:dom-typed 的反查要把参数当字面 id,
+//    拼接出来的 id 反查不到 ⇒ 那 2 条留在基线里,原因与边界都写在该用例里)。
+//
 // ⚠️读源码一律走 read():本机检出是 CRLF,`\r` 会卡在 `$` 前面把 not.toMatch 变成空断言。
 import { describe, it, expect, afterEach } from 'vitest';
 import fs from 'node:fs';
@@ -31,6 +37,7 @@ const CLAIM = {
   byIdCanvas: 'canvas',
   byIdSelect: 'select',
   byIdBtn: 'button',
+  byIdFrame: 'iframe',
   qsEl: null,
   qsInput: 'input',
   qsArea: 'textarea',
@@ -278,6 +285,12 @@ describe('dom-typed 助手本体与调用点', () => {
       'src/gate/settings/upload-import.js',
       'src/kunlun/finale.js',
       'src/gate/housecolor.js',
+      // 第十刀·批次2 接上的后台五份(整族 41 条 DOM 报错,判据见下面"admin 那一族"那两条)
+      'src/admin/admin-chat.js',
+      'src/admin/admin-content.js',
+      'src/admin/admin-docs.js',
+      'src/admin/admin-tabs.js',
+      'src/admin/admin.js',
     ];
     for (const rel of converted) {
       const t = read(rel);
@@ -318,6 +331,51 @@ describe('dom-typed 助手本体与调用点', () => {
     });
   });
 
+  it('admin 那一族的 `$` 只许交回 HTMLElement(拿 any 换数字就是拆掉这一族的病根)', () => {
+    // 后台那 41 条 TS2339 的**根**只有这一行:admin-core.js 的 `$` 把 getElementById 的结果原样交出去。
+    // 于是"最省事的修法"恰好是最坏的修法:给它加一句 `@returns {any}` ⇒ 39 条一起消失,
+    // 而 admin 全目录从此再没有任何读数点被检查过(退比 unknown 更糟的那条,第九刀批次6 已实测过形状)。
+    // 所以这条判据不看数量,只看这一行**还是不是那份窄声明**。
+    const src = read('src/admin/admin-core.js');
+    const line = src.split('\n').find((l) => /^\s*export const \$ =/.test(l));
+    if (!line) throw new Error('锚点没命中:admin-core.js 里 `export const $ =` 这一行');
+    expect(line, '$ 的取法被改了').toContain('document.getElementById(id)');
+    expect(line).not.toMatch(/\bany\b/);
+    // 也不许在别处给 $ 补一条 any 的 @returns
+    expect(src).not.toMatch(/@returns\s*\{\s*(?:any|\*)\s*\}\s*\n\s*export const \$/);
+    // admin 目录里不许出现 `@type {any}`/`: any` 这类"顺手放宽"的写法(第八刀之后新增的都是本族的)
+    for (const rel of files.filter((f) => f.startsWith('src/admin/')))
+      expect(read(rel), `${rel} 出现了 any 取用`).not.toMatch(/@type \{\s*(?:any|\*)\s*\}/);
+  });
+
+  it('admin 目录里 `$(…).标签专属成员` 的直接读数归零,唯一例外点名记在账上', () => {
+    // 判据:形如 `$('x').value` / `$('x').disabled` / `$('x').dataset` 的直接读数一个都不许留
+    // (留一条就等于留一条 TS2339,或者更糟——留一条没人负责的内联 cast)。
+    const direct = [];
+    for (const rel of files.filter((f) => f.startsWith('src/admin/'))) {
+      const t = read(rel);
+      for (const m of t.matchAll(
+        /\$\([^)]*\)\.(value|disabled|checked|files|srcdoc|contentDocument|dataset|onchange|oninput|placeholder)\b/g
+      ))
+        direct.push(`${rel}:${m[1]}`);
+    }
+    expect(direct, '还留着的直接读数:\n' + direct.join('\n')).toEqual([]);
+
+    // 唯一那处用不了的:上传按钮的名字是拼出来的(`up-photos`/`up-videos`/…),而 dom-typed 的判据
+    // 要把参数当**字面 id** 去 markup 表里反查标签 ⇒ 拼接 id 一律反查不到(第十刀·批次2 实测)。
+    // 这 2 条因此留在基线里;它必须是**恰好这一处**,别想用它当借口再开第二条。
+    const c = read('src/admin/admin-content.js');
+    // 只数代码行:该文件头部那段说明必然要复述这个写法(第九刀 emit / 第十刀批次1 的 @param {object}
+    // 之后这是**第三次**撞"注释喂自己的判据"),所以判据一律先剥注释再扫。
+    const code = c
+      .split('\n')
+      .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+      .join('\n');
+    expect((code.match(/\$\('up-' \+ dir\)/g) || []).length, "$('up-' + dir) 只许一处").toBe(1);
+    expect((code.match(/\binp\.files\b/g) || []).length, '它喂给那两个读数点的次数').toBe(2);
+    expect(c, '这处不许漂成内联 cast').not.toMatch(/@type \{HTML/);
+  });
+
   it('本文件那张 CLAIM 表 ≡ 助手自己声明的返回类型(表与源码漂了就红)', () => {
     const src = read(MOD);
     const TAGTYPE = {
@@ -326,6 +384,7 @@ describe('dom-typed 助手本体与调用点', () => {
       button: 'HTMLButtonElement',
       textarea: 'HTMLTextAreaElement',
       select: 'HTMLSelectElement',
+      iframe: 'HTMLIFrameElement', // 第十刀·批次2 随 byIdFrame 补上(漏了它,这条表比对直接抛"标签不在表里")
     };
     for (const [n, claim] of Object.entries(CLAIM)) {
       const at = src.indexOf(`export function ${n}(`);
