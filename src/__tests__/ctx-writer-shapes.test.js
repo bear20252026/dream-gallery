@@ -408,7 +408,7 @@ describe('批次6-7 地板(第十刀·批次0 起改成了"上限"而不是"等�
    * 批次1(裸 object 族:plane-physics 22 + chapter-map-logic 7)压到 **116**,判据钉在
    * src/__tests__/plane-and-save-shapes.test.js,那里测的是"声明与写入方同一份事实",不是条数。
    */
-  const CEILING = 116;
+  const CEILING = 75;
   it(`checkJs 基线不得超过 ${CEILING}:想抬上限必须同时改这里`, () => {
     const raw = read('scripts/checkjs-baseline.txt').trim();
     if (!/^\d+$/.test(raw)) throw new Error(`基线文件不是一个数:${raw}`);

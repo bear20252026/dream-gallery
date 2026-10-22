@@ -2,6 +2,8 @@
 // 顶层 wiring 依赖 DOM 就绪(admin.html 的 module script 在 body 末尾),保持模块顶层执行。
 
 import { tk, adminFetch, confirmAsync, $, esc, fmt, toast } from './admin-core.js';
+// 类型化取用(第十刀·批次2):#errType=<select>、#errQ=<input>(admin.html 实测),`.value` 不在 HTMLElement 上。
+import { byIdInput, byIdSelect } from '../shared/dom-typed.js';
 
 // ===================== 报错反馈(2026-08-30) =====================
 const TYPE_ICON = { js: '⚡', promise: '⏳', resource: '📦', webgl: '🖥', network: '🌐' };
@@ -71,8 +73,8 @@ $('wishRefresh').addEventListener('click', loadWishes);
 
 export async function loadErrors() {
   try {
-    const type = $('errType').value;
-    const q = $('errQ').value.trim();
+    const type = byIdSelect('errType').value;
+    const q = byIdInput('errQ').value.trim();
     // token 已由 adminFetch 统一走 x-token 头,tk() 恒返空串;查询串必须自起 "?",
     // 再写 '+ tk() + "&type="' 会拼出 client-errors&type= 畸形 URL → 404(2026-09-25 血泪)
     const r = await adminFetch(

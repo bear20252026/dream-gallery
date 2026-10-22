@@ -24,6 +24,10 @@ import {
   brandIcon,
   brandShow,
 } from './admin-core.js';
+// 类型化取用(第十刀·批次2):`.tab` 在 admin.html 里是 <div>(dataset 挂在 HTMLElement 上,
+// 而 `querySelectorAll` 交回来的是 Element ⇒ 原来报 1 条),#appSearch 是 <input>(`.value` 同理)。
+// `?.value` 与原来那句 `(($('appSearch') || {}).value || '')` 逐字等价:元素不在场都得 undefined,再 `|| ''` 兜住。
+import { byIdInput, qsaEl } from '../shared/dom-typed.js';
 import { loadErrors } from './admin-tabs.js';
 import { loadDocs } from './admin-docs.js';
 import { startChat, stopChatLive, chatSelect, chatSend } from './admin-chat.js';
@@ -71,7 +75,7 @@ function switchTab(t) {
     var p = $('tab-' + panels[i]);
     if (p) p.style.display = panels[i] === t ? '' : 'none';
   }
-  document.querySelectorAll('.tab').forEach(function (e) {
+  qsaEl(document, '.tab').forEach(function (e) {
     e.classList.toggle('active', e.dataset.tab === t);
   });
   if (t !== 'chat') stopChatLive();
@@ -296,7 +300,7 @@ function renderApprove() {
 function renderApproved(pre) {
   const A = DATA.applicants || [];
   const approved = pre || A.filter((a) => a.status === 'approved');
-  const q = (($('appSearch') || {}).value || '').trim().toLowerCase();
+  const q = (byIdInput('appSearch')?.value || '').trim().toLowerCase();
   let list = approved;
   if (q)
     list = approved.filter(

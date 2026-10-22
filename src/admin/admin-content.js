@@ -15,6 +15,13 @@ import {
   toast,
 } from './admin-core.js';
 import { DATA } from './admin-state.js';
+// 类型化取用(第十刀·批次2):#clName/#clUrl 是 <input>、#clIcon/#clModel 是 <select>(admin.html 实测),
+// `.value` 两边都有但 HTMLElement 上没有 ⇒ 原来报 8 条 TS2339。
+// ⚠️`upload(dir)` 里那两处 `$('up-' + dir)` **没**换助手:dom-typed 的判据要把参数当**字面 id**
+// 去 markup 表里反查标签,拼接出来的 id(`up-photos`/`up-videos`/…)反查不到 ⇒ 换了必红。
+// 那 2 条因此留在基线里(而不是塞一条内联 cast 进 dom-typed-sites 那笔 16 条的账 —— 那条账的口径是
+// "只减不加",要治它得先给助手加一条"按标签集合枚举 id"的能力,属于独立一批)。
+import { byIdInput, byIdSelect } from '../shared/dom-typed.js';
 
 // 内嵌媒体元素一律**裸路径**(2026-10-11 凭据治理):`<img>/<video>` 靠浏览器自动携带的 HttpOnly
 // admin_session cookie 过 /admin-media 鉴权,凭据不再进 URL(地址栏/历史/访问日志/缓存键全部干净)。
@@ -221,12 +228,12 @@ export function loadDisplay() {
   $('modeCard').innerHTML =
     `全局默认模式:<b style="color:#16a34a">普通模式(2026-09-06 起特殊模式已删除)</b>`;
   // 挂载下拉
-  $('clIcon').innerHTML =
+  byIdSelect('clIcon').innerHTML =
     '<option value="">不挂原图案(新建模型)</option>' +
     Object.entries(MOUNT_ICONS)
       .map(([k, v]) => `<option value="${k}">${v}</option>`)
       .join('');
-  $('clModel').innerHTML = Object.entries(LINK_MODELS)
+  byIdSelect('clModel').innerHTML = Object.entries(LINK_MODELS)
     .map(([k, v]) => `<option value="${k}">${v}</option>`)
     .join('');
   // 自定义链接列表
@@ -373,10 +380,10 @@ export async function delBigscreen(slot, label) {
   loadBigscreen();
 }
 export async function addCustomLink() {
-  const name = $('clName').value.trim(),
-    url = $('clUrl').value.trim();
-  const icon = $('clIcon').value,
-    model = $('clModel').value;
+  const name = byIdInput('clName').value.trim(),
+    url = byIdInput('clUrl').value.trim();
+  const icon = byIdSelect('clIcon').value,
+    model = byIdSelect('clModel').value;
   if (!name || !url) {
     toast('名称和链接都要填', 1);
     return;
@@ -389,15 +396,15 @@ export async function addCustomLink() {
   const d = await r.json();
   if (r.ok) {
     toast('已添加');
-    $('clName').value = '';
-    $('clUrl').value = '';
+    byIdInput('clName').value = '';
+    byIdInput('clUrl').value = '';
     DATA.siteConfig.customLinks.push(d.item);
     loadDisplay();
   } else toast(d.error || '失败', 1);
 }
 export function presetLink(name, url) {
-  $('clName').value = name;
-  $('clUrl').value = url;
+  byIdInput('clName').value = name;
+  byIdInput('clUrl').value = url;
 }
 export async function delCustomLink(id) {
   const r = await adminFetch('/api/admin/links' + tk(), {

@@ -2,6 +2,12 @@
 // 状态自持(docCur/docDirty/docHead/docTail),唯一跨区需求是 loadDocs 给 switchTab。
 
 import { tk, tk2, adminFetch, confirmAsync, $ } from './admin-core.js';
+// 类型化取用(第十刀·批次2):标签全部按 admin.html 的真实 markup 核对过 ——
+// #docFrame=<iframe>、#docSave/#docReload/#docRestore=<button>、#docBak=<select>、.doc-tabs 里是 <button>。
+// `srcdoc`·`contentDocument` 只在 HTMLIFrameElement 上,`disabled` 只在表单/按钮上,
+// 裸 `$()` 交回来的 HTMLElement 一个都没有 ⇒ 本文件原来报 18 条 TS2339。
+// 助手本体只有 cast、不校验标签(边界写在 src/shared/dom-typed.js 文件头),运行期与 `$('…')` 逐字相同。
+import { byIdBtn, byIdFrame, byIdSelect, qsaBtn } from '../shared/dom-typed.js';
 
 // ---------- 协议文档编辑(designMode 原页直改;不进自动刷新) ----------
 let docCur = 'agreement.html',
@@ -14,7 +20,7 @@ export async function loadDocs() {
     const r = await adminFetch('/api/admin/docs?file=' + encodeURIComponent(docCur) + tk2());
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || '加载失败');
-    const f = $('docFrame'),
+    const f = byIdFrame('docFrame'),
       bi = d.content.indexOf('<body>'),
       be = d.content.lastIndexOf('</body>');
     if (bi < 0 || be < 0) throw new Error('文件结构异常');
@@ -28,7 +34,7 @@ export async function loadDocs() {
         doc.body.style.outline = 'none';
         new MutationObserver(() => {
           docDirty = true;
-          $('docSave').disabled = false;
+          byIdBtn('docSave').disabled = false;
         }).observe(doc.body, { childList: true, subtree: true, characterData: true });
       } catch (e) {
         docMsg('编辑器初始化失败:' + (e.message || e), false); // 原:静默吞掉,假报"已加载"
@@ -48,7 +54,7 @@ function docMsg(t, ok) {
     if (m.textContent === t) m.textContent = '';
   }, 4000);
 }
-document.querySelectorAll('.doc-tabs button').forEach(
+qsaBtn(document, '.doc-tabs button').forEach(
   (b) =>
     (b.onclick = async () => {
       if (docDirty && !(await confirmAsync('当前修改未保存,切换文件将丢弃。继续?'))) return;
@@ -56,15 +62,15 @@ document.querySelectorAll('.doc-tabs button').forEach(
       b.classList.add('on');
       docCur = b.dataset.f;
       docDirty = false;
-      $('docSave').disabled = true;
+      byIdBtn('docSave').disabled = true;
       loadDocs();
     })
 );
-$('docSave').onclick = async () => {
+byIdBtn('docSave').onclick = async () => {
   if (!docDirty || !(await confirmAsync('确定保存并立即对访客生效?'))) return;
-  $('docSave').disabled = true;
+  byIdBtn('docSave').disabled = true;
   try {
-    const body = $('docFrame').contentDocument.body.innerHTML;
+    const body = byIdFrame('docFrame').contentDocument.body.innerHTML;
     const r = await adminFetch('/api/admin/docs' + tk(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -73,18 +79,18 @@ $('docSave').onclick = async () => {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || '保存失败');
     docDirty = false;
-    $('docSave').disabled = true;
+    byIdBtn('docSave').disabled = true;
     loadDocBaks();
     docMsg('已保存并生效(备份:' + d.backup + ')');
   } catch (e) {
-    $('docSave').disabled = false;
+    byIdBtn('docSave').disabled = false;
     docMsg(e.message, false);
   }
 };
-$('docReload').onclick = async () => {
+byIdBtn('docReload').onclick = async () => {
   if (!docDirty || (await confirmAsync('放弃当前修改,重新加载?'))) {
     docDirty = false;
-    $('docSave').disabled = true;
+    byIdBtn('docSave').disabled = true;
     loadDocs();
   }
 };
@@ -93,34 +99,34 @@ async function loadDocBaks() {
     const d = await (
       await adminFetch('/api/admin/docs?backups=' + encodeURIComponent(docCur) + tk2())
     ).json();
-    $('docBak').innerHTML =
+    byIdSelect('docBak').innerHTML =
       '<option value="">选择备份回滚…</option>' +
       d.backups.map((b) => '<option>' + b + '</option>').join('');
-    $('docRestore').disabled = true;
+    byIdBtn('docRestore').disabled = true;
   } catch (e) {
     // 原:静默吞掉 → 下拉空白,管理员误以为无备份可回滚
-    $('docBak').innerHTML = '<option value="">备份列表加载失败</option>';
+    byIdSelect('docBak').innerHTML = '<option value="">备份列表加载失败</option>';
     docMsg('备份列表加载失败:' + (e.message || e), false);
   }
 }
-$('docBak').onchange = () => {
-  $('docRestore').disabled = !$('docBak').value;
+byIdSelect('docBak').onchange = () => {
+  byIdBtn('docRestore').disabled = !byIdSelect('docBak').value;
 };
-$('docRestore').onclick = async () => {
+byIdBtn('docRestore').onclick = async () => {
   if (
-    !$('docBak').value ||
-    !(await confirmAsync('回滚到 ' + $('docBak').value + ' ?(会先自动备份当前版)'))
+    !byIdSelect('docBak').value ||
+    !(await confirmAsync('回滚到 ' + byIdSelect('docBak').value + ' ?(会先自动备份当前版)'))
   )
     return;
   try {
     const r = await adminFetch('/api/admin/docs' + tk(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ file: docCur, restore: $('docBak').value }),
+      body: JSON.stringify({ file: docCur, restore: byIdSelect('docBak').value }),
     });
     if (!r.ok) throw new Error((await r.json()).error || '回滚失败');
     docDirty = false;
-    $('docSave').disabled = true;
+    byIdBtn('docSave').disabled = true;
     docMsg('已回滚');
     loadDocs();
   } catch (e) {
