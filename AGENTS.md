@@ -1646,6 +1646,135 @@ prettier：`quiz.js` 与 `ctx-ui.js` 的不合排是**我引入的**（HEAD 版�
 
 
 
+## 2026-10-18 第十刀·批次2:后台 admin 那一族 41 条接回 dom-typed(116 → **75**,这批有运行期改动)
+
+批次1 之后按机制排的第二族。根只有一行:`src/admin/admin-core.js:57`
+`export const $ = (id) => document.getElementById(id);` —— 它交回的是 **HTMLElement**,
+而 `.value` 在 input/select、`.disabled` 在 button/input、`.srcdoc`·`.contentDocument` 在 iframe、
+`.dataset`·`.onclick` 在 HTMLElement 上,HTMLElement 一个都没有 ⇒ 后台五个文件报 41 条 TS2339。
+收法与第七/八刀同一条:**cast 只住 `src/shared/dom-typed.js` 一处,按标签命名,不加 `instanceof`**。
+
+### 先核实(标签一律由 markup 裁决,不靠"看名字猜")
+
+写脚本按判据自己那套正则(`/<([a-zA-Z][\w-]*)\b([^>]*)>/` + `id=` 捕获)从 `admin.html` 建表读标签,
+而不是单行 grep —— 属性换行的标签单行 grep 会漏(`#chatMsgInput` 就是这么先"查不到"的):
+
+| id | markup 里的真标签 | 用的助手 |
+| --- | --- | --- |
+| `docFrame` | **iframe** | `byIdFrame`(**本批新增**) |
+| `docSave` / `docReload` / `docRestore` | button | `byIdBtn` |
+| `docBak` | **select** | `byIdSelect` |
+| `clName` / `clUrl` | input | `byIdInput` |
+| `clIcon` / `clModel` | **select** | `byIdSelect` |
+| `chatMsgInput` | input | `byIdInput` |
+| `chatSendBtn` | button | `byIdBtn` |
+| `errType` | **select** | `byIdSelect` |
+| `errQ` | input | `byIdInput` |
+| `appSearch` | input | `byIdInput` |
+| `.tab` | **div** | `qsaEl`(不是 `qsaBtn`!) |
+| `.doc-tabs button` | button(取选择器最后一段是标签名) | `qsaBtn` |
+
+⚠️**四个"看名字会猜错"的**:`clIcon`/`clModel`/`errType`/`docBak` 都读 `.value`,但它们是 `<select>`;
+`.tab` 是 `<div>` 不是按钮(它带 `onclick` 属性),所以用 `qsaEl` 而不是 `qsaBtn`。
+按猜的写法,四条会各变成一句写在类型上的谎 —— 而编译器**不会报**(见下面 K2)。
+
+### 归因(41 条,per-file 差分数出来,不是回忆)
+
+`admin-docs 18→0` / `admin-chat 11→0` / `admin-content 10→2` / `admin-tabs 2→0` / `admin.js 2→0`,
+**变化的文件数 = 5**,其余 736 个在图文件一条没动(116 → 75)。
+
+🔴**剩下那 2 条是能力边界,不是漏做**:`upload(dir)` 里的 `$('up-' + dir)` —— id 是拼出来的
+(`up-photos`/`up-videos`/…),而 `dom-typed-sites` 的反查要把助手参数当**字面 id** 去 markup 表里查标签
+(`selOf()` 只剥 `${…}` 插值,不认 `'x' + y` 拼接)。实测:换成 `byIdInput('up-' + dir)` 或
+`` byIdInput(`up-${dir}`) `` 都会进 `bad` 列表 ⇒ 用不了助手。
+**没有**为省这 2 条塞内联 cast:那笔 16 条的账口径是"只减不加";真要治,得先给助手加一条
+"按标签集合枚举动态 id"的能力,独立一批。原因写在 `admin-content.js:16-22` 与判据里。
+
+### 反向验证 8 条注入(`.tmp/rv10b2.mjs`),全部红在指名的判据上、全部还原 md5 逐字一致
+
+| # | 注入 | 红的判据(实测点名) | checkJs(干净=75) |
+| --- | --- | --- | --- |
+| K1 | 把 `$` 退成 `/** @type {any} */` | 1 红(`$` 只许交回 HTMLElement) | 75 → **73** |
+| K2 | 类型撒谎:`chatSendBtn` 说成 input(实为 button) | 1 红(markup 反查) | **75 一字不变** |
+| K3 | id 张冠李戴:`byIdFrame('docSave')` | 1 红(markup 反查) | 不测 |
+| K4 | 拼接 id 那处漂成内联 cast | **3 红**(零内联 cast + 16 条账本 + 唯一例外点名) | 75 → **73** |
+| K5 | 模块里删掉 `byIdFrame`(CLAIM 还留着) | 2 红(助手本体 names≡CLAIM、CLAIM≡@returns) | 不测 |
+| K6 | CLAIM 里 `iframe` 改成 `input`(模块不动) | 2 红(markup 反查、CLAIM≡@returns) | 不测 |
+| K7 | 一处读数漂回裸 `$('chatMsgInput').value` | 1 红(直接读数归零) | 75 → **76** |
+| K8 | 基线抬到 76 | 1 红(`checkJs 基线不得超过 75`) | 不测 |
+
+**K1 与 K2 是这批最值得记的两条**:
+· K1 证明"最省事的修法"为什么会**静默吃掉最后两条真错** —— 给 `$` 写 `any` 之后 checkJs 从 75 掉到 73,
+  数字更好看,而 admin 全目录从此没有任何读数点被检查过。所以那条判据不看数量,只看那一行还是不是窄声明。
+· K2 证明**编译器看不见类型的谎**(把 button 说成 input,75 条一字不变) —— 这一族的真防线是 markup 反查,
+  不是 tsc。第七刀写过这句话,这次是它第一次被当成注射项量出来。
+
+### 判据(全部落在既有出处 `dom-typed-sites.test.js`,7 项 → **9 项**)
+
+· 新增"admin 那一族的 `$` 只许交回 HTMLElement"(含"admin 目录里不许出现 `@type {any}`"这一路);
+· 新增"`$(…).标签专属成员` 直接读数归零 + 拼接 id 那处**恰好一处**点名记账";
+· `converted` 覆盖名单从 11 个文件扩到 **16** 个(后台五份进表:塞回内联 cast 或不 import 助手都红);
+· `CLAIM` 加 `byIdFrame: 'iframe'`,`TAGTYPE` 加 `iframe: 'HTMLIFrameElement'`
+  —— 后者是**判据自己教我的一课**:只补 CLAIM 不补 TAGTYPE,那条"CLAIM ≡ @returns"当场抛
+  `CLAIM 里 byIdFrame 的标签 iframe 不在标签表里`,而不是悄悄放行。
+
+### 真浏览器实测:14 项全绿(`.tmp/admin-dom-check.cjs`,自起 :3257 + `GATE_DATA_FILE` 落临时目录)
+
+每条断言都对着本批改过的那个读数点,不是"页面没报错"一句:`#docFrame` 真是 iframe 且 47057 字节
+`srcdoc` 真被写、`contentDocument` 同源可达且 `contentEditable` 真被 onload 打开、点第二颗文档标签后
+换了文件(33458 字节)且保存钮复位;`#chatMsgInput` 的 `disabled` 被放开、`placeholder` 被写进、
+`chatSend()` 真读到 `.value` 并清空;`presetLink` 把「百度 / https://www.baidu.com」写进那两只 `<input>`;
+`#clIcon`/`#clModel`/`#errType` 是 `<select>` 且 `.value` 读得到;`.tab` 11 颗全带 `dataset.tab`;
+**零未捕获异常**。`chatSend` 那次写只落临时数据根,不碰生产数据。
+
+⚠️🔴 **A3 第一次是红的,而红在我的判据,不在代码** —— 这条要留名:
+`contentEditable` 是 `f.onload` 里设的,而 srcdoc 那张内联文档在 headless 里要 **6s 上下**才
+`readyState==='complete'`,我第一版只等 3s ⇒ 读到 false。按口径做了 **A/B**
+(`.tmp/adoc-ab.cjs`,HEAD 版与批次2 版各跑一遍,`loading`/`interactive`/`complete` 三个读数逐字相同)
+⇒ 判为"我的等待写错了",改成 `waitForFunction(isContentEditable, 20s)` 后 14/14。
+**没有把这条写成回归,也没有直接放宽阈值去凑绿。**
+做法上另有一条:换 HEAD 版对照用的是 `git show HEAD:… > 文件` + **事先 `cp` 备份 + md5 还原核对**
+(`a4e13bf9…` 前后一致),全程没碰 `checkout/restore/stash`(那条坑已记三次)。
+
+### 工具坑复发两条(都是已记过的,还是踩了)
+
+1. **注释撞自己的判据(第三次)**:我在 `admin-content.js` 文件头写说明时复述了 `$('up-' + dir)`,
+   被"只许一处"数成 2 ⇒ 判据红、代码没错。按第四刀既有的口径**判据侧先剥注释再扫**,不改说明措辞。
+2. **ANSI 剥不净 = 读不到汇总(第四次)**:`split(ESC).join('')` 只删了 ESC 字节,留下 `[39m` 卡在行首,
+   `^\s*Tests` 依旧配不上 ⇒ 八条注入明明全红却打印 `NO_TESTS_LINE`。正确写法是整段替换
+   `new RegExp(ESC + '\\[[0-9;]*m', 'g')`。同批另有一条新坑:**注入锚点命中数必须打印**
+   (`byIdBtn('chatSendBtn')` 有 4 处),原来"必须恰好 1 处"的守卫会把合法的多次出现误抛。
+3. `--reporter=basic` 在 vitest 4 不存在(批次1 记过),这次直接没再写它 —— 但同一条判据
+   "读不到 ≠ 没问题"要靠 `TAIL⟨…⟩` 打印兜住,它这次真的兜住了。
+
+### 门禁(全在这棵树上)
+
+`vitest **1267 项 / 109 文件** 全绿 RC=0`(上一批 1265,+2 = 本批两条新判据)/
+`npm test` 七条 7/22/31/108/46/20/6 = **240 项 0 失败 RC=0** / `eslint .` 0 / `tsc --noEmit` 0 /
+**checkJs 75 = 新基线**(`scripts/checkjs-baseline.txt` 116 → 75,`CEILING` 同步)/
+`vite build` RC=0 且三条构建断言照旧(**48 prefetch** / 入口不含 three / dist 无 importmap)/
+`npm run depcruise` 0 违规 **413 modules / 1427 deps**(模块数没涨,deps +5 = 后台五份各引一条 dom-typed 边)/
+四条 CI 闸门全过(山丘单人包判定通过、`CSP_REGISTRY_OK 4 条`、后端清单 52 可达·54 清单、
+探针隔离扫 **151** 脚本·豁免 8)。
+压缩等价这次**如实报 DIFF**:`src/shared/dom-typed.js` 720B → 783B(新增 `byIdFrame` 函数本体)
+⇒ **本批与批次1 不同,动了运行期**(取用写法从 `$()` 换成 `byIdX()`),要 deploy 才对管理员生效。
+
+### 顺带查清的一条历史欠账(本批没动)
+
+`loadDocs` 里 `f.srcdoc = d.content;` 写在 `f.onload = () => {…}` **之前** —— 内联 iframe 的 load
+在快机器上可能先完成,那时 `contentDocument` 可达但 `contentEditable` 永不被设(实测 headless 6s 才 complete,
+所以今天看起来"能用")。把 `onload` 挪到赋值之前是一处真修复,但那是**行为变更**,不属于类型批次;登记待办。
+
+### 下一批(批次3)按文件表已就绪
+
+`earth-day.js 10` / `ending-prince.js 9` / `shared/sentry.js 8`(7 条 `Cannot find name 'Sentry'` ⇒ 要一份
+最小全局声明,不许 `any`)/ `error-report.js 7` / `museum.js 6` / `visitor-fp.js 5` / `room/main.js 5` /
+`sheep-companion.js 4` / `room/lobby.js 4` / `plane-flight.js 3` / `openfilm.js 3` / 其余各 1-2。
+`planeApi`/`foxApi`/`loopManager` 三条 `unknown` 与 `types/ctx.d.ts:522` 那条**悬空声明**(`StoreAPI.set`
+在 storeApi 上不存在)一起归 ctx-drift 那一族。
+
+
+
 ## 2026-10-16 第十刀·批次1:裸 `object` 输入包(145 → **116**,不部署)
 
 批次0 撑开图之后剩下的第一族,两个文件 29 条,机制同一条:`@param {object}` 让编译器把
