@@ -17,6 +17,7 @@ import type {
   BufferAttribute,
   PointLight,
   Light,
+  HemisphereLight,
   Mesh,
   Group,
   Material,
@@ -121,11 +122,22 @@ export interface SceneNamespace {
   skyUniforms: Record<string, unknown>;
   pls: Array<{ l: PointLight }>;
   ambL: Light;
-  hemiL: Light;
+  /** 写入方 scene.js:761 `new THREE.HemisphereLight(...)` —— 声明须含 groundColor,
+   *  停在 Light 会让昼夜氛围系统读 groundColor 报 TS2339(2026-11-12 修正)。 */
+  hemiL: HemisphereLight;
   L: HTMLElement;
   // —— 运行期挂载(2026-09-20 对齐实际代码) ——
   renderPostProcessing?: () => void;
   resizePostProcessing?: (w: number, h: number) => void;
+  /** 画质档变化时同步后处理 composer 的像素比(2026-11-12 画质修复;不同步会越降档越糊) */
+  syncPostProcessingPixelRatio?: (dpr: number, w: number, h: number) => void;
+  /** 氛围参数:Bloom 强度/半径/阈值与色调映射曝光(2026-11-12 光效增强) */
+  setAtmosphere?: (opts: {
+    bloomStrength?: number;
+    bloomRadius?: number;
+    bloomThreshold?: number;
+    exposure?: number;
+  }) => void;
   activeWorld?: string;
   worldManager?: SceneManager;
   worldStack?: unknown[];
@@ -246,12 +258,30 @@ export interface PlayerNamespace {
  *   - `assertAboveGround` ← `src/scene/desert/terrain.js:106`,**实心山铁律的机器闸门**:
  *     摆放落点埋进山心就 console.error + toast 并返回 false(正常返回 true)
  */
+/** 昼夜氛围读数(light-mood.js moodAt 的返回;探针/诊断只读) */
+export interface DesertMood {
+  bloom: number;
+  bloomTh: number;
+  exposure: number;
+  fogDensity: number;
+  sandOpacity: number;
+  rimBoost: number;
+  tintR: number;
+  tintG: number;
+  tintB: number;
+  waterR: number;
+  waterG: number;
+  waterB: number;
+}
+
 export interface DesertSurface {
   getH: (x: number, z: number) => number;
   update: (dt: number, time: number) => void;
   kunlun: { x: number; z: number };
   dayNight: (hour: number) => void;
   assertAboveGround: (x: number, y: number, z: number, tag?: string) => boolean;
+  /** 最近一次生效的氛围;首帧 dayNight 未跑时为 null(desert.js 交出,2026-11-12 光效) */
+  currentMood: () => DesertMood | null;
 }
 
 export interface MediaNamespace {

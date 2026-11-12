@@ -2,6 +2,7 @@
 import { ctx } from '../ctx.js';
 import { getH, assertAboveGround, updateChunks, waterU, water, KX, KZ } from './desert/terrain.js';
 import { updateAtmosphere, dayNight, lastElev } from './desert/atmosphere.js';
+import { currentMood } from './desert/light-mood.js'; // 氛围读数(诊断/探针,2026-11-12)
 
 // ===================== 主更新循环 =====================
 function update(dt, time) {
@@ -19,4 +20,11 @@ function update(dt, time) {
 }
 
 // ===================== 导出 =====================
-ctx.media.desert = { getH, update, kunlun: { x: KX, z: KZ }, dayNight, assertAboveGround };
+ctx.media.desert = {
+  getH,
+  update,
+  kunlun: { x: KX, z: KZ },
+  dayNight,
+  assertAboveGround,
+  currentMood,
+};
