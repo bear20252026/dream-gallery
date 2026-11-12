@@ -3,11 +3,14 @@ import { ctx } from '../ctx.js';
 import { getH, assertAboveGround, updateChunks, waterU, water, KX, KZ } from './desert/terrain.js';
 import { updateAtmosphere, dayNight, lastElev } from './desert/atmosphere.js';
 import { currentMood } from './desert/light-mood.js'; // 氛围读数(诊断/探针,2026-11-12)
+import { tickSandDetail } from './desert/sand-detail.js'; // 云影时间(2026-11-12 沙地细节)
 
 // ===================== 主更新循环 =====================
 function update(dt, time) {
   // 地形区块
   updateChunks();
+  // 沙地云影时间(程序化细节的慢漂移)
+  tickSandDetail(time);
   // 水面跟随玩家
   waterU.uTime.value = time;
   if (ctx.player.pl) {
