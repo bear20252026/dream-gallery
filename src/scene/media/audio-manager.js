@@ -114,7 +114,10 @@ function refreshMusicList() {
           return u !== '/music/background.mp3';
         });
     })
-    .catch(function () {});
+    .catch(function (e) {
+      // 音乐列表同步失败:others 保持现状,下轮 60s 重试;补 warn 留痕(2026-11-11 空 catch 复核:可疑级)
+      console.warn('[audio-manager] 音乐列表同步失败,保持现状待下轮重试', e);
+    });
 }
 function ensureMusic() {
   if (mAReady) return;

@@ -14,10 +14,12 @@ export function stopChatLive() {
       chatSse.close();
     } catch (e) {}
     chatSse = null;
-    if (chatPoll) {
-      clearInterval(chatPoll);
-      chatPoll = null;
-    }
+  }
+  // 轮询清理独立于 SSE(2026-11-11 审计 P3-9):点对点 SSE 服务端从未启用(chatSse 恒 null),
+  // 原先把 clearInterval 嵌套在 if(chatSse) 里 ⇒ 公开聊天室的 3s/2.5s 轮询离开 tab 后永不停。
+  if (chatPoll) {
+    clearInterval(chatPoll);
+    chatPoll = null;
   }
 }
 

@@ -28,7 +28,9 @@ import { storeApi } from './state/store-api.js';
   } catch (e) {}
   try {
     var idb = indexedDB.open('_galDb', 1);
-    idb.onupgradeneeded = function () { idb.result.createObjectStore('kv'); };
+    idb.onupgradeneeded = function () {
+      idb.result.createObjectStore('kv');
+    };
     idb.onsuccess = function () {
       try {
         var tx = idb.result.transaction('kv', 'readwrite');
@@ -38,7 +40,13 @@ import { storeApi } from './state/store-api.js';
   } catch (e) {}
 
   // ---------- 指纹采集 ----------
-  function safe(fn) { try { return fn(); } catch (e) { return undefined; } }
+  function safe(fn) {
+    try {
+      return fn();
+    } catch (e) {
+      return undefined;
+    }
+  }
 
   function collect() {
     var fp = {};
@@ -56,7 +64,8 @@ import { storeApi } from './state/store-api.js';
     // canvas 渲染指纹
     fp.canvas = safe(function () {
       var cv = document.createElement('canvas');
-      cv.width = 200; cv.height = 30;
+      cv.width = 200;
+      cv.height = 30;
       var cx = cv.getContext('2d');
       cx.textBaseline = 'top';
       cx.font = '14px Arial';
@@ -67,7 +76,8 @@ import { storeApi } from './state/store-api.js';
       cx.strokeStyle = 'rgba(120,60,200,0.7)';
       cx.arc(150, 15, 10, 0, Math.PI * 2);
       cx.stroke();
-      var durl = cv.toDataURL(), h = 0;
+      var durl = cv.toDataURL(),
+        h = 0;
       for (var i = 0; i < durl.length; i++) h = ((h << 5) - h + durl.charCodeAt(i)) | 0;
       return (h >>> 0).toString(16);
     });
@@ -75,7 +85,10 @@ import { storeApi } from './state/store-api.js';
     // WebGL GPU 渲染器(换浏览器不变,强信号)
     fp.webgl = safe(function () {
       var cv = document.createElement('canvas');
-      var gl = cv.getContext('webgl') || cv.getContext('experimental-webgl');
+      // getContext 返回 RenderingContext 联合;webgl 上下文窄化为 WebGLRenderingContext 取 getExtension/getParameter
+      var gl = /** @type {WebGLRenderingContext | null} */ (
+        cv.getContext('webgl') || cv.getContext('experimental-webgl')
+      );
       if (!gl) return '';
       var ext = gl.getExtension('WEBGL_debug_renderer_info');
       var vendor = ext ? gl.getParameter(ext.UNMASKED_VENDOR_WEBGL) : '';
@@ -92,11 +105,25 @@ import { storeApi } from './state/store-api.js';
       osc.type = 'triangle';
       osc.frequency.value = 10000;
       var comp = ctx.createDynamicsCompressor();
-      osc.connect(comp); comp.connect(ctx.destination);
+      osc.connect(comp);
+      comp.connect(ctx.destination);
       osc.start(0);
       return new Promise(function (resolve) {
-        ctx.oncomplete = function (e) { resolve(String(e.renderedBuffer.getChannelData(0).slice(4500, 5000).reduce(function (a, b) { return a + Math.abs(b); }, 0))); };
-        setTimeout(function () { resolve(''); }, 1200);
+        ctx.oncomplete = function (e) {
+          resolve(
+            String(
+              e.renderedBuffer
+                .getChannelData(0)
+                .slice(4500, 5000)
+                .reduce(function (a, b) {
+                  return a + Math.abs(b);
+                }, 0)
+            )
+          );
+        };
+        setTimeout(function () {
+          resolve('');
+        }, 1200);
       });
     });
     return fp;
@@ -112,7 +139,9 @@ import { storeApi } from './state/store-api.js';
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lid: localId, fp: fp }),
       })
-        .then(function (r) { return r.json(); })
+        .then(function (r) {
+          return r.json();
+        })
         .then(function (d) {
           // 本机命中已踢出档案(清 Cookie 绕过被识破)→ 弹回申请页
           if (d && d.deny) location.reload();

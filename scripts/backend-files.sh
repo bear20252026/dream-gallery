@@ -22,6 +22,6 @@
 #   跨到 src/ 的依赖一条都不会自动进清单 —— 这条由 scripts/admin/check-backend-manifest.cjs
 #   按 depcruise 的可达集反查清单,漏一个就 exit 1(2026-10-12 那次 502 事故立的闸,正好管住这种新形态)。
 backend_files() {
-  printf '%s\n' server.js src/shared/mediarules.mjs src/shared/chat-words.mjs scripts/admin/table-parity.cjs
+  printf '%s\n' server.js src/shared/mediarules.mjs src/shared/chat-words.mjs src/shared/link-models.mjs scripts/admin/table-parity.cjs
   find lib -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.sql' \) 2>/dev/null | sort
 }

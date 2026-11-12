@@ -106,8 +106,8 @@ D:\b - 副本 (2)\                ← 工作区根(一切改动都在这里发�
    │  ③ npm run build → dist/
    │  ④ tar 打包 dist → scp 到阿里云
    ▼
-阿里云 101.133.235.110 /opt/gallery/   ← Node(pm2 进程名 gallery)跑 server.js
-   │  端口 3000:直接访问 http://101.133.235.110:3000/(裸后端,调试用)
+阿里云源站 $HOST /opt/gallery/   ← Node(pm2 进程名 gallery)跑 server.js
+   │  端口 3000:源站直连仅调试用($HOST 见 .deploy-host.env,不写进公开文档)
    ▼
 Cloudflare(cloudbear.cloud 域名 + HTTPS 证书 + 边缘缓存)
    │  https://cloudbear.cloud/          ← 用户真正访问的网址
@@ -188,13 +188,9 @@ Cloudflare(cloudbear.cloud 域名 + HTTPS 证书 + 边缘缓存)
   cd dream-gallery && npm run build
   cd dist && tar czf "../gallery-dist.tgz" --exclude=models . && cd ..
 
-  # ② 上传(注意:scp/ssh 是 Windows 原生 exe,源路径必须用 Windows 绝对路径)
-  scp -i "C:/Users/17296/gk.pem" "C:/Users/17296/<你的路径>/dream-gallery/gallery-dist.tgz" root@101.133.235.110:/tmp/
-
-  # ③ 服务器解包(server.js 直接服务 /opt/gallery 根目录,index.html 与 assets 都在根)
-  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110 "cd /opt/gallery && rm -rf assets && tar xzf /tmp/gallery-dist.tgz"
-
-  # ④ 只有改了 server.js / lib/ 才需要:ssh ... "pm2 restart gallery"
+  # ②③④ 上传/解包/重启(2026-11-11 审计 P3-1 后统一走发布入口,源站地址与私钥路径不再写进公开文档):
+  # 先配好 HOST(环境变量或仓库根 .deploy-host.env,gitignore)与受控私钥(SSH_KEY 或 ~/.ssh/gk-deploy.pem)
+  bash scripts/release.sh   # 内含 CI 闸门、后端先行、按清单差集清理、漂移校验
   ```
 - **铁律**:`dist/assets/` **整目录全量替换**——哈希变了,只传 index.html 会让旧包 404 白屏
 - **纯前端改动无需 pm2 restart**:静态文件即时生效(已线上验证)。只有后端文件变更才重启。
@@ -206,16 +202,16 @@ Cloudflare(cloudbear.cloud 域名 + HTTPS 证书 + 边缘缓存)
 - **连接方式**:SSH 密钥登录,无密码
   | 项 | 值 |
   |---|---|
-  | 主机 | `101.133.235.110`(域名 `cloudbear.cloud`) |
-  | 用户 | `root` |
-  | 私钥 | 本机 `C:/Users/17296/gk.pem`(**绝不入库**,见下方安全红线) |
+  | 主机 | `$HOST`(2026-11-11 审计 P3-1 后不再写进公开文档:见仓库根 `.deploy-host.env`,gitignore;域名 `cloudbear.cloud`) |
+  | 用户 | `$SSH_USER`(默认 root,可 env 覆盖) |
+  | 私钥 | 受控来源:`SSH_KEY` 环境变量或 `~/.ssh/gk-deploy.pem`(**绝不入库**,见下方安全红线) |
   | 应用目录 | `/opt/gallery/`(pm2 进程名 `gallery`) |
-- **登录与常用命令**:
+- **登录与常用命令**(先 `source .deploy-host.env` 或自行 export HOST/SSH_USER):
   ```bash
-  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110      # 登录
-  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110 "pm2 status gallery"   # 查进程
-  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110 "pm2 logs gallery --lines 50"  # 查日志
-  ssh -i "C:/Users/17296/gk.pem" root@101.133.235.110 "pm2 restart gallery"  # 重启(仅后端改动需要)
+  ssh -i "$SSH_KEY" "$SSH_USER@$HOST"      # 登录
+  ssh -i "$SSH_KEY" "$SSH_USER@$HOST" "pm2 status gallery"   # 查进程
+  ssh -i "$SSH_KEY" "$SSH_USER@$HOST" "pm2 logs gallery --lines 50"  # 查日志
+  ssh -i "$SSH_KEY" "$SSH_USER@$HOST" "pm2 restart gallery"  # 重启(仅后端改动需要)
   ```
 - **🚨 安全红线(公开仓,务必遵守)**:
   1. **私钥 `gk.pem` 永不提交**——本仓库 visibility=**PUBLIC**,私钥入库等于把服务器交给全网。

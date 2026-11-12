@@ -152,9 +152,12 @@ export function createSheepCompanion() {
       (g) => {
         const disposeSource = () =>
           g.scene.traverse((node) => {
-            node.geometry?.dispose();
-            if (Array.isArray(node.material)) node.material.forEach((m) => m.dispose());
-            else node.material?.dispose();
+            // traverse 回调收 Object3D(geometry/material 只在网格类节点上):按 Mesh 面 cast,
+            // 运行期仍靠 ?. 与 Array.isArray 真值判定,非网格节点照旧跳过,行为不变。
+            const mesh = /** @type {THREE.Mesh} */ (node);
+            mesh.geometry?.dispose();
+            if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose());
+            else mesh.material?.dispose();
           });
         if (dead) {
           disposeSource();

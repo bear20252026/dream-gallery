@@ -69,7 +69,7 @@ export async function loadFiles() {
             (s) => `<div class="file-row" style="align-items:center">
         <!-- eslint-disable-next-line no-irregular-whitespace -- 模板串全角空格是 UI 分隔符 -->
         <span class="fname"><b>${esc(s.label)}</b>&#12288;${s.file ? esc(s.file) : '<span style="opacity:.45">空</span>'}</span>
-        ${s.file && !s.hls ? `<button class="btn-day" onclick="pvUrl('${s.src}','${(s.file || '').split('.').pop().toLowerCase()}')">预览播放</button>` : ''}
+        ${s.file && !s.hls ? `<button class="btn-day" onclick="pvUrl('${j(s.src)}','${j((s.file || '').split('.').pop().toLowerCase())}')">预览播放</button>` : ''}
         ${s.file && s.hls ? `<span style="opacity:.5">HLS 流,不支持在线预览</span>` : ''}
       </div>`
           )
@@ -139,11 +139,11 @@ export function pvUrl(url, ext) {
       'ico',
     ].includes(ext)
   )
-    m.innerHTML = `<img src="${url}">`;
+    m.innerHTML = `<img src="${esc(url)}">`;
   else if (['mp4', 'webm', 'm4v', 'mov'].includes(ext))
-    m.innerHTML = `<video src="${url}" controls autoplay></video>`;
+    m.innerHTML = `<video src="${esc(url)}" controls autoplay></video>`;
   else if (['mp3', 'wav', 'ogg', 'oga', 'opus', 'm4a', 'aac', 'flac'].includes(ext))
-    m.innerHTML = `<audio src="${url}" controls autoplay></audio>`;
+    m.innerHTML = `<audio src="${esc(url)}" controls autoplay></audio>`;
   else {
     toast('该格式不支持在线播放(可下载后本地打开)', 1);
     return;
@@ -285,9 +285,9 @@ export function loadDisplay() {
         .map(
           (l) => `<div class="file-row">
     <span class="fname">[${esc(nameOf(l.dk))}] ${esc(l.name)} → <a href="${j(l.url)}" target="_blank" style="color:#8cf">${esc(l.url.slice(0, 42))}</a>
-    <span class="fsize">${LINK_MODELS[l.model] || l.model || ''} · ${fmt(l.ts)}</span></span>
+    <span class="fsize">${esc(LINK_MODELS[l.model] || l.model || '')} · ${fmt(l.ts)}</span></span>
     <button class="btn-day" onclick="copyTxt('${j(l.url)}')">复制</button>
-    <button class="btn-del" onclick="delUserLink('${l.id}')">删除</button></div>`
+    <button class="btn-del" onclick="delUserLink('${j(l.id)}')">删除</button></div>`
         )
         .join('') || '<div class="empty">暂无</div>';
   // 链接点击记录(仅后台可见)
@@ -330,12 +330,12 @@ async function loadBigscreen() {
         (
           s
         ) => `<div class="card" style="display:flex;align-items:center;gap:10px;padding:10px 12px">
-        <b style="width:64px">${s.label}</b>
+        <b style="width:64px">${esc(s.label)}</b>
         <span style="flex:1;opacity:.85;word-break:break-all">${s.file ? esc(s.file) + (s.hls ? ' <span style="opacity:.6">(HLS)</span>' : '') : '<span style="opacity:.45">空(不播放)</span>'}</span>
-        ${s.file && !s.hls ? `<button class="btn-day" onclick="pvUrl('${s.src}','${(s.file || '').split('.').pop().toLowerCase()}')">预览</button>` : ''}
+        ${s.file && !s.hls ? `<button class="btn-day" onclick="pvUrl('${j(s.src)}','${j((s.file || '').split('.').pop().toLowerCase())}')">预览</button>` : ''}
         ${s.file && s.hls ? `<span style="opacity:.5">HLS 流,不支持在线预览</span>` : ''}
-        <button class="btn-day" onclick="uploadBigscreen('${s.slot}','${s.label}')">上传替换</button>
-        ${s.file ? `<button class="btn-del" onclick="delBigscreen('${s.slot}','${s.label}')">清空</button>` : ''}
+        <button class="btn-day" onclick="uploadBigscreen('${j(s.slot)}','${j(s.label)}')">上传替换</button>
+        ${s.file ? `<button class="btn-del" onclick="delBigscreen('${j(s.slot)}','${j(s.label)}')">清空</button>` : ''}
       </div>`
       )
       .join('');

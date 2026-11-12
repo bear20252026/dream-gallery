@@ -240,6 +240,67 @@ describe('③ 端到端:照界面打字发言,机器人真的回帖', () => {
   });
 });
 
+describe('③b 召唤语言随发言携带(2026-11-11 审计 C9-2:英文站不再拿中文回帖)', () => {
+  beforeEach(() => {
+    chatTextMock.mockClear();
+    STORE.gateData.chat = [];
+  });
+
+  it('lang=en ⇒ 系统提示词用英文版(含 Always answer in English)', async () => {
+    const res = resJson();
+    CHAT.handleChatPost(
+      jsonReq({ text: '@' + WORDS.BOT_TRIGGERS[0] + ' where does the wind come from', lang: 'en' }),
+      res
+    );
+    await settle();
+    expect(res.statusCode).toBe(200);
+    expect(chatTextMock.mock.calls.length).toBe(1);
+    const sent = chatTextMock.mock.calls[0][0];
+    expect(sent.messages[0].role).toBe('system');
+    expect(sent.messages[0].content).toContain('Always answer in English');
+  });
+
+  it('lang=zh ⇒ 中文提示词(默认口径不变)', async () => {
+    const res = resJson();
+    CHAT.handleChatPost(
+      jsonReq({ text: '@' + WORDS.BOT_TRIGGERS[0] + ' 风从哪边来', lang: 'zh' }),
+      res
+    );
+    await settle();
+    expect(chatTextMock.mock.calls.length).toBe(1);
+    const sent = chatTextMock.mock.calls[0][0];
+    expect(sent.messages[0].content).toContain('昆仑之灵');
+    expect(sent.messages[0].content).not.toContain('Always answer in English');
+  });
+
+  it('老客户端不带 lang ⇒ 按中文处理(向后兼容)', async () => {
+    const res = resJson();
+    CHAT.handleChatPost(jsonReq({ text: '@' + WORDS.BOT_TRIGGERS[0] + ' 你好' }), res);
+    await settle();
+    expect(chatTextMock.mock.calls.length).toBe(1);
+    const sent = chatTextMock.mock.calls[0][0];
+    expect(sent.messages[0].content).toContain('昆仑之灵');
+  });
+
+  it('lang 非法值一律按中文(只认 en/zh,防注入奇怪提示)', async () => {
+    const res = resJson();
+    CHAT.handleChatPost(
+      jsonReq({ text: '@' + WORDS.BOT_TRIGGERS[0] + ' 你好', lang: 'fr<script>' }),
+      res
+    );
+    await settle();
+    expect(chatTextMock.mock.calls.length).toBe(1);
+    const sent = chatTextMock.mock.calls[0][0];
+    expect(sent.messages[0].content).toContain('昆仑之灵');
+  });
+
+  it('前端发言确实携带 lang(两侧接线,不是后端独角戏)', () => {
+    const front = codeOf('src/gate/settings/chat-room.js');
+    expect(front).toMatch(/lang:\s*scriptLang\(\)/);
+    expect(front).toMatch(/import\s*\{\s*scriptLang\s*\}\s*from/);
+  });
+});
+
 describe('④ 后台手册与代码同口径(C 族的文档漂移)', () => {
   const guide = read('ADMIN_GUIDE.md');
 

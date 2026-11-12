@@ -510,6 +510,15 @@ $('doLk').onclick = async () => {
   }
 };
 
+// HTML 转义(2026-11-11 审计 P3-3):链接名是访客可控文本,插 innerHTML 前必须转义。
+// 与 quizgate.js 的 escH 同形(项目惯例:各页就地定义,不跨层引 admin 模块)。
+function escH(s) {
+  return String(s == null ? '' : s).replace(
+    /[&<>"']/g,
+    (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]
+  );
+}
+
 // 我的链接管理列表(含删除)
 async function renderMyLinks() {
   const list = ctx.mode.myLinks || [];
@@ -520,7 +529,7 @@ async function renderMyLinks() {
             l,
             i
           ) => `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;font-size:12px">
-    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${l.name}</span>
+    <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">🔗 ${escH(l.name)}</span>
     <button data-i="${i}" style="padding:3px 8px;font-size:11px;border:1px solid rgba(255,120,120,0.5);border-radius:6px;background:transparent;color:#ff9a9a;cursor:pointer">删除</button>
   </div>`
         )

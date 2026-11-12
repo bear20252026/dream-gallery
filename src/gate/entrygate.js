@@ -16,6 +16,7 @@ const verTitle = () => {
 };
 import { makeLangToggle } from '../ui/lang-toggle.js';
 import { spawnAgreementPages } from './agreement-swipe.js';
+import { qsEl } from '../shared/dom-typed.js'; // ENTER 按钮取用走类型化助手(内联 cast 记账表不收新条目)
 
 // 三连协议会话签名(2026-09-18 自 main.js 外迁):闸门 60s 超时/初始化失败时放行用。
 // 会话级键不进 store(存档规矩:sessionStorage 不登记)。
@@ -119,7 +120,7 @@ function build(opts) {
   window.addEventListener('script:lang', renderLang);
   if (opts.onGateReady) opts.onGateReady(); // 加载屏就此交接(避免固定延时造成的空白间隙)
 
-  const enterBtn = ov.querySelector('.gEnter');
+  const enterBtn = qsEl(ov, '.gEnter'); // onclick 是 HTMLElement 成员,走类型化助手
   // 2026-10-03 主人批准:开头不再要求勾选协议 —— ENTER 一直可点,点了就开始故事。
   // 协议只在真正把内容交给服务器时(上传/回声壁发言)才请求同意,见 consent-session.askConsent。
   // 底部三个链接仍可阅读协议。旧的「勾选后 ENTER 才亮」(2026-09-06)已退役。

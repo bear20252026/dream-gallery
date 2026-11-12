@@ -8,6 +8,11 @@ vendor/
 # ⚠️ 本仓库是**公开仓**(GitHub visibility=PUBLIC):任何私钥一旦进库等于把服务器交给全网。
 #    SSH 登录密钥(gk.pem 等)、TLS 私钥、API 凭据一律不得提交;误提交须立即吊销轮换。
 .env
+# .env 变体同样永不入库(2026-11-11 审计:原先只忽略裸 .env,.env.local/.env.production 会漏进公开仓)
+.env.*
+!.env.example
+# 部署目标主机私密配置(源站地址不再硬编码进公开仓库,审计 P3-1;见 scripts/deploy-host.sh)
+.deploy-host.env
 origin/
 *.pem
 *.key

@@ -200,3 +200,72 @@ describe('warmBlobByKey: line audio is kept on the device between visits (2026-1
     expect(await warmBlobByKey('e'.repeat(20))).toBe(true);
   });
 });
+
+describe('warmBlobByKey 内存治理(2026-11-11 审计 C2:上限/revoke/在途去重)', () => {
+  const realFetch = globalThis.fetch;
+  const realCaches = globalThis.caches;
+  const realCreate = URL.createObjectURL;
+  const realRevoke = URL.revokeObjectURL;
+  // blobUrls 是模块级 Map,跨用例累积 ⇒ 每个用例重置模块拿干净状态
+  // (上方 import 的函数绑定仍指旧实例,本块一律经 freshWarm() 取新实例的函数)
+  const modUrl = new URL('../core/dialog-voice.mjs', import.meta.url).href;
+  const freshWarm = async () => {
+    vi.resetModules();
+    const m = await import(modUrl);
+    return m.warmBlobByKey;
+  };
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    globalThis.caches = realCaches;
+    URL.createObjectURL = realCreate;
+    URL.revokeObjectURL = realRevoke;
+    vi.resetModules();
+  });
+  const audio = (n = 4) => new Response(new Blob([new Uint8Array(n)]), { status: 200 });
+  const keyOf = (i) => i.toString(16).padStart(20, '0');
+
+  it('同一键的并发预热只发一次网络请求(在途去重)', async () => {
+    const warm = await freshWarm();
+    delete globalThis.caches; // 无 Cache Storage,直接走网络路径
+    let release;
+    const gate = new Promise((r) => {
+      release = r;
+    });
+    globalThis.fetch = vi.fn(async () => {
+      await gate;
+      return audio();
+    });
+    let seq = 0;
+    URL.createObjectURL = () => 'blob:dedup-' + ++seq;
+    const key = keyOf(0x100);
+    const p1 = warm(key);
+    const p2 = warm(key); // 在途中的第二次调用必须共享同一个 Promise
+    release();
+    expect(await p1).toBe(true);
+    expect(await p2).toBe(true);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('超过 400 条上限淘汰最旧并 revokeObjectURL(不再无界增长)', async () => {
+    const warm = await freshWarm();
+    delete globalThis.caches;
+    globalThis.fetch = vi.fn(async () => audio());
+    let seq = 0;
+    const created = [];
+    const revoked = [];
+    URL.createObjectURL = () => {
+      const u = 'blob:cap-' + ++seq;
+      created.push(u);
+      return u;
+    };
+    URL.revokeObjectURL = (u) => {
+      revoked.push(u);
+    };
+    for (let i = 0; i < 405; i++) {
+      expect(await warm(keyOf(0x200 + i))).toBe(true);
+    }
+    expect(created.length).toBe(405);
+    expect(revoked.length).toBe(5); // 405 - 400 = 5 条最旧被淘汰
+    expect(revoked).toEqual(created.slice(0, 5)); // 淘汰的恰是最先插入的 5 条
+  });
+});

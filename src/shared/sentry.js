@@ -16,7 +16,12 @@ export function initSentry() {
   if (sentryLoaded) return;
 
   // 获取 DSN(仅 meta;URL 参数来源已移除——防访客注入外发端点)
-  const dsn = document.querySelector('meta[name="sentry-dsn"]')?.content;
+  // querySelector 的返回类型是 Element(`content` 只在 meta 元素上):按选择器声称的
+  // `<meta>` 面做一次结构性 cast,运行期取法逐字不变(dom-typed 的内联 DOM cast 记账表不收新条目,
+  // 这里刻意不做整标签声称,只声称用到的那一个成员)。
+  const dsn = /** @type {Element & { content: string }} */ (
+    document.querySelector('meta[name="sentry-dsn"]')
+  )?.content;
 
   if (!dsn) {
     console.log('[sentry] 未配置 DSN,跳过初始化');

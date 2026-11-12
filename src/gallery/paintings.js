@@ -467,7 +467,10 @@ function syncNewMedia() {
         hangOne(u, '新上传的视频');
       }
     })
-    .catch(function () {});
+    .catch(function (e) {
+      // 增量同步失败:下轮 45s 重试;补 warn 留痕(2026-11-11 空 catch 复核:可疑级,对照 quizgate 轮询口径)
+      console.warn('[paintings] 新媒体墙增量同步失败,待下轮重试', e);
+    });
 }
 // 每 45s 增量同步一次新媒体墙(晨光/白板/音乐各自有同步);标签页隐藏时暂停(终审 TOP2)
 let syncTimer = setInterval(syncNewMedia, 45000);

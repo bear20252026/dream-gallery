@@ -28,9 +28,11 @@
 set -e -o pipefail
 cd "$(dirname "$0")/.."
 ROOT_DIR="$PWD"
-HOST="${HOST:-101.133.235.110}"
 SRV="${SRV:-/opt/gallery}"
-SSH_USER="${SSH_USER:-root}"
+# 源站地址不再硬编码(2026-11-11 审计 P3-1):HOST 环境变量 → .deploy-host.env(gitignore),
+# 两者皆无即 fail-closed 退出;与 deploy.sh / backend-sync.sh 共用同一处解析。
+source "$ROOT_DIR/scripts/deploy-host.sh"
+resolve_deploy_host "$ROOT_DIR" || exit 1
 SSH_BIN="${SSH_BIN:-ssh}"
 SCP_BIN="${SCP_BIN:-scp}"
 KNOWN_HOSTS="${KNOWN_HOSTS:-$ROOT_DIR/scripts/known_hosts}"
@@ -236,9 +238,13 @@ fi
 
 if printf '%s\n' "$STATS" | grep -qE '^  ✗'; then
   echo ""
-  # 前端半边有个陷阱,2026-10-12 实测踩到:本项目**构建不可复现** —— 同一棵工作树连续两次
+  # 前端半边有个陷阱,2026-10-12 实测踩到:当时本项目**构建不可复现** —— 同一棵工作树连续两次
   # `npm run build`,79 个 chunk 的文件名会全部变掉(vite/rolldown 的内容哈希里掺了每次构建都变的量)。
-  # 于是"事后单独再跑一次本脚本"必然报一堆「服务器缺文件」,看起来像部署是半成品,实际只是
+  # ⚠️ 2026-11-11 更新:依赖升级(vite 8.3.8 等)后实测**已可复现**(连续两次构建 dist 逐字节一致,
+  #    判据见 scripts/build-repro-check.cjs / npm run test:repro)。但本脚本的"服务器自洽"兜底逻辑
+  #    保留不变 —— 它防的是"线上是另一次构建"这一更普遍的情形(即便可复现,线上也可能落后于本地 HEAD),
+  #    与可复现与否无关。下面这段口径继续有效:
+  # 于是"事后单独再跑一次本脚本"可能报一堆「服务器缺文件」,看起来像部署是半成品,实际只是
   # 本地 dist 已经不是当初上传的那一份。判据不在"本地 vs 服务器",而在"服务器自洽不自洽":
   #   线上 index.html 引用的每个资源都取得到 ⇒ 线上是自洽的一次构建,但**没法证明是我们要的那一次**
   #     ⇒ 结论是「无法比对」(exit 2),不是「有漂移」(exit 1),也不是「通过」(exit 0)

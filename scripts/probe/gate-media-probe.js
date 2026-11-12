@@ -1,6 +1,7 @@
 // gate-media-probe.js — 验证媒体加载新规:未过答题→室内媒体静默;授 VIP 后→放行
 const { chromium } = require('playwright-core');
-const BASE = 'http://101.133.235.110:3000';
+// 源站地址不再硬编码(2026-11-11 审计 P3-1):BASE_URL 环境变量注入,默认本地后端
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const ADMIN_TOKEN = process.env.ADMIN_TOKEN || '';
 const api = (p) => { const u = new URL(p, BASE); u.searchParams.set('token', ADMIN_TOKEN); return u; };
 

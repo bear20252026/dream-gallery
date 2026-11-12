@@ -5,6 +5,8 @@ import { askConsent } from '../consent-session.js';
 import { byIdInput } from '../../shared/dom-typed.js'; // #chatInput 是 <input>(index.html),.value 只在 HTMLInputElement 上
 // 召唤词与后端同源(2026-10-17 审计 C9):界面教的词必须就是后端认的词,否则"照屏幕打字=死按钮"
 import * as CHAT_WORDS from '../../shared/chat-words.mjs';
+// 当前剧情语言(2026-11-11 审计 C9-2):发言带上 lang,英文站的机器人回帖不再回中文
+import { scriptLang } from '../../shared/story-text.mjs';
 const BOT_HINT = '@' + CHAT_WORDS.BOT_TRIGGERS[0] + ' 可召唤它回答';
 
 const chatOv = document.createElement('div');
@@ -100,7 +102,7 @@ async function sendChat() {
     const r = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, lang: scriptLang() === 'en' ? 'en' : 'zh' }),
     });
     const d = await r.json();
     if (!r.ok) {

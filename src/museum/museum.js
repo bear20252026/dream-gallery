@@ -44,7 +44,9 @@ function showMask(name) {
   if (!maskEl) {
     maskEl = document.createElement('div');
     maskEl.style.cssText =
-      'position:fixed;inset:0;z-index:'+Z.museumOv+';background:#0d0a12;color:#ffe2c4;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:15px;letter-spacing:2px';
+      'position:fixed;inset:0;z-index:' +
+      Z.museumOv +
+      ';background:#0d0a12;color:#ffe2c4;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:15px;letter-spacing:2px';
     maskEl.innerHTML =
       '<div id="_mzName" style="font-size:22px;font-weight:700;margin-bottom:14px"></div>' +
       '<div style="width:260px;height:8px;border-radius:4px;background:rgba(255,255,255,.12);overflow:hidden"><div id="_mzBar" style="width:0%;height:100%;background:linear-gradient(90deg,#ff9a9e,#fecfef);transition:width .2s"></div></div>' +
@@ -78,7 +80,10 @@ function loadWorld(url, name) {
         // 扫描资产贴图自带烘焙光照 → 全部转 MeshBasicMaterial(unlit)+关闭雾影响,
         // 呈现 VR Tour 原貌且不受场景灯光/雾/昼夜干扰
         obj.traverse((o) => {
-          if (o.material) {
+          // traverse 回调的 o 是 Object3D(`material` 只在 Mesh 上):按网格面 cast 一次,
+          // 运行期仍靠 `material` 真值判定(非网格节点没有该成员,照旧跳过),分支不变。
+          const mesh = /** @type {THREE.Mesh} */ (o);
+          if (mesh.material) {
             const fix = (m0) => {
               // 2026-08-31 Z-up 妥协:开雾让远处 Z-up 几何延伸融进沙漠
               const basic = new THREE.MeshBasicMaterial({ fog: true });
@@ -87,7 +92,9 @@ function loadWorld(url, name) {
               basic.side = THREE.DoubleSide; // 从建筑内部观看,必须双面渲染(否则看到的是外面)
               return basic;
             };
-            o.material = Array.isArray(o.material) ? o.material.map(fix) : fix(o.material);
+            mesh.material = Array.isArray(mesh.material)
+              ? mesh.material.map(fix)
+              : fix(mesh.material);
           }
         });
         s.add(obj);
@@ -409,23 +416,27 @@ ctx.onTick(function museumTick() {
 
 // ---------- 世界切换 ----------
 function teleportTo(x, z, yFace) {
-  return new Promise((resolve) => {
-    goldenTeleport(
-      () => {
-        const pl = ctx.player.pl;
-        // 2026-08-31:眼高 = 脚底 + 1.6;大堂一楼脚底 20.8(实测 sol 顶面)
-        const footY = current === 'hall' ? HALL_1F : 0;
-        pl.p.set(x, footY + 1.6, z);
-        pl.y = yFace;
-        pl.vy = 0;
-        pl.onGround = true;
-        ctx.scene.cam.position.copy(pl.p);
-        ctx.scene.cam.rotation.y = pl.y;
-        ctx.scene.cam.rotation.x = pl.pi;
-      },
-      () => resolve()
-    );
-  });
+  // resolve() 无参落地:checkJs 需要 JSDoc 提示才认"可无参调用的 resolve"(TS2810),
+  // 用 Promise<void> cast 声明兑现值就是 void,运行期构造与回调逐字不变。
+  return /** @type {Promise<void>} */ (
+    new Promise((resolve) => {
+      goldenTeleport(
+        () => {
+          const pl = ctx.player.pl;
+          // 2026-08-31:眼高 = 脚底 + 1.6;大堂一楼脚底 20.8(实测 sol 顶面)
+          const footY = current === 'hall' ? HALL_1F : 0;
+          pl.p.set(x, footY + 1.6, z);
+          pl.y = yFace;
+          pl.vy = 0;
+          pl.onGround = true;
+          ctx.scene.cam.position.copy(pl.p);
+          ctx.scene.cam.rotation.y = pl.y;
+          ctx.scene.cam.rotation.x = pl.pi;
+        },
+        () => resolve()
+      );
+    })
+  );
 }
 
 async function enterHall() {

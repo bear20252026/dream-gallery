@@ -3,7 +3,6 @@
 // 构建: npm run build → dist/(全部 html 入口 + assets/* hash 分包),部署 dist 全部 + 后端
 import { defineConfig } from 'vite';
 import { resolve } from 'path';
-import { createHtmlPlugin } from 'vite-plugin-html';
 import fs from 'fs';
 import { minify as terserMinify } from 'terser';
 import { execSync } from 'child_process';
@@ -19,6 +18,29 @@ function buildStamp() {
     return { n: 0, hash: '', date: new Date().toISOString().slice(0, 10) };
   }
 }
+
+// HTML 保守压缩(2026-11-11 审计:替换 2022 年停更的 vite-plugin-html@3.2.2)。
+// 只做三件安全的事:去 HTML 注释、折叠空白、去标签间空行。**绝不碰 <script>/<style>/
+// <pre>/<textarea> 的内容**——原插件的激进 minify 会改内联脚本,本仓库有过同类事故口径。
+// 功能等价于原 createHtmlPlugin({minify:true}) 的注释/空白部分,产物语义不变。
+const htmlMinify = () => ({
+  name: 'html-minify-conservative',
+  apply: 'build',
+  enforce: 'post',
+  transformIndexHtml(html) {
+    const kept = [];
+    // 占位符用私有区字符(U+E000),不用控制字符(no-control-regex);HTML 内容不会天然出现它
+    let s = html.replace(/<(script|style|pre|textarea)\b[\s\S]*?<\/\1>/gi, (m) => {
+      kept.push(m);
+      return '\uE000KEEP' + (kept.length - 1) + '\uE000';
+    });
+    s = s.replace(/<!--[\s\S]*?-->/g, '');
+    s = s.replace(/\s{2,}/g, ' ');
+    s = s.replace(/>\s+</g, '><');
+    s = s.replace(/\uE000KEEP(\d+)\uE000/g, (_, i) => kept[Number(i)]);
+    return s;
+  },
+});
 
 // 构建钩子:压缩 public/sw.js,产物覆盖到 dist/sw.js(源文件不变,部署用压缩版)
 const minifySw = () => ({
@@ -182,8 +204,8 @@ export default defineConfig({
   plugins: [
     minifySw(),
     corePreloadInject(),
-    // HTML 压缩保护:去除注释、空白、多余换行
-    createHtmlPlugin({ minify: true }),
+    // HTML 保守压缩:去注释、空白、多余换行(不碰脚本/样式内容;替代停更的 vite-plugin-html)
+    htmlMinify(),
     noImportMapInBuild(),
   ],
   build: {

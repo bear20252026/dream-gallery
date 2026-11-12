@@ -112,6 +112,13 @@ const SCHEMA = {
   // 2026-10-04 剧本补全:地球的一天(第 10 场)走到第几站;earthDay = 地球一天走完(之后才去找井)
   earthStep: { key: 'b612EarthStep', type: 'num' },
   earthDay: { key: 'b612EarthDay', type: 'flag' },
+  // 全站音视频总闸(core/av-switch.js,2026-11-11 技术债收口):?av=1 开 / ?av=0 关 / 记忆开关。
+  // 此前直写 localStorage 绕过登记册;现经 store.flag/mark/unmark,语义逐点对齐('1'=开,删除=关)。
+  avOn: { key: 'avOn', type: 'flag' },
+  // 后台调试/CI 后门(admin/admin-core.js,2026-11-11 技术债收口):控制台塞 x-token 强制回头像鉴权。
+  // admin 是独立子系统(不加载 ctx),但 store-api 零依赖可复用(同 lobby);此处只登记读出口,
+  // sessionStorage 兜底仍由 admin-core 自持(store-api 只管 localStorage 这一层)。
+  adminXToken: { key: 'admin_x_token', type: 'str' },
 };
 function entry(name) {
   const e = SCHEMA[name];

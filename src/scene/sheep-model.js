@@ -92,7 +92,8 @@ export function prepareSheep(source) {
       });
     },
     dispose() {
-      pose.traverse((node) => node.geometry?.dispose());
+      // pose 里只有 Group 与 Mesh:按 Mesh 面 cast 后 ?. 照旧对 Group 落空,释放行为不变。
+      pose.traverse((node) => /** @type {THREE.Mesh} */ (node).geometry?.dispose());
       materials.forEach((m) => m.dispose());
     },
   };

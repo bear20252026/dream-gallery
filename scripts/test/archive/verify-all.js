@@ -1,6 +1,7 @@
 // verify-all.js — 云端大版本全链路验收
 const { chromium } = require('playwright-core');
-const BASE = 'http://101.133.235.110:3000';
+// 源站地址不再硬编码(2026-11-11 审计 P3-1):BASE_URL 环境变量注入,默认本地后端
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
 const TOKEN = process.env.ADMIN_TOKEN || ''; // 后台密码走环境变量(2026-07-28 脱敏:不入库)
 const api = (p) => { const u = new URL(p, BASE); u.searchParams.set('token', TOKEN); return u; };
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ProbeUA/4.0 KimiVerify';
