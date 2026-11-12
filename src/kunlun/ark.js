@@ -689,6 +689,8 @@ function dock() {
   ctx.store.mark('arkFlew');
   ctx.kunlun.eternalWelcome && ctx.kunlun.eternalWelcome(); // 首到欢迎(已迎过则静默)
   ctx.ui.modeToast && ctx.ui.modeToast('已停靠 · 永恒展厅南侧平台');
+  // C4「天空的访客」(2026-11-12):首飞巡礼完成即点亮;延后一拍不与停靠提示抢 toast
+  setTimeout(() => ctx.ui.announceAchievements && ctx.ui.announceAchievements(), 2600);
   window.__refreshSpirits && window.__refreshSpirits();
   // 飞舟化光返回山巅
   setTimeout(() => {

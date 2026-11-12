@@ -592,6 +592,13 @@ export interface UINamespace {
    * scene7-tippler:337,367 / scene7-vanity:212,236,248),声明停在 1 参就是 9 条 TS2554。
    */
   modeToast: (msg: string, duration?: number) => void;
+  /**
+   * 成就解锁通报(C4,2026-11-12)。装配方 gate/settings.js 挂载,实现在
+   * settings/achievement-page.js:按既有进度实时判定,只通报"新达成且没通报过"的,
+   * 通报后记进存档 achievementsSeen。进度变化点(灵蕴拾取/首飞/选片/天穹里程碑)调它。
+   * @returns 本次通报的徽章 id 数组(无新解锁则空数组)
+   */
+  announceAchievements: () => string[];
   openDialog: (opts: unknown) => void;
   dialogOpen: () => boolean;
   cancelDialogScope: (scope: string) => void;
