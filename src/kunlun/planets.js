@@ -27,6 +27,7 @@ import { clampChapter, advanceChapter, decorateSpiritsState } from '../shared/st
 import { tt } from '../shared/story-text.mjs';
 import { legacyOn } from '../shared/legacy.mjs';
 import { errText } from '../shared/err-text.mjs'; // loader 的 onError 形参由 three 声明成 unknown,不能假定它有 .message
+import { planetMesh, box, cyl, numSprite } from './planets-mesh.js'; // 网格工厂(2026-11-11 巨型文件拆分抽离)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -214,56 +215,7 @@ bag.custom.push(function () {
   ctx.kunlun.groundOverride = prevOverride; // HMR 解链
 });
 
-/* ===================== 材质工具(零 PointLight:顶亮底暗顶点色) ===================== */
-function planetMesh(topHex, botHex) {
-  const g = new THREE.SphereGeometry(R, 40, 24);
-  const pos = g.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  const top = new THREE.Color(topHex),
-    bot = new THREE.Color(botHex),
-    c = new THREE.Color();
-  for (let i = 0; i < pos.count; i++) {
-    const t = THREE.MathUtils.clamp((pos.getY(i) / R) * 0.5 + 0.5, 0, 1);
-    c.copy(bot).lerp(top, t);
-    colors[i * 3] = c.r;
-    colors[i * 3 + 1] = c.g;
-    colors[i * 3 + 2] = c.b;
-  }
-  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-  return new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true }));
-}
-function box(w, h, d, hex) {
-  return new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshBasicMaterial({ color: hex })
-  );
-}
-function cyl(rt, rb, h, hex) {
-  return new THREE.Mesh(
-    new THREE.CylinderGeometry(rt, rb, h, 14),
-    new THREE.MeshBasicMaterial({ color: hex })
-  );
-}
-function numSprite(txt, color) {
-  const cv = document.createElement('canvas');
-  cv.width = 128;
-  cv.height = 64;
-  const x = cv.getContext('2d');
-  x.font = 'bold 40px Georgia,serif';
-  x.textAlign = 'center';
-  x.textBaseline = 'middle';
-  x.fillStyle = color;
-  x.fillText(txt, 64, 32);
-  const sp = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map: new THREE.CanvasTexture(cv),
-      transparent: true,
-      depthWrite: false,
-    })
-  );
-  sp.scale.set(1.8, 0.9, 1); // 章节号留作小标识，不挡住人物和目标
-  return sp;
-}
+/* ===================== 材质工具(零 PointLight:顶亮底暗顶点色;2026-11-11 抽离至 planets-mesh.js) ===================== */
 
 /* ===================== 岛屿建造(体块道具,每章一件) ===================== */
 const islands = [];
@@ -272,7 +224,7 @@ function buildIsland(cfg, idx) {
   grp.position.set(cfg.pos[0], cfg.pos[1], cfg.pos[2]);
   // 星球体(顶亮底暗)
   const shade = new THREE.Color(cfg.color).multiplyScalar(0.3);
-  const body = planetMesh(cfg.color, '#' + shade.getHexString());
+  const body = planetMesh(cfg.color, '#' + shade.getHexString(), R); // R 改入参(抽离后,2026-11-11)
   body.scale.y = 0.42;
   grp.add(body);
   // 星环细环(与商人章呼应的通用语言)
@@ -500,6 +452,36 @@ const mainGateY =
     : 0;
 gateGrp.position.set(0.1, mainGateY, 56.0);
 const pads = { main: gateGrp, king: null, b612: null };
+// 传送台 GLB 共享加载(2026-11-11 审计 C7-②):同一 portal-platform.glb(760KB)原先被
+// 两处 loadPortalPad 各起一次独立加载,白下一遍。现模块级共享一个在途 Promise:
+// 首个调用发起加载,其余调用等同一个结果;各调用点 clone 出独立子树(共享几何/材质),
+// 场景归属与释放仍走各自的 addWorldObj,互不牵连。失败不缓存,下次调用可重试。
+let portalPadPromise = null;
+function loadPortalPadScene() {
+  if (!portalPadPromise) {
+    portalPadPromise = new Promise((resolve, reject) => {
+      createGLTFLoader()
+        .setMeshoptDecoder(MeshoptDecoder)
+        .load(
+          'models/hall/b612-world/portal-platform.glb',
+          (gltf) => {
+            const m = gltf.scene;
+            m.scale.setScalar(0.003);
+            m.traverse((o) => {
+              if (o.name && /monolith|column|pillar/i.test(o.name)) o.visible = false;
+            });
+            resolve(m);
+          },
+          undefined,
+          (e) => {
+            portalPadPromise = null; // 失败不缓存:允许下一次调用重试
+            reject(e);
+          }
+        );
+    });
+  }
+  return portalPadPromise;
+}
 function loadPortalPad(world, position, targetWorld) {
   const root = new THREE.Group();
   root.position.set(position.x, position.y, position.z);
@@ -509,21 +491,9 @@ function loadPortalPad(world, position, targetWorld) {
   );
   marker.position.y = 0.09;
   root.add(marker);
-  createGLTFLoader()
-    .setMeshoptDecoder(MeshoptDecoder)
-    .load(
-      'models/hall/b612-world/portal-platform.glb',
-      (gltf) => {
-        const m = gltf.scene;
-        m.scale.setScalar(0.003);
-        m.traverse((o) => {
-          if (o.name && /monolith|column|pillar/i.test(o.name)) o.visible = false;
-        });
-        root.add(m);
-      },
-      undefined,
-      (e) => console.warn('[planets] portal platform load failed', errText(e))
-    );
+  loadPortalPadScene()
+    .then((m) => root.add(m.clone()))
+    .catch((e) => console.warn('[planets] portal platform load failed', errText(e)));
   addWorldObj(world.scene, root); // 含稍后 GLB 回调里 root.add(m) 的子树(登记=整棵释放)
   pads[targetWorld] = root;
   return root;

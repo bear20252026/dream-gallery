@@ -11,6 +11,7 @@ import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { errText } from '../shared/err-text.mjs'; // loader 的 onError 形参由 three 声明成 unknown
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import './room.css';
+import { byIdInput, qsaBtn } from '../shared/dom-typed.js'; // #chatInput 是 <input>(room.html:23),.emote-btn/.move-pad button 都是 <button>
 
 // 角色 glTF 资源路径(Wise ZZZ, CC-BY-4.0);缺失时 makeAvatar 回退到程序化轮滑小人。
 const WISE_ZZZ_GLB = '/assets/wise_zzz/scene.gltf';
@@ -21,7 +22,7 @@ const hudCode = document.getElementById('hudCode');
 const hudCount = document.getElementById('hudCount');
 const banner = document.getElementById('banner');
 const chatLog = document.getElementById('chatLog');
-const chatInput = document.getElementById('chatInput');
+const chatInput = byIdInput('chatInput');
 const chatSend = document.getElementById('chatSend');
 const leaveBtn = document.getElementById('leaveBtn');
 const roomHint = document.getElementById('roomHint');
@@ -519,7 +520,8 @@ chatInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') sendChat();
 });
 
-document.querySelectorAll('.emote-btn').forEach((b) => {
+// qsaBtn 与裸 querySelectorAll+forEach 的唯一差别是 NodeList→数组(同一批节点、同样各回调一次)
+qsaBtn(document, '.emote-btn').forEach((b) => {
   b.onclick = () => {
     const e = b.dataset.e;
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({ t: 'emote', e }));
@@ -590,7 +592,7 @@ renderer.domElement.addEventListener(
 
 // 移动端方向键
 let camDist = 8;
-document.querySelectorAll('.move-pad button').forEach((b) => {
+qsaBtn(document, '.move-pad button').forEach((b) => {
   const d = b.dataset.dir;
   b.addEventListener('pointerdown', (e) => {
     e.preventDefault();

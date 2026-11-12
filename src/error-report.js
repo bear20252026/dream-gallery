@@ -96,33 +96,43 @@ function flush(useBeacon) {
     })
       .then(() => {})
       .catch(() => {})
-      .finally(() => { sending = false; });
+      .finally(() => {
+        sending = false;
+      });
   } catch (e) {
     sending = false;
   }
 }
 
 // ---------- 1. 未捕获异常 ----------
-window.addEventListener('error', (e) => {
-  // 资源加载错误也走 error 事件(target 不是 window),单独归类
-  const t = e.target;
-  if (t && t !== window && (t.src || t.href)) {
+window.addEventListener(
+  'error',
+  (e) => {
+    // 资源加载错误也走 error 事件(target 不是 window),单独归类
+    // 资源失败的 target 是 img/script/link 等元素;EventTarget 无 src/href/tagName,
+    // 经 unknown 窄化为资源元素结构(类型债治理,不改逻辑;非 any 逃逸)
+    const t = /** @type {{ src?: string; href?: string; tagName?: string } | null} */ (
+      /** @type {unknown} */ (e.target)
+    );
+    if (t && t !== window && (t.src || t.href)) {
+      push({
+        type: 'resource',
+        message: '资源加载失败: ' + (t.src || t.href).slice(0, 180),
+        source: t.tagName ? t.tagName.toLowerCase() : 'resource',
+      });
+      return;
+    }
     push({
-      type: 'resource',
-      message: '资源加载失败: ' + (t.src || t.href).slice(0, 180),
-      source: t.tagName ? t.tagName.toLowerCase() : 'resource',
+      type: 'js',
+      message: e.message || String(e.error || 'unknown'),
+      source: e.filename ? e.filename + ':' + e.lineno + ':' + e.colno : '',
+      lineno: e.lineno,
+      colno: e.colno,
+      stack: e.error && e.error.stack ? e.error.stack : '',
     });
-    return;
-  }
-  push({
-    type: 'js',
-    message: e.message || String(e.error || 'unknown'),
-    source: e.filename ? e.filename + ':' + e.lineno + ':' + e.colno : '',
-    lineno: e.lineno,
-    colno: e.colno,
-    stack: e.error && e.error.stack ? e.error.stack : '',
-  });
-}, true); // 捕获阶段:才能收到资源加载失败(它不冒泡)
+  },
+  true
+); // 捕获阶段:才能收到资源加载失败(它不冒泡)
 
 // ---------- 2. 未处理的 Promise 拒绝 ----------
 window.addEventListener('unhandledrejection', (e) => {
@@ -140,7 +150,11 @@ window.addEventListener('load', () => {
     const cvs = document.querySelectorAll('canvas');
     cvs.forEach((cv) => {
       cv.addEventListener('webglcontextlost', (e) => {
-        push({ type: 'webgl', message: 'WebGL 上下文丢失(可能黑屏/冻结)', source: cv.id || 'canvas' });
+        push({
+          type: 'webgl',
+          message: 'WebGL 上下文丢失(可能黑屏/冻结)',
+          source: cv.id || 'canvas',
+        });
       });
     });
   } catch (e) {}
@@ -153,9 +167,17 @@ try {
     window.fetch = function (...args) {
       return origFetch.apply(this, args).catch((err) => {
         try {
-          const u = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url) || '';
+          // args[0] 是 string | Request | URL;非字符串时按 Request 取 url(URL 无 url 属性,回退空串)
+          const u =
+            typeof args[0] === 'string'
+              ? args[0]
+              : (args[0] && /** @type {Request} */ (args[0]).url) || '';
           // 忽略故意探测的接口(如未开启的功能),只记真实失败
-          push({ type: 'network', message: '请求失败: ' + String(u).slice(0, 160), source: String(err && err.message || err) });
+          push({
+            type: 'network',
+            message: '请求失败: ' + String(u).slice(0, 160),
+            source: String((err && err.message) || err),
+          });
         } catch (e) {}
         throw err; // 不改变原语义,继续把错误抛给调用方
       });
@@ -168,11 +190,22 @@ try {
 try {
   const origErr = console.error;
   let captureConsole = false;
-  expose('errCaptureConsole', (on) => { captureConsole = !!on; });
+  expose('errCaptureConsole', (on) => {
+    captureConsole = !!on;
+  });
   console.error = function (...a) {
     if (captureConsole) {
       try {
-        push({ type: 'js', message: 'console.error: ' + a.map((x) => (x && x.message) || String(x)).join(' ').slice(0, 300), source: 'console' });
+        push({
+          type: 'js',
+          message:
+            'console.error: ' +
+            a
+              .map((x) => (x && x.message) || String(x))
+              .join(' ')
+              .slice(0, 300),
+          source: 'console',
+        });
       } catch (e) {}
     }
     return origErr.apply(this, a);
@@ -186,6 +219,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // 供手动上报(业务代码可主动记录,比如"模型加载三次都失败")
-expose('reportError', (type, message, extra) => push(Object.assign({ type, message }, extra || {})));
+expose('reportError', (type, message, extra) =>
+  push(Object.assign({ type, message }, extra || {}))
+);
 
 export { push as reportError, flush };

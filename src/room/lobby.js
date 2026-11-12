@@ -3,6 +3,7 @@
 // 本页是 lobby.html 独立入口,不加载 ctx.js 冷核心,故直接引 api 而非 ctx.store。
 import './room.css';
 import { storeApi } from '../state/store-api.js';
+import { byIdInput } from '../shared/dom-typed.js'; // #name / #code 都是 <input>(lobby.html:18/:26),.value 只在 HTMLInputElement 上
 
 function randCode() {
   const cs = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -15,8 +16,8 @@ function go(code, name) {
   const n = encodeURIComponent(name || '访客');
   location.href = `/room.html?code=${c}&name=${n}`;
 }
-const nameEl = document.getElementById('name');
-const codeEl = document.getElementById('code');
+const nameEl = byIdInput('name');
+const codeEl = byIdInput('code');
 
 // 预填上次昵称(走 storeApi:roomName 已在 SCHEMA 登记,含异常兜底)
 const last = storeApi.str('roomName');
@@ -28,11 +29,21 @@ document.getElementById('createBtn').onclick = () => {
   go(randCode(), name);
 };
 document.getElementById('joinBtn').onclick = () => {
-  const code = codeEl.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (!code) { codeEl.focus(); return; }
+  const code = codeEl.value
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  if (!code) {
+    codeEl.focus();
+    return;
+  }
   const name = nameEl.value.trim() || '访客';
   storeApi.setStr('roomName', name);
   go(code, name);
 };
-codeEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('joinBtn').click(); });
-nameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') document.getElementById('createBtn').click(); });
+codeEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('joinBtn').click();
+});
+nameEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('createBtn').click();
+});

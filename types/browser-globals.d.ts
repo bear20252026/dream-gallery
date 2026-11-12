@@ -17,3 +17,10 @@ interface Navigator {
    */
   readonly deviceMemory?: number;
 }
+
+// Sentry SDK 的**动态加载全局**(src/shared/sentry.js):页面 meta 配了 DSN 才注入
+// https://browser.sentry-cdn.com 的 bundle.min.js,script.onload 里 `typeof Sentry === 'undefined'`
+// 先探活再取用 —— 运行期守卫本来就在,缺的是这份全局声明(TS2304 ×7)。
+// 它是外部 SDK,形状不属本仓契约面(eslint.config.mjs 也已把 Sentry 登记为 readonly 全局),
+// 这里只声明"存在这么一个全局",不临摹 SDK 接口 —— 临摹错了比不写更坏(同 ctx.d.ts 探针槽位的口径)。
+declare var Sentry: any;

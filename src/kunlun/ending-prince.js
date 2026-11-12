@@ -49,8 +49,10 @@ export function loadPrince(cb) {
       m.updateWorldMatrix(true, true);
       let rootBone = null;
       m.traverse((o) => {
-        if (!rootBone && o.isBone && o.name === 'root') rootBone = o;
-        if (o.isMesh) {
+        // instanceof 与 o.isBone / o.isMesh 在这里等价(three 把这两个旗只放在各自 prototype 上),
+        // 但只有 instanceof 能让 TS 认下来 —— 与 gallery/crash-site.js(本 rig 的同源模板)同口径。
+        if (!rootBone && o instanceof THREE.Bone && o.name === 'root') rootBone = o;
+        if (o instanceof THREE.Mesh) {
           o.frustumCulled = false;
           const mats = Array.isArray(o.material) ? o.material : [o.material];
           if (mats.some((mm) => /Layer_1/i.test(mm.name || ''))) o.visible = false;

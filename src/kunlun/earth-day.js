@@ -277,10 +277,14 @@ function loadRealRoses(sc) {
     const c = b.getCenter(new THREE.Vector3());
     d.position.set(-c.x * k, -b.min.y * k, -c.z * k);
     d.traverse((o) => {
-      if (o.isMesh) {
-        o.material = o.material.clone();
-        o.material.depthWrite = false;
-        o.material.opacity = Math.min(o.material.opacity, 0.3);
+      // instanceof 与 o.isMesh 在这里等价(three 把 isMesh 只放在 Mesh.prototype 上),
+      // 但只有 instanceof 能让 TS 认下来(同 gallery/crash-site.js 的既有口径)。
+      if (o instanceof THREE.Mesh) {
+        // GLB 玻璃罩是单 primitive(每 mesh 一个材质),克隆后按 Material 面写透明度。
+        const mm = /** @type {THREE.Material} */ (o.material).clone();
+        o.material = mm;
+        mm.depthWrite = false;
+        mm.opacity = Math.min(mm.opacity, 0.3);
         o.renderOrder = 2; // 透明罩最后画,里面的玫瑰看得见
       }
     });

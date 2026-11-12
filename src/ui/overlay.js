@@ -171,7 +171,9 @@ ctx.ui.overlay = {
     return stack.length > 0;
   },
   isUiTouch(t) {
-    return !!(t && t.closest && t.closest('[data-overlay]'));
+    // t 是事件 target(EventTarget);closest 是 Element 的方法,窄化后取用(类型债治理,逻辑不变)
+    const el = /** @type {Element | null} */ (/** @type {unknown} */ (t));
+    return !!(el && el.closest && el.closest('[data-overlay]'));
   },
   closeAll,
   destroy: destroyOverlay,

@@ -548,7 +548,10 @@ function buildImportFrames() {
         ctx.ui.modeToast &&
           ctx.ui.modeToast('展厅西墙最多呈现 ' + IMP_CAP + ' 幅，其余已为你留作候选。');
     })
-    .catch(() => {});
+    .catch((e) => {
+      // 西墙选片拉取失败:无兜底回退,补 warn 留痕便于排障(2026-11-11 空 catch 复核:可疑级)
+      console.warn('[eternal] 西墙选片(/api/myuploads)拉取失败', e);
+    });
 }
 buildImportFrames();
 ctx.kunlun.rebuildEternalPicks = buildImportFrames; // C2:选片保存后由设置页调用,刷新西墙

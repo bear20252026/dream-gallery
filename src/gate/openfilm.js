@@ -23,6 +23,15 @@ import { createFilmGate } from './film-gate.mjs';
 import { HAT, TRUTH } from './film-strokes.mjs';
 import { FILM, tt, scriptLang } from '../shared/story-text.mjs';
 import { makeLangToggle } from '../ui/lang-toggle.js';
+// 地形数学/着色器/纹理/缓动抽离(2026-11-11 巨型文件拆分,纯函数)
+import {
+  heightAt,
+  bump,
+  ease,
+  blobTex,
+  TERRAIN_VERTEX,
+  TERRAIN_FRAGMENT,
+} from './openfilm-terrain.js';
 
 let active = false;
 
@@ -71,6 +80,11 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
     } catch (e) {}
     try {
       window.removeEventListener('resize', onResize);
+    } catch (e) {}
+    // 语言监听与 resize/keydown 一样成对摘除(2026-11-11 审计 P3-8:原先独漏此项,
+    // 每放一次影片就在 window 上留一个永久监听)
+    try {
+      window.removeEventListener('script:lang', applyFilmLang);
     } catch (e) {}
     timers.forEach((id) => window.clearTimeout(id));
     timers.clear();
@@ -168,19 +182,7 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
   /* 地形 */
   const SEG = 140,
     SIZE = 760;
-  function noise2(x, z) {
-    return (
-      Math.sin(x * 0.013 + 1.7) * Math.cos(z * 0.016 + 0.6) * 7.5 +
-      Math.sin(x * 0.045 + z * 0.031 + 2.2) * 3.2 +
-      Math.cos(x * 0.021 - z * 0.027 + 4.1) * 4.2 +
-      Math.sin(x * 0.093 + z * 0.087) * 1.1
-    );
-  }
-  function heightAt(x, z) {
-    const d = Math.hypot(x, z - 40);
-    const flat = THREE.MathUtils.smoothstep(d, 26, 90);
-    return Math.max(0, noise2(x, z) * flat + flat * 2.2 - 1.2);
-  }
+  // noise2 / heightAt 抽离至 openfilm-terrain.js(2026-11-11 巨型文件拆分,纯数学)
   const geo = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
   geo.rotateX(-Math.PI / 2);
   {
@@ -190,32 +192,8 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
   }
   const mat = new THREE.ShaderMaterial({
     uniforms: { uInk: { value: INK } },
-    vertexShader: `varying float vH;varying vec3 vN;varying vec3 vW;
-      void main(){vH=position.y;vN=normal;vW=position;
-      gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
-    fragmentShader: `varying float vH;varying vec3 vN;varying vec3 vW;
-      uniform vec3 uInk;
-      float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
-      void main(){
-        float wob=(hash(floor(vW.xz*5.0))-.5)*.9;
-        float h=vH+wob;
-        vec3 col=mix(vec3(.957,.933,.866),vec3(.930,.890,.796),smoothstep(0.,20.,h));
-        float bl=sin(vW.x*.021+3.1)*sin(vW.z*.017+1.3);
-        col=mix(col,vec3(.902,.846,.712),bl*.5+.5)*.5+col*.5;
-        float band=h/2.6;
-        float aa=fwidth(band)*1.4;
-        float line=1.0-smoothstep(0.,aa,min(fract(band),1.0-fract(band)));
-        line*=mix(.22,1.0,smoothstep(.3,2.5,vH));
-        col=mix(col,uInk*.9,line*.42);
-        float slope=clamp(1.0-vN.y,0.,1.);
-        col=mix(col,vec3(.806,.748,.616),smoothstep(.04,.5,slope)*.55);
-        vec2 g=abs(fract(vW.xz/95.0)-.5);
-        float grid=1.0-smoothstep(0.,.004,min(g.x,g.y)*2.0/(fwidth(vW.x/95.0)+1e-4));
-        col=mix(col,uInk,grid*.10);
-        float edge=smoothstep(340.,240.,length(vW.xz));
-        col=mix(vec3(.953,.925,.847),col,edge);
-        gl_FragColor=vec4(col,1.0);
-      }`,
+    vertexShader: TERRAIN_VERTEX, // 抽离至 openfilm-terrain.js(2026-11-11)
+    fragmentShader: TERRAIN_FRAGMENT,
   });
   scene.add(new THREE.Mesh(geo, mat));
 
@@ -334,25 +312,7 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
     return sp;
   })();
 
-  /* 水彩漂粒与落地尘埃 */
-  function blobTex(hue) {
-    const s = 64,
-      c = document.createElement('canvas');
-    c.width = c.height = s;
-    const x = c.getContext('2d');
-    for (let i = 0; i < 5; i++) {
-      const r = s * 0.32 * (0.7 + Math.random() * 0.5),
-        a = s / 2 + (Math.random() - 0.5) * 8;
-      const gr = x.createRadialGradient(a, a, 1, a, a, r);
-      gr.addColorStop(0, `hsla(${hue},45%,62%,.55)`);
-      gr.addColorStop(1, `hsla(${hue},45%,62%,0)`);
-      x.fillStyle = gr;
-      x.beginPath();
-      x.arc(a, a, r, 0, 7);
-      x.fill();
-    }
-    return new THREE.CanvasTexture(c);
-  }
+  /* 水彩漂粒与落地尘埃(blobTex 抽离至 openfilm-terrain.js,2026-11-11) */
   const drift = [];
   for (let i = 0; i < 44; i++) {
     const sp = new THREE.Sprite(
@@ -465,8 +425,7 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
     last = 0;
   let restPos = null,
     restDir = null;
-  const bump = (x, c, w) => Math.exp(-Math.pow((x - c) / w, 2));
-  const ease = (x) => x * x * (3 - 2 * x);
+  // bump / ease 抽离至 openfilm-terrain.js(2026-11-11,纯缓动)
   const V = new THREE.Vector3(),
     T = new THREE.Vector3(),
     UP = new THREE.Vector3(0, 1, 0);
@@ -681,7 +640,7 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
       p.setAttribute('fill', '#4e4237');
       p.setAttribute('stroke', 'none');
     }
-    p.style.opacity = 0;
+    p.style.opacity = '0'; // CSSStyleDeclaration.opacity 是 string;运行期 '0' 与 0 等效
     svg.appendChild(p);
     return p;
   }
@@ -756,8 +715,8 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
     const P = $('fPaper');
     const flash = (id) => {
       const el = $(id);
-      el.style.opacity = 1;
-      setTimeout(() => (el.style.opacity = 0), 620);
+      el.style.opacity = '1'; // CSSStyleDeclaration.opacity 是 string;运行期等效
+      setTimeout(() => (el.style.opacity = '0'), 620);
     };
     P.style.animation = 'none';
     P.style.transition = 'clip-path .18s ease, transform .18s ease';

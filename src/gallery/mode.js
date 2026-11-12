@@ -387,7 +387,8 @@ async function refreshMode() {
     }
     applyMode();
   } catch (e) {
-    /* 失败保持现状 */
+    // 失败保持现状(下轮 60s 重试);补 warn 留痕便于排障(2026-11-11 空 catch 复核:可疑级)
+    console.warn('[mode] siteconfig 轮询失败,保持现状待下轮重试', e);
   }
 }
 refreshMode();

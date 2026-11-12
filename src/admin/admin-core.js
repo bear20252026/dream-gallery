@@ -4,10 +4,15 @@
 // 凭据取值顺序(2026-10-11 凭据治理):显式存储(CI/无 Cookie 环境手工塞的 x-token)→ 本次引导用的
 // 页面 query(服务端验完即 302 掉,这里只兜住"直接开带 token 的页"这一拍)→ 空(此后全靠 HttpOnly
 // admin_session cookie 鉴权,主 TOKEN 不再留在地址栏/历史/日志里)。
-const STORE_KEY = 'admin_x_token'; // 仅调试/CI 后门:控制台 localStorage.setItem('admin_x_token','…') 可强制回头像鉴权
+// 仅调试/CI 后门:控制台 localStorage.setItem('admin_x_token','…') 可强制回头像鉴权。
+// 2026-11-11 技术债收口:localStorage 这一层改走存档单一出口 storeApi.str('adminXToken')
+// (键已登记 store-api SCHEMA;store-api 零依赖,admin 独立子系统可复用,同 lobby 口径)。
+// sessionStorage 兜底仍自持——store-api 只管 localStorage,会话级兜底不属存档语义。
+import { storeApi } from '../state/store-api.js';
+const STORE_KEY = 'admin_x_token';
 const storedToken = (() => {
   try {
-    return localStorage.getItem(STORE_KEY) || sessionStorage.getItem(STORE_KEY) || '';
+    return storeApi.str('adminXToken') || sessionStorage.getItem(STORE_KEY) || '';
   } catch {
     return '';
   }

@@ -139,7 +139,9 @@ export function createPlaneFlight({ input }) {
       g.className = 'pc-group';
       controls.appendChild(g);
     });
-    for (const [group, key, zh, en] of [
+    // 混合元组(首列数字分组 + 后三列字符串)会被推成 (string|number)[][];
+    // 断言为 [number,string,string,string][] 让 zh/en 回到 string(类型债治理,值不变)
+    for (const [group, key, zh, en] of /** @type {[number, string, string, string][]} */ ([
       [0, 'w', '加油门', 'Power +'],
       [0, 's', '减油门', 'Power −'],
       [0, 'shift', '刹车', 'Brake'],
@@ -148,7 +150,7 @@ export function createPlaneFlight({ input }) {
       [1, 'arrowright', '右转', 'Right'],
       [1, 'arrowup', '抬头', 'Climb'],
       [1, 'arrowdown', '低头', 'Descend'],
-    ]) {
+    ])) {
       const b = document.createElement('button');
       b.type = 'button';
       b.dataset.planeControl = key;

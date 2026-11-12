@@ -44,7 +44,10 @@ function reloadBigscreen() {
         });
       }
     })
-    .catch(function () {});
+    .catch(function (e) {
+      // 大屏配置拉取失败:BIG 保持空,下次媒体变更/循环再拉;补 warn 留痕(2026-11-11 空 catch 复核:可疑级)
+      console.warn('[video-wall] 大屏配置拉取失败,本轮无内容待重拉', e);
+    });
 }
 // 后台上传/清空大屏视频 → 立即重拉配置(下次循环生效)
 onMediaChanged(function (d) {

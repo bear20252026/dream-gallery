@@ -28,16 +28,69 @@ import type {
 // (getWorld 9 / back 4 / transitioning 2 / enter 1),而那些方法**本来就在类上**
 // (registerWorld/enter/back/toMain/transitioning/…) —— 手写接口只会和类各漂各的,
 // 拿类本身当权威则不可能漂。
-// 对照:本文件里还剩的 `: unknown` 成员(`planeApi/foxApi/loopManager`)仍旧是 unknown,
+// 对照:本文件里还剩的 `: unknown` 成员(`planeApi/loopManager`)仍旧是 unknown,
 //   它们的唯一权威是各模块里的对象字面量,没有现成的类型可指。手写一份形状
 //   = 再造一条没人钉的声明,而 `mA: Material[]` 就是这条路的下场(见 MediaNamespace.mA)。
 //   要收它们得连"声明 ≡ 写入方"的钉子一起写,那是独立一批。
 //   2026-10-16 第九刀收了 `scrollLink/audioManager` 这两条:audioManager 走 `typeof import()`
 //   (形状由写入方 audio-manager.js 自己声明),scrollLink 只能手写形状 + 钉子
 //   (src/__tests__/ctx-writer-shapes.test.js)—— 两条路的差别就写在各自的成员注释里。
+//   2026-11-11 第十一刀收了 `foxApi/endingApi`:earth-day/chapter-map 进全量检查图后读数点现形,
+//   走 scrollLink 同路(手写消费面 + 批次6-8 钉子),见 FoxProbeApi/EndingProbeApi。
 import type { SceneManager } from '../src/core/scene-manager.js';
 
 // ===================== 命名空间类型 =====================
+
+/**
+ * 狐狸站探针门面(唯一写入方 src/kunlun/scene10-fox.js:503 的字面量,拆场时 :538 置 null)。
+ * 函数定义都在建造闭包里,`typeof import()` 指不到 ⇒ 照 scrollLink 那条路手写形状 + 钉子
+ * (src/__tests__/ctx-writer-shapes.test.js 批次6-8)。成员集合 ≡ 写入方字面量的七个键
+ * (声明比写入方窄会让写入方自己报 TS2353/TS2561 —— desert 那案的教训):
+ *   open ← `function open(opts)`(earth-day 传 { earth, onRite };实现只读这两个键)
+ *   sit ← sitDown(`function sitDown()`,无参)
+ *   secret ← `function secret(onDone)`
+ *   site ← `site: () => ({ ...SITE })` / seat ← 坐席世界坐标
+ *   isActive ← `() => active` / debug ← 探针快照
+ */
+export interface FoxProbeApi {
+  open: (opts?: { earth?: boolean; onRite?: () => void }) => void;
+  sit: () => void;
+  secret: (onDone?: () => void) => void;
+  site: () => { x: number; z: number };
+  seat: () => { x: number; z: number };
+  isActive: () => boolean;
+  debug: () => {
+    active: boolean;
+    current: number;
+    hour: number;
+    loaded: boolean;
+    pos: { x: number; z: number };
+  };
+}
+
+/**
+ * 结局线探针门面(唯一写入方 src/kunlun/ending-journey.js:752 的字面量,拆场时 :803 置 null)。
+ * 成员集合 ≡ 写入方字面量的七个键(同 FoxProbeApi 的口径);消费方 chapter-map.js:150/152 读 epilogue:
+ *   epilogue ← `epilogue: playEpilogue`(ending-epilogue.js:151 `export async function playEpilogue()`)
+ *   state ← 探针快照 / openBook ← openTheBook / act ← runAction(返回 boolean)
+ *   skipTo ← `skipTo(n)`(只前进) / wellPos/wallPos ← 坐标拷贝
+ */
+export interface EndingProbeApi {
+  state: () => {
+    step: number;
+    mode: string;
+    princeMode: string;
+    dist: number;
+    action: boolean;
+    still: number;
+  };
+  openBook: () => void;
+  act: () => boolean;
+  epilogue: () => Promise<void>;
+  skipTo: (n: number) => void;
+  wellPos: () => { x: number; z: number };
+  wallPos: () => { x: number; z: number };
+}
 
 export interface SceneNamespace {
   s: Scene;
@@ -122,12 +175,16 @@ export interface SceneNamespace {
   removeBounds: (list: Array<{ mnX: number; mxX: number; mnZ: number; mxZ: number }>) => void;
   /** 这四条是"探针/调试门面"槽位:由各自系统在装配时挂上、卸载时置 null
    *  (plane-flight.js:545 / scene10-fox.js:494 / earth-day.js:407 / ending-journey.js:713)。
-   *  **刻意不临摹对象形状**:今天没有被 checkJs 覆盖的读取方,而临摹错了比不写更坏(它会开始给
-   *  消费方一个假的保证)。真要上类型,请顺手把消费方一起加进 tsconfig.checkjs.json 的 include。 */
+   *  planeApi/earthDayApi **刻意不临摹对象形状**:今天没有被 checkJs 覆盖的读取方,
+   *  而临摹错了比不写更坏(它会开始给消费方一个假的保证)。
+   *  2026-11-11 第十一刀:earth-day.js / chapter-map.js 进了全量检查图,foxApi / endingApi
+   *  的读数点(seat/site/open/secret/epilogue)各报 TS2339 —— 按 scrollLink 同一条路收:
+   *  写入方的函数定义在建造闭包里,`typeof import()` 指不到,只能手写形状(成员集合 ≡ 写入方
+   *  字面量,窄了写入方自己会报 TS2353),并配钉子 src/__tests__/ctx-writer-shapes.test.js 批次6-8。 */
   planeApi: unknown;
-  foxApi: unknown;
+  foxApi: FoxProbeApi | null;
   earthDayApi: unknown;
-  endingApi: unknown;
+  endingApi: EndingProbeApi | null;
   /** properties 数组里列着,但 2026-10-14 全仓实查**既无赋值点也无读取点**的槽位。
    *  记在这里是为了"数组与声明不许漂"那条测试能过 —— 这不是"死代码可删"的结论。 */
   getActiveAtmosphere: unknown;
@@ -519,7 +576,9 @@ export interface StoreAPI {
   houseColor: (group: string) => string;
   setHouseColor: (group: string, hex: string) => boolean;
   clearHouseColor: (group: string) => boolean;
-  set: (key: string, value: unknown) => void;
+  // (原 `set: (key, value) => void;` 已删,2026-11-11:唯一写入方 store-api.js 的 storeApi
+  //   字面量里没有 set,全仓产品代码也没有任何 ctx.store.set / storeApi.set 调用点 ——
+  //   过期声明比运行期宽,store.js:13 挂载时报 TS2741「缺 set」。口径同 MediaNamespace 删 wb/ytHeart。)
   /** 测试钩:vitest 的 localStorage mock 直写 backing store 时手动失效内存缓存(业务代码勿用) */
   _dropCache: () => void;
 }
@@ -586,6 +645,10 @@ export interface UINamespace {
         z: number;
         en: string;
         zh: string;
+        /** 目标名的原始 {zh,en} 对(调用点 `label: tt(ns.label), ...ns.label` 的产物):
+         *  journey-system.js:104 原样展开存进 objective,罗盘/任务卡经 tt() 读它 ——
+         *  唯一传它的写入方是 scene10-fox.js:391/:442,声明缺这个键 ⇒ 那两处字面量各报 TS2353。 */
+        label?: { zh: string; en: string };
         action?: { zh: string; en: string };
         onActivate?: () => void;
       } | null

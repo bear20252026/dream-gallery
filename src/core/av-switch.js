@@ -8,7 +8,9 @@
 // 豁免范围(2026-09-26 主人追加令:「先只让人物的对话进行」):
 //   avAllowed('dialogue') 恒真 —— 人物对白(kunlunSpeak TTS / 剧情台词朗读 dialog-voice)
 //   不受总闸影响,照常开口;其余(BGM/视频/提示音/协议配乐/彩蛋)仍默认全静。
-const LS_KEY = 'avOn';
+// 存档单一出口(2026-11-11 技术债收口):avOn 已登记进 store-api SCHEMA,不再直写 localStorage。
+// store-api 零 ctx 依赖,core 模块直接复用(同 lobby 独立入口口径);写失败/不可用由其内部兜底。
+import { storeApi } from '../state/store-api.js';
 function avAllowed(scope) {
   if (scope === 'dialogue') return true; // 对白豁免:人物说话不算干扰源
   // 剧情机制音豁免(2026-10-03 结局线):找井「只能靠听」、尾声「会笑的小铃铛」是玩法本身,
@@ -31,17 +33,14 @@ function avAllowed(scope) {
   }
   try {
     const q = new URLSearchParams(location.search).get('av');
-    if (q === '1') {
-      localStorage.setItem(LS_KEY, '1');
-      return true;
-    }
+    if (q === '1') return storeApi.mark('avOn'); // mark 成功=true;写失败=false(与旧 setItem 抛→catch false 同)
     if (q === '0') {
-      localStorage.removeItem(LS_KEY);
+      storeApi.unmark('avOn');
       return false;
     }
-    return localStorage.getItem(LS_KEY) === '1';
+    return storeApi.flag('avOn'); // 不可用时 flag=false,保持全静(fail-closed)
   } catch (e) {
-    return false; // localStorage 不可用(隐私模式等):保持全静
+    return false; // location/存储不可用(隐私模式等):保持全静
   }
 }
 export { avAllowed };
