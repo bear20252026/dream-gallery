@@ -1,6 +1,7 @@
 // terrain.js — 地形系统:高度函数、地基保护、颜色材质、实例化地物、区块系统、水面
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
+import { attachSandDetail } from './sand-detail.js'; // 2026-11-12 画质:沙地程序化细节(去塑料感)
 const { s } = ctx;
 
 // ===================== 地形参数 =====================
@@ -222,6 +223,9 @@ export const terrainMat = new THREE.MeshStandardMaterial({
   metalness: 0,
   side: THREE.DoubleSide,
 });
+// 沙地细节(波痕/沙粒/云影):去掉「一整片光滑塑料」的观感。
+// 程序化注入,零外部资产;区块共享此材质,不增加 draw call。
+attachSandDetail(terrainMat);
 
 function genChunk(cx, cz) {
   const g = new THREE.Group();
