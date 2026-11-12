@@ -502,6 +502,15 @@ export class LoopManager {
         avatar.position.y = footY;
         // 角色朝向 = 模型朝向(移动时平滑转向移动方向,静止保持,环绕看正脸)
         avatar.rotation.y = _modelYaw + Math.PI;
+        // 2026-11-12 角色:步态(四肢摆动/躯干前倾/转身侧倾/呼吸起伏)。
+        // 必须在写完位置与朝向**之后**调用 —— 它要用同一帧的位移与转角。
+        const gaitTick = ctx.player.tickAvatarGait;
+        if (gaitTick) {
+          gaitTick(dt, _modelYaw);
+          // 起伏是相对偏移,叠在贴地高度之上(不改 footY 本身,物理契约不动)
+          const bob = avatar.children[0] && avatar.children[0].userData.bob;
+          if (typeof bob === 'number') avatar.position.y = footY + bob;
+        }
       }
     } else {
       // 第一人称

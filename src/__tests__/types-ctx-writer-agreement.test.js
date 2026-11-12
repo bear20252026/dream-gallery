@@ -116,9 +116,12 @@ describe('ctx.d.ts 三条成员声明 ≡ 各自唯一写入方', () => {
 
   it('desert 声明指向 DesertSurface,其成员集合 ≡ desert.js 交出去的字面量', () => {
     expect(memberLine('MediaNamespace', 'desert')).toBe('DesertSurface');
-    // 唯一写入方:`ctx.media.desert = { getH, update, kunlun: {...}, dayNight, assertAboveGround };`
+    // 唯一写入方:`ctx.media.desert = { getH, update, kunlun: {...}, dayNight, assertAboveGround, currentMood };`
+    // ⚠️正则必须吃**多行**:成员加到 6 个后 prettier 把这个字面量折成了一行一键
+    // (2026-11-12 提交钩子实测),原先 `[^\n]*` 的单行写法当场匹配不到 ⇒ 假红。
+    // 用 [\s\S] 非贪婪 + 行首 `};` 锚定收尾,单行与多行两种排版都能解析。
     const d = read('src/scene/desert.js');
-    const m = d.match(/ctx\.media\.desert = (\{[^\n]*\});/);
+    const m = d.match(/ctx\.media\.desert = (\{[\s\S]*?\n?\});/);
     expect(m, 'desert.js 里找不到那行导出(改写法要同步改这条断言)').not.toBe(null);
     const wrote = m[1]
       .replace(/\{[^{}]*\}/g, ' X ') // 先塌掉一层嵌套对象(kunlun 的 { x, z })

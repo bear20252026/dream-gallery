@@ -243,6 +243,10 @@ export interface PlayerNamespace {
   drawMap: () => void;
   /** 跳跃/滑翔/重力物理的每帧步进 ← src/scene/player.js:145,由 loop-manager.js:318 取用 */
   tickPhysics: (dt: number) => void;
+  /** 第三人称小人步态的每帧步进(2026-11-12 角色)← src/scene/player.js `function tickAvatarGait`,
+   *  由 loop-manager 第三人称分支在写完 position/rotation.y **之后**调用(要用同一帧的位移与转角)。
+   *  modelYaw 传主循环的 _modelYaw;起伏偏移写在 avatar.children[0].userData.bob 上。 */
+  tickAvatarGait: (dt: number, modelYaw: number) => void;
   viewMode: number;
   quizPassed: boolean;
   quizPassScore: number;

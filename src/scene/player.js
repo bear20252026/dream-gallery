@@ -13,6 +13,8 @@ import { i18nText, i18nAttr } from '../ui/i18n-dom.js'; // 界面文字中英切
 import { StateMachine } from '../player/StateMachine.js';
 import { IdleState } from '../player/states/PlayerStates.js';
 import { resolveMove } from './collision-resolve.js'; // 2026-08-31 水平碰撞解析(子步进+滑行,纯函数)
+import { createAvatarFigure } from './avatar-figure.js'; // 2026-11-12 角色:带关节、比例正常的小人
+import { createGaitState, stepGait, gaitPose } from '../shared/avatar-gait.mjs'; // 程序化步态(纯逻辑)
 const playerSM = new StateMachine();
 ctx.player.playerSM = playerSM; // 供外部查询当前状态(2026-09-18 收编登记册)
 
@@ -43,26 +45,17 @@ cam.rotation.y = pl.y;
 cam.rotation.x = pl.pi;
 // 视角模式:0=第一人称,1=第三人称(按 V 切换)
 ctx.player.viewMode = 0;
-// 第三人称下显示的玩家小人(胶囊身+球头,第一人称时隐藏)
+// 第三人称下显示的玩家小人(第一人称时隐藏)。
+// 2026-11-12 角色重做:原先是「胶囊身 + 球头 + 鼻尖」三件融合体 ——
+// 头半径 0.22 对身体半径 0.28 几乎一样宽(比例怪),且没有四肢无从摆动(动作僵)。
+// 现改为 avatar-figure.js 的带关节小人:1.7m 身高、头肩比 1:1.6、四肢两段式可摆。
+// avatar 仍是**一个 Group**(场景管理器要在世界间整体 reparent,holder 语义不能破)。
 const avatar = new THREE.Group();
-const bodyMat = new THREE.MeshStandardMaterial({ color: '#ffb6c8', roughness: 0.6 });
-const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.28, 0.7, 6, 12), bodyMat);
-body.position.y = 0.75;
-avatar.add(body);
-const head = new THREE.Mesh(
-  new THREE.SphereGeometry(0.22, 16, 12),
-  new THREE.MeshStandardMaterial({ color: '#ffe8f0', roughness: 0.5 })
-);
-head.position.y = 1.45;
-avatar.add(head);
-// 面向指示(鼻尖)
-const nose = new THREE.Mesh(
-  new THREE.ConeGeometry(0.06, 0.16, 8),
-  new THREE.MeshStandardMaterial({ color: '#ff6b8a' })
-);
-nose.rotation.x = Math.PI / 2;
-nose.position.set(0, 1.45, -0.24);
-avatar.add(nose);
+const figure = createAvatarFigure();
+avatar.add(figure.root);
+// 步态状态与上一帧位置(算本帧位移用;位移驱动相位 ⇒ 脚不打滑)
+const gait = createGaitState();
+const _prevPos = new THREE.Vector3().copy(pl.p);
 avatar.visible = false;
 // (avatar 加入场景在 scene 引用可用后立即执行)
 if (ctx.scene.s) ctx.scene.s.add(avatar);
@@ -679,7 +672,41 @@ homeBtn.addEventListener('click', (e) => {
 });
 document.body.appendChild(homeBtn);
 
-Object.assign(ctx.player, { pl, jD, ks, mv, drawMap, tickPhysics });
+// ===================== 角色步态驱动(2026-11-12 角色:治「动作僵」) =====================
+// 由主循环在写完 avatar 位置/朝向后调用(loop-manager 第三人称分支)。
+// 为什么不在这里自己 onTick:位置与朝向的权威在主循环(它算 footY 与 _modelYaw),
+// 步态必须用**同一帧**的位移与转角,否则会与身体错开一帧、看着发抖。
+let _lastYaw = pl.y;
+/**
+ * 推进并应用小人步态。
+ * @param {number} dt 帧间隔(秒)
+ * @param {number} modelYaw 本帧角色朝向(弧度,主循环的 _modelYaw)
+ */
+function tickAvatarGait(dt, modelYaw) {
+  // 本帧水平位移:只算 xz(垂直由重力管,不能混进步频)
+  const dx = pl.p.x - _prevPos.x,
+    dz = pl.p.z - _prevPos.z;
+  const travel = Math.hypot(dx, dz);
+  _prevPos.set(pl.p.x, pl.p.y, pl.p.z);
+  const safeDt = Math.max(dt, 1e-4);
+  // 转角速度取最短弧,避免 ±π 处跳变导致侧倾猛甩
+  let dYaw = (modelYaw ?? _lastYaw) - _lastYaw;
+  while (dYaw > Math.PI) dYaw -= Math.PI * 2;
+  while (dYaw < -Math.PI) dYaw += Math.PI * 2;
+  _lastYaw = modelYaw ?? _lastYaw;
+  stepGait(gait, {
+    travel,
+    speed: travel / safeDt,
+    turnRate: dYaw / safeDt,
+    dt,
+    airborne: !pl.onGround,
+    gliding: pl.gliding,
+  });
+  figure.apply(gaitPose(gait, { airborne: !pl.onGround, gliding: pl.gliding }));
+}
+// 起伏偏移由主循环叠加到 footY(见 loop-manager):这里只把数值放进 userData,
+// 不直接写 avatar.position.y —— 脚底贴地的权威仍是主循环。
+Object.assign(ctx.player, { pl, jD, ks, mv, drawMap, tickPhysics, tickAvatarGait });
 ctx.kunlun.fadeTeleport = fadeTeleport;
 
 // B612灵鉴:行走氛围——「山记得你的每一步。」(已进展厅后,每 4 分钟至多浮现一次)
