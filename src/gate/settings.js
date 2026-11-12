@@ -9,7 +9,12 @@ import { byIdInput } from '../shared/dom-typed.js'; // #nickInput / #gearNickInp
 import { wishApi, openWish } from './settings/wish-page.js';
 import { etPickApi, openEternalPick } from './settings/upload-import.js';
 import { qApi, openQuality } from './settings/quality.js';
+import { achApi, openAchievements, announceAchievements } from './settings/achievement-page.js'; // C4 成就徽章(2026-11-12)
 const bag = hotBegin('settings');
+
+// 成就通报经 ctx.ui 暴露(C4):进度变化点(灵蕴拾取/首飞/选片/天穹里程碑)只调总线,
+// 不 import 本页模块 —— 避免把 DOM 拖进 3D 模块,也不造 settings ↔ kunlun 的环。
+ctx.ui.announceAchievements = announceAchievements;
 
 let myName = ctx.store.str('nick');
 let panelOpen = false;
@@ -80,14 +85,15 @@ panel.innerHTML = `<h4>设 置<span class="px" id="gearX">✕</span></h4>
     <button id="gmUploadLink">🔗 添加我的链接</button>
     <button id="gmColor">🎨 房屋换色</button>
     <button id="gmGuide">📖 元素共鸣准则(说明书)</button>
-    <button id="gmSky">🌌 天穹</button>
+    <button id="gmSky">🌌 星图</button>
     <button id="gmWish">✧ 写下你的一念</button>
-    <button id="gmSpirits">✦ 六星屑</button>
+    <button id="gmSpirits">✦ 六颗星</button>
+    <button id="gmAchieve">🏅 成就</button>
     <button id="gmSelectEternal">🖼 展厅选片</button>
     <button id="gmQuality">🎚 画质</button>
     <button id="gmChat">💬 聊天</button>
   </div>
-  <div id="skyBox" style="display:none;text-align:center;margin-top:10px"><canvas id="skyCv" width="150" height="150"></canvas><div id="skyTx" style="font-size:12px;color:#ffd9a8;letter-spacing:2px;margin-top:4px"></div><div id="skySub" style="font-size:10px;color:rgba(255,217,168,.55);margin-top:2px"></div><div id="skyLine" style="font-size:11px;color:rgba(255,235,200,.8);line-height:1.7;margin-top:5px;min-height:18px"></div><div id="skyStats" style="font-size:10px;color:rgba(255,255,255,.45);margin-top:4px"></div><div id="skyFull" style="display:none;font-size:11px;color:rgba(255,220,170,.8);line-height:1.8;margin-top:6px">天穹已合。你带来的每一片星屑，都回到了它该在的地方。<br>但B612不闭门——新的裂痕总会生出，你会回来吗？</div></div>`;
+  <div id="skyBox" style="display:none;text-align:center;margin-top:10px"><canvas id="skyCv" width="150" height="150"></canvas><div id="skyTx" style="font-size:12px;color:#ffd9a8;letter-spacing:2px;margin-top:4px"></div><div id="skySub" style="font-size:10px;color:rgba(255,217,168,.55);margin-top:2px"></div><div id="skyLine" style="font-size:11px;color:rgba(255,235,200,.8);line-height:1.7;margin-top:5px;min-height:18px"></div><div id="skyStats" style="font-size:10px;color:rgba(255,255,255,.45);margin-top:4px"></div><div id="skyFull" style="display:none;font-size:11px;color:rgba(255,220,170,.8);line-height:1.8;margin-top:6px">星图已亮。你带来的每一片星屑，都回到了它该在的地方。<br>这本书写完了——但B612不闭门。你想回来时，星星还在这里。</div></div>`;
 document.body.appendChild(panel);
 
 // ===================== 快捷菜单入口 =====================
@@ -111,6 +117,10 @@ document.getElementById('gmSelectEternal').onclick = function () {
 document.getElementById('gmQuality').onclick = function () {
   closePanel();
   openQuality();
+};
+document.getElementById('gmAchieve').onclick = function () {
+  closePanel();
+  openAchievements();
 };
 document.getElementById('gmUpload').onclick = function () {
   closePanel();
