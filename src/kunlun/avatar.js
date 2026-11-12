@@ -12,9 +12,9 @@ import { expose } from '../debug-hooks.js';
 
 let avatarHolder = null; // Group:loop-manager 每帧写入 position/rotation
 let avatarModel = null; // gltf.scene(内层:贴地偏移与动画)
-let mixer = null;       // AnimationMixer
-let clips = null;       // { loop, start?, end? } AnimationClip
-let stateAnim = null;   // 当前 loop Action
+let mixer = null; // AnimationMixer
+let clips = null; // { loop, start?, end? } AnimationClip
+let stateAnim = null; // 当前 loop Action
 const CDN = 'https://cdn.cloudbear.cloud/models/avatar/';
 // 单 GLB 含走路循环;start/end 留接口,后续按需加
 const MODEL_URL = CDN + 'catwalk/catwalk-loop-378982.glb';
@@ -40,7 +40,26 @@ function clearStatus() {
 //   点原按钮只切视角(看到的是 player.js 的胶囊小人),点新按钮才下载真人模型。
 // 现改为:订阅 viewMode,无论从哪个入口切到第三人称,都自动按需加载真人模型。
 // 加载完成后 setupModel 会把胶囊小人(旧 ctx.scene.avatar)移除并换成真人模型。
+// 2026-11-12 角色:**不再切到第三人称就自动换成真人 GLB**。
+// 原因:那套是 ActorCore「catwalk」成人时装走秀动捕(见文件头),套在 1.7m 的小人身上
+// 就是主人说的「比例怪、动作僵」—— 台步本身是刻意绷直、慢放的表演步态。
+// 现在默认用 scene/avatar-figure.js 的程序化小人(比例按少年身高分配、四肢按位移摆动),
+// 它无需下载、切视角即刻可用。真人模型作为**显式可选**保留(资产是主人提供的,不删):
+//   控制台或调试面板调用 window.__useGlbAvatar() 才下载并替换。
+const USE_GLB_BY_DEFAULT = false;
 function watchViewMode() {
+  if (!USE_GLB_BY_DEFAULT) {
+    // 仍暴露显式入口,保留原有能力(加载失败重试等逻辑都在 ensureAvatar 里)
+    if (typeof window !== 'undefined') {
+      window.__useGlbAvatar = function () {
+        ensureAvatar(function () {
+          setStatus('真人模型已就绪', '#66ff99');
+          setTimeout(clearStatus, 2500);
+        });
+      };
+    }
+    return;
+  }
   let prompting = false;
   ctx.onTick(function () {
     // 已加载好 / 或不在第三人称 → 什么都不做
@@ -67,7 +86,9 @@ function loadModel(url, onOk, onFail, attempt) {
   setStatus('角色加载中' + (attempt > 1 ? '(第' + attempt + '次) ' : '') + ' 0%', '#ffcc66');
   createGLTFLoader().load(
     url,
-    function (gltf) { onOk(gltf); },
+    function (gltf) {
+      onOk(gltf);
+    },
     function (xhr) {
       if (xhr.total > 0) {
         var pct = Math.round((xhr.loaded / xhr.total) * 100);
@@ -75,10 +96,15 @@ function loadModel(url, onOk, onFail, attempt) {
       }
     },
     function (err) {
-      console.warn('[avatar] 加载失败(第' + attempt + '次):', err && /** @type {any} */ (err).message);
+      console.warn(
+        '[avatar] 加载失败(第' + attempt + '次):',
+        err && /** @type {any} */ (err).message
+      );
       if (attempt < 3) {
         setStatus('加载失败，' + (3 - attempt) + ' 秒后重试...', '#ff6666');
-        setTimeout(function () { loadModel(url, onOk, onFail, attempt + 1); }, 3000);
+        setTimeout(function () {
+          loadModel(url, onOk, onFail, attempt + 1);
+        }, 3000);
       } else {
         onFail && onFail(err);
       }
@@ -126,8 +152,12 @@ function makeSeamlessLoop(clip) {
       const vs = tr.values.length / n;
       let same = true;
       for (let k = 0; k < vs; k++) {
-        const a = tr.values[k], b = tr.values[(n - 1) * vs + k];
-        if (Math.abs(a - b) > 1e-4 * Math.max(1, Math.abs(a))) { same = false; break; }
+        const a = tr.values[k],
+          b = tr.values[(n - 1) * vs + k];
+        if (Math.abs(a - b) > 1e-4 * Math.max(1, Math.abs(a))) {
+          same = false;
+          break;
+        }
       }
       if (same) {
         tr.times = tr.times.slice(0, n - 1);
@@ -157,7 +187,8 @@ function setupModel(gltf) {
   // 缩放到目标身高
   obj.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(obj);
-  const size = new THREE.Vector3(); box.getSize(size);
+  const size = new THREE.Vector3();
+  box.getSize(size);
   if (size.y > 0.001) {
     obj.scale.setScalar(TARGET_HEIGHT / size.y);
   }
@@ -238,24 +269,41 @@ function isMovingNow() {
 // 只有一个 loop clip,用 timeScale 平滑表达"走路 / 静止呼吸"两态:
 //   timeScale 逐帧向目标插值(走路 1,静止 0.15),切换无跳变。
 // 第一人称(holder 不可见)直接跳过,省掉每帧 101 骨骼的蒙皮矩阵计算。
+// 上一帧位置:算真实水平速度用(2026-11-12 角色)
+const _prevP = new THREE.Vector3();
+let _prevReady = false;
 function avatarTick(dt) {
   if (!mixer || !avatarHolder) return;
   if (!avatarHolder.visible) return; // 第一人称:模型不渲染也不算动画
   const moving = isMovingNow();
-  const target = moving ? 1 : IDLE_TIME_SCALE;
+  // 2026-11-12:步频按**真实速度**给,不再只有 1 / 0.15 两档。
+  // 原先滑翔(1.6 倍速)与常速用同一 timeScale ⇒ 脚在地面上打滑,这是「动作僵」的一半。
+  const pl = ctx.player.pl;
+  const d = Math.min(dt || 0, 0.1);
+  let speed = 0;
+  if (pl && pl.p) {
+    if (_prevReady && d > 1e-4) speed = Math.hypot(pl.p.x - _prevP.x, pl.p.z - _prevP.z) / d;
+    _prevP.copy(pl.p);
+    _prevReady = true;
+  }
+  // 常速 3.2m/s 对应 clip 原速;上限 2.2 防止瞬移/传送把动作抽成鬼畜
+  const target = moving ? Math.max(0.35, Math.min(2.2, speed / 3.2)) : IDLE_TIME_SCALE;
   if (stateAnim) {
     // 低帧率下 dt 被钳到 0.1,插值系数用固定比例即可,肉眼平滑
     const t = stateAnim.timeScale + (target - stateAnim.timeScale) * 0.12;
     stateAnim.timeScale = Math.abs(t - target) < 0.01 ? target : t;
   }
-  mixer.update(Math.min(dt || 0, 0.1));
+  mixer.update(d);
 }
 
 // ===================== 按需加载 =====================
 const avatarWaiters = [];
 let avatarRequested = false;
 function ensureAvatar(cb) {
-  if (avatarHolder) { cb && cb(); return; }
+  if (avatarHolder) {
+    cb && cb();
+    return;
+  }
   if (cb) avatarWaiters.push(cb);
   if (avatarRequested) return;
   avatarRequested = true;
