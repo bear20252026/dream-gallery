@@ -221,7 +221,10 @@ jobs:
         run: npm run build
 
       - name: Install Chromium (playwright-core registry)
-        run: npx playwright-core@1.61.1 install --with-deps chromium
+        # 用项目锁定的 playwright-core 版本装浏览器(2026-11-11 修复):原先固定 @1.61.1,
+        # 但 ^1.61.1 会解析到更高版本(如 1.65.0),其期望的浏览器 revision 与 1.61.1 装的不同,
+        # 导致 smoke-gate 报 "Executable doesn't exist"。不带版本号即用 node_modules 里 npm ci 装好的同一版本。
+        run: npx playwright-core install --with-deps chromium
 
       - name: Start local server
         run: |
