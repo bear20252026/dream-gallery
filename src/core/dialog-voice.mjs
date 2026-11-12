@@ -242,8 +242,29 @@ async function sha256hex(s) {
 // 且台词小包与模型大资产共用 cdn.cloudbear.cloud 连接池,h2 挤兑下 16KB 爬 15.9s。
 // 解法:闸门死时间里 fetch(CORS 全放行)拉成 blob → objectURL 内存常驻,
 // 播放期零网络、零缓存博弈;拥塞窗口付一次钱(后台 idle),之后永远秒开。
-const blobUrls = new Map(); // <20hex键> -> blob: URL
+const blobUrls = new Map(); // <20hex键> -> blob: URL(Map 迭代序=插入序,用作 LRU 依据)
+// blob 内存上限(2026-11-11 审计 C2):原先无上限、无 revoke,长 session 只增不减。
+// 400 条 × 平均 ~30KB ≈ 12MB 量级,足够覆盖整段剧情的常驻;超限淘汰最旧并 revokeObjectURL。
+// ⚠️ 被淘汰的键若正在播放,Audio 已持有 blob 数据不受影响;下次播放走 R2/流式兜底。
+const BLOB_MAX = 400;
+function blobSet(key, url) {
+  if (blobUrls.has(key)) blobUrls.delete(key); // 刷新 LRU 位置
+  blobUrls.set(key, url);
+  while (blobUrls.size > BLOB_MAX) {
+    const oldest = blobUrls.keys().next().value;
+    const oldUrl = blobUrls.get(oldest);
+    blobUrls.delete(oldest);
+    try {
+      URL.revokeObjectURL(oldUrl);
+    } catch (e) {
+      /* 环境无 revoke(测试)静默 */
+    }
+  }
+}
 const AUDIO_CACHE = 'tts-audio-v1'; // Cache Storage bucket for line audio (bump the suffix to drop old files)
+// Cache Storage 条目上限(2026-11-11 审计 C2):原先只进不出,跨会话无限膨胀。
+// 台词小包总量可控,800 条足够全站台词富余;超出按写入序淘汰最旧(异步,不阻塞播放)。
+const CACHE_MAX = 800;
 async function cacheMatch(url) {
   try {
     if (typeof caches === 'undefined') return null;
@@ -258,33 +279,51 @@ function cachePut(url, response) {
     if (typeof caches === 'undefined') return;
     caches
       .open(AUDIO_CACHE)
-      .then((c) => c.put(url, response))
+      .then(async (c) => {
+        await c.put(url, response);
+        const keys = await c.keys();
+        if (keys.length > CACHE_MAX) {
+          for (const k of keys.slice(0, keys.length - CACHE_MAX)) await c.delete(k);
+        }
+      })
       .catch(() => {});
   } catch (e) {
     /* storage full or blocked: the in-memory blob still works */
   }
 }
+// 在途去重(2026-11-11 审计 C2):同一键的并发预热原先各发一次 fetch;现共享一个 Promise。
+const blobInflight = new Map(); // <20hex键> -> Promise<boolean>
 /** 按 20hex 键拉取并驻留内存;失败返回 false(播放期自然走流式路径) */
 export async function warmBlobByKey(key) {
   if (!/^[0-9a-f]{20}$/.test(String(key || ''))) return false;
-  if (blobUrls.has(key)) return true;
-  const url = R2_BASE + '/tts-audio/' + key + '.mp3';
-  try {
-    // 2026-10-04: Cache Storage keeps the line on the player's device between visits, so a returning
-    // player loads nothing from the network and every line opens at once. Any cache failure falls back to the network.
-    let r = await cacheMatch(url);
-    if (!r) {
-      r = await fetch(url, { mode: 'cors' });
-      if (!r.ok) return false;
-      cachePut(url, r.clone());
-    }
-    const blob = await r.blob();
-    if (!blob.size) return false;
-    blobUrls.set(key, URL.createObjectURL(blob));
+  if (blobUrls.has(key)) {
+    blobSet(key, blobUrls.get(key)); // 命中也刷新 LRU
     return true;
-  } catch (e) {
-    return false; // CORS/网络失败静默
   }
+  if (blobInflight.has(key)) return blobInflight.get(key);
+  const p = (async () => {
+    const url = R2_BASE + '/tts-audio/' + key + '.mp3';
+    try {
+      // 2026-10-04: Cache Storage keeps the line on the player's device between visits, so a returning
+      // player loads nothing from the network and every line opens at once. Any cache failure falls back to the network.
+      let r = await cacheMatch(url);
+      if (!r) {
+        r = await fetch(url, { mode: 'cors' });
+        if (!r.ok) return false;
+        cachePut(url, r.clone());
+      }
+      const blob = await r.blob();
+      if (!blob.size) return false;
+      blobSet(key, URL.createObjectURL(blob));
+      return true;
+    } catch (e) {
+      return false; // CORS/网络失败静默
+    } finally {
+      blobInflight.delete(key);
+    }
+  })();
+  blobInflight.set(key, p);
+  return p;
 }
 /** 按文本+音色预热(blob 键 = 缓存键,与 ttsUrl 同一哈希) */
 export async function warmBlob(text, voice) {

@@ -119,6 +119,13 @@ jobs:
       - name: Frontend build (quality gate)
         run: npm run build
 
+      # 构建可复现性(2026-11-11 技术债整改:R6 不变发布的本地前提)。连续两次构建逐字节比对,
+      # 不一致即红。非阻断起步(continue-on-error):先积累跨平台稳定性,确认无误报后再转阻断。
+      # 背景:2026-10-12 曾实测不可复现(79 chunk 全变),依赖升级后 2026-11-11 实测已可复现。
+      - name: Build reproducibility check (non-blocking — R6 immutable-release prerequisite)
+        continue-on-error: true
+        run: npm run test:repro
+
       - name: Backend atomic-write regression (no media assets needed)
         run: node scripts/test/test-store.js
 
@@ -153,9 +160,9 @@ jobs:
       - name: Upload ownership security regression (same-UA strangers isolated / legacy claim binds aid)
         run: node scripts/test/test-upload-security.js
 
-      # ⚠️ KNOWN GAP(刻意不补,别照抄上面两条):scripts/test/test-mobile.js(6 项)要无头浏览器,
-      # 而 build-and-test 作业不装 Chromium(只有 smoke 作业装了 playwright-core 的浏览器),
-      # 加进来会把 CI 直接打红。它由本地 `npm test`(release.sh 第 3 步)与 smoke 作业分别覆盖。
+      # scripts/test/test-mobile.js(6 项)要无头浏览器,build-and-test 作业不装 Chromium,
+      # 故放在下方 smoke 作业里跑(2026-11-11 审计 CI 覆盖:原注释声称"由 smoke 覆盖"但 smoke
+      # 只有 1280×800/960×600 桌面视口,移动端仿真实际缺失——现已在 smoke 真补上 iPhone 12 仿真)。
       #
       # Also non-blocking by design: the `npm audit` step above swallows its own failure (`|| echo warning`),
       # so a high/critical advisory can never turn the workflow red. That is a reporting step, not a gate.
@@ -229,6 +236,17 @@ jobs:
         env:
           VR_UPDATE: ${{ github.event_name == 'workflow_dispatch' && inputs.update_vr_baseline && '1' || '' }}
         run: BASE_URL=http://127.0.0.1:3311 PW_BROWSER=chromium node scripts/probe/scene-visual-regression.cjs
+
+      # 移动端渲染 6 项(2026-11-11 审计 CI 覆盖补上的真缺口):iPhone 12 仿真 + 手机灯光限额路径。
+      # 自起临时服务器(端口 3212,数据根隔离),与上面 3311 的冒烟服务互不干扰。
+      - name: Mobile rendering regression (iPhone 12 emulation - shader / JS errors / light budget)
+        run: PW_BROWSER=chromium node scripts/test/test-mobile.js
+
+      # 通关探针(2026-11-11 审计 C5:E 键断言已重写,按挂账口径以**非阻断**进 CI)。
+      # 自起服务器 + 临时数据根,完整主线较长;失败只告警不打红,先积累稳定性再转阻断。
+      - name: B612 journey probe (non-blocking - full storyline walkthrough)
+        continue-on-error: true
+        run: PW_BROWSER=chromium node scripts/probe/b612-journey-probe.cjs
 
       - name: Upload new baselines (manual rebuild only)
         if: github.event_name == 'workflow_dispatch' && inputs.update_vr_baseline

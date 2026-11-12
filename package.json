@@ -15,6 +15,7 @@
     "test:smoke": "node scripts/probe/smoke-gate.js",
     "test:scene": "node scripts/probe/scene-visual-regression.cjs",
     "test:orbit": "node scripts/probe/verify-orbit.js",
+    "test:repro": "node scripts/build-repro-check.cjs",
     "dev": "node scripts/gen/dev.js",
     "build": "vite build",
     "preview": "vite preview",
@@ -61,20 +62,20 @@
     "@gltf-transform/extensions": "^4.4.2",
     "@gltf-transform/functions": "^4.4.2",
     "@types/three": "^0.186.0",
-    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/coverage-v8": "4.1.12",
     "dependency-cruiser": "^18.1.0",
     "esbuild": "^0.28.1",
-    "eslint": "^10.8.0",
+    "eslint": "10.14.0",
     "globals": "^17.8.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.3.0",
     "playwright-core": "^1.61.1",
     "prettier": "^3.9.6",
-    "sharp": "^0.35.4",
+    "sharp": "0.35.5",
+    "terser": "^5.51.2",
     "typescript": "^7.0.2",
-    "vite": "^8.1.5",
-    "vite-plugin-html": "^3.2.2",
-    "vitest": "^4.1.11"
+    "vite": "8.3.8",
+    "vitest": "4.1.12"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1101.0",
@@ -86,5 +87,15 @@
   },
   "engines": {
     "node": ">=22.12"
+  },
+  "overrides": {
+    "brace-expansion@^2": "^2.1.7",
+    "brace-expansion@^5": "^5.0.13",
+    "minimatch@^9": "^11.0.8",
+    "minimatch@^10": "^11.0.8",
+    "@eslint/config-array": {
+      "minimatch": "^11.0.8"
+    },
+    "glob@^10": "^14.0.4"
   }
 }

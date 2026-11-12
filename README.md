@@ -25,7 +25,7 @@ The owner manages visitors, approvals and content through an admin panel.
 
 ## Tech stack
 
-- **Frontend**: native ES Modules + Three.js 0.160 (native ESM in development, bundled by Vite 8 for production)
+- **Frontend**: native ES Modules + Three.js 0.186 (native ESM in development, bundled by Vite 8 for production)
 - **Backend**: Node router + `lib/` modules (`server.js` entry, declarative route table in `lib/routes.js`);
   persistence is **SQLite primary + JSON mirror** (`gate_data.db` / `gate_data.json`; `USE_SQLITE=0` rolls back)
 - **Infrastructure**: Cloudflare CDN/R2 (media and models) + Alibaba Cloud origin (pm2 process `gallery`) +
@@ -35,7 +35,9 @@ The owner manages visitors, approvals and content through an admin panel.
 
 ```
 server.js          # backend entry (require + routing + listen only)
-lib/               # backend modules: config/util/store/gate/admin/quiz/files/siteconfig/vision/track/docs/chat/abuse/tts/aichannels (single source for AI channels)
+lib/               # backend modules: 37 top-level modules + repo/ upload/ migrations/ subdirs
+                   # (config/util/store/gate/admin/quiz/files/siteconfig/vision/track/docs/chat/abuse/tts/
+                   #  aichannels/music/retention/ratelimit/security/shadow/sqlite-store/r2outbox/… — see directory)
 src/               # frontend ES modules (main.js imports in order)
   ctx.js           # shared bus: registry + 7 namespaces (ui/kunlun/player/scene/media/gallery/mode)
   core/            # composition root, game state, game loop, world loader, scene manager
@@ -61,12 +63,18 @@ node server.js                                # or run the backend alone on :300
 ## Tests (all green before any deploy)
 
 ```bash
+npm test                            # full local gate: the 7 backend suites below + mobile rendering
 node scripts/test/test-store.js     # backend atomic-save suite
+node scripts/test/test-store-sqlite.js # SQLite persistence layer
+node scripts/test/test-backup.js    # backup/restore drill
 node scripts/test/test.js           # backend API / security / gate / upload / invites
+node scripts/test/test-session.js   # session revocation / expiry self-heal / legacy guards
+node scripts/test/test-upload-security.js # upload ownership (same-UA strangers isolated)
 node scripts/test/test-mobile.js    # mobile rendering (iPhone emulation: shader errors, JS exceptions, blank screen)
 npm run test:unit                   # Vitest unit tests
+npm run lint && npm run typecheck   # ESLint + tsc (checkJs baseline gate: scripts/checkjs-baseline.txt)
 npm run test:scene                  # scene screenshot regression
-# focused probes live in scripts/probe/ (overlay, store, media-rules, security-fix, story chains, minimap, …)
+# focused probes live in scripts/probe/ (overlay, store, security-fix, story chains, minimap, b612-journey, …)
 ```
 
 ## Deploy

@@ -157,6 +157,7 @@ describe('保留期表是单一源(数值改动要同步 ADMIN_GUIDE.md / AGENTS
       geo: 90,
       ipHistory: 180,
       rateTable: 7,
+      ttsCache: 90, // 2026-11-11 审计 C2:TTS 合成缓存保留期(.tts-cache 按 mtime 老化)
     });
   });
   it('毫秒表由天数表派生,调度周期为一天', () => {

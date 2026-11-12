@@ -58,7 +58,11 @@ function startServer(port) {
   // ---------- 动态:模拟 iPhone 加载页面 ----------
   console.log('\n[模拟 iPhone 12 加载]');
   const base = await startServer(3212);
-  const browser = await chromium.launch({ channel: 'msedge', headless: true });
+  // 浏览器选择走共享助手(2026-11-11 审计 CI 覆盖):原先写死 channel:'msedge',
+  // 没装 Edge 的机器(macOS/CI)直接起不来。现与探针同口径:PW_BROWSER=chromium 用注册表
+  // Chromium,否则按平台找本机 Edge、缺失回落注册表。iPhone 仿真由下方 devices 上下文负责。
+  const { launch } = require('../probe/browser.js');
+  const browser = await launch();
   children.push({ kill: () => browser.close() });
   const ctx = await browser.newContext({ ...devices['iPhone 12'] });
   const page = await ctx.newPage();

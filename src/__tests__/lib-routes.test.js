@@ -94,7 +94,8 @@ describe('路由表结构契约', () => {
     // 2026-09-26: +1 GET /tts-audio/<key>.mp3 台词音频边缘可缓存出口(CF 默认缓存 .mp3)
     // 2026-10-07: +1 GET /healthz 健康检查(审查#3 后半:发布后探活,只报进程活性与运行时长)
     // 2026-10-12: +1 GET /api/admin/ai-usage AI 用量台账只读汇总(审计 P2 可观测性,auth=token)
-    expect(ROUTES.length).toBe(59);
+    // 2026-11-11: +1 GET /api/music/search 音乐搜索后端代理(审计 P1-1:第三方密钥收进服务器,auth=public 自带限流)
+    expect(ROUTES.length).toBe(60);
   });
 });
 

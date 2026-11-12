@@ -44,13 +44,15 @@ for a in "$@"; do
     --yes|-y) YES=1 ;;
   esac
 done
-HOST="${HOST:-101.133.235.110}"
 SRV="${SRV:-/opt/gallery}"
-SSH_USER="${SSH_USER:-root}"
 # SSH_BIN/SCP_BIN 只为"不碰生产"的演练/自测留的注入口(默认就是 ssh/scp,正常发布无需设置)
 SSH_BIN="${SSH_BIN:-ssh}"
 SCP_BIN="${SCP_BIN:-scp}"
 ROOT_DIR="$PWD"
+# 源站地址不再硬编码(2026-11-11 审计 P3-1):HOST 环境变量 → .deploy-host.env(gitignore),
+# 两者皆无即 fail-closed 退出;与 deploy.sh / verify-drift.sh 共用同一处解析。
+source "$ROOT_DIR/scripts/deploy-host.sh"
+resolve_deploy_host "$ROOT_DIR" || exit 1
 KNOWN_HOSTS="${KNOWN_HOSTS:-$ROOT_DIR/scripts/known_hosts}"
 BACKUP_ROOT="${BACKUP_ROOT:-/opt/gallery-backups/backend}"
 KEEP_BACKUP="${KEEP_BACKUP:-10}"

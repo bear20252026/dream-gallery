@@ -13,7 +13,7 @@
 抵达空中永恒展厅 → 解锁"六合藏梦人"称号。另有白板共创、音乐地板、聊天室(AI 回帖)、
 访客上传照片/视频上墙、AI 看图配文、TTS 全站语音、双模式展示区(普通/特殊)。
 
-- **线上**:https://cloudbear.cloud(Cloudflare CDN 前置)→ 阿里云 `101.133.235.110`(pm2 进程名 `gallery`,目录 `/opt/gallery/`)
+- **线上**:https://cloudbear.cloud(Cloudflare CDN 前置)→ 阿里云源站(pm2 进程名 `gallery`,目录 `/opt/gallery/`)。⚠️源站地址不再写进公开仓库(2026-11-11 审计 P3-1):部署脚本从 `HOST` 环境变量或仓库根 `.deploy-host.env`(gitignore)读取;地址本身见主人私密交接记录。源站防火墙应只放行 Cloudflare IP 段。
 - **代码备份**:本地 git(main)+ GitHub **公开仓** `bear20252026/dream-gallery`(⚠️ PUBLIC,密钥一律不得入库)
 - **数据备份**:服务器 cron 每天 03:17(数据库+照片+音乐+代码,留 14 份)/ 每周日 04:23(视频,留 2 份)→ `/opt/backups/`
 
@@ -21,10 +21,10 @@
 
 ## 1. 技术栈与目录
 
-- **前端**:原生 ES Modules + Three.js 0.160,`src/` 下分 scene/gallery/gate/kunlun/ui/state/shared/styles。
-  开发态根 `index.html` 原生 ESM 直跑(importmap→`vendor/`);生产 Vite 8 打包 `dist/`(8 个 html 入口 + assets hash 分包)。
-- **后端**:Node 零依赖,`server.js`(仅 require+路由+listen)+ `lib/` 15 个模块。
-  **数据库就是 `gate_data.json` 单文件**(运行时生成,git 不跟踪,cron 每日备份)。
+- **前端**:原生 ES Modules + Three.js 0.186,`src/` 下分 scene/gallery/gate/kunlun/ui/state/shared/styles。
+  开发态根 `index.html` 原生 ESM 直跑(importmap→`vendor/`);生产 Vite 8 打包 `dist/`(10 个 html 入口 + assets hash 分包)。
+- **后端**:Node,`server.js`(仅 require+路由+listen)+ `lib/` 37 个顶层模块 + repo/upload/migrations 子目录。
+  **持久化 = SQLite 权威库 + JSON 镜像**(`gate_data.db` / `gate_data.json`,运行时生成,git 不跟踪,cron 每日备份;`USE_SQLITE=0` 可回退仅 JSON)。
 - **AI**:全站 AI 走 `lib/aichannels.js` 唯一入口——小米 MiMo 首选(tp 订阅 → sk 按量)→ moonshot → Kimi 会员。
 - **媒体**:照片/视频/音乐在 `photos/` `videos/` `music/`;户外大屏 5 视频走 Cloudflare R2 CDN(`cdn.cloudbear.cloud`)。
 
@@ -170,11 +170,10 @@ npm run dev          # 前后双进程(:5173 前端 + :3000 后端)
 npm run build        # → dist/
 npm test             # 两套测试
 node scripts/probe/debug-browser.js https://cloudbear.cloud/ 15   # 公网验证
-# 部署:
-cd dist && tar czf /tmp/gallery-dist.tgz . && cd ..
-scp -i ~/Downloads/网站私钥bear1.pem /tmp/gallery-dist.tgz root@101.133.235.110:/tmp/
-ssh -i ~/Downloads/网站私钥bear1.pem root@101.133.235.110 \
-  "cd /opt/gallery && rm -rf assets && tar xzf /tmp/gallery-dist.tgz"
+# 部署(2026-11-11 审计 P3-1 后:源站地址与私钥路径都不再写进公开文档):
+# 先配好 HOST(环境变量或 .deploy-host.env)与受控私钥(SSH_KEY 或 ~/.ssh/gk-deploy.pem),
+# 然后走带 CI 闸门与漂移校验的发布入口:
+bash scripts/release.sh
 # 改了 lib/server.js 才:pm2 restart gallery
 ```
 

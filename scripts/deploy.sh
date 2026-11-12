@@ -35,8 +35,10 @@
 set -e -o pipefail
 cd "$(dirname "$0")/.."
 ROOT_DIR="$PWD"
-HOST="${HOST:-101.133.235.110}"
-SSH_USER="${SSH_USER:-root}"
+# 源站地址不再硬编码(2026-11-11 审计 P3-1):HOST 环境变量 → .deploy-host.env(gitignore),
+# 两者皆无即 fail-closed 退出。三个部署脚本共用 scripts/deploy-host.sh 这一处解析。
+source "$ROOT_DIR/scripts/deploy-host.sh"
+resolve_deploy_host "$ROOT_DIR" || exit 1
 # SRV 与 backend-sync.sh / verify-drift.sh 共用同一个旋钮:改一处即三处一致(默认 /opt/gallery)
 SRV="${SRV:-/opt/gallery}"
 # SSH_BIN/SCP_BIN:默认 ssh/scp;只有"绝不碰生产"的离线演练才覆盖(与 backend-sync.sh 同一套)
@@ -425,15 +427,29 @@ if [ "$SYNC_MODELS" = "1" ]; then
   #   GNU/Linux   输出 `<md5>  <路径>`(文本模式,两个空格)。
   # 直接比对会一行都对不上、每次全量重传 → 先统一成 `<md5> <路径>` 单空格再比。
   norm() { awk '{ p=$2; sub(/^\*/,"",p); print $1" "p }' "$1"; }
-  ( cd models && find . -type f -print0 | xargs -0 md5sum ) 2>/dev/null | norm > /tmp/models_local.md5 || true
-  "${SSH_ARR[@]}" "$TARGET" \
+  # 清单采集失败必须响亮(2026-11-11 审计 P3-5):原先 ||true 吞错,本地清单为空时
+  # diff 恒为 0 → 误报"模型已全部一致"。现在任一侧采集失败即跳过比对并明确告警,
+  # 绝不把"没采到"当成"已一致"。模型是持久资产,本步仍不阻断部署(2026-09-23 口径不变)。
+  if ! ( cd models && find . -type f -print0 | xargs -0 md5sum ) 2>/dev/null | norm > /tmp/models_local.md5; then
+    echo "⚠️ 本地模型 md5 清单采集失败,跳过模型比对(请手工检查 models/)"
+    return 0
+  fi
+  if ! "${SSH_ARR[@]}" "$TARGET" \
     "cd /opt/gallery/models 2>/dev/null && find . -type f -print0 | xargs -0 md5sum" \
-    2>/dev/null | norm > /tmp/models_srv.md5 || true
+    2>/dev/null | norm > /tmp/models_srv.md5; then
+    echo "⚠️ 服务器模型 md5 清单采集失败(目录不存在或连接异常),跳过模型比对"
+    return 0
+  fi
   # 服务器已有且 md5 相同的行,从本地清单里剔除 → 剩下的就是"缺的或改过的"
   awk 'NR==FNR { seen[$0]=1; next } !seen[$0]' \
     /tmp/models_srv.md5 /tmp/models_local.md5 > /tmp/models_diff.md5 2>/dev/null || true
   DIFF_N=$(wc -l < /tmp/models_diff.md5 2>/dev/null | tr -d ' ')
   LOC_N=$(find models -type f | wc -l | tr -d ' ')
+  # 本地有模型但清单为空 = 采集异常,不得宣称一致
+  if [ "$LOC_N" != "0" ] && [ ! -s /tmp/models_local.md5 ]; then
+    echo "⚠️ 本地模型清单为空但 models/ 有 $LOC_N 个文件,跳过比对(请手工检查)"
+    return 0
+  fi
   echo "本地模型 $LOC_N 个 / 需补传 $DIFF_N 个"
   if [ "$DIFF_N" = "0" ]; then
     echo "✅ 模型已全部一致,无需上传"

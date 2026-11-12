@@ -8,7 +8,7 @@
 //   ⑤ 消费方埋点真在记账:vision / tts / quiz-ai / chat-bot 各自留下一笔,并记下以前被丢掉的
 //      r.by(命中通道)与 usage.total_tokens;被限流挡下(没出网)的那一笔不入账。
 //      —— 全程把 lib/aichannels.js 与 lib/r2sync.js 打在 require.cache 上:零真网络、零真 AI 调用。
-//   ⑥ 只读端点 GET /api/admin/ai-usage:带 x-token 200 / 无 token 401 / 错 token 401;路由快照 58→59。
+//   ⑥ 只读端点 GET /api/admin/ai-usage:带 x-token 200 / 无 token 401 / 错 token 401;路由快照 59→60。
 // 约定(同 lib-vision-guard.test.js):GATE_DATA_FILE 重定向到临时目录 + 自己播种容器 + require.cache 打桩。
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vitest';
 import fs from 'node:fs';
@@ -647,12 +647,13 @@ describe('⑥ 只读统计端点与路由契约', () => {
     return { handled, res };
   }
 
-  it('路由表加一行且 auth=token;端点数快照 58→59', () => {
+  it('路由表加一行且 auth=token;端点数快照 59→60', () => {
     const rows = routes.ROUTES.filter((r) => String(r.match).includes('/api/admin/ai-usage'));
     expect(rows).toHaveLength(1);
     expect(rows[0].method).toBe('GET');
     expect(rows[0].auth).toBe('token');
-    expect(routes.ROUTES.length).toBe(59); // 与 lib-routes.test.js 的快照同源
+    // 2026-11-11: +1 GET /api/music/search 音乐搜索后端代理(审计 P1-1),与 lib-routes.test.js 快照同源
+    expect(routes.ROUTES.length).toBe(60);
   });
 
   it('带 x-token → 200:按天×能力的汇总 + 最近调用 + 通道命中', async () => {

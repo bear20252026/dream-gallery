@@ -12,7 +12,8 @@
  *   - 单页应用(SPA)回退:任意未命中路径 → index.html(react-router 通配兜底)
  *   - 路径穿越防护:拒绝 .. 与绝对路径
  *   - 缓存:index.html 不缓存(便于即时更新),带 hash 的静态资源长缓存
- *   - 仅服务白名单扩展名,其余 404
+ *   - MIME 按扩展名查表,未知扩展名回退 application/octet-stream(带 nosniff);
+ *     路径穿越由 safeResolve 拒绝(2026-11-11 审计 P3-6:原注释"白名单扩展名"与实现不符,已更正)
  */
 const http = require('http');
 const fs = require('fs');
@@ -52,11 +53,16 @@ function safeResolve(relPath) {
   return target;
 }
 
-function sendFile(res, filePath, { cache } = {}) {
+function sendFile(res, filePath, { cache, spaFallback = true } = {}) {
   fs.stat(filePath, (err, st) => {
     if (err || !st.isFile()) {
-      // SPA 回退:交给 react-router(已配置 <Route path="*"> 兜底)
-      return sendFile(res, path.join(ROOT, 'index.html'), { cache: false });
+      // SPA 回退:交给 react-router(已配置 <Route path="*"> 兜底)。
+      // 回退只许一次(2026-11-11 审计 P3-6):index.html 本身缺失时原先无限递归,
+      // 现在直接 404,不再把进程栈打爆。
+      if (spaFallback) return sendFile(res, path.join(ROOT, 'index.html'), { cache: false, spaFallback: false });
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'X-Content-Type-Options': 'nosniff' });
+      res.end('Not Found');
+      return;
     }
     const ext = path.extname(filePath).toLowerCase();
     const type = MIME[ext] || 'application/octet-stream';

@@ -1,7 +1,8 @@
 // daynight-probe.js — 昼夜相位 × 卡顿关联实验
 // 90 秒(1.5 个昼夜)连续采样: rAF 帧间隔 / 长任务 / 着色器程序数 / 视频丢帧,按昼夜相位分桶
 const { chromium } = require('playwright-core');
-const URL_ARG = process.argv[2] || 'http://101.133.235.110:3000/';
+// 源站地址不再硬编码(2026-11-11 审计 P3-1):命令行参数 → BASE_URL 环境变量 → 本地后端
+const URL_ARG = process.argv[2] || process.env.BASE_URL || 'http://localhost:3000/';
 
 (async () => {
   const browser = await chromium.launch({ channel: 'msedge', headless: false });
