@@ -57,6 +57,8 @@ export function createSceneNamespace(vault) {
     'kintsugiOn',
     'renderPostProcessing',
     'resizePostProcessing',
+    'syncPostProcessingPixelRatio', // 2026-11-12 画质修复:降档时同步后处理缓冲
+    'setAtmosphere', // 2026-11-12 光效:Bloom/曝光氛围参数
     'worldManager',
     'activeWorld',
     'worldChanged',

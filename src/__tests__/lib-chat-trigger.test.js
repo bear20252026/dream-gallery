@@ -269,7 +269,7 @@ describe('③b 召唤语言随发言携带(2026-11-11 审计 C9-2:英文站不�
     await settle();
     expect(chatTextMock.mock.calls.length).toBe(1);
     const sent = chatTextMock.mock.calls[0][0];
-    expect(sent.messages[0].content).toContain('昆仑之灵');
+    expect(sent.messages[0].content).toContain('B612之灵'); // 2026-11-12 世界观统一后的人格
     expect(sent.messages[0].content).not.toContain('Always answer in English');
   });
 
@@ -279,7 +279,7 @@ describe('③b 召唤语言随发言携带(2026-11-11 审计 C9-2:英文站不�
     await settle();
     expect(chatTextMock.mock.calls.length).toBe(1);
     const sent = chatTextMock.mock.calls[0][0];
-    expect(sent.messages[0].content).toContain('昆仑之灵');
+    expect(sent.messages[0].content).toContain('B612之灵'); // 2026-11-12 世界观统一后的人格
   });
 
   it('lang 非法值一律按中文(只认 en/zh,防注入奇怪提示)', async () => {
@@ -291,7 +291,7 @@ describe('③b 召唤语言随发言携带(2026-11-11 审计 C9-2:英文站不�
     await settle();
     expect(chatTextMock.mock.calls.length).toBe(1);
     const sent = chatTextMock.mock.calls[0][0];
-    expect(sent.messages[0].content).toContain('昆仑之灵');
+    expect(sent.messages[0].content).toContain('B612之灵'); // 2026-11-12 世界观统一后的人格
   });
 
   it('前端发言确实携带 lang(两侧接线,不是后端独角戏)', () => {

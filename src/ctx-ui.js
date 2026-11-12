@@ -38,6 +38,9 @@ export function createUINamespace(vault) {
     // 2026-10-16 接线:温柔度面板(gate/quiz.js)的开关入口 —— 菜单条目调 open(),
     // 判据在 src/__tests__/gentle-panel-wiring.test.js(声明 ≡ 写入方)
     'gentleTest',
+    // 2026-11-12 C4 成就徽章:进度变化点(灵蕴拾取/首飞/选片/天穹里程碑)经此通报新解锁。
+    // 写入方 gate/settings.js(装配时挂 achievement-page 的实现),判据 types-ctx-drift 要求声明 ≡ 成员。
+    'announceAchievements',
   ];
   const proxy = {};
 

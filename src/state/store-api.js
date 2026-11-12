@@ -119,6 +119,10 @@ const SCHEMA = {
   // admin 是独立子系统(不加载 ctx),但 store-api 零依赖可复用(同 lobby);此处只登记读出口,
   // sessionStorage 兜底仍由 admin-core 自持(store-api 只管 localStorage 这一层)。
   adminXToken: { key: 'admin_x_token', type: 'str' },
+  // 成就徽章已通报记录(C4,2026-11-12):存已弹过提示的徽章 id 数组。
+  // ⚠️ 只用于"哪些已经通报过",**不是达成依据** —— 达成永远由 shared/achievements.mjs 按既有进度
+  //   实时判定,所以清掉这个键不会丢成就(只会重新通报一次)。脏 id 由纯核过滤。
+  achievementsSeen: { key: 'b612AchievementsSeen', type: 'json' },
 };
 function entry(name) {
   const e = SCHEMA[name];

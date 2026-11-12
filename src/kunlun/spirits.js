@@ -306,6 +306,9 @@ function collect(extKey, extLine) {
     ctx.ui.modeToast(
       (line.toast || sp.name + ' · ' + sp.emotion + ' · 已收入罗盘') + '（' + n + '/6）'
     );
+  // C4 成就通报(2026-11-12):拾得灵蕴 → 对应徽章;六齐时一并点亮「六合归位」。
+  // 延后一拍,让上面那句收集提示先说完,不与成就提示抢同一条 toast。
+  setTimeout(() => ctx.ui.announceAchievements && ctx.ui.announceAchievements(), 2800);
   setTimeout(() => {
     collecting = false;
     if (n >= 6) {

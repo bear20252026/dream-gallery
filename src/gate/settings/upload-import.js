@@ -80,4 +80,6 @@ document.getElementById('etPickSave').onclick = function () {
   etPickApi.close();
   ctx.ui.modeToast &&
     ctx.ui.modeToast('选片已保存' + (etSel.size ? '（' + etSel.size + ' 幅）' : '（已清空）'));
+  // C4「云端的归宿」(2026-11-12):首次为展厅选片即点亮;延后一拍不与保存提示抢 toast
+  setTimeout(() => ctx.ui.announceAchievements && ctx.ui.announceAchievements(), 2400);
 };

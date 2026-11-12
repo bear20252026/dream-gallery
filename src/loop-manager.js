@@ -136,6 +136,20 @@ export class LoopManager {
   }
 
   /**
+   * 应用当前档位的像素比(2026-11-12 画质修复:统一出口)。
+   * ⚠️ 关键:renderer.setPixelRatio 之后**必须同步后处理 composer** ——
+   * EffectComposer 的 renderTarget 停在旧 dpr 会让后处理缓冲与画布错位,
+   * 表现为「越降档越糊、锯齿更明显」(主人报的糊/发虚根因之一)。
+   * 所有改档路径一律走这里,不再各自裸调 setPixelRatio。
+   */
+  _applyPixelRatio() {
+    const pr = this.PR_STEPS[this.prIdx];
+    this.ctx.scene.rnd.setPixelRatio(pr);
+    const sync = this.ctx.scene.syncPostProcessingPixelRatio;
+    if (sync) sync(pr, window.innerWidth, window.innerHeight);
+  }
+
+  /**
    * 设置低画质模式
    * @param {boolean} on - 是否开启低画质
    */
@@ -145,7 +159,7 @@ export class LoopManager {
       this.ctx.store.setJson('lowQuality', this.lowQuality);
     } catch (e) {}
     this.prIdx = this.lowQuality ? this.PR_STEPS.length - 1 : 0;
-    this.ctx.scene.rnd.setPixelRatio(this.PR_STEPS[this.prIdx]);
+    this._applyPixelRatio();
     if (this.ctx.ui.modeToast) {
       this.ctx.ui.modeToast(
         // 2026-10-03:此前写死「PixelRatio=1」,与实际最低档 0.75 不符,玩家按提示对不上号。
@@ -167,7 +181,7 @@ export class LoopManager {
       // 手动低画质:钉死最低档,不再自适应回升
       if (this.prIdx !== this.PR_STEPS.length - 1) {
         this.prIdx = this.PR_STEPS.length - 1;
-        this.ctx.scene.rnd.setPixelRatio(this.PR_STEPS[this.prIdx]);
+        this._applyPixelRatio();
       }
       return;
     }
@@ -185,11 +199,11 @@ export class LoopManager {
     // >45 即回升(此前 52 太苛刻,升不回去,长期停留在糊档)。
     if (avg < 25 && this.prIdx < this.PR_STEPS.length - 1) {
       this.prIdx++;
-      this.ctx.scene.rnd.setPixelRatio(this.PR_STEPS[this.prIdx]);
+      this._applyPixelRatio();
       this.prLastChange = now;
     } else if (avg > 45 && this.prIdx > 0) {
       this.prIdx--;
-      this.ctx.scene.rnd.setPixelRatio(this.PR_STEPS[this.prIdx]);
+      this._applyPixelRatio();
       this.prLastChange = now;
     }
   }

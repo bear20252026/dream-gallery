@@ -16,6 +16,8 @@
     "test:scene": "node scripts/probe/scene-visual-regression.cjs",
     "test:orbit": "node scripts/probe/verify-orbit.js",
     "test:repro": "node scripts/build-repro-check.cjs",
+    "test:achievements": "node scripts/probe/achievement-probe.cjs",
+    "test:worldvoice": "node scripts/probe/worldvoice-probe.cjs",
     "dev": "node scripts/gen/dev.js",
     "build": "vite build",
     "preview": "vite preview",

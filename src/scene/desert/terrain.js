@@ -211,7 +211,12 @@ function makeInstanced(geo, mat, items) {
 const CHUNK = 24,
   DIST = 4;
 const chunks = new Map();
-const terrainMat = new THREE.MeshStandardMaterial({
+// 2026-11-12 光效:导出供昼夜染色(desert/light-mood.js 的 applyMood 改它的 color)。
+// ⚠️ 为什么改材质 color 而不是顶点色:顶点色(getColor)里盐滩是 0.85/0.82/0.78 近白,
+// 叠上 1.6 强度日光后**过曝成一片白**(主人报「画面发白、光照平」的真病根)。
+// 顶点色写死在几何体里,改它要重建全部区块;而材质 color 是与顶点色相乘的全局染色因子,
+// 改一个 uniform 即可让整片地表随昼夜压暗/染色,零重建、零新增 draw call。
+export const terrainMat = new THREE.MeshStandardMaterial({
   vertexColors: true,
   roughness: 0.98,
   metalness: 0,
@@ -499,6 +504,14 @@ export const waterU = {
   uColor: { value: new THREE.Color(0x5a7a6a) },
   uOpacity: { value: 0.75 },
   uOffset: { value: new THREE.Vector2(0, 0) },
+  // 2026-11-12 画质:水面是自定义 ShaderMaterial,**不走 Three 的光照管线**,
+  // 所以昼夜怎么变它都不动 —— 夜里天空全黑了,水面仍是白天亮度,看着像一片
+  // 自发光的青绿地面(主人夜里看到的那片诡异青色就是它)。
+  // 这里加一个光照因子,由 dayNight 逐帧写:夜里压暗并偏冷,晨昏染暖,白天原样。
+  // ⚠️ 必须是 Color 而不是 Vector3:氛围层用 setRGB() 写它,Vector3 没有这个方法
+  //    (实机首轮就报 "setRGB is not a function";单测替身掩盖了,故此处注明)。
+  //    Color 默认在**线性**工作空间,setRGB 直接写线性分量,正是着色器要的。
+  uLight: { value: new THREE.Color(1, 1, 1) },
 };
 export const water = new THREE.Mesh(
   new THREE.PlaneGeometry(400, 400, 60, 60),
@@ -524,9 +537,10 @@ export const water = new THREE.Mesh(
     fragmentShader: `
       uniform vec3 uColor;
       uniform float uOpacity;
+      uniform vec3 uLight; // 昼夜光照因子(2026-11-12;白天为 1,1,1 ⇒ 与原先完全一致)
       varying float vElevation;
       void main(){
-        vec3 color=uColor+vElevation*0.15;
+        vec3 color=(uColor+vElevation*0.15)*uLight;
         float alpha=uOpacity+vElevation*0.06;
         gl_FragColor=vec4(color,alpha);
       }`,

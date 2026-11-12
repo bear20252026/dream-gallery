@@ -215,6 +215,10 @@ async function preloadWorld() {
     pp.initPostProcessing(rnd, s, cam);
     ctx.scene.renderPostProcessing = pp.renderPostProcessing;
     ctx.scene.resizePostProcessing = pp.resizePostProcessing;
+    // 2026-11-12 画质修复:画质档变化时必须同步 composer 的 pixelRatio,
+    // 否则后处理缓冲与画布分辨率错位 ⇒ 越降档越糊(LoopManager._applyPixelRatio 调它)。
+    ctx.scene.syncPostProcessingPixelRatio = pp.syncPostProcessingPixelRatio;
+    ctx.scene.setAtmosphere = pp.setAtmosphere; // 氛围参数(Bloom/曝光),供昼夜与画质档调用
     // 多世界:把主世界后处理管线注入 SceneManager(切世界时由它接管挂/摘)
     if (ctx.scene.worldManager && ctx.scene.worldManager.setMainPost)
       ctx.scene.worldManager.setMainPost(pp.renderPostProcessing);

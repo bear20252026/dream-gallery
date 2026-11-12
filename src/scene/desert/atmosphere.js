@@ -1,10 +1,13 @@
 // atmosphere.js — 大气效果:飞鸟、沙暴、云团、风行粒子、灯塔、罗盘、天空昼夜、HUD
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
-import { getH, KX, KZ } from './terrain.js';
+import { getH, KX, KZ, terrainMat, waterU } from './terrain.js';
 import { tt } from '../../shared/story-text.mjs';
 import { legacyOn } from '../../shared/legacy.mjs';
 import { qsEl } from '../../shared/dom-typed.js'; // HUD 小元素按标签取名:.cp-needle / #dtText / #dtPhase / #dtBar / #dtName / #dtElev 都是 <div>
+import { applyMood, currentMood, smoothstep } from './light-mood.js'; // 昼夜氛围增强(2026-11-12:Bloom/曝光/雾密度/沙暴联动)
+import { createDesertSky } from './sky-dome.js'; // 渐变天穹(2026-11-12:治「天空一整块纯色」)
+import { softenPoints } from './particle-sprite.js'; // 粒子柔和圆点(2026-11-12:治「方块粒子」)
 const { s } = ctx;
 
 // ===================== 飞鸟 =====================
@@ -27,7 +30,7 @@ for (let i = 0; i < BIRDS; i++) {
 birdGeo.setAttribute('position', new THREE.BufferAttribute(birdPos, 3));
 const birds = new THREE.Points(
   birdGeo,
-  new THREE.PointsMaterial({ color: 0x3a2a1a, size: 0.5, sizeAttenuation: true })
+  softenPoints(new THREE.PointsMaterial({ color: 0x3a2a1a, size: 0.5, sizeAttenuation: true }))
 );
 s.add(birds);
 
@@ -43,14 +46,16 @@ for (let i = 0; i < SAND; i++) {
   sandSp[i] = 8 + Math.random() * 15;
 }
 sandGeo.setAttribute('position', new THREE.BufferAttribute(sandPos, 3));
-const sandMat = new THREE.PointsMaterial({
-  color: 0xd4a574,
-  size: 0.25,
-  transparent: true,
-  opacity: 0.15,
-  sizeAttenuation: true,
-  depthWrite: false,
-});
+const sandMat = softenPoints(
+  new THREE.PointsMaterial({
+    color: 0xd4a574,
+    size: 0.25,
+    transparent: true,
+    opacity: 0.15,
+    sizeAttenuation: true,
+    depthWrite: false,
+  })
+);
 const sand = new THREE.Points(sandGeo, sandMat);
 s.add(sand);
 
@@ -76,15 +81,17 @@ for (let i = 0; i < DUST; i++) {
   dustPos[i * 3 + 2] = KZ + Math.sin(dustAngle[i]) * 6;
 }
 dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
-const dustMat = new THREE.PointsMaterial({
-  color: 0xffeebb,
-  size: 0.5,
-  transparent: true,
-  opacity: 0.7,
-  sizeAttenuation: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-});
+const dustMat = softenPoints(
+  new THREE.PointsMaterial({
+    color: 0xffeebb,
+    size: 0.5,
+    transparent: true,
+    opacity: 0.7,
+    sizeAttenuation: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+);
 const dust = new THREE.Points(dustGeo, dustMat);
 s.add(dust);
 
@@ -114,6 +121,9 @@ const cpNeedle = qsEl(compass, '.cp-needle'); // markup 自己写的 <div class=
 // ===================== 天空昼夜 =====================
 const skyBg = new THREE.Color(0xd4c8a0);
 s.background = skyBg;
+// 2026-11-12 画质:渐变天穹盖在纯色背景之上。背景色仍保留作兜底
+// (天穹万一创建失败,画面退回原来的纯色而不是黑屏)。
+const desertSky = createDesertSky(s);
 const sunMesh = new THREE.Mesh(
   new THREE.SphereGeometry(2.0, 16, 16),
   new THREE.MeshBasicMaterial({ color: 0xfff0d0, fog: false })
@@ -136,14 +146,16 @@ for (let i = 0; i < STARS; i++) {
   starPos[i * 3 + 2] = r * Math.cos(ph);
 }
 starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-const starMat = new THREE.PointsMaterial({
-  color: 0xfff8e0,
-  size: 0.4,
-  transparent: true,
-  opacity: 0,
-  sizeAttenuation: true,
-  fog: false,
-});
+const starMat = softenPoints(
+  new THREE.PointsMaterial({
+    color: 0xfff8e0,
+    size: 0.4,
+    transparent: true,
+    opacity: 0,
+    sizeAttenuation: true,
+    fog: false,
+  })
+);
 const stars = new THREE.Points(starGeo, starMat);
 s.add(stars);
 const rimL = new THREE.DirectionalLight(0xcc9977, 0.4);
@@ -164,6 +176,9 @@ const ambDay = new THREE.Color(0xfff0d0),
   ambNight = new THREE.Color(0x1a1510);
 const _c1 = new THREE.Color();
 export let lastElev = 1;
+// 沙暴不透明度的昼夜基准(由 dayNight → applyMood 写,逐帧更新按地形缩放)。
+// 初值取白天基准,避免首帧 dayNight 还没跑时沙暴为 0。
+let moodSandOpacity = 0.16;
 
 // ===================== 沙漠日光 =====================
 const sunL = new THREE.DirectionalLight('#fff8e7', 1.8);
@@ -181,31 +196,31 @@ export function dayNight(hour) {
   moonMesh.position.set(-sunX * orbitR, -sunY * orbitR, -10);
   sunMesh.visible = sunY > -0.1;
   moonMesh.visible = sunY < 0.1;
-  let ambInt, sunInt;
-  if (elev < 0.25) {
-    const t = elev / 0.25;
-    skyBg.copy(_c1.copy(skyColorNight).lerp(skyColorSunset, t));
-    s.fog.color.copy(_c1.copy(fogNight).lerp(fogSunset, t));
-    sunL.color.copy(_c1.copy(sunColorNight).lerp(sunColorSunset, t));
-    ctx.scene.ambL.color.copy(_c1.copy(ambNight).lerp(ambSunset, t));
-    ambInt = 0.3 + t * 0.09;
-    sunInt = 0.05 + t * 0.95;
-  } else if (elev < 0.75) {
-    const t = (elev - 0.25) / 0.5;
-    skyBg.copy(_c1.copy(skyColorSunset).lerp(skyColorDay, t));
-    s.fog.color.copy(_c1.copy(fogSunset).lerp(fogDay, t));
-    sunL.color.copy(_c1.copy(sunColorSunset).lerp(sunColorDay, t));
-    ctx.scene.ambL.color.copy(_c1.copy(ambSunset).lerp(ambDay, t));
-    ambInt = 0.39 + t * 0.06;
-    sunInt = 1.0;
-  } else {
-    skyBg.copy(skyColorDay);
-    s.fog.color.copy(fogDay);
-    sunL.color.copy(sunColorDay);
-    ctx.scene.ambL.color.copy(ambDay);
-    ambInt = 0.45;
-    sunInt = 1.0;
-  }
+  // 2026-11-12 光效:三段线性 → **以地平线为峰的连续曲线**。
+  // 病原先 elev=0.5(正是 18:00 日落)落在「晨昏档」正中 t=0.5,天空被插值成
+  // 日落色与白天色的各一半 ⇒ 米色,而不是琥珀色。日落的色彩峰值本该在地平线附近。
+  // 现按「夜权重 / 日落权重 / 白天权重」三者归一混合,峰值对齐:
+  //   elev 0   → 纯夜;elev≈0.5 → 日落峰(琥珀);elev 1 → 纯白天。
+  const wNight = 1 - smoothstep(0.16, 0.46, elev); // 夜:0.46 以上归零
+  const wDay = smoothstep(0.58, 0.92, elev); // 白天:0.58 起渐入
+  const wDusk = Math.max(0, 1 - wNight - wDay); // 余下全给日落 ⇒ elev 0.5 时接近 1
+  const mix3 = (target, cN, cD, cDay) => {
+    // 三色加权(权重和为 1);在线性空间累加,避免 sRGB 直插出脏灰
+    target.setRGB(
+      cN.r * wNight + cD.r * wDusk + cDay.r * wDay,
+      cN.g * wNight + cD.g * wDusk + cDay.g * wDay,
+      cN.b * wNight + cD.b * wDusk + cDay.b * wDay
+    );
+    return target;
+  };
+  mix3(skyBg, skyColorNight, skyColorSunset, skyColorDay);
+  mix3(s.fog.color, fogNight, fogSunset, fogDay);
+  mix3(sunL.color, sunColorNight, sunColorSunset, sunColorDay);
+  mix3(ctx.scene.ambL.color, ambNight, ambSunset, ambDay);
+  // 强度同样按权重连续过渡(夜 0.30 → 日落 0.40 → 白天 0.45)
+  const ambInt = 0.3 * wNight + 0.4 * wDusk + 0.45 * wDay;
+  // 日光:夜里几乎为零,日落中等偏暖,白天足量
+  const sunInt = 0.05 * wNight + 0.72 * wDusk + 1.0 * wDay;
   ctx.scene.ambL.intensity = ambInt;
   ctx.scene.hemiL.intensity = 0.15 + 0.3 * elev;
   sunL.intensity = sunInt * 1.6;
@@ -213,12 +228,27 @@ export function dayNight(hour) {
     .set(sunX * orbitR, sunY * orbitR, -10)
     .normalize()
     .multiplyScalar(60);
-  rimL.intensity = elev < 0.3 ? 0.5 : 0.3;
+  const baseRim = elev < 0.3 ? 0.5 : 0.3;
+  rimL.intensity = baseRim;
   rimL.color.setHex(elev < 0.3 ? 0x664433 : 0x886655);
   let so = 0;
   if (elev < 0.15) so = 1;
   else if (elev < 0.35) so = 1 - (elev - 0.15) / 0.2;
   starMat.opacity = so;
+  // 2026-11-12 光效增强:必须放在**本函数末尾** —— 这里才是昼夜的权威写入点,
+  // 任何在它之外改这些属性的代码都会被下一帧覆盖(本轮实测过,已回退那种做法)。
+  // 补的是本函数原先没做的四件:Bloom/曝光联动、雾密度呼吸、沙暴随昼夜、晨昏轮廓光加成。
+  const mood = applyMood(ctx.scene, elev, { sandMat, rimL, baseRim, terrainMat, waterU });
+  // 沙暴的昼夜基准存起来供逐帧更新按地形缩放(updateAtmosphere 里读它,不再硬写 0.2/0.08)
+  moodSandOpacity = mood.sandOpacity;
+  // 渐变天穹:必须在 applyMood **之后** —— 它写的雾色正是天穹的地平线色,
+  // 顺序反了天穹就会用上一帧的雾色,远景与天空之间出现一道色差缝。
+  desertSky.update({
+    fogColor: s.fog.color,
+    sunDir: sunL.position,
+    weights: { wNight, wDusk, wDay },
+    camera: ctx.scene.cam,
+  });
 }
 
 // ===================== 漂移云团 =====================
@@ -235,16 +265,18 @@ for (let i = 0; i < CLOUDS; i++) {
 cloudGeo.setAttribute('position', new THREE.BufferAttribute(cloudPos, 3));
 const clouds = new THREE.Points(
   cloudGeo,
-  new THREE.PointsMaterial({
-    color: 0xffeedd,
-    size: 6.5,
-    transparent: true,
-    opacity: 0.1,
-    sizeAttenuation: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    fog: false,
-  })
+  softenPoints(
+    new THREE.PointsMaterial({
+      color: 0xffeedd,
+      size: 6.5,
+      transparent: true,
+      opacity: 0.1,
+      sizeAttenuation: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      fog: false,
+    })
+  )
 );
 s.add(clouds);
 let cloudAcc = 0;
@@ -257,15 +289,17 @@ const windVel = new Float32Array(WIND * 3);
 const windLife = new Float32Array(WIND);
 for (let i = 0; i < WIND; i++) windLife[i] = Math.random();
 windGeo.setAttribute('position', new THREE.BufferAttribute(windPos, 3));
-const windMat = new THREE.PointsMaterial({
-  color: 0xffddaa,
-  size: 0.15,
-  transparent: true,
-  opacity: 0.5,
-  sizeAttenuation: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-});
+const windMat = softenPoints(
+  new THREE.PointsMaterial({
+    color: 0xffddaa,
+    size: 0.15,
+    transparent: true,
+    opacity: 0.5,
+    sizeAttenuation: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+);
 const wind = new THREE.Points(windGeo, windMat);
 s.add(wind);
 
@@ -274,15 +308,17 @@ const HWIND = 60;
 const hwindGeo = new THREE.BufferGeometry();
 const hwindPos = new Float32Array(HWIND * 3);
 hwindGeo.setAttribute('position', new THREE.BufferAttribute(hwindPos, 3));
-const hwindMat = new THREE.PointsMaterial({
-  color: 0xffeebb,
-  size: 0.08,
-  transparent: true,
-  opacity: 0,
-  sizeAttenuation: true,
-  depthWrite: false,
-  blending: THREE.AdditiveBlending,
-});
+const hwindMat = softenPoints(
+  new THREE.PointsMaterial({
+    color: 0xffeebb,
+    size: 0.08,
+    transparent: true,
+    opacity: 0,
+    sizeAttenuation: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  })
+);
 const hwind = new THREE.Points(hwindGeo, hwindMat);
 s.add(hwind);
 
@@ -388,7 +424,11 @@ function updateSandstorm(dt) {
       }
     }
     sandGeo.attributes.position.needsUpdate = true;
-    sandMat.opacity = getH(ctx.player.pl.p.x, ctx.player.pl.p.z) < 8 ? 0.2 : 0.08;
+    // 2026-11-12:地形权重(低地沙暴更浓)× 昼夜权重(light-mood 的 sandOpacity)。
+    // 原先这里是硬写 0.2/0.08,会把 applyMood 的昼夜联动**每帧覆盖**;
+    // 现改为在昼夜基准上按地形缩放,两个维度都保留。
+    const terrainBoost = getH(ctx.player.pl.p.x, ctx.player.pl.p.z) < 8 ? 1.25 : 0.5;
+    sandMat.opacity = moodSandOpacity * terrainBoost;
   }
 }
 

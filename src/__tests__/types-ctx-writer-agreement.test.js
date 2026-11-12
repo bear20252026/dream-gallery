@@ -127,7 +127,9 @@ describe('ctx.d.ts 三条成员声明 ≡ 各自唯一写入方', () => {
       .map((s) => s.trim().split(':')[0].trim())
       .filter(Boolean)
       .sort();
-    expect(wrote).toEqual(['assertAboveGround', 'dayNight', 'getH', 'kunlun', 'update'].sort());
+    expect(wrote).toEqual(
+      ['assertAboveGround', 'currentMood', 'dayNight', 'getH', 'kunlun', 'update'].sort()
+    );
     expect(ifaceMembers('DesertSurface').sort()).toEqual(wrote);
     // 说谎的窄写法不许回来(它曾让 11 条真实成员读取全报 TS2339)
     expect(DTS).not.toMatch(/^ {2}desert: \{ getH/m);
