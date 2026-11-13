@@ -87,7 +87,9 @@ const FRAG_COLOR = `
 export function attachFoliageLife(mat, opts) {
   if (!mat || mat.userData.foliageLife) return mat;
   mat.userData.foliageLife = true;
-  const o = opts || {};
+  // 兜底对象必须带类型:裸 {} 会被 checkJs 推成空对象,读 o.sway 报 TS2339
+  const o =
+    opts || /** @type {{sway?: number, base?: number, height?: number, mottle?: number}} */ ({});
   const uSway = { value: o.sway ?? 0.05 };
   const uBase = { value: o.base ?? 0 };
   const uHeight = { value: o.height ?? 1 };
