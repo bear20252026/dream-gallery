@@ -51,7 +51,7 @@ export default [
       'server.js',
       'landing-server.js',
       'live-verify.cjs',
-      'vitest.config.js',
+      'vitest.config.mjs', // 2026-11-13 随 Vitest4 迁移改名(原 vitest.config.js),白名单同步
       'eslint.config.mjs',
       '.dependency-cruiser.cjs',
       'lib/**/*.js',
