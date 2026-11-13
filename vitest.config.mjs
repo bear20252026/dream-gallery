@@ -23,9 +23,8 @@ export default defineConfig({
     // GitHub runner 只有 2 核(那边默认本来就 <8)⇒ **CI 行为一字不变**,变的只是本机。
     // 代价要说清:并发降低 ⇒ 由"多 worker 互相抢"暴露出来的判据漂移更难被撞见;
     // 所以这类判据的正确验法仍是**注入延迟**(见 AGENTS 2026-10-17「读数不再猜毫秒」那节的教训),不是加压复跑。
-    poolOptions: {
-      threads: { maxThreads: Number(process.env.VITEST_MAX_THREADS || 8) },
-    },
+    // Vitest 4:poolOptions 已移除,worker 上限收敛为顶层 maxWorkers(语义等价:本机 cap 8,CI 2 核仍按核数)。
+    maxWorkers: Number(process.env.VITEST_MAX_THREADS || 8),
     // 开跑前收走**自己**留在 %TEMP% 的旧 `dg-*` 数据根(按 mtime 只收 6 小时前的,免得抢掉并发跑的目录)。
     // 起因:Windows 上 afterAll 的 rmSync 删得掉文件删不掉目录(SQLite 句柄要等 process.on('exit') 才放),
     // 本机实测攒了 2063 个空目录。细节与判据见 src/__tests__/global-setup.mjs。
