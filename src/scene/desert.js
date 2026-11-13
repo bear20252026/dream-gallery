@@ -4,6 +4,7 @@ import { getH, assertAboveGround, updateChunks, waterU, water, KX, KZ } from './
 import { updateAtmosphere, dayNight, lastElev } from './desert/atmosphere.js';
 import { currentMood } from './desert/light-mood.js'; // 氛围读数(诊断/探针,2026-11-12)
 import { tickSandDetail } from './desert/sand-detail.js'; // 云影时间(2026-11-12 沙地细节)
+import { tickFoliage } from './desert/foliage-life.js'; // 风时间(2026-11-13 植被风摆)
 
 // ===================== 主更新循环 =====================
 function update(dt, time) {
@@ -11,6 +12,8 @@ function update(dt, time) {
   updateChunks();
   // 沙地云影时间(程序化细节的慢漂移)
   tickSandDetail(time);
+  // 植被风时间(2026-11-13 自然表面)
+  tickFoliage(time);
   // 水面跟随玩家
   waterU.uTime.value = time;
   if (ctx.player.pl) {
