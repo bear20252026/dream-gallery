@@ -219,6 +219,12 @@ async function preloadWorld() {
     // 否则后处理缓冲与画布分辨率错位 ⇒ 越降档越糊(LoopManager._applyPixelRatio 调它)。
     ctx.scene.syncPostProcessingPixelRatio = pp.syncPostProcessingPixelRatio;
     ctx.scene.setAtmosphere = pp.setAtmosphere; // 氛围参数(Bloom/曝光),供昼夜与画质档调用
+    // 2026-11-13 首屏兜底:开场层若因跳过/异常路径未自清理,进场 8s 后派事件让它
+    // 走自己的幂等收束口淡出移除(绝不外部强删:play() 的 await 会摸到 null 元素)。
+    // 真实浏览器首屏曾残留相框/纸飞机/暗层(fFrame/fPlaneDom/fDark),把主世界染成灰白老照片。
+    setTimeout(() => {
+      if (document.getElementById('b612film')) window.dispatchEvent(new Event('dg:film-cleanup'));
+    }, 8000);
     // 多世界:把主世界后处理管线注入 SceneManager(切世界时由它接管挂/摘)
     if (ctx.scene.worldManager && ctx.scene.worldManager.setMainPost)
       ctx.scene.worldManager.setMainPost(pp.renderPostProcessing);

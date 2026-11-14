@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
 import { attachSandDetail } from './sand-detail.js'; // 2026-11-12 画质:沙地程序化细节(去塑料感)
+import { attachFoliageLife } from './foliage-life.js'; // 2026-11-13 自然表面:植被风摆+斑驳
+import { makeContactShadows } from './contact-shadows.js'; // 2026-11-13:植被落地接触阴影
 const { s } = ctx;
 
 // ===================== 地形参数 =====================
@@ -164,6 +166,15 @@ const saltMat = new THREE.MeshStandardMaterial({
 });
 const grassMat = new THREE.MeshStandardMaterial({ color: 0xbdb76b, roughness: 0.9 });
 
+// 2026-11-13 自然表面:植被风摆+斑驳。base≈实例原点离地偏移-几何半高(≈地面),
+// 权重随高度平方 ⇒ 根部不动梢部摆;树冠摆幅大、树干微颤、草整株摇。
+attachFoliageLife(leafMat, { sway: 0.12, base: 1.9, height: 2.6, mottle: 0.28 });
+attachFoliageLife(tamLeafMat, { sway: 0.05, base: 0.55, height: 1.0, mottle: 0.26 });
+attachFoliageLife(grassMat, { sway: 0.12, base: 0.0, height: 0.45, mottle: 0.22 });
+attachFoliageLife(trunkMat, { sway: 0.02, base: 0.0, height: 3.5, mottle: 0.12 });
+attachFoliageLife(tamTrunkMat, { sway: 0.015, base: 0.0, height: 1.2, mottle: 0.12 });
+attachFoliageLife(cactusMat, { sway: 0.008, base: 0.0, height: 1.8, mottle: 0.15 });
+
 const popTrunkGeo = new THREE.CylinderGeometry(0.1, 0.25, 3.5, 5);
 const popBranchGeo = new THREE.CylinderGeometry(0.04, 0.08, 1.5, 4);
 const popLeafGeo = new THREE.DodecahedronGeometry(1, 0);
@@ -278,6 +289,8 @@ function genChunk(cx, cz) {
     salt: [],
     grass: [],
   };
+  // 接触阴影落点(局部坐标,与区块网格同系)
+  const shadowItems = [];
   const place = (count, cond, cb) => {
     for (let i = 0; i < count; i++) {
       const lx = (Math.random() - 0.5) * (CHUNK - 3),
@@ -334,6 +347,7 @@ function genChunk(cx, cz) {
         });
       }
       bind(0.4, wx, wz, sc);
+      shadowItems.push({ x: lx, y: h, z: lz, r: 1.1 * sc });
     }
   );
   place(
@@ -366,6 +380,7 @@ function genChunk(cx, cz) {
       if (Math.random() > 0.5)
         B.cacA.push({ x: lx + 0.2 * sc, y: h + 1.2 * sc, z: lz, rz: -0.6, sx: sc, sy: sc, sz: sc });
       bind(0.2, wx, wz, sc);
+      shadowItems.push({ x: lx, y: h, z: lz, r: 0.5 * sc });
     }
   );
   place(
@@ -403,6 +418,7 @@ function genChunk(cx, cz) {
         sz: r * (1 + Math.random() * 0.8) * sc,
       });
       bind(0.8, wx, wz, sc);
+      shadowItems.push({ x: lx, y: h, z: lz, r: r * 1.15 });
     }
   );
   place(
@@ -455,6 +471,9 @@ function genChunk(cx, cz) {
     const im = makeInstanced(geo, mat, items);
     if (im) g.add(im);
   });
+  // 接触阴影:落点收集完后建实例化圆盘(单 draw call),随区块一起卸载
+  const cShadows = makeContactShadows(shadowItems);
+  if (cShadows) g.add(cShadows);
   s.add(g);
   return { g, colliders };
 }
@@ -516,6 +535,11 @@ export const waterU = {
   //    (实机首轮就报 "setRGB is not a function";单测替身掩盖了,故此处注明)。
   //    Color 默认在**线性**工作空间,setRGB 直接写线性分量,正是着色器要的。
   uLight: { value: new THREE.Color(1, 1, 1) },
+  // 2026-11-13 自然表面轮:太阳方向/天空色/日光色,由 dayNight 逐帧写,
+  // 供水面做菲涅尔天空反射与太阳高光(原先水面是纯平涂色,没有「水」的光学特征)。
+  uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+  uSky: { value: new THREE.Color(0xd4c8a0) },
+  uSunCol: { value: new THREE.Color(0xfff0d0) },
 };
 export const water = new THREE.Mesh(
   new THREE.PlaneGeometry(400, 400, 60, 60),
@@ -527,26 +551,55 @@ export const water = new THREE.Mesh(
       uniform float uTime;
       uniform vec2 uOffset;
       varying float vElevation;
+      varying vec3 vWPos;
+      varying vec3 vNrm;
       void main(){
         vec3 pos=position;
         float worldX=pos.x+uOffset.x;
         float worldZ=-pos.y+uOffset.y;
-        float wave=sin(worldX*0.3+uTime*1.2)*0.08
-                 +cos(worldZ*0.25+uTime*0.9)*0.08
-                 +sin((worldX+worldZ)*0.15+uTime*0.6)*0.05;
+        float a1=worldX*0.3+uTime*1.2;
+        float a2=worldZ*0.25+uTime*0.9;
+        float a3=(worldX+worldZ)*0.15+uTime*0.6;
+        float wave=sin(a1)*0.08+cos(a2)*0.08+sin(a3)*0.05;
+        // 解析法线:对波形求导(局部系),转世界系供片元做反射/高光
+        float dx=cos(a1)*0.024+cos(a3)*0.0075;
+        float dy=-sin(a2)*0.02+cos(a3)*0.0075;
+        vNrm=normalize(vec3(-dx,dy,1.0)); // 局部 z 向上,旋转后对应世界 +y
         pos.z+=wave;
         vElevation=wave;
+        vWPos=(modelMatrix*vec4(pos,1.0)).xyz;
         gl_Position=projectionMatrix*modelViewMatrix*vec4(pos,1.0);
       }`,
     fragmentShader: `
       uniform vec3 uColor;
       uniform float uOpacity;
-      uniform vec3 uLight; // 昼夜光照因子(2026-11-12;白天为 1,1,1 ⇒ 与原先完全一致)
+      uniform vec3 uLight; // 昼夜光照因子(白天 1,1,1)
+      uniform vec3 uSunDir;
+      uniform vec3 uSky;
+      uniform vec3 uSunCol;
+      uniform float uTime;
       varying float vElevation;
+      varying vec3 vWPos;
+      varying vec3 vNrm;
       void main(){
-        vec3 color=(uColor+vElevation*0.15)*uLight;
-        float alpha=uOpacity+vElevation*0.06;
-        gl_FragColor=vec4(color,alpha);
+        // 局部法线( z  up )→ 世界( y up ):mesh 绕 X -90°
+        vec3 N=normalize(vec3(vNrm.x,vNrm.z,-vNrm.y));
+        // 细碎涟漪:两层小波扰动法线,高光才会「碎」成粼粼而不是一个光斑
+        float r1=sin(vWPos.x*2.1+uTime*2.2)*sin(vWPos.z*1.7-uTime*1.8);
+        float r2=sin(vWPos.x*4.3-uTime*3.1)*sin(vWPos.z*3.9+uTime*2.6);
+        N=normalize(N+vec3(r1*0.06+r2*0.03,0.0,r1*0.05-r2*0.04));
+        vec3 V=normalize(cameraPosition-vWPos);
+        vec3 L=normalize(uSunDir);
+        // 菲涅尔:掠射角反射天空,正视看水体 ⇒ 水面有「反光」的真实感
+        float fres=pow(1.0-max(dot(N,V),0.0),3.0);
+        vec3 base=(uColor+vElevation*0.15)*uLight;
+        vec3 col=mix(base,uSky*max(uLight,vec3(0.15)),fres*0.65);
+        // 太阳高光:窄瓣镜面 + 宽瓣粼光
+        vec3 H=normalize(L+V);
+        float spec=pow(max(dot(N,H),0.0),120.0)*1.2+pow(max(dot(N,H),0.0),24.0)*0.25;
+        col+=uSunCol*spec*max(uLight,vec3(0.0));
+        float alpha=uOpacity+vElevation*0.06+fres*0.15;
+        gl_FragColor=vec4(col,alpha);
       }`,
   })
 );

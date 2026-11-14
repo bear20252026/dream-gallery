@@ -349,7 +349,9 @@ export class LoopManager {
       // 时间源可注入(2026-09-07 P4):默认挂真实时钟;测试/剧情机关经
       // ctx.media.dayTimeSource = () => 12 覆盖(0-24),不必再 monkey-patch dayNight。
       const src = ctx.media.dayTimeSource;
-      const hour = typeof src === 'function' ? Number(src(now)) % 24 : (12 + now / 2500) % 24;
+      // 2026-11-13 首屏:默认起点从正午改为黄金时刻 17.8 —— 打开的第一眼就是暖日落,
+      // 而不是随机落在灰档(主人真实浏览器首屏灰白的根因之一)。仍保持 60s 一周快转。
+      const hour = typeof src === 'function' ? Number(src(now)) % 24 : (17.8 + now / 2500) % 24;
       ctx.media.dayHour = hour;
       if (desert && now - this._lastDayT > 100) {
         this._lastDayT = now;

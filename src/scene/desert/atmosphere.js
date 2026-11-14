@@ -249,6 +249,11 @@ export function dayNight(hour) {
     weights: { wNight, wDusk, wDay },
     camera: ctx.scene.cam,
   });
+  // 2026-11-13 自然表面:水面光学参数随昼夜(菲涅尔反射天空色 + 太阳高光)。
+  // 放在末尾保证用本帧最新的太阳/天空色;缺件静默跳过(装配顺序容错)。
+  if (waterU.uSunDir) waterU.uSunDir.value.copy(sunL.position).normalize();
+  if (waterU.uSky) waterU.uSky.value.copy(skyBg);
+  if (waterU.uSunCol) waterU.uSunCol.value.copy(sunL.color);
 }
 
 // ===================== 漂移云团 =====================

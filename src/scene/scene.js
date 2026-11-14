@@ -9,6 +9,7 @@ import { createGLTFLoader } from './gltf-loader.js'; // 婚礼拱廊外壳加载
 import { LAYOUT } from './layout.mjs'; // 建筑布局尺寸唯一源(2026-09-07 P4)
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表;此处只借主干名口径)
 import { showGlLost, watchGlContext } from '../ui/gl-lost.js'; // WebGL 失效友好提示(2026-10-03)
+import { attachStucco } from './stucco.js'; // 2026-11-13 建筑表面:灰泥颗粒(去平涂色块)
 
 const L = document.getElementById('l'),
   C = document.getElementById('c'),
@@ -215,6 +216,8 @@ const wallMatShared = new THREE.MeshStandardMaterial({
   metalness: 0.02,
 });
 houseMats.wall.push(wallMatShared); // 房屋换色(housecolor.js)对 wall 组逐材质 setColor,单材质一次全生效
+// 2026-11-13 建筑表面:灰泥颗粒+抹刀痕,去掉「平涂色块」墙(程序化,零外部资产)
+attachStucco(wallMatShared);
 const wallSpecs = []; // {x1,z1,x2,z2,cx,cz,ang,len,hue,perim} — 装配段统一建实例
 
 function w(x1, z1, x2, z2) {
