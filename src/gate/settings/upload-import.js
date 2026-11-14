@@ -1,5 +1,6 @@
 import { Z } from '../../shared/z-layers.mjs';
-// upload-import.js — C2 展厅选片导入(从上传中挑选 ≤20 幅呈现在永恒展厅西墙)
+// upload-import.js — C2 画廊选片导入(从上传中挑选 ≤20 幅呈现在「星星上的画廊」西墙)
+// 2026-11-14:文案统一到小王子叙事(原「永恒展厅」属昆仑旧线);存档键 eternalPicks 不变。
 import { ctx } from '../../ctx.js';
 import { qsInput } from '../../shared/dom-typed.js'; // 每行 label 里那枚 <input type=checkbox> 由本文件上一行自己写出来
 
@@ -12,7 +13,7 @@ etPickOv.style.cssText =
 etPickOv.innerHTML =
   '<div style="width:min(420px,92vw);max-height:84vh;overflow-y:auto;background:linear-gradient(160deg,rgba(38,22,34,0.98),rgba(24,14,26,0.98));border:1px solid rgba(255,214,170,.3);border-radius:18px;padding:18px;color:#fff;box-shadow:0 24px 80px rgba(0,0,0,.55)">' +
   '<div style="display:flex;align-items:center;margin-bottom:6px"><b style="letter-spacing:2px;font-size:15px">展厅选片</b><span id="etPickX" style="margin-left:auto;cursor:pointer;color:rgba(255,255,255,.55);padding:2px 8px;font-size:14px">✕</span></div>' +
-  '<div style="font-size:11px;color:rgba(255,217,168,.6);line-height:1.7;margin-bottom:4px">从「我的上传」挑选 ≤20 幅,呈现在永恒展厅西墙(仅自己可见)。选好后需抵达展厅才会显现。</div>' +
+  '<div style="font-size:11px;color:rgba(255,217,168,.6);line-height:1.7;margin-bottom:4px">从「我的上传」挑选 ≤20 幅,挂在「星星上的画廊」西墙(仅自己可见)。走完六颗星、抵达那颗星之后才会显现。</div>' +
   '<div id="etPickCount" style="font-size:12px;color:#ffd9a8;margin-bottom:6px">已选 0 / 20</div>' +
   '<div id="etPickList"></div>' +
   '<div id="etPickEmpty" style="display:none;font-size:12px;color:rgba(255,255,255,.5);text-align:center;padding:14px">你还没有上传过作品。先去「上传照片 / 视频」吧。</div>' +

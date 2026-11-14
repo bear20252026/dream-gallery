@@ -305,7 +305,10 @@ describe('⑥ 搁置令没有被顺手改掉(2026-10-03 主人令「旧玩法先
     const body = t.slice(at, t.indexOf('])', at));
     expect(body).toMatch(/'quiz'/);
     const ids = (body.match(/'[a-z0-9-]+',?/g) || []).length;
-    expect(ids, 'LEGACY_MODULE_IDS 名单条数变了(接线不许顺手把别的旧玩法一起放出来)').toBe(12);
+    // 2026-11-14:12 → 11。展厅本体(eternal)重建为小王子叙事的「星星上的画廊」并移出搁置,
+    // 因为终章指路指向它、搁置着就等于指向不存在的去处(主人令:故事不能分裂)。
+    // 其余 11 条旧玩法仍搁置 —— 这条判据继续守着"不许顺手把别的旧玩法一起放出来"。
+    expect(ids, 'LEGACY_MODULE_IDS 名单条数变了(接线不许顺手把别的旧玩法一起放出来)').toBe(11);
   });
 
   it('world-loader 里 quiz 这条槽位还在(接线不是靠新增加载路径,而是修好了原有那条)', () => {

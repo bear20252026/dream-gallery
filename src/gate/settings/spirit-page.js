@@ -78,12 +78,12 @@ function renderSpirits() {
     }
     html +=
       '<div style="margin-top:10px;display:flex;gap:8px">' +
-      '<button id="spGoHall" style="flex:1;padding:9px;border:none;border-radius:9px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;cursor:pointer;font-size:12px">⇪ 返回永恒展厅</button>' +
+      '<button id="spGoHall" style="flex:1;padding:9px;border:none;border-radius:9px;background:linear-gradient(135deg,#c98a4b,#8a5a2a);color:#fff;cursor:pointer;font-size:12px">⇪ 星星上的画廊</button>' +
       '<button id="spGoPeak" style="flex:1;padding:9px;border:1px solid rgba(255,214,170,.5);border-radius:9px;background:transparent;color:#ffe2c4;cursor:pointer;font-size:12px">⇣ 山巅登飞舟</button></div>';
     html +=
       '<div style="margin-top:10px;padding:10px;border:1px dashed rgba(255,214,170,.5);border-radius:12px;font-size:11px;line-height:1.9;color:#ffe9c4">六星屑齐聚。雅号可冠前缀：<br>' +
       '<select id="spPrefix" style="margin-top:6px;width:100%;padding:7px;border-radius:8px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.2)">' +
-      '<option value="">无前缀</option><option value="B612 旅人·">B612 旅人·</option><option value="心象行者·">心象行者·</option><option value="B612回响·">B612回响·</option></select>' +
+      '<option value="">无前缀</option><option value="B612 旅人·">B612 旅人·</option><option value="星际旅人·">星际旅人·</option><option value="B612回响·">B612回响·</option></select>' +
       '<div style="opacity:.6;margin-top:4px">选好后,再保存一次昵称即生效(聊天与访客记录中显示)。</div></div>';
   } else {
     const next = list.find((x) => x.state === 'open');
@@ -91,7 +91,7 @@ function renderSpirits() {
       '<div style="margin-top:8px;font-size:11px;color:rgba(255,217,168,.7)">' +
       (next
         ? '下一颗：' + next.name + '（' + next.place + '）——循金色光柱而去'
-        : '天穹合拢之后，残镜自会指引你。') +
+        : '六颗星的光都带回来之后，沙地上的星门自会为你打开。') +
       '</div>';
   }
   spCard.innerHTML = html;

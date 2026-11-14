@@ -51,7 +51,9 @@ export const WORLD_MODULES = [
 
 /** 后台链:进图后不阻塞补载(远区/深剧情;保持相对顺序) @type {Array<{id:string,label:string,load:() => Promise<unknown>}>} */
 export const WORLD_MODULES_DEFERRED = [
-  { id: 'eternal', label: '永恒厅', load: () => import('../kunlun/eternal.js') },
+  // 2026-11-14:重建为小王子叙事的「星星上的画廊」,已移出搁置名单 ⇒ 默认加载。
+  // 放在后台链首条:它注册 groundOverride/eternalKeepOut,planets.js 与 museum.js 会链式接管。
+  { id: 'eternal', label: '星星画廊', load: () => import('../kunlun/eternal.js') },
   { id: 'ark', label: '飞舟', load: () => import('../kunlun/ark.js') },
   { id: 'windchime', label: '风铃', load: () => import('../kunlun/windchime.js') },
   { id: 'fireplace', label: '壁炉', load: () => import('../kunlun/fireplace.js') },

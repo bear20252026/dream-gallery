@@ -1,6 +1,23 @@
-// eternal.js — 空中永恒展厅·二期①(2026-07-27 主人定稿:六星屑+空中永恒展厅融合方案)
-// ①晨光留影:主展厅东北角金门(六星屑集齐才可开)→ 传送至B612上空 400m 六边形浮空展厅
+// eternal.js — 星星上的画廊(2026-11-14 重建:统一到《小王子》单一叙事)
+//
+// 【为什么重建】主人令「我们现在是小王子,故事要统一,情节结构不能分裂」。
+// 本模块原先是昆仑/女娲线的「空中永恒展厅」:欢迎语讲西王母存放心象碎片、门贴「B612封印」、
+// 未解锁提示说「万镜画廊」。玩家在小王子的沙漠里读补天叙事 —— 那就是分裂。
+// 且它整个被 legacy.mjs 搁置(默认不加载),于是 story-progress 终章指路「去永恒展厅挂上你的画」
+// 指向一个**根本不存在的去处**,罗盘「返回永恒展厅」按钮点了没反应。本轮把这两件事一起治:
+//   ① 世界观全部改成小王子语汇(星星/画廊/旅人),不再有第二个神话;
+//   ② 从搁置名单移出,默认加载 ⇒ 终章指路与罗盘入口真正可达。
+//
+// 【它在故事里的位置】六颗星走完(325 国王 → 330 地理学家,拾齐六枚星屑)后开启。
+// 不是新的神话实体,而是「你走过的六颗星,把你送到了这里」——旅程的收束处,
+// 玩家把自己一路上传/画下的东西挂在这颗星的墙上。存档键与接口一律不变(老玩家进度不丢)。
+//
+// ①晨光留影:画廊外的星门(六星屑集齐才可开)→ 传送至B612上空 400m 六边形浮空展厅
 //   东墙三幅「你最早挂上的画」+ 体积光晨光;南侧平台金拱门返程
+// ⚠️ 接口形状被测试逐字钉住(types-ctx-writer-agreement / ctx-writer-shapes):
+//    eternalKeepOut 的 `function (x, z) { return inHall(x, z);` 两行、
+//    eternalClick 里 `const h = …eternalHandlers[act];` + `if (h) h(cg);` 派发、
+//    以及拆场时四个成员置 null —— 改这些要连钉子一起改,别顺手"优化"。
 // 可见性铁律:/api/files 服务端已按设备过滤(演示照片全员/本人上传仅本人/图库仅特殊模式),
 //   本模块直接消费其返回,客户端不做二次判断——图库永不泄密
 // 手机灯光账户:不新增任何 PointLight——窗/光柱/光束/光池全部 MeshBasicMaterial,画框背光用 emissiveMap
@@ -9,6 +26,7 @@ import { ctx } from '../ctx.js';
 import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片即刷新晨光(2026-08-29)
+import { attachStucco } from '../scene/stucco.js'; // 墙面灰泥(2026-11-14:与画廊外墙同一套)
 const bag = hotBegin('eternal');
 // 星屑收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
 const { s, onTick, loadTexCapped, iG, bounds } = ctx;
@@ -64,6 +82,9 @@ const stoneM = new THREE.MeshStandardMaterial({
   roughness: 0.85,
   metalness: 0.05,
 }); // 暖色磨石
+// 2026-11-14:接上已有的灰泥注入(与画廊外墙同一套),墙面不再是平涂色块。
+// 幂等、零新增灯光、零新增 draw call;低画质档自动降细噪声(detail-quality 登记表)。
+attachStucco(stoneM);
 const VX = [],
   VZ = [];
 for (let k = 0; k < 6; k++) {
@@ -99,15 +120,48 @@ const floorM = new THREE.Mesh(
 );
 floorM.position.set(HX, FLOOR - 0.15, HZ);
 s.add(floorM);
+// 2026-11-14:吊顶从「半透明米色板」换成**星空顶**——这里是一颗星星上的画廊,
+// 抬头就该看见星夜,而不是一块塑料板。程序化 canvas 星图,零外部资产、零新增灯光。
 const ceilM = new THREE.Mesh(
   new THREE.CircleGeometry(HR, 6),
-  new THREE.MeshStandardMaterial({
-    color: '#e8dcc8',
-    transparent: true,
-    opacity: 0.4,
-    roughness: 0.6,
+  new THREE.MeshBasicMaterial({
+    map: (function () {
+      const c = document.createElement('canvas');
+      c.width = c.height = 512;
+      const x = c.getContext('2d');
+      // 夜蓝底 + 中心略亮(像银河的一段)
+      const bg = x.createRadialGradient(256, 256, 20, 256, 256, 256);
+      bg.addColorStop(0, '#1b2447');
+      bg.addColorStop(0.6, '#121a33');
+      bg.addColorStop(1, '#0a0f1e');
+      x.fillStyle = bg;
+      x.fillRect(0, 0, 512, 512);
+      // 星点:大小/亮度分层,少量暖色(呼应六颗星的光)
+      for (let i = 0; i < 260; i++) {
+        const sx = Math.random() * 512,
+          sy = Math.random() * 512;
+        const r = Math.random() < 0.86 ? 0.7 + Math.random() * 0.9 : 1.6 + Math.random() * 1.3;
+        const a = 0.35 + Math.random() * 0.6;
+        x.fillStyle =
+          Math.random() < 0.12 ? 'rgba(255,214,150,' + a + ')' : 'rgba(226,238,255,' + a + ')';
+        x.beginPath();
+        x.arc(sx, sy, r, 0, Math.PI * 2);
+        x.fill();
+      }
+      const t = new THREE.CanvasTexture(c);
+      t.colorSpace = THREE.SRGBColorSpace;
+      return t;
+    })(),
+    // ⚠️ 必须 fog:false —— 展厅在 400m 高空,指数雾按**相机距离**算,
+    // 但顶面各点距相机 3~8m 本不该起雾;实测被雾染成米色是因为
+    // MeshBasicMaterial 默认 fog:true 且场景雾色是暖沙色,叠上来把星夜洗白了。
+    // 不受场景雾影响:厅在 400m 高空,暖沙色雾会把星夜洗淡
+    fog: false,
+    // 走正常色调映射(与画面其余部分同一色彩空间);夜蓝由贴图本身保证
+    side: THREE.DoubleSide,
   })
 );
+// 朝向:CircleGeometry 法线 +Z,绕 X +π/2 后法线为 -Y(朝下)⇒ 厅内仰视正对正面。
 ceilM.rotation.x = Math.PI / 2;
 ceilM.rotation.z = Math.PI / 6;
 ceilM.position.set(HX, FLOOR + 3.5, HZ);
@@ -506,7 +560,8 @@ refreshMorning();
 // 每 45s 同步一次晨光(与新媒体墙同步周期一致;仅集合变化才重建)
 setInterval(refreshMorning, 45000);
 // 服务端主动推送:后台增删照片 → 立即刷新晨光三帧(不等轮询)
-onMediaChanged(function (d) {
+// 接住退订函数:拆场时要摘掉,否则热重载后旧回调仍在刷新一批已销毁的画框
+const offMediaChanged = onMediaChanged(function (d) {
   if (!d || d.dir === 'photos') refreshMorning();
 });
 
@@ -540,13 +595,12 @@ function buildImportFrames() {
           'photos/' + encodeURIComponent(name),
           name,
           null,
-          '你挑入永恒展厅的画'
+          '你挂在这颗星上的画'
         );
         i++;
       }
       if (picks.length > IMP_CAP)
-        ctx.ui.modeToast &&
-          ctx.ui.modeToast('展厅西墙最多呈现 ' + IMP_CAP + ' 幅，其余已为你留作候选。');
+        ctx.ui.modeToast && ctx.ui.modeToast('西墙最多挂 ' + IMP_CAP + ' 幅，其余已为你留作候选。');
     })
     .catch((e) => {
       // 西墙选片拉取失败:无兜底回退,补 warn 留痕便于排障(2026-11-11 空 catch 复核:可疑级)
@@ -556,9 +610,15 @@ function buildImportFrames() {
 buildImportFrames();
 ctx.kunlun.rebuildEternalPicks = buildImportFrames; // C2:选片保存后由设置页调用,刷新西墙
 
-// ===================== 金门(地面·主展厅东北角 x=15 z=-12,两面可点;六星屑集齐才开) =====================
+// ===================== 星门(地面·画廊外沙地;六星屑集齐才开) =====================
+// ⚠️ 位置有硬约束:paintings.js:527 的答题守卫会把 x∈(-19,19) 且 z∈(-13,29) 内的
+// 一切点击丢弃(quizPassed 之前)。原先门在 (15,-12) **正落在矩形里** ⇒ 新玩家点它
+// 毫无反应,只能靠罗盘绕路。现移到建筑 footprint 之外的沙地 (0,34):
+// z=34>29 出矩形,且距出生点(-3.5,70.5)约 36m,首屏朝北(166°)就能看见这道门。
+const DOOR_X = 0,
+  DOOR_Z = 34;
 const doorG = new THREE.Group();
-doorG.position.set(15, 0, -12);
+doorG.position.set(DOOR_X, 0, DOOR_Z);
 for (const p of [-1, 1]) {
   const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.18, 3.0, 0.5), goldTrim);
   pillar.position.set(p * 0.99, 1.5, 0);
@@ -584,21 +644,21 @@ doorG.userData = { eternalAction: 'door' };
 s.add(doorG);
 iG.push(doorG);
 myIG.push(doorG);
-// 封印条(解锁前贴在南面)
+// 未开启时的封条(贴在南面)。文案改小王子语汇:不是"封印",而是"还没走完六颗星"。
 const seal = (function () {
   const c = document.createElement('canvas');
   c.width = 128;
   c.height = 512;
   const x = c.getContext('2d');
-  x.fillStyle = '#a02020';
+  x.fillStyle = '#2a3a5a'; // 夜蓝(原朱红封印属旧神话配色)
   x.fillRect(0, 0, 128, 512);
   x.strokeStyle = '#ffd98a';
   x.lineWidth = 6;
   x.strokeRect(8, 8, 112, 496);
   x.fillStyle = '#ffd98a';
-  x.font = 'bold 64px serif';
+  x.font = 'bold 56px serif';
   x.textAlign = 'center';
-  'B612封印'.split('').forEach((ch, i) => x.fillText(ch, 64, 90 + i * 110));
+  '六星未齐'.split('').forEach((ch, i) => x.fillText(ch, 64, 100 + i * 105));
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   const m = new THREE.Mesh(
@@ -613,9 +673,10 @@ const seal = (function () {
 const GLOW_N = 16,
   glowPos = new Float32Array(GLOW_N * 3);
 for (let i = 0; i < GLOW_N; i++) {
-  glowPos[i * 3] = 14.1 + Math.random() * 1.8;
+  // 跟着门走:原先写死 14.1/-12.3(旧门位),门一挪光点就飘在空地上
+  glowPos[i * 3] = DOOR_X - 0.9 + Math.random() * 1.8;
   glowPos[i * 3 + 1] = 0.2 + Math.random() * 2.9;
-  glowPos[i * 3 + 2] = -12.3 + Math.random() * 0.6;
+  glowPos[i * 3 + 2] = DOOR_Z - 0.3 + Math.random() * 0.6;
 }
 const glowGeo = new THREE.BufferGeometry();
 glowGeo.setAttribute('position', new THREE.BufferAttribute(glowPos, 3));
@@ -642,10 +703,10 @@ const chime = () => blipChime(1047, { peak: 0.18, decay: 1.2, delay2: 0.1 });
 function welcome() {
   if (ctx.store.flag('eternalWelcomed')) return;
   ctx.store.mark('eternalWelcomed');
-  bigText('永恒展厅。你终于到了。', { hold: 2600 });
+  bigText('星星上的画廊。你终于到了。', { hold: 2600 });
   ctx.ui.kunlunSpeak &&
     ctx.ui.kunlunSpeak(
-      '你终于到了。这里不在大地上，也不在天穹上。它在你与天空之间——那个只有完整的人才能抵达的位置。从前，这里是西王母存放心象碎片的地方。现在，它是你的了。',
+      '你终于到了。这颗星很小，只放得下一间画廊——可它一直在等你。你走过国王、爱虚荣的人、酒鬼、商人、点灯人和地理学家，六颗星的光把你送到了这里。现在，把你一路画下的、留下的，挂到墙上去吧。真正重要的东西，眼睛是看不见的；可你挂在这里的每一幅，都是你用心看过的。',
       'hall'
     ); // B6 展厅音色
 }
@@ -655,18 +716,33 @@ import { chime as blipChime } from '../shared/audio-blip.js';
 let tpLock = false;
 function teleport(intoHall) {
   if (tpLock || !ctx.player.pl) return;
+  // 进厅守卫:罗盘「星星上的画廊」与 kunlun:teleport 事件都走这里,
+  // 原先只有**点门**那条路查六星,事件这条路能绕过门禁直接进厅。统一到一处判。
+  if (intoHall && !(ctx.kunlun.isDone && ctx.kunlun.isDone())) {
+    const n = ctx.kunlun.spiritsGot ? ctx.kunlun.spiritsGot() : 0;
+    ctx.ui.modeToast && ctx.ui.modeToast('六颗星还没走完（' + n + '/6）——先把六颗星的光都带回来。');
+    return;
+  }
   tpLock = true;
   chime();
   goldenTeleport(
     () => {
       const pl = ctx.player.pl;
       if (intoHall) {
-        pl.p.set(802.6, FLOOR + 1.6, 594.5);
-        pl.y = 3.68;
-        pl.pi = 0.1;
+        // 2026-11-14:落点移到厅心偏西,朝向 **+x(东墙那三幅画)**。
+        // 原先落 (802.6,594.5)、yaw 3.68 —— 那是**朝着刚进来的门墙**,
+        // 实机截图里玩家一睁眼面对两米外的空白墙角,什么也看不见。
+        // yaw=-π/2 ⇒ forward=(-sin,0,-cos)=(+1,0,0),正对东墙晨光留影。
+        pl.p.set(HX - 1.5, FLOOR + 1.6, HZ);
+        pl.y = -Math.PI / 2;
+        pl.pi = 0.06; // 近乎平视:画心在 FLOOR+1.8,眼高 FLOOR+1.6
       } else {
-        pl.p.set(15, 1.55, -10.6);
-        pl.y = Math.PI;
+        // 返程落在星门**南侧**(门外),朝北正对门;原先落 (15,-10.6) 是旧门位。
+        // 高度按真实地形取,不写死 1.55 —— 沙面起伏处写死会让玩家悬空或陷沙。
+        const rz = DOOR_Z + 2.2;
+        const g = ctx.media.desert && ctx.media.desert.getH ? ctx.media.desert.getH(DOOR_X, rz) : 0;
+        pl.p.set(DOOR_X, g + 1.6, rz); // 1.6 = EYE_HEIGHT(player.js 同口径)
+        pl.y = 0; // heading 0 = 朝 -Z(北),正对星门
         pl.pi = 0.12;
       }
       pl.vy = 0;
@@ -697,7 +773,9 @@ ctx.kunlun.eternalClick = function (cg) {
     if (!(ctx.kunlun.isDone && ctx.kunlun.isDone())) {
       const n = ctx.kunlun.spiritsGot ? ctx.kunlun.spiritsGot() : 0;
       ctx.ui.modeToast &&
-        ctx.ui.modeToast('六星屑未齐（' + n + '/6）——万镜画廊的门，还不会为你打开。');
+        ctx.ui.modeToast(
+          '六颗星还没走完（' + n + '/6）——星星上的画廊，要等你把六颗星的光都带回来。'
+        );
       return;
     }
     teleport(true);
@@ -716,13 +794,55 @@ function setUnlocked(announce) {
   seal.visible = false;
   doorGlow.visible = true;
   beamsG.visible = true;
-  halo.visible = true; // B612上空浮现六色光点
-  if (announce) ctx.ui.modeToast && ctx.ui.modeToast('万镜画廊的门，开了。B612上空，有光在等你。');
+  // 光晕只给地面远眺看;人在厅内时由主循环按 inHall 关掉(否则整屏被暖光糊满)
+  const plU = ctx.player.pl;
+  halo.visible = !(plU && inHall(plU.p.x, plU.p.z));
+  if (announce)
+    ctx.ui.modeToast &&
+      ctx.ui.modeToast('六颗星的光齐了。沙地上那道星门开了——星星上的画廊在等你。');
 }
+// ===================== 厅内氛围(2026-11-14) =====================
+// 「整厅米色」的真凶已用逐层排除实验判定:**halo 那个 26×26 加色光晕**
+// (给地面远眺标记展厅位置用,不写深度 ⇒ 永远盖在不透明几何之上;进厅后相机距它 1.6m,
+//  整屏被暖光糊满)。隐藏它后夜蓝星图立刻显现 —— 见主循环里的 halo.visible。
+//
+// 所以这里**只做两件小事**,不动灯光/天穹(那些是排查途中基于误判的改动,已收回):
+//   ① 背景换星夜蓝:展厅在 400m 高空,窗外不该是沙漠暖色;
+//   ② 曝光略降 + 辉光收敛:星夜画廊的调性,画作不被 Bloom 冲淡。
+// ⚠️ 昼夜层每帧写曝光/辉光 ⇒ 厅内要持续压住;背景没人管,离厅时自己还原。
+let hallMoodOn = false;
+let savedBg = null;
+const HALL_MOOD = { bloomStrength: 0.16, bloomThreshold: 0.88, exposure: 0.92 };
+function applyHallMood(inHallNow) {
+  if (inHallNow === hallMoodOn) return;
+  hallMoodOn = inHallNow;
+  const sc = ctx.scene.s;
+  if (inHallNow) {
+    savedBg = sc ? sc.background : null;
+    if (sc) sc.background = new THREE.Color(0x0a0f1e);
+    ctx.scene.setAtmosphere && ctx.scene.setAtmosphere(HALL_MOOD);
+  } else {
+    if (sc) sc.background = savedBg;
+    savedBg = null;
+    // 曝光/辉光交回昼夜层(它每帧都写,下一帧自然覆盖)
+  }
+}
+
 onTick(function () {
   const t = performance.now() * 0.001;
   if (!unlocked && ctx.kunlun.isDone && ctx.kunlun.isDone()) setUnlocked(!firstCheck); // 载入时已齐:静默开门;本 session 集齐:通报
   firstCheck = false;
+  // 厅内光照接管(每帧判,状态切换才写)
+  const pl0 = ctx.player.pl;
+  const inHallNow = !!(pl0 && inHall(pl0.p.x, pl0.p.z));
+  applyHallMood(inHallNow);
+  // ⚠️ 光晕必须在厅内隐藏 —— 这是「整厅米色」的**真凶**(逐层排除实验判定):
+  // halo 是 26×26 的加色 Sprite,给**地面远眺**标记展厅位置用的;它不写深度、
+  // 永远盖在不透明几何之上。玩家进厅后相机距它仅 1.6m ⇒ 整屏被暖光糊满,
+  // 星空顶与画作全被洗白。隐藏它之后夜蓝星图立刻显现(实机截图对比确认)。
+  halo.visible = unlocked && !inHallNow;
+  // 昼夜层每帧覆写曝光/辉光 ⇒ 厅内必须持续压住,否则下一帧又被推回沙漠调性
+  if (hallMoodOn) ctx.scene.setAtmosphere && ctx.scene.setAtmosphere(HALL_MOOD);
   if (unlocked) doorMat.emissiveIntensity = 0.45 + Math.sin(t * 2) * 0.15;
   for (let i = 0; i < shaftMats.length; i++)
     shaftMats[i].opacity = 0.42 + Math.sin(t * 1.2 + i * 1.7) * 0.08;
@@ -762,6 +882,11 @@ bag.custom.push(() => {
   ctx.kunlun.eternalTeleport = null;
   offTeleportEvt();
   ctx.kunlun.eternalWelcome = null;
+  // 拆场时人可能还在厅内:还原背景色,否则热重载后沙漠天空永久停在星夜蓝。
+  // (旧模块漏了 rebuildEternalPicks 与媒体订阅的解绑,这次一并补上,别重犯)
+  applyHallMood(false);
+  ctx.kunlun.rebuildEternalPicks = null;
+  offMediaChanged && offMediaChanged();
 });
 hotEnd('eternal');
 if (import.meta.hot) import.meta.hot.accept();

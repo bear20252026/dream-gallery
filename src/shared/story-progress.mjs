@@ -143,8 +143,8 @@ export function storyNext(flags) {
   if (!p) {
     return {
       code: 'next-finale',
-      en: 'The book is written — wander, hang your drawings in the eternal hall',
-      zh: '书已写完——慢慢逛，去永恒展厅挂上你的画',
+      en: 'The book is written — wander, then hang your drawings in the gallery on the star',
+      zh: '书已写完——慢慢逛，去星星上的画廊挂上你的画',
     };
   }
   // 诚实指引(2026-09-27):下一站没建成就不许指路 —— 空岛有去无回,
