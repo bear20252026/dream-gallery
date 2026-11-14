@@ -14,6 +14,7 @@
 // ⚠️ 无顶层副作用:attachFoliageLife(mat, opts) 由 terrain.js 调用,便于单测。
 
 import * as THREE from 'three';
+import { registerScaled, registerRecompile } from './detail-quality.js'; // 画质档联动(2026-11-13)
 
 /** 全植被共享的时间 uniform(由 desert 主循环 tick) */
 export const foliageUniforms = {
@@ -71,7 +72,12 @@ float folNoise(vec2 p){
 `;
 const FRAG_COLOR = `
 {
-  float folN = folNoise(vFolWorld.xz * 2.3) * 0.65 + folNoise(vFolWorld.xz * 6.1) * 0.35;
+  // 低画质档:编译期砍掉细尺度噪声(2 次 → 1 次),只留叶簇大明暗
+  #ifdef DETAIL_LOW
+    float folN = folNoise(vFolWorld.xz * 2.3);
+  #else
+    float folN = folNoise(vFolWorld.xz * 2.3) * 0.65 + folNoise(vFolWorld.xz * 6.1) * 0.35;
+  #endif
   diffuseColor.rgb *= 1.0 + (folN - 0.5) * uMottle;
 }
 `;
@@ -114,6 +120,9 @@ export function attachFoliageLife(mat, opts) {
       );
   };
   mat.needsUpdate = true;
+  // 画质档联动:斑驳幅度按档缩放 + 低档走简化分支(风摆保留,它是「活」的关键且极便宜)
+  registerScaled(uMottle, o.mottle ?? 0.2);
+  registerRecompile(mat);
   return mat;
 }
 

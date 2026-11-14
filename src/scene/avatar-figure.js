@@ -97,6 +97,39 @@ export function createAvatarFigure() {
   nose.rotation.x = -Math.PI / 2; // 模型正面朝 -Z(与 loop-manager 的 yaw+π 约定一致)
   nose.position.set(0, -0.01, -FIG.headR * 0.98);
   head.add(nose);
+  // 眼睛(2026-11-13 微动作):两片深色小扁球 + 可眨的眼睑缩放。
+  // 原先脸上只有鼻尖,近看是个无表情的球 —— 眨眼是「活着」最便宜的一笔。
+  const eyeMat = new THREE.MeshStandardMaterial({ color: 0x3a2a2a, roughness: 0.35 });
+  mats.push(eyeMat);
+  const eyes = [];
+  for (const sx of [-1, 1]) {
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(0.021, 8, 6), eyeMat);
+    eye.scale.set(1, 1.15, 0.5);
+    eye.position.set(sx * 0.048, 0.012, -FIG.headR * 0.9);
+    head.add(eye);
+    eyes.push(eye);
+  }
+  // 围巾(2026-11-13 微动作):颈环 + 两段飘带,随风与速度摆动。
+  // 小王子的黄围巾是标志性识别物,比加一堆细节更有「这是谁」的辨识度。
+  const scarfMat = new THREE.MeshStandardMaterial({ color: 0xf2c14e, roughness: 0.72 });
+  mats.push(scarfMat);
+  const collar = new THREE.Mesh(new THREE.TorusGeometry(0.062, 0.022, 6, 12), scarfMat);
+  collar.rotation.x = Math.PI / 2;
+  collar.position.y = FIG.neckY - FIG.hipY + 0.01;
+  spine.add(collar);
+  // 飘带挂在颈后,两段式(根段 + 尾段),旋转根关节即整条飘
+  const scarfRoot = new THREE.Group();
+  scarfRoot.position.set(0.03, FIG.neckY - FIG.hipY, 0.05);
+  spine.add(scarfRoot);
+  const tail1 = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.2, 0.016), scarfMat);
+  tail1.position.y = -0.1;
+  scarfRoot.add(tail1);
+  const scarfTip = new THREE.Group();
+  scarfTip.position.y = -0.2;
+  scarfRoot.add(scarfTip);
+  const tail2 = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.17, 0.014), scarfMat);
+  tail2.position.y = -0.085;
+  scarfTip.add(tail2);
 
   /**
    * 建一条两段式肢体(肩→肘 / 髋→膝)。
@@ -185,6 +218,8 @@ export function createAvatarFigure() {
     hipR: legR.upper,
     kneeL: legL.lower,
     kneeR: legR.lower,
+    scarf: scarfRoot,
+    scarfTip,
   };
 
   /**
@@ -210,6 +245,15 @@ export function createAvatarFigure() {
     joints.shoulderR.rotation.z = -0.1;
     joints.elbowL.rotation.x = -p.elbowL;
     joints.elbowR.rotation.x = -p.elbowR;
+    // 眨眼:压扁眼球的 Y 缩放(1.15 是睁眼基准),留 0.08 下限避免缩放为 0 导致法线退化
+    const blink = typeof p.blink === 'number' ? p.blink : 0;
+    for (const eye of eyes) eye.scale.y = 1.15 * (1 - blink * 0.93);
+    // 围巾:根段整体飘 + 尾段延迟摆(两段不同相位才有布料感)
+    if (typeof p.scarfX === 'number') {
+      joints.scarf.rotation.x = p.scarfX;
+      joints.scarf.rotation.z = p.scarfZ;
+      joints.scarfTip.rotation.x = p.scarfTipX;
+    }
   }
 
   function dispose() {

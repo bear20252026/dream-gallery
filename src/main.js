@@ -219,12 +219,10 @@ async function preloadWorld() {
     // 否则后处理缓冲与画布分辨率错位 ⇒ 越降档越糊(LoopManager._applyPixelRatio 调它)。
     ctx.scene.syncPostProcessingPixelRatio = pp.syncPostProcessingPixelRatio;
     ctx.scene.setAtmosphere = pp.setAtmosphere; // 氛围参数(Bloom/曝光),供昼夜与画质档调用
-    // 2026-11-13 首屏兜底:开场层若因跳过/异常路径未自清理,进场 8s 后派事件让它
-    // 走自己的幂等收束口淡出移除(绝不外部强删:play() 的 await 会摸到 null 元素)。
-    // 真实浏览器首屏曾残留相框/纸飞机/暗层(fFrame/fPlaneDom/fDark),把主世界染成灰白老照片。
-    setTimeout(() => {
-      if (document.getElementById('b612film')) window.dispatchEvent(new Event('dg:film-cleanup'));
-    }, 8000);
+    // 2026-11-13 首屏兜底清理挂到 finishIntro()(影片交棒完成处),**不能挂在这里**:
+    // 影片是在世界加载之后才播的(见下方 playOpeningFilm),本行执行时影片还没开始,
+    // 在此立刻清会把正在播的影片误杀。真实浏览器首屏曾残留相框/纸飞机/暗层
+    // (fFrame/fPlaneDom/fDark)把主世界染成灰白老照片,故在交棒后再兜一次。
     // 多世界:把主世界后处理管线注入 SceneManager(切世界时由它接管挂/摘)
     if (ctx.scene.worldManager && ctx.scene.worldManager.setMainPost)
       ctx.scene.worldManager.setMainPost(pp.renderPostProcessing);
@@ -446,6 +444,15 @@ import('./gate/entrygate.js')
       if (ctx.stopAgreementMusic) ctx.stopAgreementMusic();
       // 大屏轮播延迟启动(2026-09-18 外迁 video-wall.startBigscreenWhenReady)
       startBigscreenWhenReady(deferMedia);
+      // 2026-11-13 首屏兜底:影片已交棒(或跳过),此刻若开场层还在,必是收束断链 ⇒
+      // 派事件让它走自己的幂等收束口淡出移除(绝不外部强删:play() 的 await 会摸到 null)。
+      // 立刻清一次 + 2.5s 后再兜一次(覆盖淡出定时器被异常打断的路径)。
+      // 实测:残留的 fFrame/fPlaneDom/fDark 会把主世界染成灰白老照片。
+      const filmCleanup = () => {
+        if (document.getElementById('b612film')) window.dispatchEvent(new Event('dg:film-cleanup'));
+      };
+      filmCleanup();
+      setTimeout(filmCleanup, 2500);
     }
     if (skipFilm) {
       finishIntro(true);

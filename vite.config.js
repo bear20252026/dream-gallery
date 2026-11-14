@@ -42,6 +42,59 @@ const htmlMinify = () => ({
   },
 });
 
+// 构建期预压缩(2026-11-13 发布优化):给 dist 里的大文本资源产出 .gz 旁文件。
+// 为什么:lib/files-static.js 原先对每个 >20KB 的文本首次请求做 gzipSync(level 6),
+// three chunk 876KB 同步压缩会阻塞事件循环几十毫秒,冷启动首屏尤其明显。
+// 预压缩后服务端直接读旁文件发送(它按 mtime 比对,源文件一变即退回实时压缩,不会发陈旧内容)。
+// 只压 >20KB 的 js/mjs/css/html/json/svg —— 与服务端阈值一致;媒体(m4a/mp3/glb/图)不压(已是压缩格式)。
+const precompress = () => ({
+  name: 'precompress-assets',
+  apply: 'build',
+  enforce: 'post',
+  closeBundle() {
+    const dir = resolve(__dirname, 'dist');
+    if (!fs.existsSync(dir)) return;
+    const exts = new Set(['.js', '.mjs', '.css', '.html', '.json', '.svg']);
+    let n = 0,
+      before = 0,
+      after = 0;
+    const walk = (d) => {
+      for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+        const p = resolve(d, e.name);
+        if (e.isDirectory()) {
+          // .vite/manifest 是构建元数据,不对外服务,跳过
+          if (e.name !== '.vite') walk(p);
+          continue;
+        }
+        if (!exts.has(require('path').extname(e.name).toLowerCase())) continue;
+        const src = fs.readFileSync(p);
+        if (src.length < 20 * 1024) continue;
+        const gz = require('zlib').gzipSync(src, { level: 9 });
+        // 只在真的更小时才写(极小或已压缩内容可能反而变大)
+        if (gz.length >= src.length) continue;
+        fs.writeFileSync(p + '.gz', gz);
+        // mtime 对齐源文件:服务端判据是 pst.mtimeMs >= st.mtimeMs
+        const st = fs.statSync(p);
+        fs.utimesSync(p + '.gz', st.atime, st.mtime);
+        n++;
+        before += src.length;
+        after += gz.length;
+      }
+    };
+    walk(dir);
+    const kb = (b) => (b / 1024).toFixed(0) + 'KB';
+    console.log('[precompress] ' + n + ' 个文本资源已预压缩:' + kb(before) + ' → ' + kb(after));
+    // 自检:three chunk 必须被压到(它是最大的一份,漏了等于优化没生效)
+    const assets = resolve(dir, 'assets');
+    if (fs.existsSync(assets)) {
+      const three = fs.readdirSync(assets).find((f) => /^three-.*\.js$/.test(f));
+      if (three && !fs.existsSync(resolve(assets, three + '.gz'))) {
+        throw new Error('[precompress] three chunk 没有 .gz 旁文件 ⇒ 首屏仍会走同步压缩,优化未生效');
+      }
+    }
+  },
+});
+
 // 构建钩子:压缩 public/sw.js,产物覆盖到 dist/sw.js(源文件不变,部署用压缩版)
 const minifySw = () => ({
   name: 'minify-sw',
@@ -203,7 +256,10 @@ export default defineConfig({
   } },
   plugins: [
     minifySw(),
+    // 预压缩必须排在 corePreloadInject 之后:后者会改写 dist/index.html(注入 prefetch),
+    // 顺序反了旁文件就对应不上最终 HTML 的 mtime,服务端会退回实时压缩。
     corePreloadInject(),
+    precompress(),
     // HTML 保守压缩:去注释、空白、多余换行(不碰脚本/样式内容;替代停更的 vite-plugin-html)
     htmlMinify(),
     noImportMapInBuild(),

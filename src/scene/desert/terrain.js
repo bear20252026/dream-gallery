@@ -4,6 +4,7 @@ import { ctx } from '../../ctx.js';
 import { attachSandDetail } from './sand-detail.js'; // 2026-11-12 画质:沙地程序化细节(去塑料感)
 import { attachFoliageLife } from './foliage-life.js'; // 2026-11-13 自然表面:植被风摆+斑驳
 import { makeContactShadows } from './contact-shadows.js'; // 2026-11-13:植被落地接触阴影
+import { registerRecompile } from './detail-quality.js'; // 2026-11-13:水面低画质档降涟漪
 const { s } = ctx;
 
 // ===================== 地形参数 =====================
@@ -586,8 +587,13 @@ export const water = new THREE.Mesh(
         vec3 N=normalize(vec3(vNrm.x,vNrm.z,-vNrm.y));
         // 细碎涟漪:两层小波扰动法线,高光才会「碎」成粼粼而不是一个光斑
         float r1=sin(vWPos.x*2.1+uTime*2.2)*sin(vWPos.z*1.7-uTime*1.8);
-        float r2=sin(vWPos.x*4.3-uTime*3.1)*sin(vWPos.z*3.9+uTime*2.6);
-        N=normalize(N+vec3(r1*0.06+r2*0.03,0.0,r1*0.05-r2*0.04));
+        // 低画质档:编译期去掉第二层涟漪(4 sin → 2 sin),粼光仍在
+        #ifdef DETAIL_LOW
+          N=normalize(N+vec3(r1*0.06,0.0,r1*0.05));
+        #else
+          float r2=sin(vWPos.x*4.3-uTime*3.1)*sin(vWPos.z*3.9+uTime*2.6);
+          N=normalize(N+vec3(r1*0.06+r2*0.03,0.0,r1*0.05-r2*0.04));
+        #endif
         vec3 V=normalize(cameraPosition-vWPos);
         vec3 L=normalize(uSunDir);
         // 菲涅尔:掠射角反射天空,正视看水体 ⇒ 水面有「反光」的真实感
@@ -606,3 +612,5 @@ export const water = new THREE.Mesh(
 water.rotation.x = -Math.PI / 2;
 water.position.y = -2.5;
 s.add(water);
+// 水面接画质档:低档走上面 DETAIL_LOW 的单层涟漪分支
+registerRecompile(water.material);

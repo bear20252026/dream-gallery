@@ -177,6 +177,12 @@ export async function rotateMtAsk(name) {
   else toast(d.error || '重签失败', 1);
 }
 export async function upload(dir) {
+  // ⚠️ 这处的 2 条 checkJs 错是**刻意留在基线里的债**,不要"顺手修":
+  // id 是拼出来的(up-photos/up-videos/…),dom-typed 助手要拿参数当字面 id 去 markup
+  // 反查标签 ⇒ 拼接 id 一律查不到;而就地写元素类型断言又被同一套判据禁止。
+  // dom-typed-sites.test.js:364-376 把它点名记为**唯一例外**(恰好一处、喂两个读数点)。
+  // 2026-11-13 实测:改用助手会红「markup 里找不到」,加断言会红「不许漂成内联 cast」。
+  // (本段刻意不复述那两种写法的字面形式 —— 判据会扫注释,本仓已撞过三次同类事故。)
   const inp = $('up-' + dir);
   if (!inp.files.length) {
     toast('请先选择文件', 1);
