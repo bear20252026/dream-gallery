@@ -47,12 +47,14 @@ describe('搁置集合与清单对得上(M-10 的两半)', () => {
     expect(stale).toEqual([]);
   });
 
-  it('搁置的仍是当初那 12 个旧玩法(名单缩水必须是一次看得见的决定)', () => {
+  // 2026-11-14 主人令「我们现在是小王子,故事要统一」:展厅本体(eternal)重建为
+  // 「星星上的画廊」并**移出**搁置名单 —— 它是终章指路的去处,搁置着就等于指向不存在的地方。
+  // 12 → 11 是这次看得见的决定;附属旧玩法(风铃/壁炉/雪窗/放下/重置视角/飞舟/终章)仍搁置。
+  it('搁置的是 11 个旧玩法(展厅已归主线;名单再缩水必须又是一次看得见的决定)', () => {
     expect([...LEGACY_MODULE_IDS].sort()).toEqual(
       [
         'ark',
         'dome-towers',
-        'eternal',
         'finale',
         'fireplace',
         'letgo',
@@ -66,9 +68,15 @@ describe('搁置集合与清单对得上(M-10 的两半)', () => {
     );
   });
 
-  it('搁置项落在核心链 4 条 + 后台链 8 条(与标签时代同一份账)', () => {
+  it('展厅不再被搁置(终章指路的去处必须默认加载)', () => {
+    const hall = ALL.find((e) => e.id === 'eternal');
+    expect(hall, '加载链里找不到 eternal 模块').toBeTruthy();
+    expect(isShelved(hall, false)).toBe(false);
+  });
+
+  it('搁置项落在核心链 4 条 + 后台链 7 条(展厅移出后后台少一条)', () => {
     expect(WORLD_MODULES.filter((e) => LEGACY_MODULE_IDS.has(e.id))).toHaveLength(4);
-    expect(WORLD_MODULES_DEFERRED.filter((e) => LEGACY_MODULE_IDS.has(e.id))).toHaveLength(8);
+    expect(WORLD_MODULES_DEFERRED.filter((e) => LEGACY_MODULE_IDS.has(e.id))).toHaveLength(7);
   });
 });
 
@@ -105,7 +113,6 @@ describe('__worldPhase 的措辞是对外契约(6 个探针在读)', () => {
         '温柔度',
         '答题门',
         '远方山巅',
-        '永恒厅',
         '飞舟',
         '风铃',
         '壁炉',
@@ -147,7 +154,7 @@ describe('__worldPhase 的措辞是对外契约(6 个探针在读)', () => {
       '后处理',
     ]);
     expect(WORLD_MODULES_DEFERRED.map((e) => e.label)).toEqual([
-      '永恒厅',
+      '星星画廊',
       '飞舟',
       '风铃',
       '壁炉',
