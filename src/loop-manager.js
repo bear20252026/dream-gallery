@@ -168,6 +168,12 @@ export class LoopManager {
           : '已恢复「高画质·自动」'
       );
     }
+    // 2026-11-13 性能护栏:程序化表面细节按档降强度 + 编译期砍细噪声。
+    // 此前这个事件全仓零监听 ⇒ 低画质只降分辨率,沙纹/植被/灰泥/水面仍付全额噪声开销。
+    // 动态 import:主循环不该静态拖进沙漠材质链(入口减重口径同 vite.config 的 entry-weight 断言)。
+    import('./scene/desert/detail-quality.js')
+      .then((m) => m.applyDetailQuality(this.lowQuality))
+      .catch(() => {}); // 非主世界/未加载沙漠时静默跳过
     eventBus.emit('loop:qualityChanged', this.lowQuality);
   }
 

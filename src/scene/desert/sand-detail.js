@@ -18,6 +18,7 @@
 // ⚠️ 无顶层副作用:attachSandDetail(mat) 由 terrain.js 调用,便于单测 import。
 
 import * as THREE from 'three';
+import { registerScaled, registerRecompile } from './detail-quality.js'; // 画质档联动(2026-11-13)
 
 /** 细节强度总开关(0=关,1=满;供画质档/调试用) */
 export const sandDetailUniforms = {
@@ -58,18 +59,27 @@ const FRAG_COLOR = `
   float fade = (1.0 - smoothstep(22.0, 60.0, camD)) * uSandDetail;
   // ① 风成波痕:风向约 (0.8,0.6)。波长 ~0.9m(首版 1.7m 实测像灯芯绒布纹,
   //    收细 + 加强扭曲后才像沙脊);扭曲用两个尺度,脊线不机械平行
-  float warp = sandNoise(wp * 0.5) * 3.5 + sandNoise(wp * 1.7) * 1.2;
-  float ripple = sin(dot(wp, vec2(0.8, 0.6)) * 7.0 + warp);
-  ripple = ripple * 0.5 + 0.5;
-  // ② 沙粒:两个尺度的值噪声,去塑料高光
-  float grain = sandNoise(wp * 2.1) * 0.6 + sandNoise(wp * 7.3) * 0.4;
-  // ③ 云影:大尺度、极慢漂移
-  float cloud = sandNoise(wp * 0.02 + vec2(uSandTime * 0.016, uSandTime * 0.010));
-  float m = 1.0 + fade * (
-      (ripple - 0.5) * 0.10
-    + (grain - 0.5) * 0.12
-    + (cloud - 0.5) * 0.16
-  );
+  // 低画质档(DETAIL_LOW):**编译期**砍掉细尺度项,6 次 noise → 3 次。
+  // 只调 uniform 省不了 GPU,必须让分支在预处理阶段就被剔除。
+  #ifdef DETAIL_LOW
+    float warp = sandNoise(wp * 0.5) * 3.5;
+    float ripple = sin(dot(wp, vec2(0.8, 0.6)) * 7.0 + warp) * 0.5 + 0.5;
+    float cloud = sandNoise(wp * 0.02 + vec2(uSandTime * 0.016, uSandTime * 0.010));
+    float m = 1.0 + fade * ((ripple - 0.5) * 0.12 + (cloud - 0.5) * 0.16);
+  #else
+    float warp = sandNoise(wp * 0.5) * 3.5 + sandNoise(wp * 1.7) * 1.2;
+    float ripple = sin(dot(wp, vec2(0.8, 0.6)) * 7.0 + warp);
+    ripple = ripple * 0.5 + 0.5;
+    // ② 沙粒:两个尺度的值噪声,去塑料高光
+    float grain = sandNoise(wp * 2.1) * 0.6 + sandNoise(wp * 7.3) * 0.4;
+    // ③ 云影:大尺度、极慢漂移
+    float cloud = sandNoise(wp * 0.02 + vec2(uSandTime * 0.016, uSandTime * 0.010));
+    float m = 1.0 + fade * (
+        (ripple - 0.5) * 0.10
+      + (grain - 0.5) * 0.12
+      + (cloud - 0.5) * 0.16
+    );
+  #endif
   diffuseColor.rgb *= m;
 }
 `;
@@ -80,10 +90,16 @@ const FRAG_ROUGH = `
   float camD = distance(cameraPosition, vSandWorld);
   float fade = (1.0 - smoothstep(22.0, 60.0, camD)) * uSandDetail; // 与反照率段同区间
   // 与反照率段同一组波痕参数(两处必须一致,否则高光与纹理错位)
-  float warp = sandNoise(wp * 0.5) * 3.5 + sandNoise(wp * 1.7) * 1.2;
-  float ripple = sin(dot(wp, vec2(0.8, 0.6)) * 7.0 + warp) * 0.5 + 0.5;
-  float grain = sandNoise(wp * 7.3);
-  roughnessFactor = clamp(roughnessFactor + fade * ((ripple - 0.5) * 0.10 + (grain - 0.5) * 0.08), 0.0, 1.0);
+  #ifdef DETAIL_LOW
+    float warp = sandNoise(wp * 0.5) * 3.5;
+    float ripple = sin(dot(wp, vec2(0.8, 0.6)) * 7.0 + warp) * 0.5 + 0.5;
+    roughnessFactor = clamp(roughnessFactor + fade * (ripple - 0.5) * 0.12, 0.0, 1.0);
+  #else
+    float warp = sandNoise(wp * 0.5) * 3.5 + sandNoise(wp * 1.7) * 1.2;
+    float ripple = sin(dot(wp, vec2(0.8, 0.6)) * 7.0 + warp) * 0.5 + 0.5;
+    float grain = sandNoise(wp * 7.3);
+    roughnessFactor = clamp(roughnessFactor + fade * ((ripple - 0.5) * 0.10 + (grain - 0.5) * 0.08), 0.0, 1.0);
+  #endif
 }
 `;
 
@@ -115,6 +131,9 @@ export function attachSandDetail(mat) {
   };
   // 注入后必须重编译,否则已编译程序不会带上新代码
   mat.needsUpdate = true;
+  // 画质档联动(2026-11-13):强度按档缩放 + 低档打 DETAIL_LOW 走上面的简化分支
+  registerScaled(sandDetailUniforms.uSandDetail, 1);
+  registerRecompile(mat);
   return mat;
 }
 

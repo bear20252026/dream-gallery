@@ -8,6 +8,10 @@
 // ⚠️ 无顶层副作用;幂等;换色(housecolor)改的是 color,与本注入相乘,互不冲突。
 
 import * as THREE from 'three';
+import { registerScaled, registerRecompile } from './desert/detail-quality.js'; // 画质档联动(2026-11-13)
+
+/** 灰泥强度(按画质档缩放) */
+export const stuccoUniforms = { uStucco: { value: 1 } };
 
 const VERT_HEAD = `
 varying vec3 vStuWorld;
@@ -23,6 +27,7 @@ const VERT_BODY = `
 `;
 const FRAG_HEAD = `
 varying vec3 vStuWorld;
+uniform float uStucco;
 float stuHash(vec2 p){
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -40,16 +45,23 @@ const FRAG_COLOR = `
 {
   // 墙面用 (x+y) 与 (z+y) 两对坐标,保证任意朝向的墙都有纹理(不依赖 UV)
   vec2 su = vec2(vStuWorld.x + vStuWorld.y, vStuWorld.z + vStuWorld.y);
-  float grain = stuNoise(su * 6.0) * 0.6 + stuNoise(su * 18.0) * 0.4;
+  // 低画质档:编译期砍掉细颗粒(3 次 noise → 2 次),保留抹刀痕的大手感
+  #ifdef DETAIL_LOW
+    float grain = stuNoise(su * 6.0);
+  #else
+    float grain = stuNoise(su * 6.0) * 0.6 + stuNoise(su * 18.0) * 0.4;
+  #endif
   float trowel = stuNoise(vec2(su.x * 0.7, su.y * 2.2));
-  diffuseColor.rgb *= 1.0 + (grain - 0.5) * 0.12 + (trowel - 0.5) * 0.08;
+  diffuseColor.rgb *= 1.0 + ((grain - 0.5) * 0.12 + (trowel - 0.5) * 0.08) * uStucco;
 }
 `;
 const FRAG_ROUGH = `
 {
   vec2 su = vec2(vStuWorld.x + vStuWorld.y, vStuWorld.z + vStuWorld.y);
-  float grain = stuNoise(su * 12.0);
-  roughnessFactor = clamp(roughnessFactor + (grain - 0.5) * 0.1, 0.0, 1.0);
+  #ifndef DETAIL_LOW
+    float grain = stuNoise(su * 12.0);
+    roughnessFactor = clamp(roughnessFactor + (grain - 0.5) * 0.1 * uStucco, 0.0, 1.0);
+  #endif
 }
 `;
 
@@ -62,6 +74,7 @@ export function attachStucco(mat) {
   if (!mat || mat.userData.stucco) return mat;
   mat.userData.stucco = true;
   mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uStucco = stuccoUniforms.uStucco;
     shader.vertexShader =
       VERT_HEAD +
       shader.vertexShader.replace(
@@ -78,5 +91,7 @@ export function attachStucco(mat) {
         );
   };
   mat.needsUpdate = true;
+  registerScaled(stuccoUniforms.uStucco, 1);
+  registerRecompile(mat);
   return mat;
 }

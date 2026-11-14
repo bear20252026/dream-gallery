@@ -53,7 +53,7 @@ export function stepGait(st, inp) {
  * 数值口径参照真人步态:腿摆 ±30°、臂反相摆 ±25°、躯干起伏 ~2cm。
  * @param {{phase: number, walk: number, lean: number, time: number}} st 步态状态
  * @param {{airborne: boolean, gliding: boolean}} pose 姿态开关
- * @returns {{hipL: number, hipR: number, kneeL: number, kneeR: number, shoulderL: number, shoulderR: number, elbowL: number, elbowR: number, spineX: number, spineZ: number, bob: number, headX: number, headZ: number}}
+ * @returns {{hipL: number, hipR: number, kneeL: number, kneeR: number, shoulderL: number, shoulderR: number, elbowL: number, elbowR: number, spineX: number, spineZ: number, bob: number, headX: number, headZ: number, blink: number, scarfX: number, scarfZ: number, scarfTipX: number}}
  */
 export function gaitPose(st, pose) {
   const w = Math.max(0, Math.min(1, st.walk));
@@ -102,7 +102,29 @@ export function gaitPose(st, pose) {
     bob,
     headX,
     headZ,
+    // ── 微动作(2026-11-13):眨眼 + 围巾飘动 ──
+    // 眨眼用相位取模而非随机计时器:纯函数、可单测、不随帧率漂移。
+    // 每 ~3.7s 一次、闭合仅占 0.12s ⇒ 是「眨」不是「闭眼」。
+    blink: blinkPulse(st.time),
+    // 围巾:基础风摆 + 速度/滑翔带来的向后飘(跑得越快飘得越平)
+    scarfX: -(w * 0.5 + glide * 0.7) + Math.sin(st.time * 2.3) * 0.06,
+    scarfZ: Math.sin(st.time * 2.3) * 0.16 + Math.sin(st.time * 3.7) * 0.07,
+    scarfTipX: -Math.abs(Math.sin(st.time * 3.1 + 0.9)) * 0.3 - w * 0.2,
   };
+}
+
+/**
+ * 眨眼脉冲(纯函数):0=睁眼,1=完全闭合。
+ * @param {number} time 累计时间(秒)
+ * @returns {number} 0..1
+ */
+export function blinkPulse(time) {
+  const PERIOD = 3.7;
+  const WINDOW = 0.12;
+  const t = ((Number(time) || 0) % PERIOD + PERIOD) % PERIOD;
+  if (t <= PERIOD - WINDOW) return 0;
+  // 窗口内 0→1→0 三角脉冲,峰值在窗口正中
+  return Math.max(0, 1 - Math.abs((t - (PERIOD - WINDOW / 2)) / (WINDOW / 2)));
 }
 
 /** 新建步态状态(供调用方初始化) */
