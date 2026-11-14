@@ -91,6 +91,9 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
     try {
       document.removeEventListener('keydown', onEsc);
     } catch (e) {}
+    try {
+      window.removeEventListener('dg:film-cleanup', onForceCleanup);
+    } catch (e) {}
     if (onDone) onDone();
   }
   function onResize() {
@@ -101,6 +104,10 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
   }
   function onEsc() {
     skip();
+  }
+  // 兜底清理入口(2026-11-13):走幂等收束口,与 skip/上下文丢失同路
+  function onForceCleanup() {
+    gate.finish();
   }
 
   /* ================= 容器 ================= */
@@ -764,6 +771,10 @@ export function playOpeningFilm(onDone, onFinishBegin, onBlackout) {
     root.style.opacity = '0';
     setTimeout(done, 1700);
   });
+  // 2026-11-13 首屏兜底:主流程进场 8s 后若开场层仍在(跳过/异常路径收束断链),
+  // 派发本事件走**自己的幂等收束口**(与上下文丢失同口),安全淡出并移除 DOM。
+  // 绝不从外部强删容器:play() 的 await 序列会摸到 null 元素(2026-09-06 线上抓获过)。
+  window.addEventListener('dg:film-cleanup', onForceCleanup);
   function skip() {
     if (!gate.skip()) return; // 幂等+播放中才有效(原 skipped||!running 判断内聚进状态机)
     root.classList.add('act2');
