@@ -54,7 +54,8 @@ const FRAG_COLOR = `
 {
   vec2 wp = vSandWorld.xz;
   float camD = distance(cameraPosition, vSandWorld);
-  float fade = (1.0 - smoothstep(35.0, 90.0, camD)) * uSandDetail;
+  // 2026-11-13:淡出提前(22→60m),治掠射角远处脊线碎成噪点带
+  float fade = (1.0 - smoothstep(22.0, 60.0, camD)) * uSandDetail;
   // ① 风成波痕:风向约 (0.8,0.6)。波长 ~0.9m(首版 1.7m 实测像灯芯绒布纹,
   //    收细 + 加强扭曲后才像沙脊);扭曲用两个尺度,脊线不机械平行
   float warp = sandNoise(wp * 0.5) * 3.5 + sandNoise(wp * 1.7) * 1.2;
@@ -77,7 +78,7 @@ const FRAG_ROUGH = `
 {
   vec2 wp = vSandWorld.xz;
   float camD = distance(cameraPosition, vSandWorld);
-  float fade = (1.0 - smoothstep(35.0, 90.0, camD)) * uSandDetail;
+  float fade = (1.0 - smoothstep(22.0, 60.0, camD)) * uSandDetail; // 与反照率段同区间
   // 与反照率段同一组波痕参数(两处必须一致,否则高光与纹理错位)
   float warp = sandNoise(wp * 0.5) * 3.5 + sandNoise(wp * 1.7) * 1.2;
   float ripple = sin(dot(wp, vec2(0.8, 0.6)) * 7.0 + warp) * 0.5 + 0.5;

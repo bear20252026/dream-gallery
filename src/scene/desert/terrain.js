@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { ctx } from '../../ctx.js';
 import { attachSandDetail } from './sand-detail.js'; // 2026-11-12 画质:沙地程序化细节(去塑料感)
 import { attachFoliageLife } from './foliage-life.js'; // 2026-11-13 自然表面:植被风摆+斑驳
+import { makeContactShadows } from './contact-shadows.js'; // 2026-11-13:植被落地接触阴影
 const { s } = ctx;
 
 // ===================== 地形参数 =====================
@@ -288,6 +289,8 @@ function genChunk(cx, cz) {
     salt: [],
     grass: [],
   };
+  // 接触阴影落点(局部坐标,与区块网格同系)
+  const shadowItems = [];
   const place = (count, cond, cb) => {
     for (let i = 0; i < count; i++) {
       const lx = (Math.random() - 0.5) * (CHUNK - 3),
@@ -344,6 +347,7 @@ function genChunk(cx, cz) {
         });
       }
       bind(0.4, wx, wz, sc);
+      shadowItems.push({ x: lx, y: h, z: lz, r: 1.1 * sc });
     }
   );
   place(
@@ -376,6 +380,7 @@ function genChunk(cx, cz) {
       if (Math.random() > 0.5)
         B.cacA.push({ x: lx + 0.2 * sc, y: h + 1.2 * sc, z: lz, rz: -0.6, sx: sc, sy: sc, sz: sc });
       bind(0.2, wx, wz, sc);
+      shadowItems.push({ x: lx, y: h, z: lz, r: 0.5 * sc });
     }
   );
   place(
@@ -413,6 +418,7 @@ function genChunk(cx, cz) {
         sz: r * (1 + Math.random() * 0.8) * sc,
       });
       bind(0.8, wx, wz, sc);
+      shadowItems.push({ x: lx, y: h, z: lz, r: r * 1.15 });
     }
   );
   place(
@@ -465,6 +471,9 @@ function genChunk(cx, cz) {
     const im = makeInstanced(geo, mat, items);
     if (im) g.add(im);
   });
+  // 接触阴影:落点收集完后建实例化圆盘(单 draw call),随区块一起卸载
+  const cShadows = makeContactShadows(shadowItems);
+  if (cShadows) g.add(cShadows);
   s.add(g);
   return { g, colliders };
 }

@@ -22,7 +22,9 @@ ctx.player.playerSM = playerSM; // 供外部查询当前状态(2026-09-18 收编
 // 出生点(2026-09-07 主人定:迁至坠机残骸旁——石门南侧沙漠洼地,残骸与王子出场见 gallery/crash-site.js)
 // X -5.5 / Z 72.8,面朝残骸与小王子落点(西北);pitch 0.85=仰面朝天醒来(crash-site.js 1.8s 缓缓回正)
 // 改这一个常量即同时生效:①首次出生 ②跌出世界兜底 ③⌂ 一键回家
-const SPAWN = { x: -3.5, z: 70.5, yaw: (135 * Math.PI) / 180, pitch: 0.85 };
+// 2026-11-13 首屏构图:yaw 166° 面朝画廊拱门与牌子同框(建筑中心 (0,8)),
+// 替代原先 135° 的空白沙地朝向;pitch 0.85 仰面醒来不变。
+const SPAWN = { x: -3.5, z: 70.5, yaw: (166 * Math.PI) / 180, pitch: 0.85 };
 const pl = {
   p: new THREE.Vector3(SPAWN.x, EYE_HEIGHT, SPAWN.z), // 出生眼高(首帧 tickPhysics 会按地形校正)
   y: SPAWN.yaw,
