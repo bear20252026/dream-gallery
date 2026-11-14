@@ -6,6 +6,7 @@
 //   · dispose 清定时器、移除网格、释放几何,支持热替换/孤立测试。
 import * as THREE from 'three';
 import { defineSystem } from './system.js';
+import { softenPoints } from '../scene/desert/particle-sprite.js'; // 圆点贴图(2026-11-14 修方块烟花)
 
 export function createEffectsSystem(deps = {}) {
   const { scene, floorW, floorD, IL, IR, IRT, IRB, OT, OBR, WH, bW, bD, pyrHeight } = deps;
@@ -92,7 +93,9 @@ export function createEffectsSystem(deps = {}) {
     const count = generation === 0 ? 24 : generation === 1 ? 12 : 6;
     const speed = generation === 0 ? 3 : generation === 1 ? 2 : 1.2;
     const life = generation === 0 ? 60 : generation === 1 ? 45 : 30;
-    const size = generation === 0 ? 2.5 : generation === 1 ? 1.8 : 1.2;
+    // 2026-11-14:原尺寸 2.5/1.8/1.2 **米**且无贴图 ⇒ 沙漠远眺满屏白方块(实机截图抓获)。
+    // 缩到分米级 + 圆点贴图,近看是火花、远看是星点。
+    const size = generation === 0 ? 0.5 : generation === 1 ? 0.36 : 0.24;
     const color = fwColors[Math.floor(Math.random() * fwColors.length)];
     const col = new THREE.Color(color);
     for (let i = 0; i < count; i++) {
@@ -197,15 +200,17 @@ export function createEffectsSystem(deps = {}) {
     root.add(
       new THREE.Points(
         pG,
-        new THREE.PointsMaterial({
-          color: '#ffb6c8',
-          size: 0.035,
-          transparent: true,
-          opacity: 0.4,
-          depthWrite: false,
-          sizeAttenuation: true,
-          blending: THREE.AdditiveBlending,
-        })
+        softenPoints(
+          new THREE.PointsMaterial({
+            color: '#ffb6c8',
+            size: 0.035,
+            transparent: true,
+            opacity: 0.4,
+            depthWrite: false,
+            sizeAttenuation: true,
+            blending: THREE.AdditiveBlending,
+          })
+        )
       )
     );
   }
@@ -228,15 +233,17 @@ export function createEffectsSystem(deps = {}) {
     fwGeo.setAttribute('position', new THREE.BufferAttribute(fwPosArr, 3));
     fwGeo.setAttribute('color', new THREE.BufferAttribute(fwColArr, 3));
     fwGeo.setAttribute('size', new THREE.BufferAttribute(fwSizeArr, 1));
-    const fwPointsMat = new THREE.PointsMaterial({
-      color: 0xffffff,
-      size: 3,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true,
-    });
+    const fwPointsMat = softenPoints(
+      new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.5,
+        transparent: true,
+        opacity: 0.85,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        sizeAttenuation: true,
+      })
+    );
     fwPoints = new THREE.Points(fwGeo, fwPointsMat);
     root.add(fwPoints);
   }

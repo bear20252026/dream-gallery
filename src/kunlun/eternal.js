@@ -34,6 +34,7 @@ import {
   shaftTexture as palaceShaftTexture,
   disposePalaceArt,
 } from './palace-art.js'; // 星光宫殿的程序化材质(2026-11-14)
+import { softenPoints } from '../scene/desert/particle-sprite.js'; // 浮尘圆点(与沙漠粒子同一套)
 const bag = hotBegin('eternal');
 // 星屑收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
 const { s, onTick, loadTexCapped, iG, bounds } = ctx;
@@ -515,16 +516,20 @@ for (let i = 0; i < DUST_N; i++) {
 }
 const dustGeo = new THREE.BufferGeometry();
 dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
+// 2026-11-14:浮尘必须用柔和圆点贴图 —— 默认 PointsMaterial 无 map 时画**实心方块**,
+// 殿内近看是方屑、沙漠远眺被放大成满屏白方块(实机截图抓获)。与沙漠粒子同一套 softenPoints。
 const dust = new THREE.Points(
   dustGeo,
-  new THREE.PointsMaterial({
-    color: '#ffdf9a',
-    size: 0.045,
-    transparent: true,
-    opacity: 0.75,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  })
+  softenPoints(
+    new THREE.PointsMaterial({
+      color: '#ffdf9a',
+      size: 0.07,
+      transparent: true,
+      opacity: 0.55,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    })
+  )
 );
 s.add(dust);
 
