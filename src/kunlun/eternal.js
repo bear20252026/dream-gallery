@@ -26,7 +26,14 @@ import { ctx } from '../ctx.js';
 import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片即刷新晨光(2026-08-29)
-import { attachStucco } from '../scene/stucco.js'; // 墙面灰泥(2026-11-14:与画廊外墙同一套)
+import {
+  marbleTexture,
+  floorInlayTexture,
+  starDomeTexture,
+  archWindowTexture,
+  shaftTexture as palaceShaftTexture,
+  disposePalaceArt,
+} from './palace-art.js'; // 星光宫殿的程序化材质(2026-11-14)
 const bag = hotBegin('eternal');
 // 星屑收集数(spirits.js 经 ctx.kunlun.spiritsGot 暴露)
 const { s, onTick, loadTexCapped, iG, bounds } = ctx;
@@ -34,11 +41,17 @@ const { s, onTick, loadTexCapped, iG, bounds } = ctx;
 // ===================== 位置与地基 =====================
 // 展厅悬浮在B612正上方(800,600),地板步行面 y=400(相机远平面 2000,地面远眺在射程内;
 // 雾密度 0.006 下实体天然隐形,集齐后点亮的六色光束(fog:false)就是"隐约浮现的光点")
+// 2026-11-14 宫殿扩建:HR 7→16(跨度 32m)、墙高 3.5→9m、上加 11m 穹顶。
+// 原先十来米见方、抬头一块平板的小房间无论怎么打光都不是宫殿;
+// 宫殿感来自**尺度**(人在柱廊下显得小)+ **表面**(大理石金脉/星图穹顶/地面星罗盘)。
 const HX = 800,
   HZ = 600,
-  HR = 7,
+  HR = 16,
   FLOOR = 400; // 厅心/半径/地板高
-const inHall = (x, z) => (x - HX) * (x - HX) + (z - HZ) * (z - HZ) < 9.0 * 9.0; // 含南侧平台
+const WALL_H = 9; // 柱廊墙高
+const DOME_R = 15.4; // 穹顶半径(略小于墙圈,坐在檐口内)
+const DOME_H = 11; // 穹顶起拱高度
+const inHall = (x, z) => (x - HX) * (x - HX) + (z - HZ) * (z - HZ) < 18.5 * 18.5; // 含南侧平台
 // 物理接管(player.js groundY 每帧询问):厅内地面=展厅地板;走出平台边缘=回到沙漠引力(可滑翔落地)
 ctx.kunlun.groundOverride = function (x, z) {
   return inHall(x, z) ? FLOOR : undefined;
@@ -77,14 +90,30 @@ function addBox(x1, z1, x2, z2, y0, h, mat, th) {
 }
 
 // ===================== 展厅本体(六边形;边法线朝 0/60/…/300°,东墙=法线+x,门墙=300°) =====================
+// 2026-11-14 宫殿:墙面从「灰泥暖石」换成**暖白大理石 + 金脉**(程序化,零外部资产)。
+// 灰泥是住宅外墙的质感,宫殿要的是抛光石材 —— 低粗糙度 + 微金属度才有反光。
+const marbleTex = marbleTexture();
 const stoneM = new THREE.MeshStandardMaterial({
-  color: '#d9c4a5',
-  roughness: 0.85,
-  metalness: 0.05,
-}); // 暖色磨石
-// 2026-11-14:接上已有的灰泥注入(与画廊外墙同一套),墙面不再是平涂色块。
-// 幂等、零新增灯光、零新增 draw call;低画质档自动降细噪声(detail-quality 登记表)。
-attachStucco(stoneM);
+  color: '#f0e6d6',
+  map: marbleTex || null,
+  roughness: 0.42,
+  metalness: 0.08,
+});
+// 柱身/檐口用同一张大理石但更亮,靠 metalness 拉出石材的润感
+const columnM = new THREE.MeshStandardMaterial({
+  color: '#f6eee0',
+  map: marbleTex || null,
+  roughness: 0.34,
+  metalness: 0.1,
+});
+// 金饰(檐线/柱头/门框):高金属度 + 自发光,不新增灯光也有「贵气」
+const goldM = new THREE.MeshStandardMaterial({
+  color: '#d8ae52',
+  roughness: 0.26,
+  metalness: 0.9,
+  emissive: '#7a5a18',
+  emissiveIntensity: 0.22,
+});
 const VX = [],
   VZ = [];
 for (let k = 0; k < 6; k++) {
@@ -92,87 +121,175 @@ for (let k = 0; k < 6; k++) {
   VX.push(HX + HR * Math.cos(a));
   VZ.push(HZ + HR * Math.sin(a));
 }
-// 六面墙(门墙 E5 留 1.66m 门洞)
-const GAP = 0.83; // 门洞半宽
+// 六面墙(门墙 E5 留 3.2m 宽 × 4.6m 高的宫殿正门)
+const GAP = 1.6; // 门洞半宽
+const DOOR_H = 4.6; // 门洞高
 for (let k = 0; k < 6; k++) {
   const x1 = VX[k],
     z1 = VZ[k],
     x2 = VX[(k + 1) % 6],
     z2 = VZ[(k + 1) % 6];
   if (k !== 5) {
-    addBox(x1, z1, x2, z2, FLOOR, 3.5, stoneM);
+    addBox(x1, z1, x2, z2, FLOOR, WALL_H, stoneM);
     continue;
   }
-  // 门墙:沿墙方向截两段,中央留洞
+  // 门墙:沿墙方向截两段,中央留洞;洞上方补到墙顶
   const mx = (x1 + x2) / 2,
     mz = (z1 + z2) / 2,
     dl = Math.hypot(x2 - x1, z2 - z1),
     ux = (x2 - x1) / dl,
     uz = (z2 - z1) / dl;
-  addBox(x1, z1, mx - ux * GAP, mz - uz * GAP, FLOOR, 3.5, stoneM);
-  addBox(mx + ux * GAP, mz + uz * GAP, x2, z2, FLOOR, 3.5, stoneM);
-  addBox(mx - ux * GAP, mz - uz * GAP, mx + ux * GAP, mz + uz * GAP, FLOOR + 2.6, 0.9, stoneM); // 门楣段(洞上方补墙)
+  addBox(x1, z1, mx - ux * GAP, mz - uz * GAP, FLOOR, WALL_H, stoneM);
+  addBox(mx + ux * GAP, mz + uz * GAP, x2, z2, FLOOR, WALL_H, stoneM);
+  addBox(
+    mx - ux * GAP,
+    mz - uz * GAP,
+    mx + ux * GAP,
+    mz + uz * GAP,
+    FLOOR + DOOR_H,
+    WALL_H - DOOR_H,
+    stoneM
+  );
+}
+
+// ===================== 柱廊(12 根大理石柱 + 金柱头 + 檐口金线) =====================
+// 宫殿感的第一来源是**尺度参照**:人站在 9m 高的柱子下才显得小。
+// 柱位沿墙圈均匀布 12 根(每面墙 2 根),半径略内收,不挡墙上的画。
+const COL_R = HR - 1.5;
+const colShaftGeo = new THREE.CylinderGeometry(0.42, 0.5, WALL_H - 1.1, 16, 1);
+const colBaseGeo = new THREE.CylinderGeometry(0.66, 0.74, 0.5, 16);
+const colCapGeo = new THREE.CylinderGeometry(0.72, 0.46, 0.6, 16);
+const colRingGeo = new THREE.TorusGeometry(0.5, 0.06, 8, 20);
+for (let i = 0; i < 12; i++) {
+  const a = ((15 + i * 30) * Math.PI) / 180;
+  const cx = HX + COL_R * Math.cos(a),
+    cz = HZ + COL_R * Math.sin(a);
+  const g = new THREE.Group();
+  g.position.set(cx, FLOOR, cz);
+  const base = new THREE.Mesh(colBaseGeo, columnM);
+  base.position.y = 0.25;
+  g.add(base);
+  const shaft = new THREE.Mesh(colShaftGeo, columnM);
+  shaft.position.y = 0.5 + (WALL_H - 1.1) / 2;
+  g.add(shaft);
+  const cap = new THREE.Mesh(colCapGeo, goldM);
+  cap.position.y = WALL_H - 0.3;
+  g.add(cap);
+  // 柱身两道金箍(上/下),给柱子节奏
+  for (const ry of [1.4, WALL_H - 1.6]) {
+    const ring = new THREE.Mesh(colRingGeo, goldM);
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = ry;
+    g.add(ring);
+  }
+  s.add(g);
+  // 柱进碰撞:半径 0.75 的方盒(玩家不能穿柱)
+  const b = { mnX: cx - 0.75, mxX: cx + 0.75, mnZ: cz - 0.75, mxZ: cz + 0.75 };
+  ctx.scene.addBounds && ctx.scene.addBounds([b]);
+  myBounds.push(b);
+}
+// 檐口:墙顶一圈金线 + 承托穹顶的石檐(六边形环)
+{
+  const corniceGeo = new THREE.CylinderGeometry(HR + 0.5, HR + 0.5, 0.55, 6, 1, true);
+  const cornice = new THREE.Mesh(corniceGeo, columnM);
+  cornice.position.set(HX, FLOOR + WALL_H + 0.27, HZ);
+  cornice.rotation.y = Math.PI / 6;
+  cornice.material.side = THREE.DoubleSide;
+  s.add(cornice);
+  const trimGeo = new THREE.TorusGeometry(HR + 0.35, 0.1, 6, 6);
+  const trim = new THREE.Mesh(trimGeo, goldM);
+  trim.rotation.x = Math.PI / 2;
+  trim.rotation.z = Math.PI / 6;
+  trim.position.set(HX, FLOOR + WALL_H + 0.58, HZ);
+  s.add(trim);
 }
 // 地板/吊顶/倒锥底座
+// 地面:抛光大理石 + 中央星罗盘嵌花(宫殿的身份标记)
+const inlayTex = floorInlayTexture();
 const floorM = new THREE.Mesh(
   new THREE.CylinderGeometry(HR, HR, 0.3, 6),
-  new THREE.MeshStandardMaterial({ color: '#6a5138', roughness: 0.7 })
+  new THREE.MeshStandardMaterial({ color: '#e6d8c0', roughness: 0.3, metalness: 0.12 })
 );
 floorM.position.set(HX, FLOOR - 0.15, HZ);
 s.add(floorM);
-// 2026-11-14:吊顶从「半透明米色板」换成**星空顶**——这里是一颗星星上的画廊,
-// 抬头就该看见星夜,而不是一块塑料板。程序化 canvas 星图,零外部资产、零新增灯光。
+// 嵌花圆盘略高于地面(1cm)避免 z-fighting;半径取墙圈的一半多,居中成阵
+{
+  const inlay = new THREE.Mesh(
+    new THREE.CircleGeometry(HR * 0.62, 64),
+    new THREE.MeshStandardMaterial({
+      map: inlayTex || null,
+      color: '#ffffff',
+      roughness: 0.22,
+      metalness: 0.16,
+    })
+  );
+  inlay.rotation.x = -Math.PI / 2;
+  inlay.position.set(HX, FLOOR + 0.012, HZ);
+  s.add(inlay);
+  // 嵌花外缘金环
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(HR * 0.62, 0.07, 8, 72), goldM);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.set(HX, FLOOR + 0.02, HZ);
+  s.add(ring);
+}
+// ===================== 星图穹顶(2026-11-14 宫殿) =====================
+// 从「一块平板贴星图」换成**真半球穹顶**:11m 起拱、坐在 9m 高的檐口上,
+// 内表面贴程序化星图(银河带 + 三层星点 + 六颗主星连线 + 金色刻度环)。
+// 用 BackSide 从内侧看,不写深度以外的花招;fog:false 免得暖沙雾把星夜洗淡。
+const domeTex = starDomeTexture();
 const ceilM = new THREE.Mesh(
-  new THREE.CircleGeometry(HR, 6),
+  new THREE.SphereGeometry(DOME_R, 48, 24, 0, Math.PI * 2, 0, Math.PI / 2),
   new THREE.MeshBasicMaterial({
-    map: (function () {
-      const c = document.createElement('canvas');
-      c.width = c.height = 512;
-      const x = c.getContext('2d');
-      // 夜蓝底 + 中心略亮(像银河的一段)
-      const bg = x.createRadialGradient(256, 256, 20, 256, 256, 256);
-      bg.addColorStop(0, '#1b2447');
-      bg.addColorStop(0.6, '#121a33');
-      bg.addColorStop(1, '#0a0f1e');
-      x.fillStyle = bg;
-      x.fillRect(0, 0, 512, 512);
-      // 星点:大小/亮度分层,少量暖色(呼应六颗星的光)
-      for (let i = 0; i < 260; i++) {
-        const sx = Math.random() * 512,
-          sy = Math.random() * 512;
-        const r = Math.random() < 0.86 ? 0.7 + Math.random() * 0.9 : 1.6 + Math.random() * 1.3;
-        const a = 0.35 + Math.random() * 0.6;
-        x.fillStyle =
-          Math.random() < 0.12 ? 'rgba(255,214,150,' + a + ')' : 'rgba(226,238,255,' + a + ')';
-        x.beginPath();
-        x.arc(sx, sy, r, 0, Math.PI * 2);
-        x.fill();
-      }
-      const t = new THREE.CanvasTexture(c);
-      t.colorSpace = THREE.SRGBColorSpace;
-      return t;
-    })(),
-    // ⚠️ 必须 fog:false —— 展厅在 400m 高空,指数雾按**相机距离**算,
-    // 但顶面各点距相机 3~8m 本不该起雾;实测被雾染成米色是因为
-    // MeshBasicMaterial 默认 fog:true 且场景雾色是暖沙色,叠上来把星夜洗白了。
-    // 不受场景雾影响:厅在 400m 高空,暖沙色雾会把星夜洗淡
+    map: domeTex || null,
+    color: domeTex ? '#ffffff' : '#141c38',
+    side: THREE.BackSide,
     fog: false,
-    // 走正常色调映射(与画面其余部分同一色彩空间);夜蓝由贴图本身保证
-    side: THREE.DoubleSide,
   })
 );
-// 朝向:CircleGeometry 法线 +Z,绕 X +π/2 后法线为 -Y(朝下)⇒ 厅内仰视正对正面。
-ceilM.rotation.x = Math.PI / 2;
-ceilM.rotation.z = Math.PI / 6;
-ceilM.position.set(HX, FLOOR + 3.5, HZ);
+ceilM.scale.y = DOME_H / DOME_R; // 压成扁穹顶(比正半球更有殿堂感)
+ceilM.position.set(HX, FLOOR + WALL_H + 0.5, HZ);
 s.add(ceilM);
+// 穹顶中心悬一颗「本星」:自发光小球 + 光晕,是整座宫殿的光源意象(不新增灯)
+const heartStar = new THREE.Mesh(
+  new THREE.SphereGeometry(0.55, 24, 16),
+  new THREE.MeshBasicMaterial({ color: '#fff3cf', fog: false, toneMapped: false })
+);
+heartStar.position.set(HX, FLOOR + WALL_H + DOME_H * 0.62, HZ);
+s.add(heartStar);
+// 穹顶肋:12 道金肋从檐口收向顶心,给穹顶结构感(细圆环切片)
+for (let i = 0; i < 12; i++) {
+  const a = (i / 12) * Math.PI * 2;
+  const ribCurve = new THREE.QuadraticBezierCurve3(
+    new THREE.Vector3(
+      HX + Math.cos(a) * DOME_R * 0.99,
+      FLOOR + WALL_H + 0.55,
+      HZ + Math.sin(a) * DOME_R * 0.99
+    ),
+    new THREE.Vector3(
+      HX + Math.cos(a) * DOME_R * 0.55,
+      FLOOR + WALL_H + DOME_H * 0.86,
+      HZ + Math.sin(a) * DOME_R * 0.55
+    ),
+    new THREE.Vector3(HX, FLOOR + WALL_H + DOME_H * 0.99, HZ)
+  );
+  const rib = new THREE.Mesh(new THREE.TubeGeometry(ribCurve, 20, 0.075, 6, false), goldM);
+  s.add(rib);
+}
+// 浮空基座:倒锥 + 岩层环,让宫殿「站在一颗星的碎岩上」
 const baseM = new THREE.Mesh(
-  new THREE.CylinderGeometry(0.6, HR, 4.5, 6),
-  new THREE.MeshStandardMaterial({ color: '#8a7358', roughness: 0.9 })
+  new THREE.CylinderGeometry(1.2, HR, 9, 6),
+  new THREE.MeshStandardMaterial({ color: '#7a6349', roughness: 0.92 })
 );
 baseM.rotation.y = Math.PI / 6;
-baseM.position.set(HX, FLOOR - 2.55, HZ);
+baseM.position.set(HX, FLOOR - 4.8, HZ);
 s.add(baseM);
+{
+  const rim = new THREE.Mesh(new THREE.TorusGeometry(HR + 0.2, 0.22, 8, 6), goldM);
+  rim.rotation.x = Math.PI / 2;
+  rim.rotation.z = Math.PI / 6;
+  rim.position.set(HX, FLOOR - 0.35, HZ);
+  s.add(rim);
+}
 
 // ===================== 六色光束 + 光晕(集齐才点亮;fog:false,地面可见"隐约浮现") =====================
 const SPIRIT_COLORS = ['#7ddb7a', '#ff5a4a', '#e8a03c', '#dfeaf5', '#7cc8e8', '#f0a860'];
@@ -191,7 +308,7 @@ for (let k = 0; k < 6; k++) {
       fog: false,
     })
   );
-  beam.position.set(HX + 5.5 * Math.cos(a), FLOOR - 61, HZ + 5.5 * Math.sin(a));
+  beam.position.set(HX + HR * 0.78 * Math.cos(a), FLOOR - 61, HZ + HR * 0.78 * Math.sin(a));
   beamsG.add(beam);
 }
 beamsG.visible = false;
@@ -218,7 +335,7 @@ const halo = (function () {
       fog: false,
     })
   );
-  sp.scale.set(26, 26, 1);
+  sp.scale.set(58, 58, 1); // 随宫殿跨度放大(原 26 对应 HR=7)
   sp.position.set(HX, FLOOR + 2, HZ);
   sp.visible = false;
   s.add(sp);
@@ -226,42 +343,45 @@ const halo = (function () {
 })();
 
 // ===================== 南侧平台 + 护栏 + 返程金拱门 =====================
+// 平台段在 APOTHEM 定义之前,这里先算一份边心距(同式,单一口径 HR*cos30)
+const APOTHEM_DECK = HR * Math.cos(Math.PI / 6);
 // 门墙法线朝 300°:外向 O=(0.5,-0.866),沿墙 D=(0.866,0.5)
 const OX = 0.5,
   OZ = -0.866,
   DX = 0.866,
   DZ = 0.5;
-const deckC = { x: HX + 7.4 * OX, z: HZ + 7.4 * OZ }; // (803.7,593.6)
-const deck = new THREE.Mesh(new THREE.BoxGeometry(4.0, 0.3, 2.8), stoneM);
+const DECK_OFF = APOTHEM_DECK + 3.0; // 平台中心离厅心:墙外再挑 3m
+const deckC = { x: HX + DECK_OFF * OX, z: HZ + DECK_OFF * OZ };
+const deck = new THREE.Mesh(new THREE.BoxGeometry(7.0, 0.3, 6.0), stoneM);
 deck.position.set(deckC.x, FLOOR - 0.15, deckC.z);
 deck.rotation.y = Math.atan2(DX, DZ);
 s.add(deck);
 // 三边护栏(高1m,进碰撞;靠厅一侧敞开)
 addBox(
-  deckC.x + DX * 2 + OX * 1.4,
-  deckC.z + DZ * 2 + OZ * 1.4,
-  deckC.x - DX * 2 + OX * 1.4,
-  deckC.z - DZ * 2 + OZ * 1.4,
+  deckC.x + DX * 3.5 + OX * 3.0,
+  deckC.z + DZ * 3.5 + OZ * 3.0,
+  deckC.x - DX * 3.5 + OX * 3.0,
+  deckC.z - DZ * 3.5 + OZ * 3.0,
   FLOOR,
   1.0,
   stoneM,
   0.14
 );
 addBox(
-  deckC.x + DX * 2 - OX * 1.3,
-  deckC.z + DZ * 2 - OZ * 1.3,
-  deckC.x + DX * 2 + OX * 1.4,
-  deckC.z + DZ * 2 + OZ * 1.4,
+  deckC.x + DX * 3.5 - OX * 2.9,
+  deckC.z + DZ * 3.5 - OZ * 2.9,
+  deckC.x + DX * 3.5 + OX * 3.0,
+  deckC.z + DZ * 3.5 + OZ * 3.0,
   FLOOR,
   1.0,
   stoneM,
   0.14
 );
 addBox(
-  deckC.x - DX * 2 - OX * 1.3,
-  deckC.z - DZ * 2 - OZ * 1.3,
-  deckC.x - DX * 2 + OX * 1.4,
-  deckC.z - DZ * 2 + OZ * 1.4,
+  deckC.x - DX * 3.5 - OX * 2.9,
+  deckC.z - DZ * 3.5 - OZ * 2.9,
+  deckC.x - DX * 3.5 + OX * 3.0,
+  deckC.z - DZ * 3.5 + OZ * 3.0,
   FLOOR,
   1.0,
   stoneM,
@@ -276,18 +396,18 @@ const goldTrim = new THREE.MeshStandardMaterial({
   emissiveIntensity: 0.4,
 });
 const portalG = new THREE.Group();
-portalG.position.set(deckC.x + OX * 1.1, FLOOR, deckC.z + OZ * 1.1);
+portalG.position.set(deckC.x + OX * 2.4, FLOOR, deckC.z + OZ * 2.4);
 portalG.rotation.y = Math.atan2(-OX, -OZ); // 面朝厅内
 for (const p of [-1, 1]) {
-  const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.16, 2.6, 0.16), goldTrim);
-  pillar.position.set(p * 0.8, 1.3, 0);
+  const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.26, 4.2, 0.26), goldTrim);
+  pillar.position.set(p * 1.5, 2.1, 0);
   portalG.add(pillar);
 }
-const plintel = new THREE.Mesh(new THREE.BoxGeometry(1.9, 0.18, 0.18), goldTrim);
-plintel.position.set(0, 2.65, 0);
+const plintel = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.3, 0.3), goldTrim);
+plintel.position.set(0, 4.3, 0);
 portalG.add(plintel);
 const ppane = new THREE.Mesh(
-  new THREE.PlaneGeometry(1.44, 2.4),
+  new THREE.PlaneGeometry(2.7, 4.0),
   new THREE.MeshBasicMaterial({
     color: '#ffd98a',
     transparent: true,
@@ -298,90 +418,100 @@ const ppane = new THREE.Mesh(
     toneMapped: false,
   })
 );
-ppane.position.set(0, 1.3, 0);
+ppane.position.set(0, 2.1, 0);
 portalG.add(ppane);
 portalG.userData = { eternalAction: 'portal' };
 s.add(portalG);
 iG.push(portalG);
 myIG.push(portalG);
 
-// ===================== 晨光:东墙三扇亮窗 + 斜射体积光柱 + 地面光池 + 浮尘(全 Basic,零灯光) =====================
-// 东墙=V5→V0(x=HX+6.06,z=HZ±3.5),内侧面朝 -x
-const EX = HX + 6.06 * 1 - 0.15; // 内壁 x=805.91
-function shaftTexture() {
-  const c = document.createElement('canvas');
-  c.width = 32;
-  c.height = 256;
-  const x = c.getContext('2d');
-  const g = x.createLinearGradient(0, 0, 0, 256);
-  g.addColorStop(0, 'rgba(255,226,168,0.85)');
-  g.addColorStop(0.55, 'rgba(255,214,150,0.32)');
-  g.addColorStop(1, 'rgba(255,214,150,0)');
-  x.fillStyle = g;
-  x.fillRect(0, 0, 32, 256);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-const shaftTex = shaftTexture(),
+// ===================== 晨光:东墙三扇拱窗 + 斜射体积光柱 + 地面光池 + 浮尘(全 Basic,零灯光) =====================
+// 东墙内壁 x = HX + HR*cos(30°) - 壁厚/2(六边形边心距 = HR*cos30)。
+// ⚠️ 全部按 HR/WALL_H 推导,不再写死 805.91/804/802.2 —— 宫殿扩建后写死值会飘到墙外。
+const APOTHEM = HR * Math.cos(Math.PI / 6); // 边心距
+const EX = HX + APOTHEM - 0.16; // 东墙内壁
+const WIN_Y = FLOOR + WALL_H * 0.62; // 窗心高(宫殿高窗)
+const WIN_W = 2.4,
+  WIN_H = 3.6; // 拱窗尺寸
+const FRAME_SPAN = 5.2; // 三扇窗/三幅画的横向间距
+const shaftTex = palaceShaftTexture(),
   shaftMats = [];
-for (const wz of [HZ - 2.2, HZ, HZ + 2.2]) {
+const winTex = archWindowTexture();
+for (const wz of [HZ - FRAME_SPAN, HZ, HZ + FRAME_SPAN]) {
+  // 金窗框
   const wframe = new THREE.Mesh(
-    new THREE.PlaneGeometry(1.05, 1.25),
-    new THREE.MeshBasicMaterial({ color: '#caa040', toneMapped: false })
+    new THREE.PlaneGeometry(WIN_W + 0.3, WIN_H + 0.3),
+    new THREE.MeshBasicMaterial({ color: '#d8ae52', toneMapped: false, fog: false })
   );
   wframe.rotation.y = -Math.PI / 2;
-  wframe.position.set(EX - 0.02, FLOOR + 2.9, wz);
+  wframe.position.set(EX - 0.02, WIN_Y, wz);
   s.add(wframe);
+  // 窗面:暖金渐变 + 棂条(程序化贴图)
   const wpane = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.9, 1.1),
-    new THREE.MeshBasicMaterial({ color: '#ffe0ae', toneMapped: false })
+    new THREE.PlaneGeometry(WIN_W, WIN_H),
+    new THREE.MeshBasicMaterial({
+      map: winTex || null,
+      color: winTex ? '#ffffff' : '#ffe0ae',
+      toneMapped: false,
+      fog: false,
+    })
   );
   wpane.rotation.y = -Math.PI / 2;
-  wpane.position.set(EX - 0.04, FLOOR + 2.9, wz);
+  wpane.position.set(EX - 0.05, WIN_Y, wz);
   s.add(wpane);
-  // 体积光柱:窗口(805.8,+2.9)→地面(802.2,+0.15),双片交叉,加色渐隐
+  // 拱顶:半圆金拱(窗上方的弧线),给「宫殿高窗」的读感
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(WIN_W / 2, 0.11, 8, 24, Math.PI), goldM);
+  arch.rotation.y = -Math.PI / 2;
+  arch.position.set(EX - 0.08, WIN_Y + WIN_H / 2, wz);
+  s.add(arch);
+  // 体积光柱:窗口 → 斜落到地面,双片交叉,加色渐隐
+  const poolX = EX - 6.5;
   const smat = new THREE.MeshBasicMaterial({
     map: shaftTex,
     transparent: true,
-    opacity: 0.42,
+    opacity: 0.34,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     side: THREE.DoubleSide,
     toneMapped: false,
+    fog: false,
   });
   shaftMats.push(smat);
   const grp = new THREE.Group();
-  grp.position.set(804, FLOOR + 1.5, wz);
-  grp.rotation.z = -0.92;
-  const pA = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 5.0), smat);
+  const shaftLen = Math.hypot(WIN_Y - FLOOR, EX - poolX) * 1.05;
+  grp.position.set((EX + poolX) / 2, (WIN_Y + FLOOR) / 2, wz);
+  grp.rotation.z = -Math.atan2(EX - poolX, WIN_Y - FLOOR);
+  const pA = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W * 1.15, shaftLen), smat);
   grp.add(pA);
-  const pB = new THREE.Mesh(new THREE.PlaneGeometry(1.3, 5.0), smat);
+  const pB = new THREE.Mesh(new THREE.PlaneGeometry(WIN_W * 1.15, shaftLen), smat);
   pB.rotation.y = Math.PI / 2;
   grp.add(pB);
   s.add(grp);
+  // 地面光池:椭圆(斜射拉长的光斑)
   const pool = new THREE.Mesh(
-    new THREE.CircleGeometry(0.95, 24),
+    new THREE.CircleGeometry(1.9, 32),
     new THREE.MeshBasicMaterial({
       color: '#ffd9a0',
       transparent: true,
-      opacity: 0.2,
+      opacity: 0.22,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       toneMapped: false,
+      fog: false,
     })
   );
   pool.rotation.x = -Math.PI / 2;
-  pool.position.set(802.2, FLOOR + 0.04, wz);
+  pool.scale.set(1, 1.7, 1);
+  pool.position.set(poolX, FLOOR + 0.03, wz);
   s.add(pool);
 }
 // 浮尘(45 粒,缓慢飘落+轻摆)
-const DUST_N = 45,
+const DUST_N = 160,
   dustPos = new Float32Array(DUST_N * 3);
 for (let i = 0; i < DUST_N; i++) {
-  dustPos[i * 3] = HX - 3 + Math.random() * 8;
-  dustPos[i * 3 + 1] = FLOOR + 0.3 + Math.random() * 3;
-  dustPos[i * 3 + 2] = HZ - 3.2 + Math.random() * 6.4;
+  dustPos[i * 3] = HX - HR * 0.8 + Math.random() * HR * 1.6;
+  dustPos[i * 3 + 1] = FLOOR + 0.4 + Math.random() * (WALL_H + DOME_H * 0.5);
+  dustPos[i * 3 + 2] = HZ - HR * 0.8 + Math.random() * HR * 1.6;
 }
 const dustGeo = new THREE.BufferGeometry();
 dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPos, 3));
@@ -419,11 +549,11 @@ s.add(dust);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   const plaque = new THREE.Mesh(
-    new THREE.PlaneGeometry(2.2, 0.55),
+    new THREE.PlaneGeometry(5.2, 1.3),
     new THREE.MeshBasicMaterial({ map: t, toneMapped: false })
   );
   plaque.rotation.y = -Math.PI / 2;
-  plaque.position.set(EX - 0.06, FLOOR + 3.15, HZ);
+  plaque.position.set(EX - 0.07, FLOOR + WALL_H * 0.9, HZ);
   s.add(plaque);
 }
 
@@ -438,12 +568,12 @@ let captionsFixed = false;
 // mtime 供 letgo.js 空画框题「此处曾有过——日期」
 function buildFrame(x, z, rotY, nx, nz, url, name, mtime, caption) {
   const g = new THREE.Group();
-  g.position.set(x, FLOOR + 1.8, z);
+  g.position.set(x, FLOOR + 3.0, z);
   g.rotation.y = rotY;
   g.userData = {
     isPainting: true,
     ox: x,
-    oy: FLOOR + 1.8,
+    oy: FLOOR + 3.0,
     oz: z,
     nx: nx,
     nz: nz,
@@ -455,7 +585,7 @@ function buildFrame(x, z, rotY, nx, nz, url, name, mtime, caption) {
     mtime: mtime || null,
   };
   const frame = new THREE.Mesh(
-    new THREE.BoxGeometry(1.1, 1.3, 0.07),
+    new THREE.BoxGeometry(2.1, 2.6, 0.12),
     new THREE.MeshStandardMaterial({ color: '#b89040', metalness: 0.75, roughness: 0.3 })
   );
   g.add(frame);
@@ -468,8 +598,8 @@ function buildFrame(x, z, rotY, nx, nz, url, name, mtime, caption) {
     emissiveMap: tex,
     emissiveIntensity: 0.16,
   });
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(0.94, 1.14), pm);
-  plane.position.z = 0.045;
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(1.86, 2.36), pm);
+  plane.position.z = 0.075;
   g.add(plane);
   s.add(g);
   iG.push(g);
@@ -480,7 +610,7 @@ function buildFrame(x, z, rotY, nx, nz, url, name, mtime, caption) {
 function addFrame(z, url, name, mtime) {
   buildFrame(EX - 0.1, z, -Math.PI / 2, -1, 0, url, name, mtime, '晨光留影');
 }
-const FRAME_Z = [HZ - 2.2, HZ, HZ + 2.2],
+const FRAME_Z = [HZ - FRAME_SPAN, HZ, HZ + FRAME_SPAN],
   DEMO_FILL = ['201.jpg', '202.jpg', '203.jpg', '204.jpg', '205.png'];
 // 晨光留影同步(2026-08-29):后台增删照片后,游戏内最早三幅实时跟随,不中断链条
 let mornFrames = [],
@@ -569,7 +699,7 @@ const offMediaChanged = onMediaChanged(function (d) {
 // 本人从「我的上传」中挑选的作品,呈现在永恒展厅西墙(私人收藏墙);
 // 可见性由 /api/myuploads 服务端按设备过滤保证(与 mediarules.isMine 同口径:仅本人上传可见),
 // 客户端只呈现「已选 ∩ 本人拥有」之名,删除的作品自动跳过。西墙网格容量 5列×3行=15 幅。
-const WX = HX - 6.06; // 西墙内壁 x
+const WX = HX - APOTHEM + 0.16; // 西墙内壁 x(按边心距推导)
 const IMP_CAP = 15;
 function buildImportFrames() {
   const picks = ctx.store.json('eternalPicks', []) || [];
@@ -584,8 +714,8 @@ function buildImportFrames() {
         if (i >= IMP_CAP) break;
         const col = i % 5,
           row = Math.floor(i / 5);
-        const z = HZ + (-3.0 + col * 1.5);
-        const y = FLOOR + (0.65 + row * 1.1); // 3 行:0.65/1.75/2.85(画框高1.3,顶不超墙3.5)
+        const z = HZ + (-6.0 + col * 3.0);
+        const y = FLOOR + (1.6 + row * 2.9); // 3 行,画框高 2.6,顶不超 WALL_H
         buildFrame(
           WX + 0.1,
           z,
@@ -733,7 +863,7 @@ function teleport(intoHall) {
         // 原先落 (802.6,594.5)、yaw 3.68 —— 那是**朝着刚进来的门墙**,
         // 实机截图里玩家一睁眼面对两米外的空白墙角,什么也看不见。
         // yaw=-π/2 ⇒ forward=(-sin,0,-cos)=(+1,0,0),正对东墙晨光留影。
-        pl.p.set(HX - 1.5, FLOOR + 1.6, HZ);
+        pl.p.set(HX - APOTHEM * 0.55, FLOOR + 1.6, HZ);
         pl.y = -Math.PI / 2;
         pl.pi = 0.06; // 近乎平视:画心在 FLOOR+1.8,眼高 FLOOR+1.6
       } else {
@@ -850,7 +980,7 @@ onTick(function () {
   for (let i = 0; i < DUST_N; i++) {
     da[i * 3 + 1] -= 0.0035;
     da[i * 3] += Math.sin(t * 0.8 + i) * 0.0006;
-    if (da[i * 3 + 1] < FLOOR + 0.25) da[i * 3 + 1] = FLOOR + 3.2;
+    if (da[i * 3 + 1] < FLOOR + 0.3) da[i * 3 + 1] = FLOOR + WALL_H + DOME_H * 0.5;
   }
   dustGeo.attributes.position.needsUpdate = true;
   if (unlocked) {
@@ -887,6 +1017,7 @@ bag.custom.push(() => {
   applyHallMood(false);
   ctx.kunlun.rebuildEternalPicks = null;
   offMediaChanged && offMediaChanged();
+  disposePalaceArt(); // 程序化贴图(大理石/星图/嵌花)一并释放,热重载不泄漏显存
 });
 hotEnd('eternal');
 if (import.meta.hot) import.meta.hot.accept();
