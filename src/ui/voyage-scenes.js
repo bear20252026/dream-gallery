@@ -10,9 +10,12 @@ import { Z } from '../shared/z-layers.mjs';
 import { defineSystem } from '../core/system.js';
 
 // 四幕:标题/旁白/场景文件。旁白只走小王子一条叙事线。
+// unlock: 主线章节(planetsChapter)达到该值后解锁,把四幕织进叙事进度;
+// 第一幕始终开放(它是旅程的起点),后三幕随主线推进逐幕点亮。
 export const VOYAGE_ACTS = [
   {
     id: 'b612',
+    unlock: 0,
     file: '/voxel/b612.html',
     title: '第一幕 · 他的星球',
     sub: 'B612 · 三座火山与一朵玫瑰',
@@ -23,6 +26,7 @@ export const VOYAGE_ACTS = [
   },
   {
     id: 'rose',
+    unlock: 1,
     file: '/voxel/rose.html',
     title: '第二幕 · 玫瑰园',
     sub: '五千朵玫瑰，与独一无二的那一朵',
@@ -33,6 +37,7 @@ export const VOYAGE_ACTS = [
   },
   {
     id: 'fox',
+    unlock: 3,
     file: '/voxel/fox.html',
     title: '第三幕 · 狐狸与麦田',
     sub: '驯养 · 金黄色的麦子',
@@ -43,6 +48,7 @@ export const VOYAGE_ACTS = [
   },
   {
     id: 'koi',
+    unlock: 5,
     file: '/voxel/koi.html',
     title: '第四幕 · 云海之鲤',
     sub: '天空の鯉 · 带着花园去远方',
@@ -79,6 +85,8 @@ const STYLE = `
   color:#f5c451;font-size:20px;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.5);transition:transform .18s}
 #vsEntry:hover{transform:scale(1.08)}
 #vsEntry:focus-visible{outline:2px solid #f5c451;outline-offset:2px}
+#vsEntry.vs-done{border-color:rgba(245,196,81,.9);color:#ffe9c2;
+  box-shadow:0 0 18px rgba(245,196,81,.5),0 4px 18px rgba(0,0,0,.5)}
 @media (max-width:900px){#vsEntry{right:12px;bottom:110px}#voyageScenes .vs-sub{display:none}}
 `;
 
@@ -104,6 +112,25 @@ export function createVoyageScenes() {
     try {
       ctx.store.setJson('voyageScenes', { done });
     } catch (e) {}
+    refreshEntry();
+  }
+  // 主线章节进度:四幕随 planetsChapter 逐幕解锁(织入叙事,而非孤立放映)
+  function chapter() {
+    try {
+      return ctx.store.num('planetsChapter') || 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+  function unlocked(i) {
+    return chapter() >= (VOYAGE_ACTS[i].unlock || 0);
+  }
+  function refreshEntry() {
+    if (!entry) return;
+    const n = done.length;
+    entry.textContent = n >= VOYAGE_ACTS.length ? '✦' : '✧';
+    entry.title = '星之旅程 · 已看 ' + n + '/' + VOYAGE_ACTS.length + ' 幕';
+    entry.classList.toggle('vs-done', n >= VOYAGE_ACTS.length);
   }
   function renderCap() {
     const act = VOYAGE_ACTS[actIdx];
@@ -132,18 +159,26 @@ export function createVoyageScenes() {
         writeDone();
       }
       if (actIdx < VOYAGE_ACTS.length - 1) {
-        mk('继续旅程 ›', 'primary', () => openAct(actIdx + 1));
+        if (unlocked(actIdx + 1)) {
+          mk('继续旅程 ›', 'primary', () => openAct(actIdx + 1));
+        } else {
+          mk('下一幕随主线解锁', '', () =>
+            ctx.ui.modeToast?.('继续主线旅程，下一幕就会为你点亮。')
+          );
+        }
       } else {
+        // 终幕结语:四幕走完,把旅程收束回小王子的一句话
+        line.textContent = '四幕走完。星星发亮，是为了让每一个人有一天都能找到属于自己的星星。';
         mk('旅程完成 · 回到沙漠', 'primary', () => api.close());
       }
     }
     mk('重看此幕', '', () => openAct(actIdx));
     mk('回到沙漠', '', () => api.close());
-    // 幕次小圆点
+    // 幕次小圆点:●当前 ✦已看 ○未看 🔒未解锁
     const dots = document.createElement('span');
     dots.style.cssText = 'align-self:center;color:#c3b9cf;font-size:12px;margin-left:6px';
     dots.textContent = VOYAGE_ACTS.map((a, i) =>
-      i === actIdx ? '●' : done.includes(a.id) ? '✦' : '○'
+      i === actIdx ? '●' : done.includes(a.id) ? '✦' : unlocked(i) ? '○' : '🔒'
     ).join(' ');
     acts.appendChild(dots);
   }
@@ -161,6 +196,10 @@ export function createVoyageScenes() {
   }
   function openAct(i) {
     actIdx = Math.max(0, Math.min(VOYAGE_ACTS.length - 1, i));
+    if (!unlocked(actIdx)) {
+      ctx.ui.modeToast?.('这一幕还没点亮——先继续主线旅程吧。');
+      return;
+    }
     lineIdx = 0;
     const act = VOYAGE_ACTS[actIdx];
     frame.src = base + act.file.split('/').pop(); // 同源单文件场景;独立渲染器,不碰主循环
@@ -206,11 +245,14 @@ export function createVoyageScenes() {
       entry.style.zIndex = String(Z.hudBtn);
       entry.onclick = () => {
         done = readDone();
-        // 从第一幕未完成的开始;全完成则从头
-        const next = VOYAGE_ACTS.findIndex((a) => !done.includes(a.id));
-        openAct(next < 0 ? 0 : next);
+        refreshEntry();
+        // 从第一个"已解锁且未看"的幕开始;都看完则从头重看
+        let next = VOYAGE_ACTS.findIndex((a, i) => unlocked(i) && !done.includes(a.id));
+        if (next < 0) next = 0;
+        openAct(next);
       };
       document.body.appendChild(entry);
+      refreshEntry();
       ctx.ui.voyageScenes = {
         open: () => entry.onclick(),
         openAct,
