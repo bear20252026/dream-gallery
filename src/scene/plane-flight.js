@@ -22,6 +22,7 @@ import { createGLTFLoader } from './gltf-loader.js';
 import { Z } from '../shared/z-layers.mjs';
 import { tt } from '../shared/story-text.mjs';
 import { PLANE_PARAMS as P, stepPlane, planePhase, planeSpeedKmh } from './plane-physics.mjs';
+import { createKoiShip } from './koi-ship.js'; // 2026-11-15 主人指定:锦鲤庭园作为飞船
 import { allowPlaneBoard } from '../shared/journey-guidance.mjs';
 import { EYE_HEIGHT } from '../shared/constants.js';
 import { eventBus } from '../core/event-bus.js';
@@ -80,10 +81,13 @@ const T = {
   flew: { zh: '你已经飞过这片沙海了', en: 'You have flown this desert' },
 };
 
-export function createPlaneFlight({ input }) {
+export function createPlaneFlight({ input, vehicle = 'koi' }) {
+  // vehicle:'koi'(默认,主人指定的锦鲤庭园飞船) | 'plane'(原 Piper 真机)。
+  const isKoi = vehicle === 'koi';
   let root = null,
     modelWrap = null,
-    shadow = null;
+    shadow = null,
+    koiShip = null;
   let hud = null,
     promptEl = null,
     style = null;
@@ -224,6 +228,22 @@ export function createPlaneFlight({ input }) {
     root.add(shadow);
     ctx.scene.s.add(root);
 
+    if (isKoi) {
+      // 锦鲤飞船:体素巨鲤背驮庭园。机头(-Z)对齐飞行前进(+Z)需绕 Y 转 π。
+      koiShip = createKoiShip({ scale: 0.55 });
+      const inner = new THREE.Group();
+      inner.rotation.y = Math.PI;
+      inner.add(koiShip.root);
+      modelWrap = inner;
+      root.add(inner);
+      // 碰撞:只保留鲤身中段一盒,鳍/尾/云/鹤下可穿行(同真机口径)
+      ctx.scene.addBounds?.([
+        { mnX: PARK.x - 6, mxX: PARK.x + 6, mnZ: PARK.z - 16, mxZ: PARK.z + 16 },
+      ]);
+      if (driving && camMode === 1) root.visible = false;
+      return;
+    }
+
     createGLTFLoader().load(
       MODEL,
       (g) => {
@@ -259,7 +279,9 @@ export function createPlaneFlight({ input }) {
 
   function syncMesh() {
     if (!root) return;
-    root.position.set(state.pos.x, state.pos.y - (P.GROUND_CLEAR + P.WHEEL_R), state.pos.z);
+    // 锦鲤巡航抬升:渲染整体上移 cruiseLift,让原作品云海落到沙漠地面之上(物理状态不变)
+    const lift = isKoi && koiShip && driving ? koiShip.cruiseLift : 0;
+    root.position.set(state.pos.x, state.pos.y - (P.GROUND_CLEAR + P.WHEEL_R) + lift, state.pos.z);
     root.rotation.set(state.pitch, state.yaw, state.roll, 'YXZ');
     if (shadow) {
       const gh = groundH(state.pos.x, state.pos.z);
@@ -268,7 +290,7 @@ export function createPlaneFlight({ input }) {
       const k = Math.max(0.2, Math.min(1, 1 - h / 70));
       shadow.scale.setScalar(k);
       shadow.material.opacity = 0.28 * k;
-      shadow.visible = !crashed;
+      shadow.visible = !crashed && !isKoi; // 锦鲤在云海之上,不投沙漠地面阴影
     }
   }
 
@@ -276,11 +298,21 @@ export function createPlaneFlight({ input }) {
   function updateCamera(dt) {
     const cam = ctx.scene.cam;
     if (!cam) return;
-    const p = state.pos;
+    // 锦鲤巡航抬升:相机与注视点同步上移,否则船在镜头上方画外(物理 pos 不变)
+    const lift = isKoi && koiShip && driving ? koiShip.cruiseLift : 0;
+    const p = { x: state.pos.x, y: state.pos.y + lift, z: state.pos.z };
     const fx = Math.sin(state.yaw),
       fz = Math.cos(state.yaw);
     let want;
-    if (camMode === 1) {
+    if (isKoi) {
+      // 锦鲤体量大(长约40m):相机拉远, cockpit=站在背上庭园
+      if (camMode === 1) want = new THREE.Vector3(p.x - fx * 2, p.y + 7.5, p.z - fz * 2);
+      else if (camMode === 2) want = new THREE.Vector3(p.x - fz * 34, p.y + 10, p.z + fx * 34);
+      else {
+        const back = 30 + state.speed * 0.5;
+        want = new THREE.Vector3(p.x - fx * back, p.y + 12, p.z - fz * back);
+      }
+    } else if (camMode === 1) {
       // 驾驶舱:贴在机头,随飞机滚转(真机座舱会随倾斜)
       want = new THREE.Vector3(p.x + fx * 1.7, p.y + 0.75, p.z + fz * 1.7);
     } else if (camMode === 2) {
@@ -364,6 +396,8 @@ export function createPlaneFlight({ input }) {
     gs.set('flightLock', true); // 冻结玩家移动(与飞舟同一条通道)
     document.body.dataset.flying = '1';
     if (root) root.visible = camMode !== 1;
+    // 锦鲤:登机接管原作品天空/灯光/辉光/雾,飞行画面与原作品一致
+    if (isKoi && koiShip) koiShip.applyEnv(true, ctx);
     syncHud();
     showPrompt(T.exit);
     return true;
@@ -376,6 +410,7 @@ export function createPlaneFlight({ input }) {
     ctx.ui.journey?.setPhase('plane-flight', null);
     delete document.body.dataset.flying;
     gs.set('flightLock', false);
+    if (isKoi && koiShip) koiShip.applyEnv(false, ctx); // 下机还原沙漠氛围
     if (root) root.visible = true; // 下机后把玩家放到飞机侧方,而不是机身里
     const pl = ctx.player && ctx.player.pl;
     state = freshState(); // 主动结束探索，回到起点；不把玩家丢在高空或遥远的沙海。
@@ -506,6 +541,7 @@ export function createPlaneFlight({ input }) {
         updateCamera(dt);
         syncHud();
         syncMesh();
+        if (isKoi && koiShip) koiShip.update(Math.min(0.05, dt)); // 鳍/尾/瀑布/花瓣/鹤 动画
         return;
       }
       // 地面:靠近才提示登机
@@ -538,6 +574,10 @@ export function createPlaneFlight({ input }) {
         root = null;
         modelWrap = null;
         shadow = null;
+      }
+      if (koiShip) {
+        koiShip.dispose();
+        koiShip = null;
       }
       ctx.scene.planeApi = null;
     },
