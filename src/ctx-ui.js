@@ -41,6 +41,8 @@ export function createUINamespace(vault) {
     // 2026-11-12 C4 成就徽章:进度变化点(灵蕴拾取/首飞/选片/天穹里程碑)经此通报新解锁。
     // 写入方 gate/settings.js(装配时挂 achievement-page 的实现),判据 types-ctx-drift 要求声明 ≡ 成员。
     'announceAchievements',
+    // 2026-11-15 星之旅程四幕放映(ui/voyage-scenes.js):open/openAct/close。
+    'voyageScenes',
   ];
   const proxy = {};
 

@@ -651,6 +651,8 @@ export interface UINamespace {
   } | null;
   chapterMap: { open: () => void } | null;
   starMap: { open: () => void; close: () => void; isOpen: () => boolean } | null;
+  /** 星之旅程四幕放映(DOM 全屏 iframe)。写入方 `src/ui/voyage-scenes.js` init。 */
+  voyageScenes: { open: () => void; openAct: (i: number) => void; close: () => void } | null;
   /** 温柔度面板(DOM 弹窗)。写入方 `src/gate/quiz.js` 末尾那个 `ctx.ui.gentleTest = {…}`,
    *  成员集合由 `src/__tests__/gentle-panel-wiring.test.js` 拿源码比对,不靠这里抄一遍。 */
   gentleTest: { open: () => void; close: () => void; isOpen: () => boolean } | null;

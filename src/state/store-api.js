@@ -89,6 +89,8 @@ const SCHEMA = {
   kunlunVer: { key: 'kunlunVer', type: 'str' }, // 存档版本迁移标记(index.html 开机块写入,先于一切模块)
   uiFold: { key: 'b612UiFold', type: 'json' }, // 大站位 UI 收纳状态(questHud 折叠等)
   journeyMemories: { key: 'b612JourneyMemories', type: 'json' }, // 旅途观察手札；只存已完成的回忆
+  // 星之旅程四幕放映进度(2026-11-15):{done:[actId]}。未登记键 setJson 会抛,必须在此登记。
+  voyageScenes: { key: 'b612VoyageScenes', type: 'json' },
   journeyTaskCheckpoint: { key: 'b612JourneyTaskCheckpoint', type: 'json' }, // 当前任务内的观察点与时间刻度
   homeMemoryStep: { key: 'b612HomeMemoryStep', type: 'num' }, // 家的四站；完成互动后才保存
   kingMemoryStep: { key: 'b612KingMemoryStep', type: 'num' }, // 国王对白/互动的六段检查点

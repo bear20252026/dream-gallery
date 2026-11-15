@@ -28,6 +28,7 @@ import { createWitnessCard } from './ui/witness-card.js'; // witness cards for 3
 import { createChapterMap } from './ui/chapter-map.js'; // 章节地图 + 存档码(2026-10-03)
 import { createStarMap } from './ui/star-map.js'; // 星图:点星飞过去(2026-10-04)
 import { createVoyage } from './ui/voyage.js'; // 旅途卡:一夜接一夜(2026-10-04)
+import { createVoyageScenes } from './ui/voyage-scenes.js'; // 星之旅程四幕放映(2026-11-15,轻量 DOM 不拖 three)
 import { createJourneySystem } from './core/journey-system.js'; // 原著旅途交互与观察手札，组合根统一装配
 // ↓ 这 7 个模块原先是**静态** import(原 32-36、38、40 行),是入口 chunk 里 three(895KB / gzip 231KB)
 //   的唯一来源:静态边 ⇒ 它们进了 index.html 的模块图 ⇒ 闸门/电影那条根本不需要 3D 的路径也得先付
@@ -278,6 +279,7 @@ async function preloadWorld() {
     compositionRoot.register(createWitnessCard());
     compositionRoot.register(createChapterMap());
     compositionRoot.register(createVoyage());
+    compositionRoot.register(createVoyageScenes()); // 星之旅程四幕放映(2026-11-15)
     compositionRoot.register(createStarMap());
     compositionRoot.register(createStoryMusic());
     // 可驾驶 Piper PA-18(2026-10-03):坠机点旁的真飞机。物理核 src/scene/plane-physics.mjs(26 项单测),
