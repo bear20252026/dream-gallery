@@ -348,10 +348,12 @@ export class LoopManager {
     if (world !== 'b612') this._updateCamera(dt, now);
 
     // 沙漠区块/水面/飞鸟/沙暴逐帧更新(多世界切割:仅主世界)
-    if (desert && world === 'main') desert.update(dt, now * 0.001);
+    // 锦鲤飞行期(flightLock)沙漠整体让位给原作品云海氛围:停区块/昼夜,避免每帧覆盖天空与雾色
+    const koiFlying = !!ctx.kunlun.flightLock;
+    if (desert && world === 'main' && !koiFlying) desert.update(dt, now * 0.001);
 
     // 统一昼夜(多世界切割:仅主世界)
-    if (world === 'main') {
+    if (world === 'main' && !koiFlying) {
       // 时间源可注入(2026-09-07 P4):默认挂真实时钟;测试/剧情机关经
       // ctx.media.dayTimeSource = () => 12 覆盖(0-24),不必再 monkey-patch dayNight。
       const src = ctx.media.dayTimeSource;
