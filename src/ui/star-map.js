@@ -135,6 +135,10 @@ const STYLE = `
 @keyframes smShake{25%{margin-left:-6px}75%{margin-left:6px}}
 #starMap .sm-foot{text-align:center;padding:4px 0 26px}
 #starMap .sm-saves{color:#b9a77f;background:none;border:0;text-decoration:underline;text-underline-offset:4px;font-size:14px;min-height:40px}
+#starMap .sm-voyage{display:block;margin:0 auto 10px;color:#ffe9c2;background:linear-gradient(150deg,#f5c45126,#e0324b2b);
+ border:1px solid #e8c98a80;border-radius:24px;padding:9px 22px;min-height:42px;font-size:14px;letter-spacing:2px;
+ box-shadow:0 0 16px #f5c45133;transition:box-shadow .2s,transform .2s}
+#starMap .sm-voyage:hover{box-shadow:0 0 24px #f5c45166;transform:translateY(-1px)}
 @media (max-aspect-ratio:1/1){
  #starMap .sm-sky{height:auto;min-height:${STAR_STOPS.length * 132}px;width:100%}
  #starMap .sm-stop{width:min(32vw,128px)}
@@ -235,6 +239,15 @@ export function createStarMap() {
       b.onclick = () => pick(s, st, b);
     });
     const foot = el('div', 'sm-foot', null, root);
+    // 星之旅程:四个 voxel 场景织入叙事的放映入口(2026-11-15),独立于钉死的 STAR_STOPS
+    if (ctx.ui.voyageScenes) {
+      const vb = el('button', 'sm-voyage', '✦ 星之旅程 · 四幕', foot);
+      vb.type = 'button';
+      vb.onclick = () => {
+        api.close();
+        ctx.ui.voyageScenes?.open();
+      };
+    }
     const saves = el('button', 'sm-saves', tt(TEXT.saves), foot);
     saves.type = 'button';
     saves.onclick = () => {
