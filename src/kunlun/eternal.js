@@ -32,6 +32,9 @@ import {
   starDomeTexture,
   archWindowTexture,
   shaftTexture as palaceShaftTexture,
+  fluteTexture,
+  bannerTexture,
+  glowTexture,
   disposePalaceArt,
 } from './palace-art.js'; // 星光宫殿的程序化材质(2026-11-14)
 import { softenPoints } from '../scene/desert/particle-sprite.js'; // 浮尘圆点(与沙漠粒子同一套)
@@ -107,6 +110,15 @@ const columnM = new THREE.MeshStandardMaterial({
   roughness: 0.34,
   metalness: 0.1,
 });
+// 2026-11-14 美化:柱身加多立克凹槽(fluting)——光柱面立刻有古典柱的明暗节奏,
+// 不再是光滑圆柱。凹槽灰度图与柱色相乘,16 槽对 16 段。
+const fluteTex = fluteTexture();
+const shaftM = new THREE.MeshStandardMaterial({
+  color: '#f6eee0',
+  map: fluteTex || marbleTex || null,
+  roughness: 0.36,
+  metalness: 0.1,
+});
 // 金饰(檐线/柱头/门框):高金属度 + 自发光,不新增灯光也有「贵气」
 const goldM = new THREE.MeshStandardMaterial({
   color: '#d8ae52',
@@ -170,7 +182,7 @@ for (let i = 0; i < 12; i++) {
   const base = new THREE.Mesh(colBaseGeo, columnM);
   base.position.y = 0.25;
   g.add(base);
-  const shaft = new THREE.Mesh(colShaftGeo, columnM);
+  const shaft = new THREE.Mesh(colShaftGeo, shaftM);
   shaft.position.y = 0.5 + (WALL_H - 1.1) / 2;
   g.add(shaft);
   const cap = new THREE.Mesh(colCapGeo, goldM);
@@ -188,6 +200,73 @@ for (let i = 0; i < 12; i++) {
   const b = { mnX: cx - 0.75, mxX: cx + 0.75, mnZ: cz - 0.75, mxZ: cz + 0.75 };
   ctx.scene.addBounds && ctx.scene.addBounds([b]);
   myBounds.push(b);
+}
+// ===================== 墙面层次(2026-11-14 美化):踢脚/檐壁金线/壁柱/垂幔 =====================
+// bare 的大理石墙是「毛坯宫殿」。古典宫殿的墙有**三段式**:踢脚 → 墙身 → 檐壁,
+// 再加壁柱与垂幔的竖向节奏。全部贴内壁、不占步行空间(深度 ≤0.1m)。
+const bannerTex = bannerTexture();
+const bannerM = new THREE.MeshStandardMaterial({
+  map: bannerTex || null,
+  color: bannerTex ? '#ffffff' : '#1a2450',
+  roughness: 0.8,
+  metalness: 0.05,
+  side: THREE.DoubleSide,
+});
+for (let k = 0; k < 6; k++) {
+  const x1 = VX[k],
+    z1 = VZ[k],
+    x2 = VX[(k + 1) % 6],
+    z2 = VZ[(k + 1) % 6];
+  const mx = (x1 + x2) / 2,
+    mz = (z1 + z2) / 2;
+  // 内壁方向:从墙中点指向厅心
+  let ix = HX - mx,
+    iz = HZ - mz;
+  const il = Math.hypot(ix, iz);
+  ix /= il;
+  iz /= il;
+  const ox = mx + ix * 0.14,
+    oz = mz + iz * 0.14; // 内壁贴面中心
+  const ang = Math.atan2(x2 - x1, z2 - z1);
+  const wallLen = Math.hypot(x2 - x1, z2 - z1);
+  // 踢脚(深色石,高0.55)
+  const sk = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.55, wallLen - 0.2), columnM);
+  sk.position.set(ox, FLOOR + 0.27, oz);
+  sk.rotation.y = ang;
+  s.add(sk);
+  // 檐壁金线(墙顶下0.5)
+  const fr = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.14, wallLen - 0.2), goldM);
+  fr.position.set(ox, FLOOR + WALL_H - 0.5, oz);
+  fr.rotation.y = ang;
+  s.add(fr);
+  // 门墙不挂垂幔/壁柱(保持正门开阔)
+  if (k === 5) continue;
+  // 两根壁柱(墙两端内收),给墙竖向结构
+  for (const t of [0.12, 0.88]) {
+    const px = x1 + (x2 - x1) * t + ix * 0.16;
+    const pz = z1 + (z2 - z1) * t + iz * 0.16;
+    const pil = new THREE.Mesh(new THREE.BoxGeometry(0.5, WALL_H - 0.8, 0.12), columnM);
+    pil.position.set(px, FLOOR + (WALL_H - 0.8) / 2, pz);
+    pil.rotation.y = ang;
+    s.add(pil);
+    const pcap = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.22, 0.2), goldM);
+    pcap.position.set(px, FLOOR + WALL_H - 0.9, pz);
+    pcap.rotation.y = ang;
+    s.add(pcap);
+  }
+  // 中央垂幔(东墙k=0留给画,不挂;其余挂)
+  if (k !== 0) {
+    const bn = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 5.2), bannerM);
+    bn.position.set(mx + ix * 0.2, FLOOR + WALL_H - 3.1, mz + iz * 0.2);
+    bn.rotation.y = ang + Math.PI / 2;
+    s.add(bn);
+    // 幔杆
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.6, 8), goldM);
+    rod.rotation.z = Math.PI / 2;
+    rod.rotation.y = ang;
+    rod.position.set(mx + ix * 0.2, FLOOR + WALL_H - 0.55, mz + iz * 0.2);
+    s.add(rod);
+  }
 }
 // 檐口:墙顶一圈金线 + 承托穹顶的石檐(六边形环)
 {
@@ -257,6 +336,49 @@ const heartStar = new THREE.Mesh(
 );
 heartStar.position.set(HX, FLOOR + WALL_H + DOME_H * 0.62, HZ);
 s.add(heartStar);
+// 2026-11-14 美化:本星加呼吸光晕 + 三颗绕星,让穹顶中心「活」起来(不新增灯)
+const glowTex = glowTexture();
+const heartGlow = new THREE.Sprite(
+  new THREE.SpriteMaterial({
+    map: glowTex || null,
+    transparent: true,
+    opacity: 0.8,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    fog: false,
+  })
+);
+heartGlow.scale.set(6, 6, 1);
+heartGlow.position.copy(heartStar.position);
+s.add(heartGlow);
+const orbitStars = [];
+for (let i = 0; i < 3; i++) {
+  const os = new THREE.Mesh(
+    new THREE.SphereGeometry(0.14, 12, 8),
+    new THREE.MeshBasicMaterial({
+      color: ['#9dff9a', '#a8e0ff', '#ffc46a'][i],
+      fog: false,
+      toneMapped: false,
+    })
+  );
+  s.add(os);
+  orbitStars.push({ mesh: os, r: 2.2 + i * 0.9, sp: 0.5 + i * 0.22, ph: (i / 3) * Math.PI * 2 });
+}
+// 浮空碎石:基座外几块缓慢浮沉的星岩,给「悬浮」以生命(共享几何/材质)
+const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+const rockM = new THREE.MeshStandardMaterial({ color: '#8a7358', roughness: 0.9, metalness: 0.05 });
+const floatRocks = [];
+for (let i = 0; i < 7; i++) {
+  const a = (i / 7) * Math.PI * 2 + 0.4;
+  const rr = HR + 3 + (i % 3) * 2.5;
+  const m = new THREE.Mesh(rockGeo, rockM);
+  const sc = 0.7 + (i % 4) * 0.4;
+  m.scale.set(sc, sc * (0.8 + (i % 2) * 0.4), sc);
+  m.position.set(HX + Math.cos(a) * rr, FLOOR - 3 - (i % 3) * 3, HZ + Math.sin(a) * rr);
+  m.rotation.set(i, i * 0.7, i * 0.3);
+  s.add(m);
+  floatRocks.push({ mesh: m, y0: m.position.y, ph: i * 1.3, sp: 0.3 + (i % 3) * 0.12 });
+}
 // 穹顶肋:12 道金肋从檐口收向顶心,给穹顶结构感(细圆环切片)
 for (let i = 0; i < 12; i++) {
   const a = (i / 12) * Math.PI * 2;
@@ -981,6 +1103,24 @@ onTick(function () {
   if (unlocked) doorMat.emissiveIntensity = 0.45 + Math.sin(t * 2) * 0.15;
   for (let i = 0; i < shaftMats.length; i++)
     shaftMats[i].opacity = 0.42 + Math.sin(t * 1.2 + i * 1.7) * 0.08;
+  // 2026-11-14 美化:本星呼吸 + 绕星公转 + 碎石浮沉 + 穹顶星图缓旋
+  const hb = 1 + Math.sin(t * 1.6) * 0.12;
+  heartStar.scale.setScalar(hb);
+  heartGlow.scale.set(6 * hb, 6 * hb, 1);
+  heartGlow.material.opacity = 0.65 + Math.sin(t * 1.6) * 0.2;
+  for (const o of orbitStars) {
+    const a = t * o.sp + o.ph;
+    o.mesh.position.set(
+      HX + Math.cos(a) * o.r,
+      heartStar.position.y + Math.sin(a * 1.7) * 0.7,
+      HZ + Math.sin(a) * o.r
+    );
+  }
+  for (const r of floatRocks) {
+    r.mesh.position.y = r.y0 + Math.sin(t * r.sp + r.ph) * 0.8;
+    r.mesh.rotation.y += 0.0006;
+  }
+  ceilM.rotation.y = t * 0.008; // 星图极慢自转,抬头有「天在动」的读感
   const da = dustGeo.attributes.position.array;
   for (let i = 0; i < DUST_N; i++) {
     da[i * 3 + 1] -= 0.0035;

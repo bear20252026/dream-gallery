@@ -358,6 +358,102 @@ export function shaftTexture() {
   });
 }
 
+/**
+ * 柱身凹槽(多立克式 fluting):竖向明暗条,贴到柱身立刻有「古典柱」的读感。
+ * 灰度图,作 map 与柱材 color 相乘;16 条槽对应柱身 16 段。
+ * @returns {THREE.Texture|null}
+ */
+export function fluteTexture() {
+  return make('flute', 256, (x, S) => {
+    x.fillStyle = '#ffffff';
+    x.fillRect(0, 0, S, S);
+    const N = 16;
+    for (let i = 0; i < N; i++) {
+      const cx = ((i + 0.5) / N) * S;
+      const w = (S / N) * 0.62;
+      const g = x.createLinearGradient(cx - w / 2, 0, cx + w / 2, 0);
+      g.addColorStop(0, 'rgba(120,100,76,0)');
+      g.addColorStop(0.5, 'rgba(120,100,76,0.34)');
+      g.addColorStop(1, 'rgba(120,100,76,0)');
+      x.fillStyle = g;
+      x.fillRect(cx - w / 2, 0, w, S);
+      x.fillStyle = 'rgba(255,252,244,0.5)';
+      x.fillRect(cx + w / 2 - 1, 0, 2, S);
+    }
+  });
+}
+
+/**
+ * 垂幔(星夜蓝底 + 金边 + 六芒星徽):挂在墙间,给 bare 墙织物层次与叙事徽记。
+ * @returns {THREE.Texture|null}
+ */
+export function bannerTexture() {
+  return make('banner', 512, (x, S) => {
+    const g = x.createLinearGradient(0, 0, 0, S);
+    g.addColorStop(0, '#1a2450');
+    g.addColorStop(0.5, '#141c3e');
+    g.addColorStop(1, '#0e1530');
+    x.fillStyle = g;
+    x.fillRect(0, 0, S, S);
+    const r = rng(4127);
+    for (let i = 0; i < 90; i++) {
+      x.fillStyle = 'rgba(255,255,255,' + (0.015 + r() * 0.03).toFixed(3) + ')';
+      x.fillRect(r() * S, 0, 1.5, S);
+    }
+    x.strokeStyle = 'rgba(214,174,84,0.85)';
+    x.lineWidth = 10;
+    x.strokeRect(14, 10, S - 28, S - 20);
+    x.strokeStyle = 'rgba(214,174,84,0.4)';
+    x.lineWidth = 3;
+    x.strokeRect(30, 26, S - 60, S - 52);
+    const C = S / 2,
+      R = S * 0.2;
+    x.save();
+    x.translate(C, C * 0.92);
+    for (const rot of [0, Math.PI / 6]) {
+      x.beginPath();
+      for (let i = 0; i < 3; i++) {
+        const a = rot + (i / 3) * Math.PI * 2 - Math.PI / 2;
+        const px = Math.cos(a) * R,
+          py = Math.sin(a) * R;
+        i === 0 ? x.moveTo(px, py) : x.lineTo(px, py);
+      }
+      x.closePath();
+      x.strokeStyle = 'rgba(232,196,110,0.9)';
+      x.lineWidth = 5;
+      x.stroke();
+    }
+    const cg = x.createRadialGradient(0, 0, 2, 0, 0, R * 0.5);
+    cg.addColorStop(0, 'rgba(255,240,200,0.95)');
+    cg.addColorStop(1, 'rgba(255,240,200,0)');
+    x.fillStyle = cg;
+    x.beginPath();
+    x.arc(0, 0, R * 0.5, 0, Math.PI * 2);
+    x.fill();
+    x.restore();
+    x.fillStyle = 'rgba(214,174,84,0.8)';
+    for (let i = 0; i < 12; i++) {
+      const px = 30 + (i / 11) * (S - 60);
+      x.fillRect(px - 2, S - 26, 4, 18);
+    }
+  });
+}
+
+/**
+ * 柔和光晕贴图(本星/窗光用):中心暖白、外缘全透。
+ * @returns {THREE.Texture|null}
+ */
+export function glowTexture() {
+  return make('glow', 128, (x, S) => {
+    const g = x.createRadialGradient(S / 2, S / 2, 2, S / 2, S / 2, S / 2);
+    g.addColorStop(0, 'rgba(255,244,214,0.95)');
+    g.addColorStop(0.3, 'rgba(255,214,140,0.42)');
+    g.addColorStop(1, 'rgba(255,200,120,0)');
+    x.fillStyle = g;
+    x.fillRect(0, 0, S, S);
+  });
+}
+
 /** 供拆场时释放(热重载不泄漏显存) */
 export function disposePalaceArt() {
   for (const t of cache.values()) t.dispose();
