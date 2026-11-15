@@ -8,6 +8,7 @@
 import { ctx } from '../ctx.js';
 import { Z } from '../shared/z-layers.mjs';
 import { defineSystem } from '../core/system.js';
+import { tt } from '../shared/story-text.mjs'; // 双语单一源:字幕/按钮跟随 scriptLang
 
 // 四幕:标题/旁白/场景文件。旁白只走小王子一条叙事线。
 // unlock: 主线章节(planetsChapter)达到该值后解锁,把四幕织进叙事进度;
@@ -17,44 +18,71 @@ export const VOYAGE_ACTS = [
     id: 'b612',
     unlock: 0,
     file: '/voxel/b612.html',
-    title: '第一幕 · 他的星球',
-    sub: 'B612 · 三座火山与一朵玫瑰',
+    title: { zh: '第一幕 · 他的星球', en: 'Act I · His Planet' },
+    sub: { zh: 'B612 · 三座火山与一朵玫瑰', en: 'B612 · three volcanoes and one rose' },
     lines: [
-      '他来自一颗很小的星球，小到只容得下三座火山和一朵玫瑰。',
-      '他每天疏通火山、给她浇水、盖上玻璃罩——她单独一朵，就比你们全部更重要。',
+      {
+        zh: '他来自一颗很小的星球，小到只容得下三座火山和一朵玫瑰。',
+        en: 'He came from a tiny planet, just big enough for three volcanoes and one rose.',
+      },
+      {
+        zh: '他每天疏通火山、给她浇水、盖上玻璃罩——她单独一朵，就比你们全部更重要。',
+        en: 'He cleaned the volcanoes, watered her, covered her with glass — she alone mattered more than all the rest.',
+      },
     ],
   },
   {
     id: 'rose',
     unlock: 1,
     file: '/voxel/rose.html',
-    title: '第二幕 · 玫瑰园',
-    sub: '五千朵玫瑰，与独一无二的那一朵',
+    title: { zh: '第二幕 · 玫瑰园', en: 'Act II · The Rose Garden' },
+    sub: {
+      zh: '五千朵玫瑰，与独一无二的那一朵',
+      en: 'Five thousand roses, and the one that is unique',
+    },
     lines: [
-      '地球上有一座玫瑰园，五千朵玫瑰和她长得一模一样。',
-      '可他明白了：是他为她花费的时间，让她变得如此重要。',
+      {
+        zh: '地球上有一座玫瑰园，五千朵玫瑰和她长得一模一样。',
+        en: 'On Earth there was a garden of five thousand roses, all just like her.',
+      },
+      {
+        zh: '可他明白了：是他为她花费的时间，让她变得如此重要。',
+        en: 'But he understood: it was the time he had spent on her that made her so important.',
+      },
     ],
   },
   {
     id: 'fox',
     unlock: 3,
     file: '/voxel/fox.html',
-    title: '第三幕 · 狐狸与麦田',
-    sub: '驯养 · 金黄色的麦子',
+    title: { zh: '第三幕 · 狐狸与麦田', en: 'Act III · The Fox and the Wheat' },
+    sub: { zh: '驯养 · 金黄色的麦子', en: 'Taming · the golden wheat' },
     lines: [
-      '狐狸说：「如果你驯养了我，我们就彼此需要了。」',
-      '「看到那边的麦田了吗？麦子金黄色的，会让我想起你。我会爱上风穿过麦浪的声音。」',
+      {
+        zh: '狐狸说：「如果你驯养了我，我们就彼此需要了。」',
+        en: 'The fox said: "If you tame me, we shall need each other."',
+      },
+      {
+        zh: '「看到那边的麦田了吗？麦子金黄色的，会让我想起你。我会爱上风穿过麦浪的声音。」',
+        en: '"See the wheat fields? The golden wheat will remind me of you. I shall love the sound of wind in the wheat."',
+      },
     ],
   },
   {
     id: 'koi',
     unlock: 5,
     file: '/voxel/koi.html',
-    title: '第四幕 · 云海之鲤',
-    sub: '天空の鯉 · 带着花园去远方',
+    title: { zh: '第四幕 · 云海之鲤', en: 'Act IV · Koi of the Cloud Sea' },
+    sub: { zh: '天空の鯉 · 带着花园去远方', en: 'Sky koi · carrying a garden afar' },
     lines: [
-      '后来他乘着云海里的巨鲤远行，背上驮着一整座花园。',
-      '「夜晚你仰望星空，因为我住在其中一颗上，于是满天的星都像在笑。」',
+      {
+        zh: '后来他乘着云海里的巨鲤远行，背上驮着一整座花园。',
+        en: 'Later he rode a great koi through the sea of clouds, a whole garden on its back.',
+      },
+      {
+        zh: '「夜晚你仰望星空，因为我住在其中一颗上，于是满天的星都像在笑。」',
+        en: '"At night you will look up at the stars; I live on one of them, so all the stars will seem to laugh."',
+      },
     ],
   },
 ];
@@ -129,16 +157,22 @@ export function createVoyageScenes() {
     if (!entry) return;
     const n = done.length;
     entry.textContent = n >= VOYAGE_ACTS.length ? '✦' : '✧';
-    entry.title = '星之旅程 · 已看 ' + n + '/' + VOYAGE_ACTS.length + ' 幕';
+    entry.title = tt({
+      zh: '星之旅程 · 已看 ' + n + '/' + VOYAGE_ACTS.length + ' 幕',
+      en: 'Star voyage · ' + n + '/' + VOYAGE_ACTS.length + ' acts',
+    });
+    entry.setAttribute('aria-label', tt({ zh: '打开星之旅程', en: 'Open the star voyage' }));
     entry.classList.toggle('vs-done', n >= VOYAGE_ACTS.length);
   }
   function renderCap() {
     const act = VOYAGE_ACTS[actIdx];
     const line = root.querySelector('.vs-line');
     const acts = root.querySelector('.vs-acts');
-    line.textContent = act.lines[lineIdx] || '';
-    root.querySelector('.vs-title').textContent = act.title;
-    root.querySelector('.vs-sub').textContent = act.sub;
+    line.textContent = act.lines[lineIdx] ? tt(act.lines[lineIdx]) : '';
+    root.querySelector('.vs-title').textContent = tt(act.title);
+    root.querySelector('.vs-sub').textContent = tt(act.sub);
+    const exitB = root.querySelector('.vs-exit');
+    if (exitB) exitB.textContent = '✕ ' + tt({ zh: '回到沙漠', en: 'Back to the desert' });
     acts.innerHTML = '';
     const mk = (label, cls, fn) => {
       const b = document.createElement('button');
@@ -149,7 +183,7 @@ export function createVoyageScenes() {
       return b;
     };
     if (lineIdx < act.lines.length - 1) {
-      mk('下一句 ›', '', () => {
+      mk(tt({ zh: '下一句 ›', en: 'Next ›' }), '', () => {
         lineIdx++;
         renderCap();
       });
@@ -160,20 +194,32 @@ export function createVoyageScenes() {
       }
       if (actIdx < VOYAGE_ACTS.length - 1) {
         if (unlocked(actIdx + 1)) {
-          mk('继续旅程 ›', 'primary', () => openAct(actIdx + 1));
+          mk(tt({ zh: '继续旅程 ›', en: 'Continue ›' }), 'primary', () => openAct(actIdx + 1));
         } else {
-          mk('下一幕随主线解锁', '', () =>
-            ctx.ui.modeToast?.('继续主线旅程，下一幕就会为你点亮。')
+          mk(tt({ zh: '下一幕随主线解锁', en: 'Next act unlocks with the story' }), '', () =>
+            ctx.ui.modeToast?.(
+              tt({
+                zh: '继续主线旅程，下一幕就会为你点亮。',
+                en: 'Continue the story to light the next act.',
+              })
+            )
           );
         }
       } else {
         // 终幕结语:四幕走完,把旅程收束回小王子的一句话
-        line.textContent = '四幕走完。星星发亮，是为了让每一个人有一天都能找到属于自己的星星。';
-        mk('旅程完成 · 回到沙漠', 'primary', () => api.close());
+        line.textContent = tt({
+          zh: '四幕走完。星星发亮，是为了让每一个人有一天都能找到属于自己的星星。',
+          en: 'The four acts are done. The stars shine so that one day everyone may find their own.',
+        });
+        mk(
+          tt({ zh: '旅程完成 · 回到沙漠', en: 'Journey complete · back to the desert' }),
+          'primary',
+          () => api.close()
+        );
       }
     }
-    mk('重看此幕', '', () => openAct(actIdx));
-    mk('回到沙漠', '', () => api.close());
+    mk(tt({ zh: '重看此幕', en: 'Replay act' }), '', () => openAct(actIdx));
+    mk(tt({ zh: '回到沙漠', en: 'Back to the desert' }), '', () => api.close());
     // 幕次小圆点:●当前 ✦已看 ○未看 🔒未解锁
     const dots = document.createElement('span');
     dots.style.cssText = 'align-self:center;color:#c3b9cf;font-size:12px;margin-left:6px';
@@ -194,10 +240,20 @@ export function createVoyageScenes() {
         base = '/public/voxel/';
       });
   }
+  // 语言切换即时重绘字幕/按钮(与 openfilm 同口径)
+  function onLang() {
+    if (api && api.isOpen()) renderCap();
+    refreshEntry();
+  }
   function openAct(i) {
     actIdx = Math.max(0, Math.min(VOYAGE_ACTS.length - 1, i));
     if (!unlocked(actIdx)) {
-      ctx.ui.modeToast?.('这一幕还没点亮——先继续主线旅程吧。');
+      ctx.ui.modeToast?.(
+        tt({
+          zh: '这一幕还没点亮——先继续主线旅程吧。',
+          en: 'This act is not lit yet — continue the story first.',
+        })
+      );
       return;
     }
     lineIdx = 0;
@@ -214,6 +270,7 @@ export function createVoyageScenes() {
     phase: 'ui',
     init() {
       probeBase();
+      window.addEventListener('script:lang', onLang);
       style = document.createElement('style');
       style.textContent = STYLE;
       document.head.appendChild(style);
@@ -260,6 +317,7 @@ export function createVoyageScenes() {
       };
     },
     dispose() {
+      window.removeEventListener('script:lang', onLang);
       api?.unregister();
       root?.remove();
       entry?.remove();
