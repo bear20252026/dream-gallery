@@ -245,9 +245,27 @@ async function testToken(base) {
   res = await fetch(base + '/api/upload?dir=photos&name=pub_t1.jpg', { method: 'POST', body: 'x' });
   ok(res.status === 201, 'photos 公开上传无需 token(新规则)');
   await fetch(base + '/api/files/photos/pub_t1.jpg', { method: 'DELETE', headers: { 'x-token': 't1' } });
+  // R4(2026-11-16):匿名视频改入待审队列 ⇒ 202 pending-review(不再自动上墙);
+  // 主人 token 直传免审仍 201;批准/拒绝走 /api/admin/bulk approve-media/reject-media。
   res = await fetch(base + '/api/upload?dir=videos&name=pub_v1.mp4', { method: 'POST', body: 'x' });
-  ok(res.status === 201, 'videos 公开上传无需 token(新规则)');
+  ok(res.status === 202, 'videos 匿名上传进待审队列(202 pending-review,R4)');
+  const pv = await res.json();
+  ok(pv.pending === true && pv.status === 'pending-review', '待审响应带 pending 标记与状态');
+  // 待审期间公开面不可见(fail-closed:陌生命名请求必须 403/404)
+  res = await fetch(base + '/videos/pub_v1.mp4', { headers: { 'user-agent': 'perm-test-R4' } });
+  ok(res.status === 403 || res.status === 404, '待审视频公开面不可见');
+  // 主人批准 → 摘 pending → 本人/公开按 mediarules 恢复;这里验记录已摘标记
+  res = await fetch(base + '/api/admin/bulk?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'approve-media', name: 'pub_v1.mp4' }) });
+  ok(res.status === 200, '主人批准待审视频成功');
+  // 再传一个走拒绝路:删文件+删记录
+  await fetch(base + '/api/upload?dir=videos&name=pub_v2.mp4', { method: 'POST', body: 'x' });
+  res = await fetch(base + '/api/admin/bulk?token=t1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'reject-media', name: 'pub_v2.mp4' }) });
+  ok(res.status === 200, '主人拒绝待审视频成功(删文件+删记录)');
+  // 主人 token 直传免待审:仍 201
+  res = await fetch(base + '/api/upload?dir=videos&name=pub_v3.mp4', { method: 'POST', headers: { 'x-token': 't1' }, body: 'x' });
+  ok(res.status === 201, 'videos 主人 token 直传免待审仍 201');
   await fetch(base + '/api/files/videos/pub_v1.mp4', { method: 'DELETE', headers: { 'x-token': 't1' } });
+  await fetch(base + '/api/files/videos/pub_v3.mp4', { method: 'DELETE', headers: { 'x-token': 't1' } });
   res = await fetch(base + '/api/upload?dir=photos&name=x.txt', { method: 'POST', body: 'x' });
   ok(res.status === 400, '公开上传拒绝非媒体文件');
 
