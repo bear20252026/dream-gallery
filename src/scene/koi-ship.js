@@ -16,9 +16,12 @@ export function createKoiShip(opts = {}) {
   const envGroup = new THREE.Group();
   envGroup.visible = false;
   root.add(envGroup);
-  const scene = envGroup; // 原作品 env 函数作用域桥接到本模块环境组
+  // 原作品 env 函数按 THREE.Scene 形状访问(写 fog 等);这里桥接到环境组,
+  // 运行时行为不变,类型上如实声明这层桥接,避免逐处窄化。
+  const scene = /** @type {THREE.Scene} */ (/** @type {unknown} */ (envGroup));
   // 原作品 setSun 会写 scene.fog.color;Group 默认无 fog,预置同参数雾避免空引用
-  envGroup.fog = new THREE.Fog(0xe08a5a, 260, 1750);
+  const envFog = new THREE.Fog(0xe08a5a, 260, 1750);
+  scene.fog = envFog;
   const koiGroup = new THREE.Group();
   root.add(koiGroup);
   const gardenGroup = new THREE.Group();
@@ -740,6 +743,7 @@ export function createKoiShip(opts = {}) {
       R1 = 0xe2705c;
     const widths = [6.5, 10.5, 14.5, 16.5, 14.5, 10.5, 6.5, 3.6];
     const nodes = [];
+    /** @type {THREE.Object3D} */
     let cur = finGroup;
     const root = new THREE.Object3D();
     root.position.set(0, -0.2, 32);
@@ -2409,9 +2413,10 @@ export function createKoiShip(opts = {}) {
   }
   function dispose() {
     root.traverse((o) => {
-      if (o.geometry) o.geometry.dispose();
-      if (o.material) {
-        (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => m.dispose());
+      const m = /** @type {THREE.Mesh} */ (o); // 资源释放遍历:非网格无 geometry/material,守卫短路
+      if (m.geometry) m.geometry.dispose();
+      if (m.material) {
+        (Array.isArray(m.material) ? m.material : [m.material]).forEach((x) => x.dispose());
       }
     });
   }
@@ -2472,7 +2477,7 @@ export function createKoiShip(opts = {}) {
           o.visible = false;
         }
       });
-      sc.s.fog = envGroup.fog; // 复用同一 Fog 实例,setSun 改色即同步到游戏场景
+      sc.s.fog = envFog; // 复用同一 Fog 实例,setSun 改色即同步到游戏场景
       sc.setAtmosphere &&
         sc.setAtmosphere({ bloomStrength: 0.62, bloomThreshold: 0.78, exposure: 1.04 });
       setSun(0.2); // 原作品默认日落高度
