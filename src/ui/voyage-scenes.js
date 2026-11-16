@@ -10,6 +10,21 @@ import { Z } from '../shared/z-layers.mjs';
 import { defineSystem } from '../core/system.js';
 import { tt } from '../shared/story-text.mjs'; // 双语单一源:字幕/按钮跟随 scriptLang
 
+// three 动态导入:本模块经 main.js 静态边进入入口图,静态引 three 会触发 entry-weight 门禁。
+let THREE = null;
+import('three').then((m) => {
+  THREE = m;
+});
+
+// 四道"星门"在主世界沙漠的落点(出生点 (10,70) 附近一圈),把四幕织进世界而非独立网页。
+const GATE_POS = [
+  { x: 14, z: 62 }, // 他的星球
+  { x: 5, z: 61 }, // 玫瑰园
+  { x: 1, z: 67 }, // 狐狸与麦田
+  { x: 3, z: 75 }, // 云海之鲤
+];
+const GATE_COLOR = [0xf5c451, 0xf7a8bf, 0xffb066, 0x7fe3e8];
+
 // 四幕:标题/旁白/场景文件。旁白只走小王子一条叙事线。
 // unlock: 主线章节(planetsChapter)达到该值后解锁,把四幕织进叙事进度;
 // 第一幕始终开放(它是旅程的起点),后三幕随主线推进逐幕点亮。
@@ -115,7 +130,11 @@ const STYLE = `
 #vsEntry:focus-visible{outline:2px solid #f5c451;outline-offset:2px}
 #vsEntry.vs-done{border-color:rgba(245,196,81,.9);color:#ffe9c2;
   box-shadow:0 0 18px rgba(245,196,81,.5),0 4px 18px rgba(0,0,0,.5)}
-@media (max-width:900px){#vsEntry{right:12px;bottom:110px}#voyageScenes .vs-sub{display:none}}
+#vsGate{position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:36;display:none;
+  padding:10px 20px;border-radius:22px;background:rgba(17,14,33,.92);border:1px solid rgba(245,196,81,.55);
+  color:#ffe9c2;font-size:13px;cursor:pointer;box-shadow:0 6px 22px rgba(0,0,0,.5)}
+#vsGate:focus-visible{outline:2px solid #f5c451;outline-offset:2px}
+@media (max-width:900px){#vsEntry{right:12px;bottom:110px}#voyageScenes .vs-sub{display:none}#vsGate{bottom:150px}}
 `;
 
 export function createVoyageScenes() {
@@ -123,10 +142,17 @@ export function createVoyageScenes() {
     frame = null,
     entry = null,
     style = null,
-    api = null;
+    api = null,
+    gatePrompt = null;
   let actIdx = 0,
     lineIdx = 0,
     done = [];
+  let gates = [],
+    gateGroup = null,
+    nearIdx = -1,
+    offTick = null,
+    onGateKey = null,
+    gateT = 0;
 
   function readDone() {
     try {
@@ -264,6 +290,110 @@ export function createVoyageScenes() {
     if (document.pointerLockElement) document.exitPointerLock();
   }
 
+  /* ── 世界星门:四幕作为主世界地点,走近即进入(同一游戏/同一存档) ── */
+  function gateLabel(i) {
+    const a = VOYAGE_ACTS[i];
+    return unlocked(i)
+      ? tt({ zh: '进入「' + a.title.zh + '」', en: 'Enter "' + a.title.en + '"' }) + ' · E'
+      : tt({ zh: '「' + a.title.zh + '」未点亮', en: '"' + a.title.en + '" not lit' });
+  }
+  function buildGates() {
+    if (!THREE || gateGroup || !ctx.scene || !ctx.scene.s) return;
+    gateGroup = new THREE.Group();
+    gateGroup.name = 'voyageGates';
+    GATE_POS.forEach((p, i) => {
+      const g = new THREE.Group();
+      const gy = ctx.media.desert ? ctx.media.desert.getH(p.x, p.z) : 0;
+      g.position.set(p.x, gy, p.z);
+      const col = GATE_COLOR[i];
+      const stone = new THREE.MeshStandardMaterial({
+        color: 0x8b8794,
+        roughness: 0.9,
+        flatShading: true,
+      });
+      const glow = new THREE.MeshBasicMaterial({ color: col });
+      const pH = 3.2;
+      const pil = new THREE.BoxGeometry(0.5, pH, 0.5);
+      const l = new THREE.Mesh(pil, stone);
+      l.position.set(-1.2, pH / 2, 0);
+      const r = new THREE.Mesh(pil, stone);
+      r.position.set(1.2, pH / 2, 0);
+      const lin = new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.5, 0.6), stone);
+      lin.position.y = pH + 0.25;
+      const portal = new THREE.Mesh(
+        new THREE.PlaneGeometry(2.2, pH - 0.3),
+        new THREE.MeshBasicMaterial({
+          color: col,
+          transparent: true,
+          opacity: 0.3,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        })
+      );
+      portal.position.y = pH / 2;
+      const star = new THREE.Mesh(new THREE.OctahedronGeometry(0.32), glow);
+      star.position.y = pH + 0.9;
+      g.add(l, r, lin, portal, star);
+      gateGroup.add(g);
+      gates.push({ g, portal, star, i });
+    });
+    ctx.scene.s.add(gateGroup);
+  }
+  function showGatePrompt(i) {
+    if (!gatePrompt) return;
+    gatePrompt.textContent = gateLabel(i);
+    gatePrompt.style.display = 'block';
+  }
+  function hideGatePrompt() {
+    if (gatePrompt) gatePrompt.style.display = 'none';
+  }
+  function gateTick(dt) {
+    gateT += dt;
+    if (!THREE) return;
+    if (!gateGroup) buildGates();
+    if (!gateGroup) return;
+    const isMain = (ctx.scene.activeWorld || 'main') === 'main';
+    gateGroup.visible = isMain;
+    if (!isMain) {
+      nearIdx = -1;
+      hideGatePrompt();
+      return;
+    }
+    for (const gt of gates) {
+      const un = unlocked(gt.i);
+      gt.portal.material.opacity = un ? 0.26 + Math.sin(gateT * 2 + gt.i) * 0.08 : 0.07;
+      gt.star.material.color.setHex(un ? GATE_COLOR[gt.i] : 0x555560);
+      gt.star.rotation.y += dt * (un ? 1.2 : 0.2);
+      gt.star.position.y = 4.1 + Math.sin(gateT * 1.5 + gt.i) * 0.15;
+    }
+    const pl = ctx.player && ctx.player.pl;
+    if (!pl || (api && api.isOpen())) {
+      nearIdx = -1;
+      hideGatePrompt();
+      return;
+    }
+    let best = -1,
+      bd = 1e9;
+    GATE_POS.forEach((p, i) => {
+      const d = Math.hypot(pl.p.x - p.x, pl.p.z - p.z);
+      if (d < bd) {
+        bd = d;
+        best = i;
+      }
+    });
+    const near = bd < 3.5 ? best : -1;
+    if (near !== nearIdx) {
+      nearIdx = near;
+      if (near >= 0) showGatePrompt(near);
+      else hideGatePrompt();
+    }
+  }
+  function tryEnterGate() {
+    if (nearIdx < 0) return;
+    if (api && api.isOpen()) return;
+    openAct(nearIdx);
+  }
+
   return defineSystem({
     name: 'voyageScenes',
     layer: 'presentation',
@@ -310,6 +440,16 @@ export function createVoyageScenes() {
       };
       document.body.appendChild(entry);
       refreshEntry();
+      // 世界星门:接近提示 + E/点击 进入
+      gatePrompt = document.createElement('button');
+      gatePrompt.id = 'vsGate';
+      gatePrompt.onclick = tryEnterGate;
+      document.body.appendChild(gatePrompt);
+      onGateKey = (e) => {
+        if ((e.key === 'e' || e.key === 'E') && !e.repeat) tryEnterGate();
+      };
+      document.addEventListener('keydown', onGateKey);
+      offTick = ctx.onTick(gateTick);
       ctx.ui.voyageScenes = {
         open: () => entry.onclick(),
         openAct,
@@ -318,6 +458,12 @@ export function createVoyageScenes() {
     },
     dispose() {
       window.removeEventListener('script:lang', onLang);
+      if (onGateKey) document.removeEventListener('keydown', onGateKey);
+      if (offTick) offTick();
+      if (gateGroup && ctx.scene && ctx.scene.s) ctx.scene.s.remove(gateGroup);
+      gateGroup = null;
+      gates = [];
+      gatePrompt?.remove();
       api?.unregister();
       root?.remove();
       entry?.remove();
