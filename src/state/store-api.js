@@ -108,6 +108,8 @@ const SCHEMA = {
   witness: { key: 'b612Witness', type: 'json' },
   // 玩家关掉了剧情背景音乐(右下「音乐」钮;ui/story-music.js)
   musicOff: { key: 'b612MusicOff', type: 'flag' },
+  // 星之旅程:到过 B612 的持久标记(ui/voyage-scenes.js 世界切换时写,防重登重复自动开幕)
+  voyageB612: { key: 'b612VoyageB612Seen', type: 'flag' },
   // 温柔度测试最近一次作答(gate/quiz.js 的两条路共用:DOM 面板与 3D 墙面面板)。
   // 只记录、不分支(与 witness 同一口径 —— 眼下没有玩法读它,读它之前先想清楚给谁看)。
   gentleTest: { key: 'b612GentleTest', type: 'json' },
