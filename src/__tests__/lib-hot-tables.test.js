@@ -808,6 +808,9 @@ describe('⑦ 对账脚本 scripts/admin/table-parity.cjs 的三种退出码', (
     expect(postTrackError({ msg: 'boom', src: 'a.js', line: 3 }).code).toBe(200);
     expect(reportClientError({ type: 'js', message: '聚合错', source: 's.js' }).code).toBe(200);
     await store.saveGateData();
+    // R1 切读后:file 信道 upsert 落表确认即免整文件重写(这正是被验收的行为)。
+    // 对账脚本读的是 client_errors.json 源侧 ⇒ 这里显式落一次源文件,模拟"冷路径 save 已到货"。
+    fs.writeFileSync(TMP_ERRORS, JSON.stringify({ list: clientErrors._getErrorList() }));
     expect(fs.existsSync(TMP_ERRORS)).toBe(true);
     expect(fs.existsSync(TMP_JSON)).toBe(true);
   }
