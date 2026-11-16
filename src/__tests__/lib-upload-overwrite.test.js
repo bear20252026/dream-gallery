@@ -21,6 +21,9 @@ const nodeRequire = createRequire(import.meta.url);
 // 全量 vitest 并发时与其他套件抢同一个文件的锁 → Windows 下 EPERM rename 失败、hook 超时假红。
 const dgTmpData = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'dg-updata-')), 'gate_data.json');
 process.env.GATE_DATA_FILE = dgTmpData;
+// R4(2026-11-16):本套件测的是**主人直传**的覆盖/改名链。匿名视频现在进待审队列(202),
+// 故给测试环境配 TOKEN 并在 up() 夹具带 x-token —— 与生产"主人 token 直传免审"同口径。
+process.env.TOKEN = process.env.TOKEN || 'overwrite-test-token';
 const r2syncId = nodeRequire.resolve('../../lib/r2sync.js');
 const r2PutMock = vi.fn(() => Promise.resolve(true));
 nodeRequire.cache[r2syncId] = {
@@ -149,6 +152,8 @@ const up = (dir, name, body, headers) => {
   const res = fakeRes();
   const req = fakeReq([body], {
     'content-length': String(Buffer.byteLength(body)),
+    // R4:本套件测主人直传覆盖链 ⇒ 默认带 token(匿名视频待审是另一条路,见 test.js R4 断言)
+    'x-token': TOKEN,
     ...(headers || {}),
   });
   handleUpload(req, res, { dir, name }, true);
