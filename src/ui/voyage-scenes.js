@@ -148,10 +148,16 @@ export function createVoyageScenes() {
     offTick = null;
   let quiet = 0, // 安静窗口起点(墙钟)
     checkT = 0;
+  let gameMode = false, // 第一幕内正在玩「B612 的一天」
+    gameBest = 0,
+    gameWins = 0,
+    onGameMsg = null;
 
   function readDone() {
     try {
       const v = ctx.store.json('voyageScenes');
+      gameBest = (v && v.gameBest) || 0;
+      gameWins = (v && v.gameWins) || 0;
       return Array.isArray(v && v.done) ? v.done : [];
     } catch (e) {
       return [];
@@ -159,7 +165,7 @@ export function createVoyageScenes() {
   }
   function writeDone() {
     try {
-      ctx.store.setJson('voyageScenes', { done });
+      ctx.store.setJson('voyageScenes', { done, gameBest, gameWins });
     } catch (e) {}
     refreshEntry();
   }
@@ -208,6 +214,45 @@ export function createVoyageScenes() {
       if (!done.includes(act.id)) {
         done.push(act.id);
         writeDone();
+      }
+      // 第一幕看完:邀请玩家亲手替小王子打理一天(可玩幕间,成绩进同一存档)
+      if (act.id === 'b612') {
+        if (gameMode) {
+          mk(tt({ zh: '‹ 回到他的玫瑰', en: '‹ Back to his rose' }), '', () => {
+            gameMode = false;
+            frame.src = base + act.file.split('/').pop();
+            renderCap();
+          });
+          if (gameBest > 0) {
+            line.textContent = tt({
+              zh: '你替他守住了这一天。最佳 ' + gameBest + ' 分 · 守住 ' + gameWins + ' 次。',
+              en:
+                'You kept this day for him. Best ' +
+                gameBest +
+                ' pts · held ' +
+                gameWins +
+                ' times.',
+            });
+          } else {
+            line.textContent = tt({
+              zh: '现在轮到你了：拔幼苗、浇玫瑰、通火山——撑过六波。',
+              en: 'Now it is your turn: pull sprouts, water the rose, clean volcanoes — survive six waves.',
+            });
+          }
+        } else {
+          mk(
+            tt({
+              zh: gameBest > 0 ? '再帮他一天 · 最佳 ' + gameBest : '帮他打理这一天 ›',
+              en: gameBest > 0 ? 'Another day · best ' + gameBest : 'Tend this day for him ›',
+            }),
+            'primary',
+            () => {
+              gameMode = true;
+              frame.src = base + 'b612-game.html';
+              renderCap();
+            }
+          );
+        }
       }
       // 下一幕:已经历才能继续;否则提示随故事解锁
       const nxt = actIdx + 1;
@@ -263,6 +308,7 @@ export function createVoyageScenes() {
     }
     quiet = 0;
     lineIdx = 0;
+    gameMode = false;
     const act = VOYAGE_ACTS[actIdx];
     frame.src = base + act.file.split('/').pop(); // 同源单文件场景;独立渲染器,不碰主循环
     renderCap();
@@ -364,6 +410,34 @@ export function createVoyageScenes() {
       offFox = ctx.events.on('fox:rite', () => {
         /* tick 会读 foxRite.days 判定 */
       });
+      // 「B612 的一天」结算消息(同源 iframe):成绩写进同一份 voyageScenes 存档
+      onGameMsg = (e) => {
+        const d = e.data;
+        if (
+          !d ||
+          d.type !== 'b612-game' ||
+          e.origin !== location.origin ||
+          !frame ||
+          e.source !== frame.contentWindow
+        )
+          return;
+        const score = Math.max(0, Number(d.score) || 0);
+        if (score > gameBest) gameBest = score;
+        if (d.win) gameWins++;
+        writeDone();
+        ctx.ui.modeToast?.(
+          tt({
+            zh: d.win
+              ? '你守住了 B612！' + score + ' 分'
+              : '这一天没守住…' + score + ' 分，明天再来。',
+            en: d.win
+              ? 'You kept B612! ' + score + ' pts'
+              : 'The day was lost… ' + score + ' pts. Try tomorrow.',
+          })
+        );
+        if (gameMode) renderCap();
+      };
+      window.addEventListener('message', onGameMsg);
       offTick = ctx.onTick(storyTick);
       ctx.ui.voyageScenes = {
         open: () => entry.onclick(),
@@ -373,6 +447,7 @@ export function createVoyageScenes() {
     },
     dispose() {
       window.removeEventListener('script:lang', onLang);
+      if (onGameMsg) window.removeEventListener('message', onGameMsg);
       if (offWorld) offWorld();
       if (offFox) offFox();
       if (offTick) offTick();
