@@ -744,7 +744,7 @@ ctx.kunlun.rebuildEternalPicks = buildImportFrames; // C2:选片保存后由设�
 // ⚠️ 位置有硬约束:paintings.js:527 的答题守卫会把 x∈(-19,19) 且 z∈(-13,29) 内的
 // 一切点击丢弃(quizPassed 之前)。原先门在 (15,-12) **正落在矩形里** ⇒ 新玩家点它
 // 毫无反应,只能靠罗盘绕路。现移到建筑 footprint 之外的沙地 (0,34):
-// z=34>29 出矩形,且距出生点(-3.5,70.5)约 36m,首屏朝北(166°)就能看见这道门。
+// z=34>29 出矩形,且距出生点(10,70)约 37m,首屏朝北(166°)就能看见这道门。
 const DOOR_X = 0,
   DOOR_Z = 34;
 const doorG = new THREE.Group();
