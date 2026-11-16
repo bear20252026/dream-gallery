@@ -233,7 +233,39 @@ server.listen(PORT, () => {
         `,回填 ${bf.length ? bf.join(' ') : '无(表里已有行或源数组为空)'}` +
         `,当前表行数 ${JSON.stringify(s.tables)}`
       );
-      console.log('[shadow] 读路径未改动:切读判据 = node scripts/admin/table-parity.cjs 退出码 0');
+      // R1 第 3 步(2026-11-16 主人批准切读):读路径走真表,落表成功即免整库落盘。
+      // 安全纪律:启动即对账(内存 gateData vs 表尾,覆盖回填后的全量),不一致 ⇒ hotread.disable()
+      // 整体回退数组老路,服务照常;HOT_READ=0 可显式保持老路。判据工具 table-parity.cjs 仍可在盒子上跑。
+      const hotread = require('./lib/hotread');
+      if (process.env.HOT_READ === '0') {
+        console.log('[hotread] HOT_READ=0:读路径保持 gateData 数组老路(双写仍在)');
+      } else {
+        const g = require('./lib/store').gateData;
+        const repoChat = require('./lib/repo/chat');
+        const repoVisits = require('./lib/repo/visits');
+        const repoClicks = require('./lib/repo/clicks');
+        const repoErrors = require('./lib/repo/errors');
+        let mismatch = null;
+        try {
+          // 逐集合:源数组每条必须能在表尾找到同 ts/t 的行(表是保留期全集,源受条数上限)
+          const tailMatch = (srcArr, tableRows, tk) => {
+            const pool = new Map();
+            for (const r of tableRows) pool.set(r[tk], (pool.get(r[tk]) || 0) + 1);
+            for (const s of srcArr || []) {
+              const n = pool.get(s[tk]) || 0;
+              if (n <= 0) return false;
+              pool.set(s[tk], n - 1);
+            }
+            return true;
+          };
+          if (!tailMatch(g.chat, repoChat.readTail(500), 'ts')) mismatch = 'chat';
+          else if (!tailMatch(g.visits, repoVisits.readTail(2000), 't')) mismatch = 'visits';
+          else if (!tailMatch(g.linkClicks, repoClicks.readTail(6000), 't')) mismatch = 'linkClicks';
+          else if (!tailMatch(g.clientErrors, repoErrors.readGateTail(1000), 't')) mismatch = 'clientErrors';
+        } catch (e) { mismatch = 'read-error: ' + (e && e.message); }
+        if (mismatch) hotread.disable(mismatch);
+        else console.log('[hotread] 启动对账一致:读路径已切真表,热写落表即免整库落盘(HOT_READ=0 回退)');
+      }
     }
   } catch (e) { console.error('[startup] 影子双写启动失败(不影响服务):', e && (e.message || e)); }
   try { require('./lib/retention').startRetention(); } catch (e) { console.error('[startup] 保留期清扫启动失败(不影响服务):', e && (e.message || e)); }
