@@ -205,3 +205,56 @@
 - 组件源包已上传 GitHub Release `voxel-scenes-2026-11-15` 附件。
 
 **终验结论：全量门禁绿；遗留项仅剩 R 系破坏性翻转点（须主人拍板）与 admin 2 条点名类型例外。**
+
+---
+
+## 六、第二轮全面审计（2026-11-16 · 覆盖 PR#54~#78 新增面）
+
+> 范围：R1 只读切换（hotread/repo）、R4 视频待审队列、星之旅程四幕、锦鲤飞行/宫殿/粒子、public/voxel 内嵌场景、B612 小游戏。
+> 方法：三路并行专项（后端安全 / 前端质量 / 测试覆盖）+ 全量门禁复跑 + 实机验收。
+
+### 门禁基线（复跑实测）
+
+| 门禁 | 结果 |
+|------|------|
+| eslint 全仓 | ✅ 0 错 0 警 |
+| tsc --noEmit | ✅ 0 错 |
+| checkJs（CI 口径） | ✅ 2 = 基线（admin 2 条点名例外） |
+| vitest | ✅ 122 文件 / **1426** 项（本轮 +5 钉） |
+| 后端 npm test | ✅ 113 + 46 + 20 + 6 全过 |
+| dependency-cruiser | ✅ 无环 |
+| npm audit --omit=dev | ✅ 0 漏洞 |
+| build | ✅ 入口不含 three；预压缩 15.4MB→3.8MB；dist 无裸 importmap |
+
+### 发现与处置（1 P1 + 5 P2 + 若干 P3，全部已修，PR #79）
+
+| 级 | 问题 | 修法 | 验证 |
+|----|------|------|------|
+| **P1** | applyEnv 异步竞态：登机后立刻下机（E→Esc），else 先于 true 的 await 到达 ⇒ 背景/雾置 undefined、沙漠永久消失 | 世代闸 envGen + envApplied；await 回来世代已变即作废；else 只在真存过值时还原 | 代码审查 + 既有飞行探针 |
+| **P2-1** | reject×压缩竞态：被拒视频经压缩收工 renameSync 复活，doMirror 在"无记录"时放行 ⇒ 被拒内容 PUT 进公开 CDN | doMirror 改 fail-closed（无记录/pending 一律不镜像）；落产物前复查原记录仍在，被拒丢弃产物；reject 改同步删+先删记录 | 实机：reject 后文件确删 |
+| **P2-2** | confirm* 基线缺陷：COUNT 瞬时抛错返 -1，恢复后 count>-1 恒真 ⇒ 未落表也跳 save，重启丢数据 | 五个 confirm* 加 `before>=0` 守卫 | 新增 2 条单测钉住 |
+| **P2-3** | 重启+回退一致性：热写免落盘 ⇒ 快照滞后；重启后 loadGateData 只读快照，真表新行从不归并 ⇒ HOT_READ=0/disable 时读旧、stats 丢计数 | mergeTablesIntoArrays 幂等并集归并；启动归并+落盘、disable 经注入钩子归并、优雅关闭 saveGateDataSync | 实机：重启后聊天 3 条全在；新增 3 条归并单测 |
+| **P2** | 飞行中拆场不还原环境（dispose 只清 flightLock） | dispose 内 driving 先 applyEnv(false) 再释放 | 代码审查 |
+| **P2** | koi dispose 不释放贴图（CanvasTexture 泄显存） | 遍历 material.map 等贴图槽一并 dispose，共享去重 | 代码审查 |
+| **P2** | busy() 漏开场电影 b612film（不走 overlay.register）⇒ 淡出窗口自动开幕盖电影 | busy 补查 b612film | 代码审查 |
+| **P2** | koi.html 移动端 canvas 缺 touch-action ⇒ 轨道拖拽被手势打断 | 补 touch-action:none | 代码审查 |
+| P3 | approve 原型污染（name='__proto__'）；非待审记录可被批准；补镜像静默漏推 | hasOwnProperty；无 videoReview 拒；漏推记台账 enqueuePut | 实机：__proto__ 返 404 未污染 |
+| P3 | 结算消息闭幕窗口期仍收、score 无上限；postMessage '*'；quiet 隐藏失效；裸 z-index；dispose 未置空 iframe | 状态闸+钳位 ≤1e6；targetOrigin 同源；visibilitychange 重置 quiet；删裸值；先置空 | 代码审查 |
+
+### 确认安全（OK 项摘要）
+
+- 路径穿越：safeJoin 前缀比较 + name 白名单 + dir 服务端写死，approve/reject 不可逃逸上传目录。
+- 鉴权：approve/reject 与其他 bulk 同级（路由 auth:'token' + tokenOk 双保险）；未配 TOKEN 时 sameToken 恒 false ⇒ 本机也 401，fail-closed。
+- pending 公开出口：墙面列表/直链/缩略图/R2/SSE/大屏全挡（mediarules pending 短路优先于 mt/isMine）；202 不广播不镜像。
+- SQL 全参数化；请求体白名单裁剪，无原型污染 spread；新增正则线性；无新增未限流公开端点。
+- postMessage 伪造：e.source===frame.contentWindow 不可由外部窗口冒充，跨源 origin 不符，无绕过面。
+- 旧存档兼容：readDone 对缺 gameBest/gameWins 回退 0，三字段合写不丢 done。
+- XSS：renderCap 全 textContent，innerHTML 仅静态模板。
+- 入口门禁：voyage-scenes 零 three 静态依赖；public/voxel 按需加载不进入口。
+
+### 测试覆盖缺口（已补关键项，其余列为后续）
+
+- **已补**：confirm 负值守卫（2 条）、归并幂等并集（3 条）→ lib-hot-read.test.js 13→18。
+- **后续建议**（约 40 条，非阻断）：approve/reject 的镜像/广播 mock 断言、分片视频待审、尾巴 B 非公开名待审、启动对账子进程用例、voyage-scenes 单测（storyTick/quiet/postMessage 校验/gameMode/存档往返，约 10 条）、koi applyEnv 对称性（3 条）、palace-art 纯函数（4 条）、通关探针扩四幕放映断言。
+
+**第二轮终验结论：1 P1 + 5 P2 全部修复并实机验收 PASS；全量门禁绿（1426 单测 / 后端 185 项 / 0 漏洞）。遗留为测试覆盖补全（非阻断）与 admin 2 条点名类型例外。**
