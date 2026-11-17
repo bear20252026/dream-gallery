@@ -430,3 +430,36 @@ ctx 按所有权真拆、gateData 按域拆+鉴权簇收敛、saveGateData 增�
 - 清空不回滚：client-errors/track 先清数组+save再清表(吞异常),清表失败则"清空"后错误复活。
 
 **第四轮终验结论：有好转(后端3→3.5/前端3→3.5/优化3.5→4.0),voxel去重/单管道/矩阵拆除/原子写是真实收益;但ctx与gateData两个上帝对象、鉴权簇、重复实现等结构性病灶未动,属外围卫生工程。复查揪出并修正了烟花闸假修复与B5回灌丢数据窗口两个自身缺陷。下一步最高杠杆：冷路径整库序列化增量化(C级)、ctx按所有权真拆(C级)、注释腐化清理与audio-manager第三轮询收编(低风险)。**
+
+---
+
+## 十、C 级治本重构执行成果（2026-11-17 · 主人批准"继续下一步"，PR #85）
+
+> 前置：PR #84（注释腐化清理 12 文件 + audio-manager 第三轮询收编，全仓 /api/files 收敛为唯一 1 条）已合并主干（merge c581ca2）。C 级三项在分支 refactor/c-arch-2026-11-17，每项独立验证。
+
+### C10 saveGateData 队列内合并 + gate 变更才落盘（零时间窗）
+- **队列合并（coalescing）**：gateData 是单一可变对象，任何排队任务写的都是同一份最新快照 ⇒ _writeChain 改"在飞 1 次 + 至多 1 个待写"，突发 N 次 save 复用 pending promise。**实测突发 50 次 ⇒ 1 次真实写盘**。onWrite 逐等待方触发、queuedMs 各算；槽位释放自校验防误清下一轮。
+- **零时间窗**：无定时器/debounce，await 仍是"真实写盘后才 resolve"，SIGKILL 不新增丢失窗——这是否决时间窗 debounce 方案的理由（身份数据丢 ≤2s 不可接受）。
+- **最高频写放大根治**：gate.js entryGate/autoAdmit 此前"每个静态资源请求都整库双序列化"。pushIp 返回实质变更 + 同 IP 时刻刷新 1h 节流（ipsAt 只被保留期消费，小时级足够）；lastAccess 同口径；改"新建档或实质变更才 save"⇒ 无变更请求零写盘。
+- 守卫全过：store 永不 reject/结论对象/串行语义/_savedAt 仲裁/原子写；行为验证 50→1 合并/await 即写盘/onWrite 逐个触发。
+
+### C8 ctx 多写属性收编（三属性全部处置）
+- **dayTimeSource → owner=time-shift.js**：scene3-night 回退散写改经 lockDayAt 接口；d.ts 补 `| null`（releaseDay 真实写入形状）；src 内写入方收敛为 time-shift 独占。
+- **groundOverride 抹链 bug 修复**（调研发现的真缺陷）：实际加载序 planets(核心链)→eternal(后台链)，eternal 裸赋值会整个抹掉 planets 浮空岛/星球地面链。改链式包装（厅内 FLOOR，未命中交还 prevOverride）+ 拆场对称解链。实机验证链完整。
+- **eternalHandlers → owner=eternal-handlers.js 叶子**：registerEternalHandler(action,fn)→off（幂等、不误删顶替自己的新注册）；五模块（windchime/fireplace/snowwin/resetview/finale）散写"||{}守卫+键赋值+delete"整套改注册 API + off 配对收手。守卫测试同 commit 改钉新形态（键集恰五个/参数≤1名cg/off必接必调）+ 新增"散写形态绝迹"断言。实机 legacy 模式五键齐全/off 幂等/顶替保护 PASS。
+- 完整 ground-resolver 栈式合成（物理面）风险最高，留待后续单独评审。
+
+### C9 store.js 职责迁出
+- 请求身份原语（parseBrand/decodeSamsung/trustedProxy/realIP/CF 网段/deviceKey/legacyDeviceKey/isAutomated）下沉 **lib/request-identity.js**（156 行叶子，零 gateData/磁盘依赖，仅 node:crypto）。
+- store.js **603→471 行（-132）**，职责从 ≥7 收敛为持久化+会话+配额+统计；顶部同名 re-export，**零消费方改动**（全部 require('./store').realIP 等引用形状不变）。
+- 部署清单守卫 ✅（57 可达模块全覆盖）。
+
+### 验证汇总
+1422 单测 / 后端 248 项 / lint / tsc / deps 全 0 / checkJs 基线 2 / 部署清单 ✅。C10 行为验证（合并/await 语义/回调）；C8 实机（链完整/lockDayAt/off 幂等/legacy 五键）；崩溃安全语义不变。
+
+### 剩余（诚实标注）
+- gateData 上帝对象本体（29 集合按域拆）与鉴权簇收敛（36 处懒 require）未动——改动面最大，须单独评审。
+- ground-resolver 完整栈式合成、限流 5 套归一（语义各异）留待后续。
+- 冷路径 per-collection kv 增量：当前快照 KB 级收益有限，留待数据量真正变大后与逐行化一起做。
+
+**C 级终验结论：三项治本重构完成并验证，PR #85 待合并。写放大最高频根源已根治（无变更请求零写盘+突发合并），ctx 三个多写属性全部有了 owner（含一个真 bug 修复），store 职责收敛 -132 行。上帝对象本体拆分是下一座山。**
