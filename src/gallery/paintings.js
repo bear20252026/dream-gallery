@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { zoomIn, zoomOut, initPaintingZoom } from './painting-zoom.js';
 import { ctx } from '../ctx.js';
-import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片/视频即同步新媒体墙(2026-08-29)
+import { onMediaFiles } from '../media-files.js'; // 共享媒体列表管道:单轮询+SSE+隐藏暂停,与晨光共用(2026-11-17 B7)
 import { P, V, AI_DESC, LINKS, VIDEO_WALL_SOURCES } from '../../data.js';
 import * as MR from '../shared/mediarules.mjs'; // 可见性决策表单一源(服务端 canServeMedia 同表,2026-07-28 深化④)
 import { withMemoryPrefix } from '../shared/memory-prefix.mjs'; // 配文前缀单一源(2026-09-24 抽出)
@@ -359,25 +359,25 @@ ctx.gallery.hangOne = hangOne;
 // dynAdded:本机制动态上墙的 URL 集合,用于增量同步(新增挂上/删除移除,不重排已有挂画)
 const dynAdded = new Set();
 const knownStatic = new Set(P.concat(V, VIDEO_WALL_SOURCES));
-fetch('/api/files', { cache: 'no-store' })
-  .then(function (r) {
-    return r.json();
-  })
-  .then(function (d) {
-    const newP = (d.photos || [])
-      .map(function (f) {
-        return f.url.slice(1);
-      })
-      .filter(function (u) {
-        return !knownStatic.has(u) && !/^photos\/whiteboard-/i.test(u);
-      });
-    const newV = (d.videos || [])
-      .map(function (f) {
-        return f.url.slice(1);
-      })
-      .filter(function (u) {
-        return !knownStatic.has(u);
-      });
+// 2026-11-17 B7:首次上墙与增量同步统一走共享媒体列表管道(onMediaFiles),
+// 与晨光留影共用一个 45s 轮询 + 一个 SSE 订阅 + 一处隐藏暂停,不再各自拉 /api/files。
+// firstSync 区分首次(批量 hangPaintings)与增量(逐个 hangOne,不重排已有)。
+let firstSync = true;
+function applyMediaFiles(d) {
+  const photos = (d.photos || []).map(function (f) {
+    return f.url.slice(1);
+  });
+  const videos = (d.videos || []).map(function (f) {
+    return f.url.slice(1);
+  });
+  if (firstSync) {
+    firstSync = false;
+    const newP = photos.filter(function (u) {
+      return !knownStatic.has(u) && !/^photos\/whiteboard-/i.test(u);
+    });
+    const newV = videos.filter(function (u) {
+      return !knownStatic.has(u);
+    });
     for (let i = newP.length - 1; i >= 0; i--) {
       aM.unshift({ u: newP[i], d: '新上传的照片' });
       dynAdded.add(newP[i]);
@@ -387,10 +387,48 @@ fetch('/api/files', { cache: 'no-store' })
       dynAdded.add(newV[i]);
     }
     hangPaintings();
-  })
-  .catch(function () {
-    hangPaintings();
+    return;
+  }
+  // 增量同步:后台增删照片/视频后游戏内实时跟随;只增删对应挂画,不重排已有
+  const nowSet = new Set(photos.concat(videos));
+  // 1) 后台已删除 → 游戏内移除
+  for (const u of Array.from(dynAdded)) {
+    if (!nowSet.has(u)) {
+      removePaintByUrl(u);
+      const ai = aM.findIndex(function (am) {
+        return am.u === u;
+      });
+      if (ai >= 0) aM.splice(ai, 1);
+      dynAdded.delete(u);
+    }
+  }
+  // 2) 新上传 → 挂上(空位挂,不重排)
+  const newP = photos.filter(function (u) {
+    return !knownStatic.has(u) && !dynAdded.has(u) && !/^photos\/whiteboard-/i.test(u);
   });
+  const newV = videos.filter(function (u) {
+    return !knownStatic.has(u) && !dynAdded.has(u);
+  });
+  for (let i = newP.length - 1; i >= 0; i--) {
+    const u = newP[i];
+    dynAdded.add(u);
+    aM.unshift({ u: u, d: '新上传的照片' });
+    hangOne(u, '新上传的照片');
+  }
+  for (let i = newV.length - 1; i >= 0; i--) {
+    const u = newV[i];
+    dynAdded.add(u);
+    aM.unshift({ u: u, d: '新上传的视频' });
+    hangOne(u, '新上传的视频');
+  }
+}
+// 订阅共享管道;onError 保真原 fallback:首次拉取失败仍挂静态画
+onMediaFiles(applyMediaFiles, function () {
+  if (firstSync) {
+    firstSync = false;
+    hangPaintings();
+  }
+});
 // 按 URL 移除动态上墙的挂画(含视频清理),用于后台删除后游戏内同步消失
 function removePaintByUrl(url) {
   const idx = paintGroups.findIndex(function (g) {
@@ -422,70 +460,9 @@ function removePaintByUrl(url) {
   if (ii >= 0) iG.splice(ii, 1);
   paintGroups.splice(idx, 1);
 }
-// 新媒体墙增量同步(2026-08-29):后台增删照片/视频后,游戏内实时跟随;只增删对应挂画,不重排已有
-function syncNewMedia() {
-  fetch('/api/files', { cache: 'no-store' })
-    .then(function (r) {
-      return r.json();
-    })
-    .then(function (d) {
-      const photos = (d.photos || []).map(function (f) {
-        return f.url.slice(1);
-      });
-      const videos = (d.videos || []).map(function (f) {
-        return f.url.slice(1);
-      });
-      const nowSet = new Set(photos.concat(videos));
-      // 1) 后台已删除 → 游戏内移除
-      for (const u of Array.from(dynAdded)) {
-        if (!nowSet.has(u)) {
-          removePaintByUrl(u);
-          const ai = aM.findIndex(function (am) {
-            return am.u === u;
-          });
-          if (ai >= 0) aM.splice(ai, 1);
-          dynAdded.delete(u);
-        }
-      }
-      // 2) 新上传 → 挂上(空位挂,不重排)
-      const newP = photos.filter(function (u) {
-        return !knownStatic.has(u) && !dynAdded.has(u) && !/^photos\/whiteboard-/i.test(u);
-      });
-      const newV = videos.filter(function (u) {
-        return !knownStatic.has(u) && !dynAdded.has(u);
-      });
-      for (let i = newP.length - 1; i >= 0; i--) {
-        const u = newP[i];
-        dynAdded.add(u);
-        aM.unshift({ u: u, d: '新上传的照片' });
-        hangOne(u, '新上传的照片');
-      }
-      for (let i = newV.length - 1; i >= 0; i--) {
-        const u = newV[i];
-        dynAdded.add(u);
-        aM.unshift({ u: u, d: '新上传的视频' });
-        hangOne(u, '新上传的视频');
-      }
-    })
-    .catch(function (e) {
-      // 增量同步失败:下轮 45s 重试;补 warn 留痕(2026-11-11 空 catch 复核:可疑级,对照 quizgate 轮询口径)
-      console.warn('[paintings] 新媒体墙增量同步失败,待下轮重试', e);
-    });
-}
-// 每 45s 增量同步一次新媒体墙(晨光/白板/音乐各自有同步);标签页隐藏时暂停(终审 TOP2)
-let syncTimer = setInterval(syncNewMedia, 45000);
-document.addEventListener('visibilitychange', function () {
-  if (document.hidden) {
-    clearInterval(syncTimer);
-  } else {
-    syncNewMedia();
-    syncTimer = setInterval(syncNewMedia, 45000);
-  }
-});
-// 服务端主动推送:后台增删照片/视频 → 立即同步新媒体墙(不等轮询)
-onMediaChanged(function (d) {
-  if (!d || d.dir === 'photos' || d.dir === 'videos') syncNewMedia();
-});
+// 2026-11-17 B7:原 syncNewMedia + 45s 定时器 + 隐藏暂停 + onMediaChanged 订阅整套移除,
+// 统一由共享媒体列表管道(media-files.js)驱动 applyMediaFiles(见上)。单轮询+SSE+隐藏暂停,
+// 与晨光留影共用,不再各自拉 /api/files。removePaintByUrl 仍被 applyMediaFiles 增量分支调用。
 
 // ===== 3D原位放大系统（平滑飞出动效 + 景深虚化 + 物理摇晃）=====
 // ray/mP2 由 scene.js 创建并经 ctx 共享
