@@ -81,9 +81,10 @@ export function refreshMediaFiles() {
 
 function ensure() {
   if (timer || offMedia) return; // 已在跑
-  // SSE 推送:后台增删 → 立即拉一次(不等轮询);photos/videos 都关心
+  // SSE 推送:后台增删 → 立即拉一次(不等轮询);photos/videos/music 都关心
+  // (2026-11-17 收编 audio-manager 第三套轮询:music 目录变更也触发,全量响应本就含 music)
   offMedia = onMediaChanged((d) => {
-    if (!d || d.dir === 'photos' || d.dir === 'videos') refreshMediaFiles();
+    if (!d || d.dir === 'photos' || d.dir === 'videos' || d.dir === 'music') refreshMediaFiles();
   });
   startTimer();
   // 隐藏暂停:后台标签页不空拉;回前台立即补一次

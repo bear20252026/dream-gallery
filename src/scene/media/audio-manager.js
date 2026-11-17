@@ -1,6 +1,6 @@
 // audio-manager.js — 统一音频管理器 + TTS 昆仑开口 + HTML5 背景音乐
 import { ctx } from '../../ctx.js';
-import { onMediaChanged } from '../../media-push.js'; // 服务端主动推送:后台增删音乐即刷新(2026-08-29)
+import { onMediaFiles } from '../../media-files.js'; // 共享媒体列表管道:单轮询+SSE+隐藏暂停(2026-11-17 收编第三套轮询)
 import { avAllowed } from '../../core/av-switch.js'; // 全站音视频总闸(2026-09-26):默认全静,?av=1 恢复
 import { ttsUrl, warmBlob } from '../../core/dialog-voice.mjs'; // 台词音频缓存键三级路径(2026-09-28)
 import { i18nText } from '../../ui/i18n-dom.js'; // 界面文字中英切换(2026-10-03 英文为默认)
@@ -99,24 +99,17 @@ let mA = new Audio(),
   mIdx2 = 0,
   others = [],
   musicEndedBound = false;
-// 同步音乐列表:后台新增/删除音乐后,游戏内播放列表随轮换实时跟随(不中断播放链)
-function refreshMusicList() {
-  fetch('/api/files?dir=music')
-    .then(function (r) {
-      return r.json();
+// 同步音乐列表:后台新增/删除音乐后,游戏内播放列表随轮换实时跟随(不中断播放链)。
+// 2026-11-17 收编进共享管道(media-files.js):原独立 60s fetch ?dir=music + 自有 SSE 订阅
+// 整套拆除(无隐藏暂停/定时器不可清理的第三套轮询),改订阅全量数据取 music 字段。
+// 失败语义保真:管道 onError 时 others 保持现状,下轮重试(warn 由管道统一留痕)。
+function applyMusicList(d) {
+  others = (d.music || [])
+    .map(function (f) {
+      return f.url;
     })
-    .then(function (d) {
-      others = (d.music || [])
-        .map(function (f) {
-          return f.url;
-        })
-        .filter(function (u) {
-          return u !== '/music/background.mp3';
-        });
-    })
-    .catch(function (e) {
-      // 音乐列表同步失败:others 保持现状,下轮 60s 重试;补 warn 留痕(2026-11-11 空 catch 复核:可疑级)
-      console.warn('[audio-manager] 音乐列表同步失败,保持现状待下轮重试', e);
+    .filter(function (u) {
+      return u !== '/music/background.mp3';
     });
 }
 function ensureMusic() {
@@ -126,7 +119,9 @@ function ensureMusic() {
   mA.loop = true;
   mA.volume = 0.5;
   mA.preload = 'auto';
-  refreshMusicList();
+  // 订阅共享管道(订阅即喂缓存/首订即拉一次;music 目录 SSE 变更也触发,见 media-files.js)。
+  // 模块级订阅与 paintings 同款:页面生命周期常驻,隐藏暂停由管道统一负责。
+  onMediaFiles(applyMusicList);
   if (!musicEndedBound) {
     musicEndedBound = true;
     mA.addEventListener('ended', function () {
@@ -143,13 +138,8 @@ function ensureMusic() {
       mA.play().catch(function () {});
     });
   }
-  // 每 60s 同步一次音乐列表(轻量,后台增删音乐无需刷新页面即进入轮换)
-  setInterval(refreshMusicList, 60000);
-  // 服务端主动推送:后台增删音乐 → 立即刷新列表(不等轮询)
-  onMediaChanged(function (d) {
-    if (d && d.dir === 'music') refreshMusicList();
-    else if (d) refreshMusicList(); // 增删 photos/videos 不影响音乐,但保底刷新一次无妨
-  });
+  // 2026-11-17 收编:原 60s setInterval + 自有 onMediaChanged 订阅整套拆除,
+  // 轮询/SSE/隐藏暂停统一由 media-files.js 管道负责(上方 onMediaFiles 订阅)。
 }
 // 2026-10-03:右下「音乐」钮由 ui/story-music.js 接管(按章节的剧情配乐 + 开/关);
 // 旧的随机轮播只在 ?legacy=1 时绑定。
