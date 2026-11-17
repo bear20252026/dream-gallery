@@ -25,7 +25,7 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
-import { onMediaChanged } from '../media-push.js'; // 服务端主动推送:后台增删照片即刷新晨光(2026-08-29)
+import { onMediaFiles } from '../media-files.js'; // 共享媒体列表管道:单轮询+SSE+隐藏暂停,与新媒体墙共用(2026-11-17 B7)
 import {
   marbleTexture,
   floorInlayTexture,
@@ -638,62 +638,56 @@ function disposeMorn() {
   }
   mornFrames = [];
 }
-function refreshMorning() {
-  fetch('/api/files?dir=photos', { cache: 'no-store' })
-    .then((r) => r.json())
-    .then((d) => {
-      const pool = (d.photos || []).filter((f) => !/^whiteboard-/i.test(f.name)); // 白板作品有专属墙,不进晨光
-      pool.sort((a, b) => (a.mtime < b.mtime ? -1 : a.mtime > b.mtime ? 1 : 0)); // 最早的在前
-      const picks = pool.slice(0, 3).map((f) => ({ name: f.name, mtime: f.mtime }));
-      for (const dm of DEMO_FILL) {
-        if (picks.length >= 3) break;
-        if (!picks.some((p) => p.name === dm)) picks.push({ name: dm, mtime: null });
-      } // 不够三张,演示照片补足
-      const key = picks
-        .slice(0, 3)
-        .map((p) => p.name)
-        .join('|');
-      if (key === mornPicks) return; // 集合没变,不重建(避免纹理反复重载)
-      mornPicks = key;
-      disposeMorn();
-      picks
-        .slice(0, 3)
-        .forEach((p, i) =>
-          mornFrames.push(
-            buildFrame(
-              EX - 0.1,
-              FRAME_Z[i],
-              -Math.PI / 2,
-              -1,
-              0,
-              'photos/' + encodeURIComponent(p.name),
-              p.name,
-              p.mtime,
-              '晨光留影'
-            )
-          )
-        );
-    })
-    .catch(() => {
-      const key = DEMO_FILL.slice(0, 3).join('|');
-      if (key === mornPicks) return;
-      mornPicks = key;
-      disposeMorn();
-      DEMO_FILL.slice(0, 3).forEach((n, i) =>
-        mornFrames.push(
-          buildFrame(EX - 0.1, FRAME_Z[i], -Math.PI / 2, -1, 0, 'photos/' + n, n, null, '晨光留影')
+// 2026-11-17 B7:晨光留影改接共享媒体列表管道(media-files.js),与新媒体墙共用一个
+// 45s 轮询 + 一个 SSE 订阅 + 一处隐藏暂停,不再各自拉 /api/files。数据用 name+mtime(全量响应带)。
+function applyMorning(d) {
+  const pool = (d.photos || []).filter((f) => !/^whiteboard-/i.test(f.name)); // 白板作品有专属墙,不进晨光
+  pool.sort((a, b) => (a.mtime < b.mtime ? -1 : a.mtime > b.mtime ? 1 : 0)); // 最早的在前
+  const picks = pool.slice(0, 3).map((f) => ({ name: f.name, mtime: f.mtime }));
+  for (const dm of DEMO_FILL) {
+    if (picks.length >= 3) break;
+    if (!picks.some((p) => p.name === dm)) picks.push({ name: dm, mtime: null });
+  } // 不够三张,演示照片补足
+  const key = picks
+    .slice(0, 3)
+    .map((p) => p.name)
+    .join('|');
+  if (key === mornPicks) return; // 集合没变,不重建(避免纹理反复重载)
+  mornPicks = key;
+  disposeMorn();
+  picks
+    .slice(0, 3)
+    .forEach((p, i) =>
+      mornFrames.push(
+        buildFrame(
+          EX - 0.1,
+          FRAME_Z[i],
+          -Math.PI / 2,
+          -1,
+          0,
+          'photos/' + encodeURIComponent(p.name),
+          p.name,
+          p.mtime,
+          '晨光留影'
         )
-      );
-    });
+      )
+    );
 }
-refreshMorning();
-// 每 45s 同步一次晨光(与新媒体墙同步周期一致;仅集合变化才重建)
-setInterval(refreshMorning, 45000);
-// 服务端主动推送:后台增删照片 → 立即刷新晨光三帧(不等轮询)
-// 接住退订函数:拆场时要摘掉,否则热重载后旧回调仍在刷新一批已销毁的画框
-const offMediaChanged = onMediaChanged(function (d) {
-  if (!d || d.dir === 'photos') refreshMorning();
-});
+// 拉取失败 fallback:演示照片补足三帧(保真原 catch 语义)
+function morningFallback() {
+  const key = DEMO_FILL.slice(0, 3).join('|');
+  if (key === mornPicks) return;
+  mornPicks = key;
+  disposeMorn();
+  DEMO_FILL.slice(0, 3).forEach((n, i) =>
+    mornFrames.push(
+      buildFrame(EX - 0.1, FRAME_Z[i], -Math.PI / 2, -1, 0, 'photos/' + n, n, null, '晨光留影')
+    )
+  );
+}
+// 订阅共享管道(订阅即喂缓存/启动即拉一次);接住退订函数:拆场时摘掉,
+// 否则热重载后旧回调仍在刷新一批已销毁的画框。变量名沿用 offMediaChanged(拆场处调用)。
+const offMediaChanged = onMediaFiles(applyMorning, morningFallback);
 
 // ===================== C2 展厅选片导入(2026-07-30) =====================
 // 本人从「我的上传」中挑选的作品,呈现在永恒展厅西墙(私人收藏墙);

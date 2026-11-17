@@ -1,0 +1,2848 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Golden Hour Fox</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #e9b483;
+      }
+      body::after {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 3;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse at 50% 47%,
+          rgba(0, 0, 0, 0) 52%,
+          rgba(74, 38, 16, 0.1) 78%,
+          rgba(58, 28, 12, 0.3) 100%
+        );
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        cursor: grab;
+      }
+      canvas.dragging {
+        cursor: grabbing;
+      }
+      #fade {
+        position: fixed;
+        inset: 0;
+        z-index: 10;
+        pointer-events: none;
+        background: #21150e;
+        opacity: 1;
+        transition: opacity 1.7s ease;
+      }
+      #fade.gone {
+        opacity: 0;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="fade"></div>
+    <script type="module">
+      import * as THREE from 'three';
+      import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+      import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+      import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+      import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+      import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+      /* ------------------------------------------------------------------
+   PALETTE
+------------------------------------------------------------------ */
+      const PAL = {
+        wheatStemA: 0xb77f32,
+        wheatStemB: 0xc9943d,
+        wheatStemC: 0xd8a94f,
+        wheatHead: 0xeec66b,
+        wheatHeadLight: 0xf8d991,
+        foxOrange: 0xd96a29,
+        foxLight: 0xed8839,
+        foxDark: 0xb65320,
+        cream: 0xf2dcb4,
+        creamLight: 0xfbf0d8,
+        white: 0xfbf2de,
+        dark: 0x3b2721,
+        paw: 0x2a1b17,
+        nose: 0x231613,
+        eye: 0x1c1311,
+        leafDeep: 0x41682f,
+        leafMid: 0x5b8138,
+        leafLight: 0x789a41,
+        leafSun: 0x94ad4c,
+        leafPale: 0xa9b95e,
+        apple: 0xb63429,
+        appleLight: 0xd74930,
+        appleDark: 0x8e2722,
+        trunk: 0x684027,
+        trunkLight: 0x7f5330,
+        trunkDark: 0x4f2f1e,
+        gravel: 0xdcc6a0,
+        gravelLight: 0xecdbbd,
+        gravelDark: 0xc2a97f,
+        soil: 0xb99466,
+        soilDark: 0xa8855a,
+        fieldA: 0x98793f,
+        fieldB: 0x876a36,
+        fieldC: 0xa88948,
+        fieldGreen: 0x86803d,
+        moss: 0x74743a,
+        base: 0x94763f,
+        fog: 0xefc094,
+      };
+
+      /* ------------------------------------------------------------------
+   SMALL HELPERS
+------------------------------------------------------------------ */
+      let seed = 19780613;
+      function rnd() {
+        seed |= 0;
+        seed = (seed + 0x6d2b79f5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      }
+      const rr = (a, b) => a + (b - a) * rnd();
+      const rpick = (arr) => arr[Math.floor(rnd() * arr.length) % arr.length];
+      const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+      const lerp = THREE.MathUtils.lerp;
+      const smoothstep = THREE.MathUtils.smoothstep;
+      const damp = (current, target, lambda, dt) =>
+        lerp(current, target, 1 - Math.exp(-lambda * dt));
+      function wrapAngle(a) {
+        while (a > Math.PI) a -= Math.PI * 2;
+        while (a < -Math.PI) a += Math.PI * 2;
+        return a;
+      }
+
+      function hash2(ix, iz) {
+        const s = Math.sin(ix * 127.1 + iz * 311.7) * 43758.5453;
+        return s - Math.floor(s);
+      }
+      function vnoise(x, z) {
+        const ix = Math.floor(x),
+          iz = Math.floor(z);
+        const fx = x - ix,
+          fz = z - iz;
+        const ux = fx * fx * (3 - 2 * fx),
+          uz = fz * fz * (3 - 2 * fz);
+        const a = hash2(ix, iz),
+          b = hash2(ix + 1, iz),
+          c = hash2(ix, iz + 1),
+          d = hash2(ix + 1, iz + 1);
+        return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
+      }
+
+      function asColor(value) {
+        return value instanceof THREE.Color ? value.clone() : new THREE.Color(value);
+      }
+
+      /* Bake a soft colour gradient into any smooth primitive: lighter where the
+   surface faces the sky / the low sun, darker underneath, plus an optional
+   bottom-to-top colour ramp. Deterministic per vertex so shading stays smooth. */
+      const _tmpColor = new THREE.Color();
+      function applySmoothColors(geo, baseColor, opts = {}) {
+        const base = asColor(baseColor);
+        const top = opts.top !== undefined ? asColor(opts.top) : null;
+        const pos = geo.attributes.position;
+        const nor = geo.attributes.normal;
+        const count = pos.count;
+        const colors = new Float32Array(count * 3);
+        const topBoost = opts.topBoost ?? 1.14;
+        const bottomShade = opts.bottomShade ?? 0.74;
+        const sunTint = opts.sunTint ?? 0.07;
+        const k = (opts.brightness ?? 1) * (1 + (rnd() - 0.5) * (opts.variation ?? 0.04));
+        let minY = Infinity,
+          maxY = -Infinity;
+        for (let i = 0; i < count; i++) {
+          const y = pos.getY(i);
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+        const span = Math.max(1e-5, maxY - minY);
+        for (let i = 0; i < count; i++) {
+          const nx = nor.getX(i),
+            ny = nor.getY(i),
+            nz = nor.getZ(i);
+          const h = (pos.getY(i) - minY) / span;
+          let shade = ny >= 0 ? 1 + (topBoost - 1) * ny : 1 + (bottomShade - 1) * -ny;
+          shade *= 1 + sunTint * Math.max(0, nx * 0.7 + ny * 0.34 - nz * 0.63);
+          shade *= 0.95 + 0.09 * h;
+          if (top) _tmpColor.copy(base).lerp(top, h);
+          else _tmpColor.copy(base);
+          colors[i * 3] = _tmpColor.r * shade * k;
+          colors[i * 3 + 1] = _tmpColor.g * shade * k;
+          colors[i * 3 + 2] = _tmpColor.b * shade * k;
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        return geo;
+      }
+
+      const _tmpVec = new THREE.Vector3();
+      function radialNormals(geo) {
+        const p = geo.attributes.position,
+          n = geo.attributes.normal;
+        for (let i = 0; i < p.count; i++) {
+          _tmpVec.fromBufferAttribute(p, i).normalize();
+          n.setXYZ(i, _tmpVec.x, _tmpVec.y, _tmpVec.z);
+        }
+        return geo;
+      }
+
+      function whiteColors(geo) {
+        const c = new Float32Array(geo.attributes.position.count * 3).fill(1);
+        geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+        return geo;
+      }
+
+      /* Finish a primitive: scale -> rotate X -> rotate Y -> rotate Z, bake colours,
+   then translate. Indexed geometries are kept indexed so that a merged mesh can
+   be re-normalled smoothly with computeVertexNormals(). */
+      function prim(geo, color, opts = {}, x = 0, y = 0, z = 0, keepIndexed = false) {
+        if (!keepIndexed && geo.index) {
+          const flat = geo.toNonIndexed();
+          geo.dispose();
+          geo = flat;
+        }
+        if (opts.scale) geo.scale(opts.scale[0], opts.scale[1], opts.scale[2]);
+        if (opts.rx) geo.rotateX(opts.rx);
+        if (opts.ry) geo.rotateY(opts.ry);
+        if (opts.rz) geo.rotateZ(opts.rz);
+        geo.deleteAttribute('uv');
+        applySmoothColors(geo, color, opts);
+        geo.translate(x, y, z);
+        return geo;
+      }
+
+      /* Average normals of coincident vertices so faceted rock shapes read as smooth. */
+      function smoothNormals(geo) {
+        const pos = geo.attributes.position,
+          nor = geo.attributes.normal;
+        const buckets = new Map();
+        const keyOf = (i) =>
+          `${pos.getX(i).toFixed(4)}|${pos.getY(i).toFixed(4)}|${pos.getZ(i).toFixed(4)}`;
+        for (let i = 0; i < pos.count; i++) {
+          const k = keyOf(i);
+          let e = buckets.get(k);
+          if (!e) {
+            e = [0, 0, 0];
+            buckets.set(k, e);
+          }
+          e[0] += nor.getX(i);
+          e[1] += nor.getY(i);
+          e[2] += nor.getZ(i);
+        }
+        for (let i = 0; i < pos.count; i++) {
+          const e = buckets.get(keyOf(i));
+          const l = Math.hypot(e[0], e[1], e[2]) || 1;
+          nor.setXYZ(i, e[0] / l, e[1] / l, e[2] / l);
+        }
+        nor.needsUpdate = true;
+        return geo;
+      }
+
+      /* Build one continuous swept surface along a spine of control points.
+   This gives a single seamless skin (no sphere/capsule intersections)
+   with per-vertex colours painted by a callback. */
+      const _swS = new THREE.Vector3();
+      const _swU = new THREE.Vector3();
+      const _swT = new THREE.Vector3();
+      const _swRef = new THREE.Vector3();
+      function sweepGeometry(controls, opts = {}) {
+        const sides = opts.sides ?? 26;
+        const rings = opts.rings ?? 36;
+        const pts = controls.map((c) => c.p);
+        const curve = new THREE.CatmullRomCurve3(pts, false, 'centripetal', 0.5);
+        const radCurve = new THREE.CatmullRomCurve3(
+          controls.map((c) => new THREE.Vector3(c.rx ?? c.r ?? 0.1, c.ry ?? c.rx ?? c.r ?? 0.1, 0)),
+          false,
+          'centripetal',
+          0.5
+        );
+        const upRef = (opts.up ?? new THREE.Vector3(0, 1, 0)).clone().normalize();
+        const _swRef2 = new THREE.Vector3();
+        const capStart = opts.capStart !== false;
+        const capEnd = opts.capEnd !== false;
+        const vCount = rings * sides + (capStart ? 1 : 0) + (capEnd ? 1 : 0);
+        const positions = new Float32Array(vCount * 3);
+        const normals = new Float32Array(vCount * 3);
+        const colors = new Float32Array(vCount * 3);
+        const index = [];
+        for (let i = 0; i < rings - 1; i++) {
+          for (let j = 0; j < sides; j++) {
+            const a = i * sides + j;
+            const b = i * sides + ((j + 1) % sides);
+            const c = a + sides;
+            const d = b + sides;
+            index.push(a, b, c, b, d, c);
+          }
+        }
+        const colorFn = opts.colorFn;
+        const out = new THREE.Color();
+        for (let i = 0; i < rings; i++) {
+          const t = i / (rings - 1);
+          const p = curve.getPoint(t);
+          curve.getTangent(t, _swT).normalize();
+          // twist-free frame: keep one reference direction and re-orthogonalise it
+          _swRef2.copy(upRef).addScaledVector(_swT, -upRef.dot(_swT));
+          if (_swRef2.lengthSq() < 1e-4) {
+            _swRef2.set(0, 0, 1).addScaledVector(_swT, -_swT.z);
+            if (_swRef2.lengthSq() < 1e-4) _swRef2.set(1, 0, 0);
+          }
+          _swRef2.normalize();
+          _swS.crossVectors(_swRef2, _swT).normalize();
+          _swU.crossVectors(_swT, _swS).normalize();
+          const r = radCurve.getPoint(t);
+          const rx = r.x,
+            ry = r.y;
+          for (let j = 0; j < sides; j++) {
+            const ang = (j / sides) * Math.PI * 2;
+            const ca = Math.cos(ang),
+              sa = Math.sin(ang);
+            const nx = _swS.x * ca + _swU.x * sa;
+            const ny = _swS.y * ca + _swU.y * sa;
+            const nz = _swS.z * ca + _swU.z * sa;
+            const k = (i * sides + j) * 3;
+            positions[k] = p.x + _swS.x * ca * rx + _swU.x * sa * ry;
+            positions[k + 1] = p.y + _swS.y * ca * rx + _swU.y * sa * ry;
+            positions[k + 2] = p.z + _swS.z * ca * rx + _swU.z * sa * ry;
+            normals[k] = nx;
+            normals[k + 1] = ny;
+            normals[k + 2] = nz;
+            if (colorFn) colorFn(t, ang, out);
+            else out.setRGB(1, 1, 1);
+            colors[k] = out.r;
+            colors[k + 1] = out.g;
+            colors[k + 2] = out.b;
+          }
+        }
+        // close both ends with a fan so the skin is watertight
+        let vi = rings * sides;
+        if (capStart) {
+          const p0 = curve.getPoint(0);
+          curve.getTangent(0, _swT).normalize();
+          positions[vi * 3] = p0.x;
+          positions[vi * 3 + 1] = p0.y;
+          positions[vi * 3 + 2] = p0.z;
+          normals[vi * 3] = -_swT.x;
+          normals[vi * 3 + 1] = -_swT.y;
+          normals[vi * 3 + 2] = -_swT.z;
+          if (colorFn) colorFn(0, 0, out);
+          else out.setRGB(1, 1, 1);
+          colors[vi * 3] = out.r;
+          colors[vi * 3 + 1] = out.g;
+          colors[vi * 3 + 2] = out.b;
+          for (let j = 0; j < sides; j++) {
+            index.push(vi, (j + 1) % sides, j);
+          }
+          vi++;
+        }
+        if (capEnd) {
+          const p1 = curve.getPoint(1);
+          curve.getTangent(1, _swT).normalize();
+          positions[vi * 3] = p1.x;
+          positions[vi * 3 + 1] = p1.y;
+          positions[vi * 3 + 2] = p1.z;
+          normals[vi * 3] = _swT.x;
+          normals[vi * 3 + 1] = _swT.y;
+          normals[vi * 3 + 2] = _swT.z;
+          if (colorFn) colorFn(1, Math.PI / 2, out);
+          else out.setRGB(1, 1, 1);
+          colors[vi * 3] = out.r;
+          colors[vi * 3 + 1] = out.g;
+          colors[vi * 3 + 2] = out.b;
+          const base = (rings - 1) * sides;
+          for (let j = 0; j < sides; j++) {
+            index.push(vi, base + j, base + ((j + 1) % sides));
+          }
+          vi++;
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.setIndex(index);
+        geo.computeVertexNormals();
+        return geo;
+      }
+
+      class PrimBatch {
+        constructor(indexed = false) {
+          this.parts = [];
+          this.indexed = indexed;
+        }
+        addRaw(geo) {
+          this.parts.push(geo);
+          return this;
+        }
+        add(geo, x, y, z, color, opts = {}) {
+          this.parts.push(prim(geo, color, opts, x, y, z, this.indexed));
+          return this;
+        }
+        ico(r, detail, x, y, z, color, opts = {}) {
+          return this.add(
+            radialNormals(new THREE.IcosahedronGeometry(r, detail)),
+            x,
+            y,
+            z,
+            color,
+            opts
+          );
+        }
+        sphere(r, ws, hs, x, y, z, color, opts = {}) {
+          return this.add(new THREE.SphereGeometry(r, ws, hs), x, y, z, color, opts);
+        }
+        cyl(rTop, rBottom, h, seg, x, y, z, color, opts = {}) {
+          return this.add(
+            new THREE.CylinderGeometry(rTop, rBottom, h, seg, 1, false),
+            x,
+            y,
+            z,
+            color,
+            opts
+          );
+        }
+        cone(r, h, seg, x, y, z, color, opts = {}) {
+          return this.add(new THREE.ConeGeometry(r, h, seg, 1, false), x, y, z, color, opts);
+        }
+        cap(r, len, x, y, z, color, opts = {}) {
+          return this.add(
+            new THREE.CapsuleGeometry(r, len, opts.capSeg ?? 5, opts.seg ?? 12),
+            x,
+            y,
+            z,
+            color,
+            opts
+          );
+        }
+        geometry() {
+          const merged = mergeGeometries(this.parts, false);
+          this.parts.forEach((p) => p.dispose());
+          this.parts.length = 0;
+          // Indexed batches get one shared, smoothly recomputed normal field so
+          // lighting runs perfectly across the merged surface. Non-indexed batches
+          // (rocks, leaves, hills) keep their own authored normals.
+          if (merged && this.indexed) merged.computeVertexNormals();
+          return merged;
+        }
+        build(material, castShadow = true, receiveShadow = true) {
+          if (!this.parts.length) return null;
+          const mesh = new THREE.Mesh(this.geometry(), material);
+          mesh.castShadow = castShadow;
+          mesh.receiveShadow = receiveShadow;
+          return mesh;
+        }
+      }
+
+      /* ------------------------------------------------------------------
+   RENDERER / SCENE / CAMERA / POST
+------------------------------------------------------------------ */
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.08;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      document.body.appendChild(renderer.domElement);
+      const canvas = renderer.domElement;
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(PAL.fog, 0.012);
+
+      const camera = new THREE.PerspectiveCamera(
+        50,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        700
+      );
+      camera.position.set(3.2, 3.6, 12);
+      camera.lookAt(1.3, 1.3, 0.5);
+
+      const composer = new EffectComposer(renderer);
+      composer.setPixelRatio(renderer.getPixelRatio());
+      composer.setSize(window.innerWidth, window.innerHeight);
+      composer.renderTarget1.samples = 4;
+      composer.renderTarget2.samples = 4;
+      const renderPass = new RenderPass(scene, camera);
+      const bloomPass = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.52,
+        0.74,
+        0.88
+      );
+      const outputPass = new OutputPass();
+      composer.addPass(renderPass);
+      composer.addPass(bloomPass);
+      composer.addPass(outputPass);
+
+      /* ------------------------------------------------------------------
+   LIGHTS (unchanged golden-hour rig)
+------------------------------------------------------------------ */
+      const sunLight = new THREE.DirectionalLight(0xffbd78, 3.35);
+      sunLight.position.set(30, 16, -30);
+      sunLight.target.position.set(-1, 1.2, -2.5);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.set(2048, 2048);
+      sunLight.shadow.camera.left = -27;
+      sunLight.shadow.camera.right = 27;
+      sunLight.shadow.camera.top = 27;
+      sunLight.shadow.camera.bottom = -27;
+      sunLight.shadow.camera.near = 1;
+      sunLight.shadow.camera.far = 105;
+      sunLight.shadow.bias = -0.0006;
+      sunLight.shadow.normalBias = 0.035;
+      sunLight.shadow.radius = 4;
+      scene.add(sunLight, sunLight.target);
+
+      const skyFill = new THREE.HemisphereLight(0xffddb8, 0x6b5834, 1.18);
+      scene.add(skyFill);
+
+      const coolRim = new THREE.DirectionalLight(0x96b8df, 0.82);
+      coolRim.position.set(-16, 10, -13);
+      scene.add(coolRim);
+
+      const amberBounce = new THREE.DirectionalLight(0xffb26d, 0.82);
+      amberBounce.position.set(10, 5, 11);
+      scene.add(amberBounce);
+
+      const ambientWarm = new THREE.AmbientLight(0xffdfc2, 0.16);
+      scene.add(ambientWarm);
+
+      /* ------------------------------------------------------------------
+   SHARED MATERIALS (smooth shading everywhere)
+------------------------------------------------------------------ */
+      const solidMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.78,
+        metalness: 0.0,
+      });
+      const groundMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.95,
+        metalness: 0.0,
+      });
+      const foliageMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0.0,
+      });
+      const appleMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.42,
+        metalness: 0.0,
+      });
+
+      /* ------------------------------------------------------------------
+   SKY DOME, LOW SUN, CLOUDS, DISTANT HILLS
+------------------------------------------------------------------ */
+      const skyGeo = new THREE.SphereGeometry(330, 32, 48);
+      {
+        const pos = skyGeo.attributes.position;
+        const skyColors = new Float32Array(pos.count * 3);
+        const stops = [
+          { t: 0.0, c: new THREE.Color(0xba8c61) },
+          { t: 0.19, c: new THREE.Color(0xf6c392) },
+          { t: 0.27, c: new THREE.Color(0xfad3a2) },
+          { t: 0.4, c: new THREE.Color(0xf3c5a0) },
+          { t: 0.56, c: new THREE.Color(0xdfb3a5) },
+          { t: 0.74, c: new THREE.Color(0xaeb4bf) },
+          { t: 1.0, c: new THREE.Color(0x8597b2) },
+        ];
+        const tmp = new THREE.Color();
+        for (let i = 0; i < pos.count; i++) {
+          const t = clamp(0.2 + pos.getY(i) / 258, 0, 1);
+          let a = stops[0],
+            b = stops[stops.length - 1];
+          for (let s = 0; s < stops.length - 1; s++) {
+            if (t >= stops[s].t && t <= stops[s + 1].t) {
+              a = stops[s];
+              b = stops[s + 1];
+              break;
+            }
+          }
+          const f = clamp((t - a.t) / Math.max(0.0001, b.t - a.t), 0, 1);
+          tmp.copy(a.c).lerp(b.c, f);
+          skyColors[i * 3] = tmp.r;
+          skyColors[i * 3 + 1] = tmp.g;
+          skyColors[i * 3 + 2] = tmp.b;
+        }
+        skyGeo.setAttribute('color', new THREE.BufferAttribute(skyColors, 3));
+      }
+      const sky = new THREE.Mesh(
+        skyGeo,
+        new THREE.MeshBasicMaterial({
+          vertexColors: true,
+          side: THREE.BackSide,
+          depthWrite: false,
+          fog: false,
+        })
+      );
+      sky.renderOrder = -10;
+      sky.frustumCulled = false;
+      scene.add(sky);
+
+      const sunGroup = new THREE.Group();
+      sunGroup.position.set(34, 22, -168);
+      scene.add(sunGroup);
+
+      // Smooth sun disc: hot core, slightly warmer limb.
+      const sunGeo = new THREE.SphereGeometry(11.5, 32, 24);
+      {
+        const n = sunGeo.attributes.normal;
+        const c = new Float32Array(n.count * 3);
+        for (let i = 0; i < n.count; i++) {
+          const f = smoothstep(n.getZ(i), 0.05, 0.85);
+          c[i * 3] = lerp(0.8, 1, f);
+          c[i * 3 + 1] = lerp(0.56, 1, f);
+          c[i * 3 + 2] = lerp(0.42, 1, f);
+        }
+        sunGeo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+      }
+      const sunCoreMat = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
+      sunCoreMat.color.setRGB(4.8, 2.9, 1.25);
+      const sunCore = new THREE.Mesh(sunGeo, sunCoreMat);
+      sunGroup.add(sunCore);
+
+      // Soft radial glow discs behind the sun (additive, fading to nothing at the rim).
+      const sunHaloMats = [];
+      const haloBaseOpacity = [];
+      function addGlowDisc(radius, r, g, b, opacity, z) {
+        const geo = new THREE.RingGeometry(0, radius, 48, 6);
+        const p = geo.attributes.position;
+        const c = new Float32Array(p.count * 3);
+        for (let i = 0; i < p.count; i++) {
+          const d = Math.min(1, Math.hypot(p.getX(i), p.getY(i)) / radius);
+          const f = Math.pow(1 - d, 2.2);
+          c[i * 3] = r * f;
+          c[i * 3 + 1] = g * f;
+          c[i * 3 + 2] = b * f;
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+        const mat = new THREE.MeshBasicMaterial({
+          vertexColors: true,
+          transparent: true,
+          opacity,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          fog: false,
+          side: THREE.DoubleSide,
+        });
+        const disc = new THREE.Mesh(geo, mat);
+        disc.position.z = z;
+        disc.renderOrder = 2;
+        sunGroup.add(disc);
+        sunHaloMats.push(mat);
+        haloBaseOpacity.push(opacity);
+      }
+      addGlowDisc(44, 1.0, 0.64, 0.32, 0.55, -2);
+      addGlowDisc(98, 1.0, 0.56, 0.28, 0.24, -3);
+
+      // Soft sunset clouds: stretched, overlapping smooth puffs.
+      function makeCloud(puffs, tint) {
+        const batch = new PrimBatch();
+        puffs.forEach(([r, x, y, z, br]) => {
+          batch.ico(r, 2, x, y, z, tint, {
+            scale: [2.3, 0.42, 1],
+            brightness: br ?? 1,
+            variation: 0.03,
+            topBoost: 1.06,
+            bottomShade: 0.9,
+            sunTint: 0.1,
+          });
+        });
+        const mesh = batch.build(
+          new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }),
+          false,
+          false
+        );
+        mesh.renderOrder = -5;
+        scene.add(mesh);
+        return mesh;
+      }
+      makeCloud(
+        [
+          [6.2, -88, 39, -188, 1.03],
+          [4.1, -74, 40.4, -186, 0.96],
+          [5.2, -60, 41.8, -188, 0.95],
+          [3.4, -48, 42.6, -190, 0.9],
+          [3.0, -101, 38.4, -186, 0.9],
+          [3.6, -40, 43.0, -186, 1.02],
+        ],
+        0xf0c3a6
+      );
+      makeCloud(
+        [
+          [4.4, 12, 30, -198, 0.98],
+          [3.0, 22, 31.4, -196, 0.92],
+          [3.2, 31, 30.4, -200, 1.02],
+          [2.2, 3, 31.2, -200, 0.88],
+        ],
+        0xeab79b
+      );
+      makeCloud(
+        [
+          [4.8, 98, 26.5, -196, 0.92],
+          [3.3, 88, 27.8, -198, 1.02],
+          [2.4, 112, 27.2, -198, 0.88],
+        ],
+        0xdfa990
+      );
+      makeCloud(
+        [
+          [3.6, -28, 58.5, -210, 0.86],
+          [2.3, -17, 59.5, -212, 0.92],
+          [1.9, -39, 57.7, -210, 0.82],
+        ],
+        0xe7c5b9
+      );
+
+      // Hazy rolling hills from overlapping flattened domes.
+      const ridgeNear = new PrimBatch();
+      const ridgeFar = new PrimBatch();
+      for (let x = -150; x <= 150; x += 12) {
+        const h = 4.5 + 4.4 * (0.5 + 0.5 * Math.sin(x * 0.09 + 1.2)) + rr(-1.2, 2.0);
+        ridgeNear.sphere(9, 12, 8, x, -0.4, -121, 0x8d7850, {
+          scale: [1.55, h / 9, 1.2],
+          brightness: rr(0.94, 1.05),
+          bottomShade: 0.9,
+          topBoost: 1.06,
+        });
+      }
+      for (let x = -170; x <= 170; x += 15) {
+        const h = 6 + 6 * (0.5 + 0.5 * Math.sin(x * 0.06 - 0.8)) + rr(-1.6, 2.2);
+        ridgeFar.sphere(12, 12, 8, x, -0.5, -155, 0xb19a79, {
+          scale: [1.6, h / 12, 1.2],
+          brightness: rr(0.97, 1.06),
+          bottomShade: 0.9,
+          topBoost: 1.05,
+        });
+      }
+      const ridgeMaterial = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+      scene.add(
+        ridgeNear.build(ridgeMaterial, false, false),
+        ridgeFar.build(ridgeMaterial, false, false)
+      );
+
+      /* ------------------------------------------------------------------
+   GROUND, CLEARING AND STONE PATH
+------------------------------------------------------------------ */
+      const GROUND_Y = 0.1;
+      const FOX_Y = 0.12;
+      const TREE_X = -4.8,
+        TREE_Z = -6.2;
+
+      const baseGround = new THREE.Mesh(
+        new THREE.CircleGeometry(200, 64).rotateX(-Math.PI / 2),
+        new THREE.MeshStandardMaterial({ color: PAL.base, roughness: 1 })
+      );
+      baseGround.position.set(0, -0.08, -18);
+      baseGround.receiveShadow = true;
+      scene.add(baseGround);
+
+      const pathCurve = new THREE.CatmullRomCurve3(
+        [
+          new THREE.Vector3(-14, 0, -46),
+          new THREE.Vector3(-7, 0, -36),
+          new THREE.Vector3(-1, 0, -27),
+          new THREE.Vector3(3.6, 0, -19),
+          new THREE.Vector3(3.1, 0, -12),
+          new THREE.Vector3(2.3, 0, -5.2),
+          new THREE.Vector3(2.15, 0, 1.2),
+          new THREE.Vector3(2.45, 0, 5.2),
+          new THREE.Vector3(2.95, 0, 8.4),
+          new THREE.Vector3(3.55, 0, 13.6),
+          new THREE.Vector3(2.5, 0, 20.5),
+          new THREE.Vector3(3.2, 0, 29),
+        ],
+        false,
+        'catmullrom',
+        0.5
+      );
+      const pathSamples = pathCurve.getSpacedPoints(210);
+
+      // One smooth, softly undulating field surface with painted vertex colours.
+      const fieldGeo = new THREE.PlaneGeometry(100, 92, 100, 92);
+      fieldGeo.rotateX(-Math.PI / 2);
+      fieldGeo.translate(0, 0, -12);
+      {
+        const p = fieldGeo.attributes.position;
+        const cols = new Float32Array(p.count * 3);
+        const cB = new THREE.Color(PAL.fieldB),
+          cC = new THREE.Color(PAL.fieldC);
+        const cGreen = new THREE.Color(PAL.fieldGreen),
+          cMoss = new THREE.Color(PAL.moss);
+        const cSoil = new THREE.Color(PAL.soil),
+          cSoil2 = new THREE.Color(PAL.soilDark);
+        const cBase = new THREE.Color(PAL.base);
+        const col = new THREE.Color(),
+          soil = new THREE.Color();
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i),
+            z = p.getZ(i);
+          const n1 = vnoise(x * 0.16, z * 0.16);
+          const n2 = vnoise(x * 0.55 + 31, z * 0.55 - 17);
+          col.copy(cB).lerp(cC, n1);
+          col.lerp(cGreen, clamp(n2 * 1.4 - 0.7, 0, 1) * 0.6);
+          const clearing = 1 - smoothstep(Math.hypot(x, z), 4.0, 6.6);
+          let d2 = 1e9;
+          for (let s = 0; s < pathSamples.length; s++) {
+            const dx = x - pathSamples[s].x,
+              dz = z - pathSamples[s].z;
+            const d = dx * dx + dz * dz;
+            if (d < d2) d2 = d;
+          }
+          const onPath = 1 - smoothstep(Math.sqrt(d2), 0.9, 1.9);
+          soil.copy(cSoil).lerp(cSoil2, n2);
+          col.lerp(soil, Math.max(clearing, onPath) * 0.92);
+          col.lerp(cMoss, (1 - smoothstep(Math.hypot(x - TREE_X, z - TREE_Z), 1.2, 3.6)) * 0.8);
+          const edge = smoothstep(Math.min(50 - Math.abs(x), z + 58, 34 - z), 0, 5);
+          col.lerp(cBase, 1 - edge);
+          const shade = 0.9 + 0.18 * n2;
+          cols[i * 3] = col.r * shade;
+          cols[i * 3 + 1] = col.g * shade;
+          cols[i * 3 + 2] = col.b * shade;
+          p.setY(i, lerp(-0.06, GROUND_Y + (n2 - 0.5) * 0.03, edge));
+        }
+        fieldGeo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+        fieldGeo.computeVertexNormals();
+      }
+      const fieldMesh = new THREE.Mesh(fieldGeo, groundMaterial);
+      fieldMesh.receiveShadow = true;
+      scene.add(fieldMesh);
+
+      /* Rounded, worn stepping stones and pebbles along the path.
+   Each stone is an irregular polyhedron, squashed a little on Y, randomly
+   rotated on every axis and sunk into the dirt so it reads as half-buried. */
+      const pathBatch = new PrimBatch();
+      const stoneColors = [0xbfae92, 0xa99780, 0xcbbb9f, 0x9c8b73, 0xb3a184];
+
+      function addStone(batch, x, z, size, color, opts = {}) {
+        // an irregular polyhedron, turned to a random orientation on all three axes
+        const geo =
+          rnd() < 0.5
+            ? new THREE.DodecahedronGeometry(size, 0)
+            : new THREE.IcosahedronGeometry(size, 1);
+        geo.rotateX(rr(0, Math.PI * 2));
+        geo.rotateY(rr(0, Math.PI * 2));
+        geo.rotateZ(rr(0, Math.PI * 2));
+        // lumpy silhouette: every copy of a shared corner gets the same push in or out
+        const sp = geo.attributes.position;
+        const phase = rr(0, 50);
+        for (let i = 0; i < sp.count; i++) {
+          const vx = sp.getX(i),
+            vy = sp.getY(i),
+            vz = sp.getZ(i);
+          const f = 1 + 0.17 * Math.sin((vx * 5.3 + vy * 7.1 + vz * 9.7) / size + phase);
+          sp.setXYZ(i, vx * f, vy * f, vz * f);
+        }
+        // a little flatter than it is wide (not a pancake), then a gentle tilt
+        geo.scale(rr(0.9, 1.35), opts.flat ?? rr(0.45, 0.62), rr(0.9, 1.3));
+        geo.rotateX(rr(-0.3, 0.3));
+        geo.rotateZ(rr(-0.3, 0.3));
+        geo.computeVertexNormals();
+        smoothNormals(geo);
+        // sink it by its real height so roughly half sits below the soil
+        geo.computeBoundingBox();
+        const bb = geo.boundingBox;
+        const y = GROUND_Y - bb.min.y - (bb.max.y - bb.min.y) * rr(0.42, 0.58);
+        batch.add(geo, x, y, z, color, {
+          brightness: (opts.brightness ?? rr(0.88, 1.06)) * 0.86,
+          topBoost: 1.08,
+          bottomShade: 0.6,
+          variation: 0.06,
+        });
+      }
+
+      for (let i = 2; i < pathSamples.length - 2; i++) {
+        const p = pathSamples[i];
+        const prev = pathSamples[i - 1];
+        const next = pathSamples[i + 1];
+        const tx = next.x - prev.x;
+        const tz = next.z - prev.z;
+        const tl = Math.hypot(tx, tz) || 1;
+        const nx = -tz / tl;
+        const nz = tx / tl;
+        for (let k = -1; k <= 1; k++) {
+          if (rnd() < 0.16) continue;
+          const off = k * 0.68 + rr(-0.15, 0.15);
+          addStone(
+            pathBatch,
+            p.x + nx * off + rr(-0.08, 0.08),
+            p.z + nz * off + rr(-0.08, 0.08),
+            rr(0.17, 0.29),
+            rpick(stoneColors)
+          );
+        }
+        if (rnd() < 0.72) {
+          const off = rr(-1.05, 1.05);
+          addStone(
+            pathBatch,
+            p.x + nx * off,
+            p.z + nz * off,
+            rr(0.05, 0.1),
+            rpick([0xe7d4b2, 0xbfa37b, 0xd5be96]),
+            { flat: rr(0.5, 0.8), brightness: rr(0.9, 1.08) }
+          );
+        }
+      }
+      for (let i = 0; i < 34; i++) {
+        const a = rr(0, Math.PI * 2);
+        const r = rr(1.3, 4.1);
+        addStone(
+          pathBatch,
+          Math.cos(a) * r,
+          Math.sin(a) * r + 0.8,
+          rr(0.05, 0.1),
+          rpick([0xd9c39c, 0xc5ab83, 0xe8d7b5]),
+          { flat: rr(0.5, 0.8), brightness: rr(0.92, 1.05) }
+        );
+      }
+      const pathGeo = pathBatch.geometry();
+      smoothNormals(pathGeo);
+      const pathMesh = new THREE.Mesh(pathGeo, groundMaterial);
+      pathMesh.castShadow = true;
+      pathMesh.receiveShadow = true;
+      scene.add(pathMesh);
+
+      // Sparse grass blades and tiny wildflowers around the clearing.
+      const tuftBatch = new PrimBatch();
+      for (let i = 0; i < 52; i++) {
+        const a = rr(0, Math.PI * 2);
+        const r = rr(1.9, 5.4);
+        const x = Math.cos(a) * r;
+        const z = Math.sin(a) * r;
+        const h = rr(0.24, 0.48);
+        tuftBatch.cone(0.04, h, 5, x, GROUND_Y + h / 2, z, rpick([0x7f8338, 0x929446, 0x6f7835]), {
+          rx: rr(-0.25, 0.25),
+          rz: rr(-0.25, 0.25),
+          top: 0xa9a850,
+        });
+        if (rnd() > 0.4) {
+          tuftBatch.cone(
+            0.034,
+            h * 0.75,
+            5,
+            x + 0.08,
+            GROUND_Y + h * 0.37,
+            z + rr(-0.06, 0.06),
+            0x898d3d,
+            { rx: rr(-0.3, 0.3), rz: rr(-0.35, 0.35), top: 0xa9a850 }
+          );
+        }
+        if (rnd() > 0.7)
+          tuftBatch.ico(0.045, 1, x, GROUND_Y + h + 0.02, z, 0xe4c16d, { scale: [1, 0.7, 1] });
+      }
+      scene.add(tuftBatch.build(groundMaterial, true, true));
+
+      /* ------------------------------------------------------------------
+   INSTANCED WHEAT (thin tapered stems + smooth ears) + WIND FIELD
+------------------------------------------------------------------ */
+      const wheatUniforms = {
+        uTime: { value: 0 },
+        uWind: { value: 1.0 },
+        uFox: { value: new THREE.Vector3(0, 0, 0) },
+      };
+
+      function makeWheatGeometry() {
+        const parts = [];
+        const TOP = 2.28;
+        const cTmp = new THREE.Color();
+        // All parts stay indexed; colour darkens toward the root, flex grows with height.
+        function part(geo, cBottom, cTop, tx, ty, tz, tiltZ = 0) {
+          if (tiltZ) geo.rotateZ(tiltZ);
+          geo.translate(tx, ty, tz);
+          geo.deleteAttribute('uv');
+          const pos = geo.attributes.position,
+            nor = geo.attributes.normal;
+          const n = pos.count;
+          const colors = new Float32Array(n * 3);
+          const flex = new Float32Array(n);
+          const a = asColor(cBottom),
+            b = asColor(cTop);
+          let minY = Infinity,
+            maxY = -Infinity;
+          for (let i = 0; i < n; i++) {
+            const y = pos.getY(i);
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+          const span = Math.max(1e-5, maxY - minY);
+          for (let i = 0; i < n; i++) {
+            const y = pos.getY(i);
+            const h = clamp(y / TOP, 0, 1);
+            const shade = (0.58 + 0.5 * h) * (1 + 0.1 * nor.getY(i));
+            cTmp.copy(a).lerp(b, (y - minY) / span);
+            colors[i * 3] = cTmp.r * shade;
+            colors[i * 3 + 1] = cTmp.g * shade;
+            colors[i * 3 + 2] = cTmp.b * shade;
+            flex[i] = h;
+          }
+          geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          geo.setAttribute('aFlex', new THREE.BufferAttribute(flex, 1));
+          parts.push(geo);
+        }
+        // lower + upper stem (thin tapered cylinders)
+        part(
+          new THREE.CylinderGeometry(0.026, 0.042, 1.0, 5, 2, true),
+          PAL.wheatStemA,
+          PAL.wheatStemB,
+          0,
+          0.5,
+          0
+        );
+        part(
+          new THREE.CylinderGeometry(0.017, 0.026, 0.64, 5, 1, true),
+          PAL.wheatStemB,
+          PAL.wheatStemC,
+          0,
+          1.31,
+          0
+        );
+        // plump, slightly brighter ear
+        const ear = new THREE.SphereGeometry(0.078, 6, 5);
+        ear.scale(1, 3.3, 1);
+        part(ear, PAL.wheatHead, PAL.wheatHeadLight, 0, 1.84, 0);
+        // awns
+        part(
+          new THREE.ConeGeometry(0.02, 0.26, 4, 1, true),
+          PAL.wheatHeadLight,
+          PAL.wheatHeadLight,
+          0,
+          2.15,
+          0
+        );
+        part(
+          new THREE.ConeGeometry(0.012, 0.24, 3, 1, true),
+          PAL.wheatHead,
+          PAL.wheatHeadLight,
+          -0.07,
+          2.06,
+          0,
+          0.42
+        );
+        part(
+          new THREE.ConeGeometry(0.012, 0.24, 3, 1, true),
+          PAL.wheatHead,
+          PAL.wheatHeadLight,
+          0.07,
+          2.06,
+          0,
+          -0.42
+        );
+        // one angled leaf blade
+        const leaf = new THREE.ConeGeometry(0.04, 0.72, 4, 1, true);
+        leaf.scale(1, 1, 0.3);
+        part(leaf, PAL.wheatStemA, 0xb9973f, 0.2, 0.86, 0, -0.6);
+
+        const merged = mergeGeometries(parts, false);
+        parts.forEach((p) => p.dispose());
+        return merged;
+      }
+
+      const wheatMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.72,
+        metalness: 0.0,
+      });
+
+      wheatMaterial.onBeforeCompile = (shader) => {
+        shader.uniforms.uTime = wheatUniforms.uTime;
+        shader.uniforms.uWind = wheatUniforms.uWind;
+        shader.uniforms.uFox = wheatUniforms.uFox;
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <common>',
+          `#include <common>
+     uniform float uTime;
+     uniform float uWind;
+     uniform vec3 uFox;
+     attribute float aFlex;
+     varying float vWheatWave;`
+        );
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <project_vertex>',
+          `vec4 mvPosition = vec4( transformed, 1.0 );
+     #ifdef USE_INSTANCING
+       mvPosition = instanceMatrix * mvPosition;
+     #endif
+     vec4 wheatWorld = modelMatrix * mvPosition;
+     float windPhase = wheatWorld.x * 0.4 + wheatWorld.z * 0.16;
+     float waveA = sin( uTime * 0.88 - windPhase );
+     float waveB = sin( uTime * 0.47 + windPhase * 1.63 + 1.4 ) * 0.34;
+     float gust = 0.66 + 0.34 * sin( uTime * 0.20 + wheatWorld.x * 0.058 + wheatWorld.z * 0.038 );
+     float flex = aFlex * aFlex;
+     float bend = ( waveA + waveB ) * gust * uWind * flex;
+     wheatWorld.x += bend * 0.44;
+     wheatWorld.z += bend * 0.17;
+     wheatWorld.y -= abs( bend ) * 0.028;
+     vec2 foxDelta = wheatWorld.xz - uFox.xz;
+     float foxDist = length( foxDelta );
+     float foxPush = ( 1.0 - smoothstep( 0.25, 1.7, foxDist ) ) * aFlex;
+     wheatWorld.xz += foxDelta / max( foxDist, 0.001 ) * foxPush * 0.85;
+     wheatWorld.y -= foxPush * aFlex * 0.5;
+     vWheatWave = clamp( waveA * gust * aFlex, 0.0, 1.0 );
+     mvPosition = viewMatrix * wheatWorld;
+     gl_Position = projectionMatrix * mvPosition;`
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <common>',
+          `#include <common>
+     varying float vWheatWave;`
+        );
+        shader.fragmentShader = shader.fragmentShader.replace(
+          '#include <color_fragment>',
+          `#include <color_fragment>
+     diffuseColor.rgb *= 1.0 + vWheatWave * 0.20;`
+        );
+      };
+      wheatMaterial.customProgramCacheKey = () => 'wheat-wind-smooth-v1';
+
+      const wheatGeometry = makeWheatGeometry();
+      const fieldStalks = [];
+      const useLiteField =
+        window.innerWidth < 820 || (navigator.deviceMemory && navigator.deviceMemory <= 4);
+      const fieldKeepChance = useLiteField ? 0.22 : 0.4;
+      const pathLookup = pathSamples.filter((_, i) => i % 4 === 0);
+
+      for (let x = -49; x <= 49; x += 0.62) {
+        for (let z = -57; z <= 31; z += 0.66) {
+          if (rnd() > fieldKeepChance) continue;
+          const px = x + rr(-0.27, 0.27);
+          const pz = z + rr(-0.28, 0.28);
+          const dFox = Math.hypot(px, pz);
+          if (dFox < 5.05) continue;
+          if (dFox < 6.5 && rnd() > (dFox - 5.05) / 1.45) continue;
+          if (Math.hypot(px - TREE_X, pz - TREE_Z) < 2.5) continue;
+          let nearPath = false;
+          for (let i = 0; i < pathLookup.length; i++) {
+            const p = pathLookup[i];
+            const dx = px - p.x;
+            const dz = pz - p.z;
+            if (dx * dx + dz * dz < 2.05) {
+              nearPath = true;
+              break;
+            }
+          }
+          if (nearPath) continue;
+          fieldStalks.push({
+            x: px,
+            z: pz,
+            h: rr(0.62, 0.95),
+            w: rr(0.9, 1.25),
+            yaw: rr(0, Math.PI * 2),
+            tiltX: rr(-0.12, 0.12),
+            tiltZ: rr(-0.12, 0.12),
+            tint: [rr(0.92, 1.12), rr(0.88, 1.04), rr(0.76, 0.94)],
+          });
+        }
+      }
+
+      const wheatMesh = new THREE.InstancedMesh(wheatGeometry, wheatMaterial, fieldStalks.length);
+      wheatMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      wheatMesh.frustumCulled = false;
+      wheatMesh.castShadow = false;
+      wheatMesh.receiveShadow = false;
+      const wheatDummy = new THREE.Object3D();
+      const wheatTint = new THREE.Color();
+      fieldStalks.forEach((s, i) => {
+        wheatDummy.position.set(s.x, GROUND_Y - 0.04, s.z);
+        wheatDummy.rotation.set(s.tiltX, s.yaw, s.tiltZ);
+        wheatDummy.scale.set(s.w, s.h, s.w);
+        wheatDummy.updateMatrix();
+        wheatMesh.setMatrixAt(i, wheatDummy.matrix);
+        wheatTint.setRGB(s.tint[0], s.tint[1], s.tint[2]);
+        wheatMesh.setColorAt(i, wheatTint);
+      });
+      wheatMesh.instanceMatrix.needsUpdate = true;
+      if (wheatMesh.instanceColor) wheatMesh.instanceColor.needsUpdate = true;
+      scene.add(wheatMesh);
+
+      /* ------------------------------------------------------------------
+   THE FOX: smooth capsules / spheres, jointed legs, curved tube tail
+------------------------------------------------------------------ */
+      const TAIL_RINGS = 28,
+        TAIL_SIDES = 14,
+        TAIL_LEN = 1.38;
+      function tailRadius(t) {
+        return (
+          0.04 +
+          0.075 * (1 - t) +
+          0.18 * Math.pow(Math.max(0, Math.sin(Math.PI * Math.pow(t, 1.25))), 0.8)
+        );
+      }
+
+      function buildTailGeometry() {
+        const vCount = TAIL_RINGS * TAIL_SIDES;
+        const geo = new THREE.BufferGeometry();
+        const positions = new Float32Array(vCount * 3);
+        const normals = new Float32Array(vCount * 3);
+        const colors = new Float32Array(vCount * 3);
+        const index = [];
+        for (let i = 0; i < TAIL_RINGS - 1; i++) {
+          for (let j = 0; j < TAIL_SIDES; j++) {
+            const a = i * TAIL_SIDES + j;
+            const b = i * TAIL_SIDES + ((j + 1) % TAIL_SIDES);
+            const c = a + TAIL_SIDES;
+            const d = b + TAIL_SIDES;
+            index.push(a, b, c, b, d, c);
+          }
+        }
+        const cOrange = new THREE.Color(PAL.foxOrange),
+          cLight = new THREE.Color(PAL.foxLight);
+        const cWhite = new THREE.Color(PAL.white);
+        const col = new THREE.Color();
+        for (let i = 0; i < TAIL_RINGS; i++) {
+          const t = i / (TAIL_RINGS - 1);
+          if (t < 0.6) col.copy(cOrange).lerp(cLight, t / 0.6);
+          else if (t < 0.8) col.copy(cLight).lerp(cWhite, (t - 0.6) / 0.2);
+          else col.copy(cWhite);
+          for (let j = 0; j < TAIL_SIDES; j++) {
+            const ang = (j / TAIL_SIDES) * Math.PI * 2;
+            const shade = 0.84 + 0.2 * (0.5 + 0.5 * Math.sin(ang));
+            const k = (i * TAIL_SIDES + j) * 3;
+            colors[k] = col.r * shade;
+            colors[k + 1] = col.g * shade;
+            colors[k + 2] = col.b * shade;
+          }
+        }
+        const posAttr = new THREE.BufferAttribute(positions, 3);
+        const norAttr = new THREE.BufferAttribute(normals, 3);
+        posAttr.setUsage(THREE.DynamicDrawUsage);
+        norAttr.setUsage(THREE.DynamicDrawUsage);
+        geo.setAttribute('position', posAttr);
+        geo.setAttribute('normal', norAttr);
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.setIndex(index);
+        geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0, -0.5), 2.2);
+        return geo;
+      }
+
+      // Re-shape the tail along a smoothly curving centre line (yaw / pitch vary along its length).
+      function updateTail(geo, yawBase, yawCurl, pitchBase, pitchCurl) {
+        const pos = geo.attributes.position.array;
+        const nor = geo.attributes.normal.array;
+        const seg = TAIL_LEN / (TAIL_RINGS - 1);
+        let px = 0,
+          py = 0,
+          pz = 0;
+        for (let i = 0; i < TAIL_RINGS; i++) {
+          const t = i / (TAIL_RINGS - 1);
+          const yaw = yawBase + yawCurl * t;
+          const pitch = pitchBase + pitchCurl * t;
+          const cp = Math.cos(pitch);
+          const dx = Math.sin(yaw) * cp,
+            dy = Math.sin(pitch),
+            dz = -Math.cos(yaw) * cp;
+          let sx = dz,
+            sz = -dx;
+          const sl = Math.hypot(sx, sz) || 1;
+          sx /= sl;
+          sz /= sl;
+          const ux = dy * sz,
+            uy = dz * sx - dx * sz,
+            uz = -dy * sx;
+          const r = i === TAIL_RINGS - 1 ? 0.004 : tailRadius(t);
+          for (let j = 0; j < TAIL_SIDES; j++) {
+            const ang = (j / TAIL_SIDES) * Math.PI * 2;
+            const ca = Math.cos(ang),
+              sa = Math.sin(ang);
+            const nx = ca * sx + sa * ux,
+              ny = sa * uy,
+              nz = ca * sz + sa * uz;
+            const k = (i * TAIL_SIDES + j) * 3;
+            pos[k] = px + nx * r;
+            pos[k + 1] = py + ny * r;
+            pos[k + 2] = pz + nz * r;
+            nor[k] = nx;
+            nor[k + 1] = ny;
+            nor[k + 2] = nz;
+          }
+          px += dx * seg;
+          py += dy * seg;
+          pz += dz * seg;
+        }
+        geo.attributes.position.needsUpdate = true;
+        geo.attributes.normal.needsUpdate = true;
+      }
+
+      /* ---------- THE FOX: ONE SEAMLESS SKIN ----------
+   Separate primitives pushed into each other always leave a crease where they
+   meet, however many segments they have. So the whole animal is described as
+   a single signed-distance field instead: smooth tubes for the spine, skull
+   and limbs, joined with a smooth union so every junction becomes a soft
+   fillet. A surface-nets pass turns that field into ONE mesh with analytic
+   (gradient) normals, and every vertex is weighted to the joints, so the same
+   continuous skin bends when the fox walks, runs, jumps or sits. */
+      const _cOrange = new THREE.Color(PAL.foxOrange);
+      const _cLight = new THREE.Color(PAL.foxLight);
+      const _cCream = new THREE.Color(PAL.cream);
+      const _cWhite = new THREE.Color(PAL.white);
+      const _cPaw = new THREE.Color(PAL.paw);
+
+      const FOX_SCALE = 1.2;
+      const useLiteFox =
+        window.innerWidth < 820 || (navigator.deviceMemory && navigator.deviceMemory <= 4);
+      // Joint positions in the standing rest pose, each relative to its parent joint.
+      const FOX_REST = {
+        torso: [0, 0.8, -0.42], // hips (the fox faces +Z)
+        head: [0, 0.46, 1.0], // child of torso
+        legF: [0.19, -0.02, 0.66], // child of torso, mirrored on x
+        legH: [0.21, -0.02, 0.0], // child of torso, mirrored on x
+        shin: [0, -0.3, 0.1], // child of the hind leg
+      };
+      // Control points [x, y, z, radius] in each joint's local space.
+      const FOX_SHAPES = {
+        body: [
+          [0, 0.02, -0.16, 0.19],
+          [0, 0.04, 0.0, 0.27],
+          [0, 0.03, 0.34, 0.285],
+          [0, 0.07, 0.64, 0.3],
+          [0, 0.25, 0.86, 0.205],
+          [0, 0.42, 0.98, 0.155],
+        ],
+        skull: [
+          [0, 0.03, -0.07, 0.185],
+          [0, 0.06, 0.05, 0.225],
+          [0, 0.0, 0.2, 0.15],
+          [0, -0.04, 0.34, 0.095],
+          [0, -0.06, 0.45, 0.062],
+        ],
+        cheek: [
+          [0.14, -0.03, 0.07, 0.115],
+          [0.2, -0.065, 0.02, 0.06],
+        ],
+        frontLeg: [
+          [0, 0.02, 0, 0.13],
+          [0, -0.3, 0.01, 0.088],
+          [0, -0.6, 0.0, 0.064],
+          [0, -0.7, 0.045, 0.078],
+        ],
+        thigh: [
+          [0, 0.0, 0.0, 0.19],
+          [0, -0.16, 0.06, 0.16],
+          [0, -0.3, 0.1, 0.115],
+        ],
+        shin: [
+          [0, 0, 0, 0.11],
+          [0, -0.2, -0.09, 0.068],
+          [0, -0.36, -0.04, 0.062],
+          [0, -0.4, 0.04, 0.078],
+        ],
+      };
+
+      function foxAdd(a, b) {
+        return [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+      }
+
+      // Joint order: 0 torso, 1 head, 2 legFL, 3 legFR, 4 legHL, 5 legHR, 6 shinL, 7 shinR
+      function foxPartDefs() {
+        const R = FOX_REST,
+          S = FOX_SHAPES;
+        const headO = foxAdd(R.torso, R.head);
+        const defs = [
+          { bone: 0, origin: R.torso, pts: S.body, up: 'y' },
+          { bone: 1, origin: headO, pts: S.skull, up: 'y' },
+          { bone: 1, origin: headO, pts: S.cheek, up: 'y' },
+          { bone: 1, origin: headO, pts: S.cheek.map((p) => [-p[0], p[1], p[2], p[3]]), up: 'y' },
+        ];
+        [-1, 1].forEach((s, i) => {
+          const fO = foxAdd(R.torso, [s * R.legF[0], R.legF[1], R.legF[2]]);
+          const hO = foxAdd(R.torso, [s * R.legH[0], R.legH[1], R.legH[2]]);
+          defs.push({ bone: 2 + i, origin: fO, pts: S.frontLeg, up: 'z', sock: 0.42 });
+          defs.push({ bone: 4 + i, origin: hO, pts: S.thigh, up: 'z' });
+          defs.push({ bone: 6 + i, origin: foxAdd(hO, R.shin), pts: S.shin, up: 'z', sock: 0.25 });
+        });
+        return defs;
+      }
+
+      // Turn a control-point chain into many short tapered capsules along a smooth spline.
+      function foxCompilePart(def) {
+        const o = def.origin;
+        const curve = new THREE.CatmullRomCurve3(
+          def.pts.map((p) => new THREE.Vector3(p[0] + o[0], p[1] + o[1], p[2] + o[2])),
+          false,
+          'centripetal'
+        );
+        const radii = new THREE.CatmullRomCurve3(
+          def.pts.map((p) => new THREE.Vector3(p[3], 0, 0)),
+          false,
+          'catmullrom',
+          0.5
+        );
+        const n = (def.pts.length - 1) * 6;
+        const segs = new Float32Array(n * 8);
+        const a = new THREE.Vector3(),
+          r = new THREE.Vector3();
+        const box = new THREE.Box3();
+        let maxR = 0;
+        for (let i = 0; i <= n; i++) {
+          curve.getPoint(i / n, a);
+          const ri = Math.max(0.012, radii.getPoint(i / n, r).x);
+          if (ri > maxR) maxR = ri;
+          box.expandByPoint(a);
+          if (i < n) segs.set([a.x, a.y, a.z, ri], i * 8);
+          if (i > 0) segs.set([a.x, a.y, a.z, ri], (i - 1) * 8 + 4);
+        }
+        const c = box.getCenter(new THREE.Vector3());
+        const cr = box.getSize(new THREE.Vector3()).length() * 0.5 + maxR;
+        return { bone: def.bone, segs, cx: c.x, cy: c.y, cz: c.z, cr, box, maxR };
+      }
+
+      // Signed distance to the whole fox: per-part distances joined by a smooth union.
+      function foxMakeSdf(parts, K) {
+        const np = parts.length;
+        return function sdf(x, y, z, out) {
+          let d = 1e9;
+          for (let pi = 0; pi < np; pi++) {
+            const part = parts[pi];
+            const ex = x - part.cx,
+              ey = y - part.cy,
+              ez = z - part.cz;
+            let di = Math.sqrt(ex * ex + ey * ey + ez * ez) - part.cr;
+            if (di < 0.3) {
+              const s = part.segs;
+              di = 1e9;
+              for (let i = 0; i < s.length; i += 8) {
+                const ax = s[i],
+                  ay = s[i + 1],
+                  az = s[i + 2],
+                  ar = s[i + 3];
+                const bx = s[i + 4] - ax,
+                  by = s[i + 5] - ay,
+                  bz = s[i + 6] - az;
+                const px = x - ax,
+                  py = y - ay,
+                  pz = z - az;
+                const l2 = bx * bx + by * by + bz * bz;
+                let h = l2 > 1e-12 ? (px * bx + py * by + pz * bz) / l2 : 0;
+                h = h < 0 ? 0 : h > 1 ? 1 : h;
+                const qx = px - bx * h,
+                  qy = py - by * h,
+                  qz = pz - bz * h;
+                const dd = Math.sqrt(qx * qx + qy * qy + qz * qz) - (ar + (s[i + 7] - ar) * h);
+                if (dd < di) di = dd;
+              }
+            }
+            if (out) out[pi] = di;
+            const hh = Math.max(K - Math.abs(d - di), 0) / K;
+            d = Math.min(d, di) - hh * hh * K * 0.25;
+          }
+          return d;
+        };
+      }
+
+      // Surface nets: one vertex per boundary cell, one quad per sign-changing lattice edge.
+      function surfaceNets(sdf, minX, minY, minZ, nx, ny, nz, cell) {
+        const sxy = nx * ny;
+        const field = new Float32Array(sxy * nz);
+        let q = 0;
+        for (let k = 0; k < nz; k++) {
+          const z = minZ + k * cell;
+          for (let j = 0; j < ny; j++) {
+            const y = minY + j * cell;
+            for (let i = 0; i < nx; i++) field[q++] = sdf(minX + i * cell, y, z, null);
+          }
+        }
+        const cxn = nx - 1,
+          cyn = ny - 1,
+          czn = nz - 1;
+        const cellVert = new Int32Array(cxn * cyn * czn).fill(-1);
+        const pos = [];
+        const v = new Float32Array(8);
+        for (let k = 0; k < czn; k++) {
+          for (let j = 0; j < cyn; j++) {
+            for (let i = 0; i < cxn; i++) {
+              const base = i + nx * j + sxy * k;
+              let mask = 0;
+              for (let c = 0; c < 8; c++) {
+                const val = field[base + (c & 1) + ((c >> 1) & 1) * nx + ((c >> 2) & 1) * sxy];
+                v[c] = val;
+                if (val < 0) mask |= 1 << c;
+              }
+              if (mask === 0 || mask === 255) continue;
+              let ax = 0,
+                ay = 0,
+                az = 0,
+                n = 0;
+              for (let c = 0; c < 8; c++) {
+                for (let bit = 1; bit <= 4; bit <<= 1) {
+                  if (c & bit) continue;
+                  const c2 = c | bit;
+                  if (v[c] < 0 === v[c2] < 0) continue;
+                  const t = v[c] / (v[c] - v[c2]);
+                  ax += (c & 1) + (bit === 1 ? t : 0);
+                  ay += ((c >> 1) & 1) + (bit === 2 ? t : 0);
+                  az += ((c >> 2) & 1) + (bit === 4 ? t : 0);
+                  n++;
+                }
+              }
+              cellVert[i + cxn * (j + cyn * k)] = pos.length / 3;
+              pos.push(
+                minX + (i + ax / n) * cell,
+                minY + (j + ay / n) * cell,
+                minZ + (k + az / n) * cell
+              );
+            }
+          }
+        }
+        const idx = [];
+        const cv = (i, j, k) => cellVert[i + cxn * (j + cyn * k)];
+        // Emit a quad, wound so its face points out of the solid along the given axis.
+        function quad(a, b, c, d, axis, outwardPositive) {
+          if (a < 0 || b < 0 || c < 0 || d < 0) return;
+          const ux = pos[b * 3] - pos[a * 3],
+            uy = pos[b * 3 + 1] - pos[a * 3 + 1],
+            uz = pos[b * 3 + 2] - pos[a * 3 + 2];
+          const wx = pos[c * 3] - pos[a * 3],
+            wy = pos[c * 3 + 1] - pos[a * 3 + 1],
+            wz = pos[c * 3 + 2] - pos[a * 3 + 2];
+          const nAxis =
+            axis === 0 ? uy * wz - uz * wy : axis === 1 ? uz * wx - ux * wz : ux * wy - uy * wx;
+          if (nAxis > 0 === outwardPositive) idx.push(a, b, c, a, c, d);
+          else idx.push(a, c, b, a, d, c);
+        }
+        for (let k = 1; k < czn; k++) {
+          for (let j = 1; j < cyn; j++) {
+            for (let i = 1; i < cxn; i++) {
+              const base = i + nx * j + sxy * k;
+              const in0 = field[base] < 0;
+              if (in0 !== field[base + 1] < 0)
+                quad(cv(i, j - 1, k - 1), cv(i, j, k - 1), cv(i, j, k), cv(i, j - 1, k), 0, in0);
+              if (in0 !== field[base + nx] < 0)
+                quad(cv(i - 1, j, k - 1), cv(i, j, k - 1), cv(i, j, k), cv(i - 1, j, k), 1, in0);
+              if (in0 !== field[base + sxy] < 0)
+                quad(cv(i - 1, j - 1, k), cv(i, j - 1, k), cv(i, j, k), cv(i - 1, j, k), 2, in0);
+            }
+          }
+        }
+        return { pos, idx };
+      }
+
+      // Mesh the field, then give every vertex a normal, joint weights and a painted colour.
+      function buildFoxSkin(defs) {
+        const parts = defs.map(foxCompilePart);
+        const cell = useLiteFox ? 0.027 : 0.021;
+        const sdf = foxMakeSdf(parts, 0.09);
+        const bounds = new THREE.Box3();
+        parts.forEach((p) => {
+          bounds.expandByPoint(_tmpVec.copy(p.box.min).addScalar(-p.maxR));
+          bounds.expandByPoint(_tmpVec.copy(p.box.max).addScalar(p.maxR));
+        });
+        bounds.expandByScalar(cell * 2.5);
+        const nx = Math.ceil((bounds.max.x - bounds.min.x) / cell) + 1;
+        const ny = Math.ceil((bounds.max.y - bounds.min.y) / cell) + 1;
+        const nz = Math.ceil((bounds.max.z - bounds.min.z) / cell) + 1;
+        const net = surfaceNets(sdf, bounds.min.x, bounds.min.y, bounds.min.z, nx, ny, nz, cell);
+        const count = net.pos.length / 3;
+        if (count < 500 || net.idx.length < 1500) throw new Error('fox skin came out empty');
+
+        const positions = new Float32Array(count * 3);
+        const normals = new Float32Array(count * 3);
+        const colors = new Float32Array(count * 3);
+        const skinIndex = new Uint16Array(count * 4);
+        const skinWeight = new Float32Array(count * 4);
+        const dists = new Float32Array(parts.length);
+        const bw = new Float32Array(8);
+        const g = new THREE.Vector3();
+        const col = new THREE.Color();
+        const e = 0.006;
+        const gradAt = (x, y, z) => {
+          g.set(
+            sdf(x + e, y, z) - sdf(x - e, y, z),
+            sdf(x, y + e, z) - sdf(x, y - e, z),
+            sdf(x, y, z + e) - sdf(x, y, z - e)
+          );
+          const l = g.length();
+          if (l > 1e-9) g.multiplyScalar(1 / l);
+          else g.set(0, 1, 0);
+          return g;
+        };
+        const tO = FOX_REST.torso;
+        const hO = foxAdd(FOX_REST.torso, FOX_REST.head);
+
+        for (let i = 0; i < count; i++) {
+          let x = net.pos[i * 3],
+            y = net.pos[i * 3 + 1],
+            z = net.pos[i * 3 + 2];
+          // pull the vertex exactly onto the surface, then take the field gradient as its normal
+          for (let it = 0; it < 2; it++) {
+            gradAt(x, y, z);
+            const d = clamp(sdf(x, y, z), -cell, cell);
+            x -= g.x * d;
+            y -= g.y * d;
+            z -= g.z * d;
+          }
+          gradAt(x, y, z);
+          const nX = g.x,
+            nY = g.y,
+            nZ = g.z;
+          positions[i * 3] = x;
+          positions[i * 3 + 1] = y;
+          positions[i * 3 + 2] = z;
+          normals[i * 3] = nX;
+          normals[i * 3 + 1] = nY;
+          normals[i * 3 + 2] = nZ;
+
+          // joint weights fall off with distance from each part, so joints bend smoothly
+          sdf(x, y, z, dists);
+          bw.fill(0);
+          for (let pi = 0; pi < parts.length; pi++) {
+            const w = Math.max(0, 1 - Math.max(0, dists[pi]) / 0.15);
+            const b = parts[pi].bone;
+            if (w * w > bw[b]) bw[b] = w * w;
+          }
+          const wT = bw[0],
+            wH = bw[1];
+          const wLeg = bw[2] + bw[3] + bw[4] + bw[5] + bw[6] + bw[7];
+          const wSum = wT + wH + wLeg || 1;
+          const tW = wT / wSum,
+            hW = wH / wSum,
+            lW = wLeg / wSum;
+          let total = 0;
+          for (let s = 0; s < 4; s++) {
+            let best = -1,
+              bestW = 0;
+            for (let b = 0; b < 8; b++)
+              if (bw[b] > bestW) {
+                bestW = bw[b];
+                best = b;
+              }
+            if (best < 0) break;
+            skinIndex[i * 4 + s] = best;
+            skinWeight[i * 4 + s] = bestW;
+            total += bestW;
+            bw[best] = 0;
+          }
+          if (total > 0) {
+            for (let s = 0; s < 4; s++) skinWeight[i * 4 + s] /= total;
+          } else {
+            skinIndex[i * 4] = 0;
+            skinWeight[i * 4] = 1;
+          }
+
+          // painted markings: orange coat, cream belly and bib, white muzzle and cheeks, dark socks
+          col.copy(_cOrange).lerp(_cLight, clamp(nY * 0.5 + 0.25, 0, 1));
+          const hx = x - hO[0],
+            hy = y - hO[1],
+            hz = z - hO[2];
+          const under = smoothstep(-nY, 0.2, 0.8) * tW;
+          const bib =
+            smoothstep(z - tO[2], 0.42, 0.78) *
+            smoothstep(nZ * 0.75 - nY * 0.65, 0.05, 0.55) *
+            (tW + hW * (1 - smoothstep(hy, -0.1, 0.0)));
+          col.lerp(_cCream, clamp(Math.max(under, bib), 0, 1));
+          col.lerp(_cWhite, clamp(bib, 0, 1) * 0.6);
+          const axisY = lerp(0.06, -0.06, clamp((hz - 0.05) / 0.4, 0, 1));
+          const lowerFace = (1 - smoothstep(hy - axisY, -0.04, 0.03)) * smoothstep(hz, -0.02, 0.12);
+          const cheekFace =
+            smoothstep(Math.abs(hx), 0.09, 0.18) * (1 - smoothstep(hy, -0.03, 0.09));
+          col.lerp(_cWhite, clamp(Math.max(lowerFace, cheekFace) * hW, 0, 1));
+          col.lerp(_cPaw, clamp(lW * (1 - smoothstep(y, 0.26, 0.5)), 0, 1));
+          const shade = nY >= 0 ? 1 + 0.1 * nY : 1 + 0.22 * nY;
+          colors[i * 3] = col.r * shade;
+          colors[i * 3 + 1] = col.g * shade;
+          colors[i * 3 + 2] = col.b * shade;
+        }
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+        geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geo.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(skinIndex, 4));
+        geo.setAttribute('skinWeight', new THREE.Float32BufferAttribute(skinWeight, 4));
+        geo.setIndex(net.idx);
+        return { geo, sdf };
+      }
+
+      function buildFox() {
+        const root = new THREE.Group();
+        const R = FOX_REST;
+        const joint = (parent, x, y, z) => {
+          const b = new THREE.Bone();
+          b.position.set(x, y, z);
+          parent.add(b);
+          return b;
+        };
+        const torso = joint(root, R.torso[0], R.torso[1], R.torso[2]);
+        const head = joint(torso, R.head[0], R.head[1], R.head[2]);
+        const legFL = joint(torso, -R.legF[0], R.legF[1], R.legF[2]);
+        const legFR = joint(torso, R.legF[0], R.legF[1], R.legF[2]);
+        const legHL = joint(torso, -R.legH[0], R.legH[1], R.legH[2]);
+        const legHR = joint(torso, R.legH[0], R.legH[1], R.legH[2]);
+        const shinL = joint(legHL, R.shin[0], R.shin[1], R.shin[2]);
+        const shinR = joint(legHR, R.shin[0], R.shin[1], R.shin[2]);
+        const bones = [torso, head, legFL, legFR, legHL, legHR, shinL, shinR];
+        const defs = foxPartDefs();
+
+        let sdf = null;
+        let skinMesh = null;
+        try {
+          const skin = buildFoxSkin(defs);
+          skinMesh = new THREE.SkinnedMesh(skin.geo, solidMaterial);
+          skinMesh.castShadow = true;
+          skinMesh.receiveShadow = true;
+          skinMesh.frustumCulled = false;
+          skinMesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.8, 0.2), 2.2);
+          root.add(skinMesh);
+          root.updateMatrixWorld(true);
+          skinMesh.bind(new THREE.Skeleton(bones));
+          sdf = skin.sdf;
+        } catch (err) {
+          // Safety net: if the skin cannot be built, fall back to smooth tubes on the same joints.
+          console.warn('Fox skin unavailable, using tube fallback.', err);
+          if (skinMesh) root.remove(skinMesh);
+          defs.forEach((d) => {
+            const geo = sweepGeometry(
+              d.pts.map((p) => ({ p: new THREE.Vector3(p[0], p[1], p[2]), r: p[3] })),
+              {
+                sides: 28,
+                rings: 34,
+                up: d.up === 'z' ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0),
+                colorFn: (t, ang, out) => {
+                  out.copy(_cOrange).lerp(_cLight, clamp(Math.sin(ang) * 0.4 + 0.3, 0, 1));
+                  if (d.sock) out.lerp(_cPaw, smoothstep(t, d.sock, d.sock + 0.25));
+                  return out;
+                },
+              }
+            );
+            const m = new THREE.Mesh(geo, solidMaterial);
+            m.castShadow = true;
+            m.receiveShadow = true;
+            bones[d.bone].add(m);
+          });
+        }
+
+        // Eyes and nose sit exactly on the skin: probe the surface from the front.
+        const hO = foxAdd(R.torso, R.head);
+        const surfaceZ = (lx, ly, fallback) => {
+          if (!sdf) return fallback;
+          for (let zz = 0.75; zz > -0.1; zz -= 0.004) {
+            if (sdf(hO[0] + lx, hO[1] + ly, hO[2] + zz, null) < 0) return zz;
+          }
+          return fallback;
+        };
+        const face = new PrimBatch();
+        const eyeOpts = { topBoost: 1, bottomShade: 1, sunTint: 0, variation: 0 };
+        [-1, 1].forEach((s) => {
+          const ez = surfaceZ(s * 0.115, 0.1, 0.2) - 0.018;
+          face.sphere(0.046, 32, 24, s * 0.115, 0.1, ez, PAL.eye, eyeOpts);
+          face.sphere(0.013, 12, 8, s * 0.115 + 0.014, 0.118, ez + 0.037, 0xfff3dc, eyeOpts);
+        });
+        const noseZ = surfaceZ(0, -0.05, 0.5);
+        face.sphere(0.047, 32, 24, 0, -0.045, noseZ - 0.012, PAL.nose, {
+          scale: [1.1, 0.85, 1],
+          topBoost: 1.4,
+          variation: 0.02,
+        });
+        head.add(face.build(appleMaterial, true, false));
+
+        function makeEar(side) {
+          const ear = new THREE.Group();
+          ear.position.set(side * 0.125, 0.19, -0.02);
+          const eb = new PrimBatch();
+          eb.cone(0.11, 0.36, 24, 0, 0.18, 0, PAL.foxOrange, { scale: [1, 1, 0.5], top: PAL.dark });
+          eb.cone(0.066, 0.23, 20, 0, 0.145, 0.036, 0x7a4a3a, {
+            scale: [1, 1, 0.4],
+            top: PAL.dark,
+            sunTint: 0,
+          });
+          ear.add(eb.build(solidMaterial, true, true));
+          ear.rotation.z = -side * 0.2;
+          head.add(ear);
+          return ear;
+        }
+        const earL = makeEar(-1);
+        const earR = makeEar(1);
+
+        // Tail: one continuous tapered tube, reshaped every frame; its root is buried in the rump.
+        const tailGroup = new THREE.Group();
+        tailGroup.position.set(0, 0.08, -0.24);
+        torso.add(tailGroup);
+        const tailGeo = buildTailGeometry();
+        updateTail(tailGeo, 1.0, 2.2, 0.12, -0.22);
+        const tailMesh = new THREE.Mesh(tailGeo, solidMaterial);
+        tailMesh.castShadow = true;
+        tailMesh.receiveShadow = true;
+        tailMesh.frustumCulled = false;
+        tailGroup.add(tailMesh);
+
+        root.scale.setScalar(FOX_SCALE);
+        return {
+          root,
+          torso,
+          head,
+          earL,
+          earR,
+          tailGroup,
+          tailGeo,
+          legFL,
+          legFR,
+          legHL,
+          legHR,
+          shinL,
+          shinR,
+        };
+      }
+
+      const foxRig = buildFox();
+      scene.add(foxRig.root);
+
+      const WALK_SPEED = 2.4,
+        RUN_SPEED = 6.0,
+        FIELD_R = 21;
+      const fox = {
+        pos: new THREE.Vector3(1.3, FOX_Y, 0.5),
+        heading: 0,
+        targetHeading: 0,
+        speed: 0,
+        targetSpeed: 0,
+        sitting: true,
+        sit: 1,
+        airborne: false,
+        jumpY: 0,
+        jumpVy: 0,
+        gait: 0,
+        gallop: 0,
+        move: 0,
+        dustTimer: 0,
+        userUntil: 0,
+        idle: 0,
+        nextAction: 5.5,
+        hasGoal: false,
+        goal: new THREE.Vector3(),
+        goalRun: false,
+        goalThen: 'sit',
+        goalTime: 0,
+      };
+      foxRig.root.position.copy(fox.pos);
+
+      // Soft dust puffs for running and landing.
+      const DUST_MAX = 24;
+      const dustParticles = [];
+      const dustMesh = new THREE.InstancedMesh(
+        new THREE.IcosahedronGeometry(0.09, 1),
+        new THREE.MeshBasicMaterial({
+          color: 0xdfcb9b,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+        }),
+        DUST_MAX
+      );
+      dustMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      dustMesh.frustumCulled = false;
+      scene.add(dustMesh);
+      const dustDummy = new THREE.Object3D();
+      for (let i = 0; i < DUST_MAX; i++) {
+        dustParticles.push({
+          x: 0,
+          y: -10,
+          z: 0,
+          vx: 0,
+          vy: 0,
+          vz: 0,
+          life: 0,
+          maxLife: 1,
+          scale: 0,
+        });
+      }
+      function spawnDust(x, y, z, count = 2) {
+        for (let k = 0; k < count; k++) {
+          for (let i = 0; i < DUST_MAX; i++) {
+            const p = dustParticles[i];
+            if (p.life <= 0) {
+              p.x = x + rr(-0.2, 0.2);
+              p.y = y + rr(0.02, 0.1);
+              p.z = z + rr(-0.2, 0.2);
+              p.vx = rr(-0.5, 0.5);
+              p.vy = rr(0.5, 1.3);
+              p.vz = rr(-0.5, 0.5);
+              p.maxLife = rr(0.4, 0.75);
+              p.life = p.maxLife;
+              p.scale = rr(0.7, 1.5);
+              break;
+            }
+          }
+        }
+      }
+
+      function foxJump() {
+        if (fox.airborne) return;
+        fox.airborne = true;
+        fox.jumpVy = 6.6;
+        fox.sitting = false;
+        spawnDust(fox.pos.x, GROUND_Y, fox.pos.z, 5);
+      }
+      function foxToggleSit() {
+        if (fox.airborne) return;
+        fox.sitting = !fox.sitting;
+        fox.hasGoal = false;
+        fox.targetSpeed = 0;
+      }
+      function foxFaceCamera() {
+        fox.targetHeading = Math.atan2(
+          camera.position.x - fox.pos.x,
+          camera.position.z - fox.pos.z
+        );
+      }
+      function foxSetGoal(x, z, run, then) {
+        const d = Math.hypot(x, z);
+        if (d > FIELD_R - 1) {
+          x *= (FIELD_R - 1) / d;
+          z *= (FIELD_R - 1) / d;
+        }
+        const tx = x - TREE_X,
+          tz = z - TREE_Z;
+        const td = Math.hypot(tx, tz);
+        if (td < 2.2) {
+          if (td < 0.001) {
+            x = TREE_X + 2.2;
+            z = TREE_Z;
+          } else {
+            x = TREE_X + (tx * 2.2) / td;
+            z = TREE_Z + (tz * 2.2) / td;
+          }
+        }
+        fox.goal.set(x, FOX_Y, z);
+        fox.hasGoal = true;
+        fox.goalRun = run;
+        fox.goalThen = then;
+        fox.goalTime = 0;
+        fox.sitting = false;
+      }
+      function foxWander() {
+        let x = 0,
+          z = 0;
+        for (let k = 0; k < 6; k++) {
+          const a = rr(0, Math.PI * 2),
+            r = rr(2.6, 8.0);
+          x = Math.cos(a) * r;
+          z = Math.sin(a) * r + 0.6;
+          if (
+            Math.hypot(x - TREE_X, z - TREE_Z) > 2.6 &&
+            Math.hypot(x - fox.pos.x, z - fox.pos.z) > 2.2
+          )
+            break;
+        }
+        const roll = rnd();
+        foxSetGoal(x, z, rnd() < 0.42, roll < 0.5 ? 'sit' : roll < 0.72 ? 'jump' : 'stand');
+      }
+
+      /* ------------------------------------------------------------------
+   THE APPLE TREE: tapered cylinder trunk + clustered smooth leaf blobs
+------------------------------------------------------------------ */
+      const treeGroup = new THREE.Group();
+      treeGroup.position.set(TREE_X, GROUND_Y - 0.02, TREE_Z);
+      scene.add(treeGroup);
+
+      const trunkBatch = new PrimBatch();
+      trunkBatch.cyl(0.32, 0.54, 2.7, 14, 0.02, 1.33, 0, PAL.trunkDark, {
+        rz: 0.035,
+        top: PAL.trunk,
+      });
+      trunkBatch.cyl(0.21, 0.33, 2.0, 12, -0.04, 3.55, 0.02, PAL.trunk, {
+        rz: -0.05,
+        top: PAL.trunkLight,
+      });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + 0.4;
+        trunkBatch.cone(0.24, 1.0, 8, Math.sin(a) * 0.4, 0.3, Math.cos(a) * 0.4, PAL.trunkDark, {
+          rx: -0.62,
+          ry: a,
+          top: PAL.trunk,
+        });
+      }
+      [
+        [0.5, 0.78, 1.7],
+        [2.1, 0.7, 1.6],
+        [3.7, 0.82, 1.8],
+        [5.2, 0.6, 1.5],
+      ].forEach(([a, tilt, len]) => {
+        const hx = (Math.sin(tilt) * len) / 2,
+          hy = (Math.cos(tilt) * len) / 2;
+        trunkBatch.cyl(
+          0.08,
+          0.17,
+          len,
+          8,
+          Math.sin(a) * hx,
+          3.7 + hy,
+          Math.cos(a) * hx,
+          PAL.trunk,
+          { rx: tilt, ry: a, top: PAL.trunkLight }
+        );
+      });
+      trunkBatch.sphere(0.13, 8, 6, 0.3, 1.5, 0.22, PAL.trunkDark, { scale: [1, 1.3, 0.7] });
+      trunkBatch.sphere(0.1, 8, 6, -0.28, 2.3, 0.16, PAL.trunkDark, { scale: [1, 1.2, 0.7] });
+      treeGroup.add(trunkBatch.build(solidMaterial, true, true));
+
+      const CANOPY = { cy: 5.95, rx: 2.72, ry: 2.08, rz: 2.38 };
+      // dark inner core so the crown never shows gaps
+      const coreBatch = new PrimBatch();
+      coreBatch.ico(1.75, 2, 0, CANOPY.cy - 0.1, 0, PAL.leafDeep, {
+        scale: [1.3, 0.95, 1.12],
+        bottomShade: 0.6,
+      });
+      treeGroup.add(coreBatch.build(foliageMaterial, true, true));
+
+      const leafBlobs = [];
+      for (let i = 0; i < 72; i++) {
+        const u = rr(-0.75, 1),
+          th = rr(0, Math.PI * 2);
+        const s = Math.sqrt(Math.max(0, 1 - u * u));
+        const dx = s * Math.cos(th),
+          dy = u,
+          dz = s * Math.sin(th);
+        const f = rr(0.38, 0.8);
+        leafBlobs.push({
+          x: dx * CANOPY.rx * f,
+          y: CANOPY.cy + dy * CANOPY.ry * f,
+          z: dz * CANOPY.rz * f,
+          r: rr(0.74, 1.12),
+          dx,
+          dy,
+          dz,
+          f,
+        });
+      }
+
+      const canopyClusters = [];
+      const clusterCells = [];
+      for (let i = 0; i < 7; i++) clusterCells.push([]);
+      leafBlobs.forEach((b) => {
+        let cluster;
+        if (b.y > 6.85) cluster = 6;
+        else {
+          const angle = Math.atan2(b.z, b.x) + Math.PI;
+          cluster = Math.min(5, Math.floor((angle / (Math.PI * 2)) * 6));
+        }
+        b.cluster = cluster;
+        clusterCells[cluster].push(b);
+      });
+
+      // Apples hang from the lower outer side of visible leaf blobs.
+      const applesByCluster = clusterCells.map(() => []);
+      {
+        const placed = [];
+        for (let i = 0; i < leafBlobs.length && placed.length < 12; i++) {
+          const b = leafBlobs[i];
+          if (b.f < 0.56 || b.dy > 0.55 || b.dy < -0.6) continue;
+          if (b.dz < -0.15 && Math.abs(b.dx) < 0.6) continue;
+          const ox = b.dx,
+            oy = b.dy * 0.4 - 0.45,
+            oz = b.dz;
+          const ol = Math.hypot(ox, oy, oz) || 1;
+          const ax = b.x + (ox / ol) * b.r * 0.9;
+          const ay = b.y + (oy / ol) * b.r * 0.78;
+          const az = b.z + (oz / ol) * b.r * 0.9;
+          let tooClose = false;
+          for (let k = 0; k < placed.length; k++) {
+            if (Math.hypot(ax - placed[k][0], ay - placed[k][1], az - placed[k][2]) < 1.0) {
+              tooClose = true;
+              break;
+            }
+          }
+          if (tooClose) continue;
+          placed.push([ax, ay, az]);
+          applesByCluster[b.cluster].push([ax, ay, az]);
+        }
+      }
+
+      const cPale = new THREE.Color(PAL.leafPale);
+      clusterCells.forEach((cells, index) => {
+        if (!cells.length) return;
+        const center = new THREE.Vector3();
+        cells.forEach((b) => center.add(_tmpVec.set(b.x, b.y, b.z)));
+        center.multiplyScalar(1 / cells.length);
+        const batch = new PrimBatch();
+        cells.forEach((b) => {
+          const hN = (b.y - (CANOPY.cy - CANOPY.ry)) / (2 * CANOPY.ry);
+          const sunSide = clamp(b.dx * 0.7 - b.dz * 0.6, 0, 1);
+          let base;
+          if (hN > 0.62) base = rpick([PAL.leafLight, PAL.leafSun, PAL.leafMid]);
+          else if (hN < 0.35) base = rpick([PAL.leafDeep, PAL.leafMid]);
+          else base = rpick([PAL.leafMid, PAL.leafLight, PAL.leafDeep]);
+          if (sunSide > 0.45 && rnd() < 0.5) base = rpick([PAL.leafSun, PAL.leafPale]);
+          const topColor = asColor(base).lerp(cPale, 0.45);
+          batch.ico(b.r, 2, b.x - center.x, b.y - center.y, b.z - center.z, base, {
+            scale: [1, 0.86, 1],
+            top: topColor,
+            bottomShade: 0.58,
+            topBoost: 1.12,
+            variation: 0.08,
+          });
+        });
+        const group = new THREE.Group();
+        group.position.copy(center);
+        group.add(batch.build(foliageMaterial, true, true));
+
+        const apples = applesByCluster[index];
+        if (apples.length) {
+          const ab = new PrimBatch();
+          apples.forEach(([ax, ay, az], i) => {
+            const s = rr(0.17, 0.22);
+            const lx = ax - center.x,
+              ly = ay - center.y,
+              lz = az - center.z;
+            ab.sphere(s, 12, 10, lx, ly, lz, i % 3 === 0 ? PAL.appleDark : PAL.apple, {
+              scale: [1, 0.92, 1],
+              top: PAL.appleLight,
+              bottomShade: 0.7,
+            });
+            ab.cyl(0.012, 0.016, 0.13, 5, lx, ly + s * 0.95, lz, PAL.trunkDark);
+          });
+          group.add(ab.build(appleMaterial, true, true));
+        }
+        treeGroup.add(group);
+        canopyClusters.push({
+          group,
+          base: center.clone(),
+          phase: rr(0, Math.PI * 2),
+          speed: rr(0.6, 1.0),
+          amount: rr(0.7, 1.25),
+        });
+      });
+
+      // windfalls and small sprouts around the roots
+      const floorBatch = new PrimBatch();
+      floorBatch.sphere(0.15, 10, 8, -1.22, 0.16, 1.25, PAL.apple, { top: PAL.appleLight });
+      floorBatch.sphere(0.13, 10, 8, 0.42, 0.14, 1.56, PAL.appleDark, { top: PAL.apple });
+      floorBatch.sphere(0.11, 10, 8, -0.55, 0.12, 1.72, PAL.appleLight);
+      for (let i = 0; i < 12; i++) {
+        const a = rr(0, Math.PI * 2);
+        const r = rr(0.9, 2.3);
+        const h = rr(0.16, 0.34);
+        floorBatch.cone(
+          0.035,
+          h,
+          5,
+          Math.cos(a) * r,
+          0.02 + h / 2,
+          Math.sin(a) * r,
+          rpick([0x748238, 0x8b8a3d]),
+          { rx: rr(-0.3, 0.3), rz: rr(-0.3, 0.3), top: 0x9bb053 }
+        );
+      }
+      treeGroup.add(floorBatch.build(appleMaterial, true, true));
+
+      /* ------------------------------------------------------------------
+   FIREFLIES AND DANDELION SEEDS
+------------------------------------------------------------------ */
+      const flyCount = useLiteField ? 17 : 27;
+      const fireflyGeometry = whiteColors(new THREE.SphereGeometry(0.06, 8, 6));
+      const fireflyMaterial = new THREE.MeshBasicMaterial({ vertexColors: true, fog: false });
+      const fireflies = new THREE.InstancedMesh(fireflyGeometry, fireflyMaterial, flyCount);
+      fireflies.frustumCulled = false;
+      fireflies.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      const haloGeometry = whiteColors(new THREE.SphereGeometry(0.17, 10, 8));
+      const haloMaterial = new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        fog: false,
+        transparent: true,
+        opacity: 0.16,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const fireflyHalos = new THREE.InstancedMesh(haloGeometry, haloMaterial, flyCount);
+      fireflyHalos.frustumCulled = false;
+      fireflyHalos.renderOrder = 4;
+      fireflyHalos.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      scene.add(fireflies, fireflyHalos);
+
+      const flyStates = [];
+      for (let i = 0; i < flyCount; i++) {
+        const angle = rr(0, Math.PI * 2);
+        const radius = rr(2.3, 10.5);
+        flyStates.push({
+          cx: Math.cos(angle) * radius + rr(-1, 1),
+          cz: Math.sin(angle) * radius + rr(-1, 1),
+          cy: rr(1.0, 3.8),
+          phase: rr(0, Math.PI * 2),
+          speed: rr(0.5, 1.3),
+          blink: rr(0.6, 1.35),
+          size: rr(0.7, 1.45),
+        });
+      }
+      const flyDummy = new THREE.Object3D();
+      const flyColor = new THREE.Color();
+      const flyHaloColor = new THREE.Color();
+      for (let i = 0; i < flyCount; i++) {
+        fireflies.setColorAt(i, flyColor.setRGB(0.15, 0.1, 0.03));
+        fireflyHalos.setColorAt(i, flyHaloColor.setRGB(0.04, 0.025, 0.008));
+      }
+
+      const seedCount = useLiteField ? 38 : 62;
+      const seedBatch = new PrimBatch();
+      seedBatch.cyl(0.006, 0.006, 0.2, 5, 0, 0.1, 0, 0xd6c6a3);
+      seedBatch.sphere(0.016, 6, 5, 0, 0.0, 0, 0x9a7b4f, { scale: [1, 1.8, 1] });
+      seedBatch.cone(0.1, 0.05, 8, 0, 0.215, 0, 0xfff4dc, {
+        rx: Math.PI,
+        topBoost: 1,
+        bottomShade: 1,
+      });
+      seedBatch.ico(0.03, 1, 0, 0.2, 0, 0xfff0d1);
+      const seedGeometry = seedBatch.geometry();
+      const seedMaterial = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0,
+        side: THREE.DoubleSide,
+        emissive: 0xffe2b0,
+        emissiveIntensity: 0.2,
+      });
+      const seeds = new THREE.InstancedMesh(seedGeometry, seedMaterial, seedCount);
+      seeds.frustumCulled = false;
+      seeds.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      seeds.castShadow = false;
+      seeds.receiveShadow = false;
+      scene.add(seeds);
+      const seedStates = [];
+      const seedColor = new THREE.Color();
+      for (let i = 0; i < seedCount; i++) {
+        seedStates.push({
+          x: rr(-14, 14),
+          z: rr(-14, 18),
+          y: rr(0.4, 8.2),
+          speed: rr(0.14, 0.36),
+          phase: rr(0, Math.PI * 2),
+          spin: rr(-0.5, 0.5),
+          size: rr(0.7, 1.45),
+        });
+        seeds.setColorAt(i, seedColor.setRGB(rr(0.9, 1.2), rr(0.82, 1.05), rr(0.68, 0.88)));
+      }
+      if (seeds.instanceColor) seeds.instanceColor.needsUpdate = true;
+      const seedDummy = new THREE.Object3D();
+
+      /* ------------------------------------------------------------------
+   DISTANT BIRDS
+------------------------------------------------------------------ */
+      const birds = [];
+      const birdMaterial = new THREE.MeshBasicMaterial({ color: 0x4a332a, fog: false });
+      const birdBodyGeo = new THREE.CapsuleGeometry(0.09, 0.36, 3, 8);
+      birdBodyGeo.rotateZ(Math.PI / 2);
+      const birdHeadGeo = new THREE.SphereGeometry(0.1, 8, 6);
+      birdHeadGeo.translate(0.3, 0.05, 0);
+      const birdWingGeo = new THREE.SphereGeometry(0.3, 8, 5);
+      birdWingGeo.scale(0.3, 0.07, 1);
+      birdWingGeo.translate(0, 0, 0.3);
+      for (let i = 0; i < 6; i++) {
+        const bird = new THREE.Group();
+        const body = new THREE.Mesh(birdBodyGeo, birdMaterial);
+        const headMesh = new THREE.Mesh(birdHeadGeo, birdMaterial);
+        const wingL = new THREE.Mesh(birdWingGeo, birdMaterial);
+        wingL.position.set(0, 0.05, 0.06);
+        const wingR = new THREE.Mesh(birdWingGeo, birdMaterial);
+        wingR.position.set(0, 0.05, -0.06);
+        wingR.rotation.y = Math.PI;
+        bird.add(body, headMesh, wingL, wingR);
+        const dir = rnd() > 0.5 ? 1 : -1;
+        bird.position.set(rr(-150, 150), rr(17, 30), rr(-120, -70));
+        bird.scale.setScalar(rr(1.1, 1.9));
+        if (dir < 0) bird.rotation.y = Math.PI;
+        scene.add(bird);
+        birds.push({
+          group: bird,
+          wingL,
+          wingR,
+          dir,
+          speed: rr(2.2, 4.2),
+          flap: rr(5.5, 8.5),
+          phase: rr(0, Math.PI * 2),
+          baseY: bird.position.y,
+          bob: rr(0.4, 1.1),
+        });
+      }
+
+      /* ------------------------------------------------------------------
+   DAMPED CAMERA ORBIT + CINEMATIC IDLE + FOX INPUT
+------------------------------------------------------------------ */
+      let elapsed = 0;
+      const orbit = {
+        target: new THREE.Vector3(fox.pos.x, fox.pos.y + 1.15, fox.pos.z),
+        baseYaw: 0.15,
+        yaw: 0.15,
+        polar: 1.4,
+        targetPolar: 1.4,
+        radius: 11.5,
+        targetRadius: 11.5,
+        autoPhase: 0.42,
+        lastInteraction: performance.now() - 5000,
+      };
+      const pointers = new Map();
+      let pinchStartDistance = 0;
+      let pinchStartRadius = orbit.targetRadius;
+
+      function pointerDistance() {
+        const arr = [...pointers.values()];
+        return Math.hypot(arr[0].x - arr[1].x, arr[0].y - arr[1].y);
+      }
+
+      const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -FOX_Y);
+      const clickRaycaster = new THREE.Raycaster();
+      const clickNDC = new THREE.Vector2();
+      const clickHit = new THREE.Vector3();
+      let lastClickTime = 0;
+
+      // Tap the ground: walk there. Double-tap / Shift+tap: run. Tap the fox: jump.
+      function handleSceneClick(event) {
+        clickNDC.x = (event.clientX / window.innerWidth) * 2 - 1;
+        clickNDC.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        clickRaycaster.setFromCamera(clickNDC, camera);
+        _tmpVec.set(fox.pos.x, fox.pos.y + 0.75, fox.pos.z);
+        if (clickRaycaster.ray.distanceSqToPoint(_tmpVec) < 0.8) {
+          foxJump();
+          fox.userUntil = elapsed + 5;
+          return;
+        }
+        if (clickRaycaster.ray.intersectPlane(groundPlane, clickHit)) {
+          const now = performance.now();
+          const isDouble = now - lastClickTime < 340;
+          lastClickTime = now;
+          foxSetGoal(clickHit.x, clickHit.z, isDouble || event.shiftKey, 'stand');
+          fox.userUntil = elapsed + 9;
+        }
+      }
+
+      // WASD / arrows: walk. Shift: run. Space: jump. C or X: sit / stand.
+      const keys = {};
+      window.addEventListener('keydown', (event) => {
+        keys[event.code] = true;
+        if (event.key) keys[event.key.toLowerCase()] = true;
+        if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code))
+          event.preventDefault();
+        if (event.repeat) return;
+        if (event.code === 'Space') {
+          foxJump();
+          fox.userUntil = elapsed + 5;
+        }
+        if (event.code === 'KeyC' || event.code === 'KeyX') {
+          foxToggleSit();
+          fox.userUntil = elapsed + 7;
+        }
+      });
+      window.addEventListener('keyup', (event) => {
+        keys[event.code] = false;
+        if (event.key) keys[event.key.toLowerCase()] = false;
+      });
+      window.addEventListener('blur', () => {
+        for (const k in keys) keys[k] = false;
+      });
+
+      canvas.addEventListener('pointerdown', (event) => {
+        canvas.setPointerCapture(event.pointerId);
+        pointers.set(event.pointerId, {
+          x: event.clientX,
+          y: event.clientY,
+          startX: event.clientX,
+          startY: event.clientY,
+          startTime: performance.now(),
+        });
+        orbit.lastInteraction = performance.now();
+        canvas.classList.add('dragging');
+        if (pointers.size === 2) {
+          pinchStartDistance = Math.max(1, pointerDistance());
+          pinchStartRadius = orbit.targetRadius;
+        }
+      });
+
+      canvas.addEventListener('pointermove', (event) => {
+        const prev = pointers.get(event.pointerId);
+        if (!prev) return;
+        orbit.lastInteraction = performance.now();
+        if (pointers.size >= 2) {
+          prev.x = event.clientX;
+          prev.y = event.clientY;
+          const dist = Math.max(1, pointerDistance());
+          orbit.targetRadius = clamp(pinchStartRadius * (pinchStartDistance / dist), 5.5, 22);
+          return;
+        }
+        const dx = event.clientX - prev.x;
+        const dy = event.clientY - prev.y;
+        orbit.baseYaw = clamp(orbit.baseYaw - dx * 0.0042, -0.62, 0.62);
+        orbit.targetPolar = clamp(orbit.targetPolar + dy * 0.0034, 0.88, 1.47);
+        prev.x = event.clientX;
+        prev.y = event.clientY;
+      });
+
+      function releasePointer(event) {
+        const p = pointers.get(event.pointerId);
+        if (p && pointers.size === 1 && event.type === 'pointerup') {
+          const moved = Math.hypot(event.clientX - p.startX, event.clientY - p.startY);
+          const duration = performance.now() - p.startTime;
+          if (moved < 7 && duration < 500) handleSceneClick(event);
+        }
+        pointers.delete(event.pointerId);
+        if (pointers.size < 2) pinchStartDistance = 0;
+        if (pointers.size === 0) canvas.classList.remove('dragging');
+        orbit.lastInteraction = performance.now();
+      }
+      canvas.addEventListener('pointerup', releasePointer);
+      canvas.addEventListener('pointercancel', releasePointer);
+      canvas.addEventListener(
+        'wheel',
+        (event) => {
+          event.preventDefault();
+          orbit.targetRadius = clamp(
+            orbit.targetRadius * Math.exp(event.deltaY * 0.00085),
+            5.5,
+            22
+          );
+          orbit.lastInteraction = performance.now();
+        },
+        { passive: false }
+      );
+      window.addEventListener('contextmenu', (event) => event.preventDefault());
+
+      function updateCamera(dt) {
+        const idleFor = (performance.now() - orbit.lastInteraction) / 1000;
+        if (idleFor > 3.4) orbit.autoPhase += dt * 0.115;
+        const autoYaw = Math.sin(orbit.autoPhase) * 0.4;
+        const yawTarget = clamp(orbit.baseYaw + autoYaw, -0.98, 0.98);
+        orbit.yaw = damp(orbit.yaw, yawTarget, 2.9, dt);
+        orbit.polar = damp(orbit.polar, orbit.targetPolar, 3.8, dt);
+        orbit.radius = damp(orbit.radius, orbit.targetRadius, 4.2, dt);
+
+        // keep the fox as the focal point
+        orbit.target.x = damp(orbit.target.x, fox.pos.x, 2.8, dt);
+        orbit.target.y = damp(orbit.target.y, FOX_Y + 1.15 + fox.jumpY * 0.5, 3.2, dt);
+        orbit.target.z = damp(orbit.target.z, fox.pos.z, 2.8, dt);
+
+        const sinPolar = Math.sin(orbit.polar);
+        camera.position.set(
+          orbit.target.x + orbit.radius * sinPolar * Math.sin(orbit.yaw),
+          orbit.target.y + orbit.radius * Math.cos(orbit.polar),
+          orbit.target.z + orbit.radius * sinPolar * Math.cos(orbit.yaw)
+        );
+        // gentle handheld sway and bob
+        camera.position.y += Math.sin(elapsed * 0.42) * 0.08;
+        camera.position.x += Math.sin(elapsed * 0.31 + 1.3) * 0.05;
+        camera.position.z += Math.cos(elapsed * 0.27 + 0.5) * 0.05;
+        camera.lookAt(orbit.target);
+      }
+
+      /* ------------------------------------------------------------------
+   FOX BRAIN + LOCOMOTION + POSE
+------------------------------------------------------------------ */
+      const _fwd = new THREE.Vector3();
+      const _right = new THREE.Vector3();
+
+      function updateFox(dt) {
+        const f = fox;
+
+        // ---- intent: keyboard > click goal > autonomous life ----
+        camera.getWorldDirection(_fwd);
+        _fwd.y = 0;
+        if (_fwd.lengthSq() < 1e-6) _fwd.set(0, 0, -1);
+        _fwd.normalize();
+        _right.set(-_fwd.z, 0, _fwd.x);
+
+        let ix = 0,
+          iz = 0;
+        if (keys.KeyW || keys.ArrowUp || keys.w) {
+          ix += _fwd.x;
+          iz += _fwd.z;
+        }
+        if (keys.KeyS || keys.ArrowDown || keys.s) {
+          ix -= _fwd.x;
+          iz -= _fwd.z;
+        }
+        if (keys.KeyD || keys.ArrowRight || keys.d) {
+          ix += _right.x;
+          iz += _right.z;
+        }
+        if (keys.KeyA || keys.ArrowLeft || keys.a) {
+          ix -= _right.x;
+          iz -= _right.z;
+        }
+        const inputLen = Math.hypot(ix, iz);
+
+        if (inputLen > 0.01) {
+          const wantsRun = keys.ShiftLeft || keys.ShiftRight || keys.shift;
+          f.hasGoal = false;
+          f.sitting = false;
+          f.userUntil = elapsed + 6;
+          f.idle = 0;
+          f.targetHeading = Math.atan2(ix, iz);
+          f.targetSpeed = wantsRun ? RUN_SPEED : WALK_SPEED;
+        } else if (f.hasGoal) {
+          const dx = f.goal.x - f.pos.x;
+          const dz = f.goal.z - f.pos.z;
+          const dist = Math.hypot(dx, dz);
+          f.goalTime += dt;
+          if (dist > 0.45 && f.goalTime < 14) {
+            f.targetHeading = Math.atan2(dx, dz);
+            f.targetSpeed = Math.min(f.goalRun ? RUN_SPEED : WALK_SPEED, 1.2 + dist * 2.2);
+          } else {
+            f.hasGoal = false;
+            f.targetSpeed = 0;
+            f.idle = 0;
+            if (f.goalThen === 'jump') foxJump();
+            else if (f.goalThen === 'sit') {
+              f.sitting = true;
+              foxFaceCamera();
+            }
+          }
+        } else {
+          f.targetSpeed = 0;
+          if (elapsed > f.userUntil && !f.airborne) {
+            f.idle += dt;
+            if (f.idle > f.nextAction) {
+              f.idle = 0;
+              f.nextAction = rr(3.5, 7.5);
+              const roll = rnd();
+              if (f.sitting) {
+                if (roll < 0.62) foxWander();
+                else if (roll < 0.8) foxJump();
+              } else {
+                if (roll < 0.45) {
+                  f.sitting = true;
+                  foxFaceCamera();
+                } else if (roll < 0.6) foxJump();
+                else foxWander();
+              }
+            }
+          }
+        }
+
+        // ---- locomotion ----
+        f.sit = damp(f.sit, f.sitting && !f.airborne && f.speed < 0.35 ? 1 : 0, 6.5, dt);
+        const canMove = !f.sitting && f.sit < 0.35;
+        const tgt = canMove ? f.targetSpeed : 0;
+        f.speed = damp(f.speed, tgt, tgt > f.speed ? 4.5 : 7.0, dt);
+        if (f.speed < 0.01) f.speed = 0;
+
+        f.heading +=
+          wrapAngle(f.targetHeading - f.heading) * Math.min(1, dt * (f.speed > 0.3 ? 7.5 : 4.5));
+        f.heading = wrapAngle(f.heading);
+
+        f.pos.x += Math.sin(f.heading) * f.speed * dt;
+        f.pos.z += Math.cos(f.heading) * f.speed * dt;
+
+        const centerDist = Math.hypot(f.pos.x, f.pos.z);
+        if (centerDist > FIELD_R) {
+          f.pos.x *= FIELD_R / centerDist;
+          f.pos.z *= FIELD_R / centerDist;
+        }
+        const tdx = f.pos.x - TREE_X,
+          tdz = f.pos.z - TREE_Z;
+        const treeDist = Math.hypot(tdx, tdz);
+        if (treeDist < 1.35 && treeDist > 0.0001) {
+          f.pos.x = TREE_X + (tdx / treeDist) * 1.35;
+          f.pos.z = TREE_Z + (tdz / treeDist) * 1.35;
+        }
+
+        if (f.airborne) {
+          f.jumpVy -= 20 * dt;
+          f.jumpY += f.jumpVy * dt;
+          if (f.jumpY <= 0) {
+            f.jumpY = 0;
+            f.jumpVy = 0;
+            f.airborne = false;
+            spawnDust(f.pos.x, GROUND_Y, f.pos.z, 6);
+          }
+        }
+        f.pos.y = FOX_Y + f.jumpY;
+        foxRig.root.position.copy(f.pos);
+        foxRig.root.rotation.y = f.heading;
+
+        if (f.speed > 4.2 && !f.airborne) {
+          f.dustTimer += dt;
+          if (f.dustTimer > 0.11) {
+            f.dustTimer = 0;
+            spawnDust(
+              f.pos.x - Math.sin(f.heading) * 0.5,
+              GROUND_Y,
+              f.pos.z - Math.cos(f.heading) * 0.5,
+              1
+            );
+          }
+        }
+
+        // ---- pose ----
+        const sit = f.sit;
+        f.move = damp(f.move, clamp(f.speed / 1.2, 0, 1), 10, dt);
+        const move = f.move;
+        const run = clamp((f.speed - 2.8) / 2.6, 0, 1);
+        const air = clamp(f.jumpY * 2.4, 0, 1);
+        f.gait += dt * f.speed * 4.7;
+        f.gallop += dt * f.speed * 2.8;
+
+        const sg = Math.sin(f.gait),
+          cg = Math.cos(f.gait);
+        const g2 = f.gallop;
+
+        // walk = diagonal pairs, run = bounding gallop (fronts reach while hinds push)
+        let fl = lerp(sg * 0.45, Math.sin(g2 + 0.35) * 0.8, run) * move;
+        let fr = lerp(-sg * 0.45, Math.sin(g2 + 0.05) * 0.8, run) * move;
+        let hl = lerp(-sg * 0.42, Math.sin(g2 + 2.6) * 0.85, run) * move;
+        let hr = lerp(sg * 0.42, Math.sin(g2 + 2.9) * 0.85, run) * move;
+        let kl = lerp(Math.max(0, cg), Math.max(0, -Math.cos(g2 + 2.6)), run) * 0.6 * move;
+        let kr = lerp(Math.max(0, -cg), Math.max(0, -Math.cos(g2 + 2.9)), run) * 0.6 * move;
+
+        // leap: fronts reach forward, hinds trail and tuck
+        fl = lerp(fl, -0.7, air);
+        fr = lerp(fr, -0.6, air);
+        hl = lerp(hl, 0.75, air);
+        hr = lerp(hr, 0.68, air);
+        kl = lerp(kl, 0.5, air);
+        kr = lerp(kr, 0.5, air);
+
+        // sit: torso pitches up, front legs stay planted, hind legs fold forward
+        // (front legs cancel the torso pitch so they stay vertical; the hind legs
+        //  fold forward along the ground with the paws planted beside the front ones)
+        foxRig.legFL.rotation.x = lerp(fl, 0.85, sit);
+        foxRig.legFR.rotation.x = lerp(fr, 0.85, sit);
+        foxRig.legHL.rotation.x = lerp(hl, -0.75, sit);
+        foxRig.legHR.rotation.x = lerp(hr, -0.75, sit);
+        foxRig.legHL.rotation.z = -0.28 * sit;
+        foxRig.legHR.rotation.z = 0.28 * sit;
+        foxRig.shinL.rotation.x = lerp(kl, 1.0, sit);
+        foxRig.shinR.rotation.x = lerp(kr, 1.0, sit);
+
+        const breathe = Math.sin(elapsed * 1.5);
+        const bounce = Math.max(0, Math.sin(g2 + 0.9)) * 0.13 * run * move;
+        const bob = -0.05 * sg * sg * (1 - run) * move;
+        foxRig.torso.position.set(
+          0,
+          lerp(0.8 + bounce + bob, 0.29, sit) + breathe * 0.004,
+          lerp(-0.42, -0.35, sit)
+        );
+        const pitchAir = clamp(f.jumpVy * 0.05, -0.32, 0.32) * air;
+        const spine = Math.sin(g2 + 0.6) * 0.16 * run * move;
+        foxRig.torso.rotation.x = lerp(spine - pitchAir, -0.85, sit) + breathe * 0.008;
+        foxRig.torso.rotation.z = sg * 0.035 * move * (1 - run) * (1 - sit);
+
+        // head: watch the viewer when resting, look ahead when travelling
+        let yawWanted = 0;
+        if (f.speed < 0.3) {
+          const toCam = wrapAngle(
+            Math.atan2(camera.position.x - f.pos.x, camera.position.z - f.pos.z) - f.heading
+          );
+          yawWanted = clamp(toCam, -0.9, 0.9) * 0.75;
+        }
+        foxRig.head.rotation.y = damp(foxRig.head.rotation.y, yawWanted, 4, dt);
+        foxRig.head.rotation.x =
+          lerp(-spine * 0.6 + pitchAir * 0.5, 0.8, sit) + Math.sin(elapsed * 0.8) * 0.02;
+        foxRig.head.rotation.z = Math.sin(elapsed * 0.43 + 0.7) * 0.03 * (1 - move);
+
+        // ears: occasional twitches, laid back at speed
+        const twitchL = Math.pow(Math.max(0, Math.sin(elapsed * 0.61 + 1.75)), 18);
+        const twitchR = Math.pow(Math.max(0, Math.sin(elapsed * 0.53 + 4.55)), 20);
+        foxRig.earL.rotation.z = 0.2 + Math.sin(elapsed * 43) * 0.22 * twitchL;
+        foxRig.earR.rotation.z = -0.2 - Math.sin(elapsed * 39 + 1.2) * 0.2 * twitchR;
+        foxRig.earL.rotation.x = Math.sin(elapsed * 27) * 0.05 * twitchL - run * 0.35;
+        foxRig.earR.rotation.x = Math.sin(elapsed * 31 + 0.6) * 0.045 * twitchR - run * 0.35;
+
+        // tail: kept level against the torso pitch, then curved along its length
+        foxRig.tailGroup.rotation.x = -foxRig.torso.rotation.x;
+        const flick = Math.pow(Math.max(0, Math.sin(elapsed * 0.21 + 2.2)), 10);
+        const sway = Math.sin(f.gait * 0.5);
+        const swayLag = Math.sin(f.gait * 0.5 - 1.0);
+        const dynYaw = sway * 0.25 * move + Math.sin(elapsed * 0.9) * 0.08 * (1 - move);
+        const dynCurl = swayLag * 0.4 * move + Math.sin(elapsed * 0.7 + 1.0) * 0.12 * (1 - move);
+        const dynPitch = lerp(lerp(-0.5, -0.12, run), 0.15, air);
+        const dynPitchCurl = lerp(lerp(0.55, 0.3 + Math.sin(g2 * 2) * 0.12 * run, run), 0.2, air);
+        updateTail(
+          foxRig.tailGeo,
+          lerp(dynYaw, 1.0 + Math.sin(elapsed * 0.92) * 0.06 + flick * 0.3, sit),
+          lerp(dynCurl, 2.2 + Math.sin(elapsed * 0.6) * 0.08 - flick * 0.35, sit),
+          lerp(dynPitch, 0.3, sit),
+          lerp(dynPitchCurl, -0.45, sit)
+        );
+
+        wheatUniforms.uFox.value.copy(f.pos);
+      }
+
+      /* ------------------------------------------------------------------
+   ONE ANIMATION LOOP
+------------------------------------------------------------------ */
+      const clock = new THREE.Clock();
+      let renderedFrames = 0;
+      const fadeElement = document.getElementById('fade');
+
+      function animate() {
+        requestAnimationFrame(animate);
+        const dt = Math.min(clock.getDelta(), 0.05);
+        elapsed += dt;
+
+        updateFox(dt);
+        updateCamera(dt);
+        wheatUniforms.uTime.value = elapsed;
+
+        // sun pulse
+        const pulse = Math.sin(elapsed * 0.55);
+        sunGroup.scale.setScalar(1 + pulse * 0.022);
+        sunHaloMats.forEach((mat, i) => {
+          mat.opacity = haloBaseOpacity[i] * (1 + Math.sin(elapsed * 0.55 + i * 0.3) * 0.28);
+        });
+        const sunBoost = 1 + pulse * 0.06;
+        sunCoreMat.color.setRGB(4.8 * sunBoost, 2.9 * sunBoost, 1.25 * sunBoost);
+        sunLight.intensity = 3.35 + pulse * 0.07;
+
+        // the apple canopy rustles as loose leaf clusters
+        for (let i = 0; i < canopyClusters.length; i++) {
+          const { group, base, phase, speed, amount } = canopyClusters[i];
+          group.rotation.z = Math.sin(elapsed * 0.72 * speed + phase) * 0.02 * amount;
+          group.rotation.x = Math.cos(elapsed * 0.57 * speed + phase * 1.6) * 0.016 * amount;
+          group.rotation.y = Math.sin(elapsed * 0.34 + phase) * 0.01;
+          group.position.x = base.x + Math.sin(elapsed * 0.38 + phase) * 0.025;
+          group.position.y = base.y + Math.sin(elapsed * 0.93 * speed + phase) * 0.028;
+          group.position.z = base.z + Math.cos(elapsed * 0.42 + phase * 1.9) * 0.02;
+        }
+
+        // drifting, blinking fireflies
+        for (let i = 0; i < flyCount; i++) {
+          const f = flyStates[i];
+          const x =
+            f.cx +
+            Math.sin(elapsed * 0.27 * f.speed + f.phase) * 1.15 +
+            Math.sin(elapsed * 0.11 + f.phase * 2.1) * 0.55;
+          const z =
+            f.cz +
+            Math.cos(elapsed * 0.23 * f.speed + f.phase * 1.7) * 1.0 +
+            Math.sin(elapsed * 0.16 + f.phase) * 0.4;
+          const y =
+            f.cy +
+            Math.sin(elapsed * 0.41 * f.speed + f.phase * 1.3) * 0.46 +
+            Math.cos(elapsed * 0.17 + f.phase) * 0.18 +
+            Math.sin(elapsed * 0.09 + f.phase * 3.1) * 0.9;
+          const blink =
+            0.07 + 0.93 * Math.pow(Math.max(0, Math.sin(elapsed * f.blink + f.phase * 2.4)), 3);
+          flyDummy.position.set(x, y, z);
+          flyDummy.rotation.set(0, 0, 0);
+          const s = f.size * (0.8 + blink * 0.5);
+          flyDummy.scale.set(s, s, s);
+          flyDummy.updateMatrix();
+          fireflies.setMatrixAt(i, flyDummy.matrix);
+          flyDummy.scale.set(s * 1.9, s * 1.9, s * 1.9);
+          flyDummy.updateMatrix();
+          fireflyHalos.setMatrixAt(i, flyDummy.matrix);
+          fireflies.setColorAt(
+            i,
+            flyColor.setRGB(0.18 + blink * 2.35, 0.1 + blink * 1.62, 0.035 + blink * 0.5)
+          );
+          fireflyHalos.setColorAt(
+            i,
+            flyHaloColor.setRGB(0.02 + blink * 0.32, 0.012 + blink * 0.2, 0.005 + blink * 0.06)
+          );
+        }
+        fireflies.instanceMatrix.needsUpdate = true;
+        fireflyHalos.instanceMatrix.needsUpdate = true;
+        if (fireflies.instanceColor) fireflies.instanceColor.needsUpdate = true;
+        if (fireflyHalos.instanceColor) fireflyHalos.instanceColor.needsUpdate = true;
+
+        // dandelion seeds rise, waft, and return to the warm air
+        for (let i = 0; i < seedCount; i++) {
+          const s = seedStates[i];
+          s.y += s.speed * dt;
+          if (s.y > 8.8) {
+            s.y = rr(0.15, 0.7);
+            s.x = rr(-14, 14);
+            s.z = rr(-14, 18);
+            s.phase = rr(0, Math.PI * 2);
+          }
+          const x =
+            s.x +
+            Math.sin(elapsed * 0.31 + s.phase) * 1.1 +
+            Math.sin(elapsed * 0.12 + s.phase * 2.3) * 0.42;
+          const z = s.z + Math.cos(elapsed * 0.26 + s.phase * 1.6) * 0.85;
+          const y = s.y + Math.sin(elapsed * 0.68 + s.phase) * 0.1;
+          seedDummy.position.set(x, y, z);
+          seedDummy.rotation.set(
+            Math.sin(elapsed * 0.55 + s.phase) * 0.42,
+            elapsed * s.spin + s.phase,
+            Math.cos(elapsed * 0.64 + s.phase) * 0.34
+          );
+          seedDummy.scale.setScalar(s.size);
+          seedDummy.updateMatrix();
+          seeds.setMatrixAt(i, seedDummy.matrix);
+        }
+        seeds.instanceMatrix.needsUpdate = true;
+
+        // distant birds cross the sky
+        for (let i = 0; i < birds.length; i++) {
+          const b = birds[i];
+          b.group.position.x += b.dir * b.speed * dt;
+          b.group.position.y = b.baseY + Math.sin(elapsed * b.bob + b.phase) * 0.9;
+          if (b.group.position.x > 165) b.group.position.x = -165;
+          if (b.group.position.x < -165) b.group.position.x = 165;
+          const flap = Math.sin(elapsed * b.flap + b.phase) * 0.55;
+          b.wingL.rotation.x = flap;
+          b.wingR.rotation.x = -flap;
+        }
+
+        // dust puffs
+        for (let i = 0; i < DUST_MAX; i++) {
+          const p = dustParticles[i];
+          if (p.life > 0) {
+            p.life -= dt;
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.z += p.vz * dt;
+            p.vy -= 1.8 * dt;
+            const prog = Math.max(0, p.life / p.maxLife);
+            const s = p.scale * (0.35 + 0.65 * Math.sin(prog * Math.PI));
+            dustDummy.position.set(p.x, p.y, p.z);
+            dustDummy.scale.set(s, s, s);
+          } else {
+            dustDummy.position.set(0, -20, 0);
+            dustDummy.scale.set(0.0001, 0.0001, 0.0001);
+          }
+          dustDummy.updateMatrix();
+          dustMesh.setMatrixAt(i, dustDummy.matrix);
+        }
+        dustMesh.instanceMatrix.needsUpdate = true;
+
+        composer.render();
+
+        renderedFrames++;
+        if (renderedFrames === 3) {
+          fadeElement.classList.add('gone');
+          window.setTimeout(() => {
+            fadeElement.style.display = 'none';
+          }, 1800);
+        }
+      }
+
+      function onResize() {
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setPixelRatio(pixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setPixelRatio(pixelRatio);
+        composer.setSize(window.innerWidth, window.innerHeight);
+        bloomPass.setSize(window.innerWidth, window.innerHeight);
+      }
+      window.addEventListener('resize', onResize);
+
+      updateCamera(1);
+      animate();
+    </script>
+  </body>
+</html>

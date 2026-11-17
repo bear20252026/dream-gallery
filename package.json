@@ -23,6 +23,7 @@
     "preview": "vite preview",
     "gen:data": "node scripts/gen/gen-data.js",
     "gen:thumbs": "node scripts/gen/gen-thumbs.js",
+    "gen:voxel": "node scripts/gen/sync-voxel-three.js && node scripts/gen/bundle-voxel.cjs",
     "postinstall": "node scripts/gen/sync-vendor.js",
     "lint": "eslint .",
     "format": "prettier --write .",

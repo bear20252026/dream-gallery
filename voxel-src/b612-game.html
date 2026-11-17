@@ -1,0 +1,1371 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>A Day on B612 · 可玩幕间</title>
+    <style>
+      :root {
+        --crimson: #e0324b;
+        --pink: #f7a8bf;
+        --gold: #f5c451;
+        --amber: #ffb066;
+        --leaf: #7ddb7a;
+        --ochre: #c8873f;
+        --rust: #8f4526;
+        --stone: #8b8794;
+        --indigo: #1b1f3d;
+        --twilight: #0b0a1a;
+        --ink: #f5efe6;
+        --ink-dim: #c3b9cf;
+        --panel: rgba(17, 14, 33, 0.88);
+        --line: rgba(247, 168, 191, 0.26);
+        --ok: #6fe0a8;
+        --warn: #f5c451;
+        --danger: #e0324b;
+        --info: #7fe3e8;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        height: 100%;
+      }
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: var(--twilight);
+        color: var(--ink);
+        font:
+          14px/1.5 'Inter',
+          'PingFang SC',
+          'Microsoft YaHei',
+          system-ui,
+          sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        cursor: grab;
+      }
+      canvas.drag {
+        cursor: grabbing;
+      }
+      #vig {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 2;
+        background: radial-gradient(
+          ellipse 74% 66% at 50% 46%,
+          transparent 34%,
+          rgba(7, 5, 16, 0.8) 100%
+        );
+      }
+      #brand {
+        position: fixed;
+        left: 22px;
+        top: 18px;
+        z-index: 6;
+        pointer-events: none;
+        text-shadow: 0 2px 16px rgba(6, 4, 14, 0.95);
+      }
+      #brand .seal {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 9px;
+        background: linear-gradient(155deg, var(--crimson), #8e1c2c);
+        color: #fff3e8;
+        font-size: 18px;
+        transform: rotate(-5deg);
+        margin-bottom: 9px;
+        box-shadow: 0 5px 18px rgba(224, 50, 75, 0.4);
+      }
+      #brand h1 {
+        margin: 0;
+        font-size: clamp(18px, 2.2vw, 26px);
+        font-weight: 600;
+        letter-spacing: 0.5px;
+      }
+      #brand h1 em {
+        font-style: normal;
+        color: var(--pink);
+      }
+      #brand p {
+        margin: 5px 0 0;
+        font-size: 12px;
+        color: var(--ink-dim);
+        max-width: 340px;
+      }
+      #brand .rule {
+        width: 56px;
+        height: 2px;
+        margin-top: 9px;
+        border-radius: 2px;
+        background: linear-gradient(90deg, var(--gold), var(--crimson) 62%, transparent);
+      }
+      #top {
+        position: fixed;
+        right: 18px;
+        top: 18px;
+        z-index: 9;
+        display: flex;
+        gap: 8px;
+      }
+      .tbtn {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        min-height: 38px;
+        padding: 0 13px;
+        border-radius: 10px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        color: var(--ink);
+        font: inherit;
+        font-size: 12.5px;
+        cursor: pointer;
+        backdrop-filter: blur(9px);
+        transition:
+          background 0.18s,
+          border-color 0.18s,
+          transform 0.18s;
+      }
+      .tbtn:hover {
+        background: rgba(48, 32, 68, 0.92);
+        border-color: rgba(245, 196, 81, 0.55);
+        transform: translateY(-1px);
+      }
+      .tbtn:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
+      }
+      .tbtn .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: var(--info);
+        box-shadow: 0 0 9px var(--info);
+      }
+      .tbtn[aria-pressed='false'] .dot {
+        background: #6b6480;
+        box-shadow: none;
+      }
+      #hud {
+        position: fixed;
+        left: 50%;
+        top: 16px;
+        transform: translateX(-50%);
+        z-index: 6;
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        padding: 9px 16px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        backdrop-filter: blur(10px);
+        pointer-events: none;
+      }
+      #hud .stat {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2px;
+        min-width: 52px;
+      }
+      #hud .stat b {
+        font-size: 15px;
+        font-variant-numeric: tabular-nums;
+        color: var(--gold);
+      }
+      #hud .stat span {
+        font-size: 10px;
+        letter-spacing: 1px;
+        color: var(--ink-dim);
+      }
+      #hp {
+        width: 120px;
+        height: 8px;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.12);
+        overflow: hidden;
+      }
+      #hp i {
+        display: block;
+        height: 100%;
+        width: 100%;
+        background: linear-gradient(90deg, var(--crimson), var(--gold));
+        transition: width 0.3s;
+      }
+      #panel {
+        position: fixed;
+        right: 18px;
+        top: 66px;
+        bottom: 18px;
+        width: 288px;
+        z-index: 7;
+        display: flex;
+        flex-direction: column;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        backdrop-filter: blur(13px);
+        box-shadow: 0 18px 50px rgba(4, 3, 12, 0.6);
+        overflow: hidden;
+      }
+      #panel header {
+        padding: 13px 15px 10px;
+        border-bottom: 1px solid rgba(247, 168, 191, 0.15);
+      }
+      #panel header b {
+        font-size: 11.5px;
+        letter-spacing: 2.2px;
+        text-transform: uppercase;
+        color: var(--gold);
+        font-weight: 600;
+      }
+      #panel header span {
+        display: block;
+        margin-top: 3px;
+        font-size: 11px;
+        color: var(--ink-dim);
+      }
+      #scroll {
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        padding: 6px 15px 15px;
+        flex: 1;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(224, 50, 75, 0.8) rgba(255, 255, 255, 0.06);
+      }
+      #scroll::-webkit-scrollbar {
+        width: 10px;
+      }
+      #scroll::-webkit-scrollbar-track {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 10px;
+        margin: 4px 0;
+      }
+      #scroll::-webkit-scrollbar-thumb {
+        border-radius: 10px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        background-color: rgba(224, 50, 75, 0.78);
+      }
+      #scroll::-webkit-scrollbar-thumb:hover {
+        background-color: var(--crimson);
+      }
+      .grp {
+        margin-top: 14px;
+      }
+      .grp > b {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 10.5px;
+        letter-spacing: 1.8px;
+        text-transform: uppercase;
+        color: var(--pink);
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .grp > b::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: linear-gradient(90deg, var(--line), transparent);
+      }
+      .row {
+        margin-bottom: 10px;
+      }
+      .row label {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+        font-size: 12.5px;
+        color: #e2dae9;
+        margin-bottom: 5px;
+      }
+      .row label output {
+        font-variant-numeric: tabular-nums;
+        font-size: 11.5px;
+        color: var(--gold);
+        background: rgba(245, 196, 81, 0.12);
+        border-radius: 5px;
+        padding: 1px 6px;
+        min-width: 42px;
+        text-align: right;
+      }
+      input[type='range'] {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 100%;
+        height: 18px;
+        background: transparent;
+        cursor: pointer;
+        margin: 0;
+      }
+      input[type='range']::-webkit-slider-runnable-track {
+        height: 3px;
+        border-radius: 3px;
+        background: linear-gradient(90deg, var(--crimson), var(--gold));
+      }
+      input[type='range']::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 14px;
+        height: 14px;
+        margin-top: -5.5px;
+        border-radius: 50%;
+        background: var(--ink);
+        border: 2px solid var(--crimson);
+        box-shadow: 0 0 0 3px rgba(224, 50, 75, 0.2);
+      }
+      input[type='range']::-moz-range-track {
+        height: 3px;
+        border-radius: 3px;
+        background: linear-gradient(90deg, var(--crimson), var(--gold));
+      }
+      input[type='range']::-moz-range-thumb {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--ink);
+        border: 2px solid var(--crimson);
+      }
+      input[type='range']:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 3px;
+        border-radius: 4px;
+      }
+      .sw {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 9px;
+        font-size: 12.5px;
+        color: #e2dae9;
+      }
+      .sw button {
+        position: relative;
+        width: 40px;
+        height: 21px;
+        flex: 0 0 40px;
+        border-radius: 21px;
+        cursor: pointer;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.09);
+        transition: background 0.2s;
+      }
+      .sw button::after {
+        content: '';
+        position: absolute;
+        left: 2px;
+        top: 2px;
+        width: 15px;
+        height: 15px;
+        border-radius: 50%;
+        background: rgba(245, 239, 230, 0.68);
+        transition: transform 0.22s cubic-bezier(0.3, 1.4, 0.4, 1);
+      }
+      .sw button[aria-pressed='true'] {
+        background: linear-gradient(160deg, var(--crimson), #a52233);
+      }
+      .sw button[aria-pressed='true']::after {
+        transform: translateX(19px);
+        background: #fff3e8;
+      }
+      .sw button:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
+      }
+      .legend {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 12px;
+        color: #e2dae9;
+      }
+      .legend i {
+        font-style: normal;
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        margin-right: 7px;
+        vertical-align: -1px;
+      }
+      .acts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 13px;
+      }
+      .acts button {
+        min-height: 38px;
+        border-radius: 9px;
+        border: 1px solid var(--line);
+        cursor: pointer;
+        font: inherit;
+        font-size: 12.5px;
+        color: var(--ink);
+        background: rgba(255, 255, 255, 0.07);
+        transition:
+          background 0.18s,
+          transform 0.18s;
+      }
+      .acts button:hover {
+        background: rgba(224, 50, 75, 0.24);
+        transform: translateY(-1px);
+      }
+      .acts button:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
+      }
+      .acts button.wide {
+        grid-column: span 2;
+        background: linear-gradient(150deg, rgba(245, 196, 81, 0.22), rgba(224, 50, 75, 0.24));
+        border-color: rgba(245, 196, 81, 0.45);
+      }
+      #toast {
+        position: fixed;
+        left: 50%;
+        bottom: 30px;
+        transform: translate(-50%, 14px);
+        z-index: 20;
+        padding: 9px 18px;
+        border-radius: 22px;
+        background: rgba(17, 14, 33, 0.95);
+        border: 1px solid rgba(245, 196, 81, 0.45);
+        color: var(--gold);
+        font-size: 12.5px;
+        opacity: 0;
+        pointer-events: none;
+        transition:
+          opacity 0.3s,
+          transform 0.3s;
+      }
+      #toast.on {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      #ov {
+        position: fixed;
+        inset: 0;
+        z-index: 15;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(7, 6, 19, 0.72);
+        backdrop-filter: blur(6px);
+      }
+      #ov .card {
+        max-width: 520px;
+        margin: 20px;
+        padding: 26px 28px;
+        border-radius: 18px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        text-align: center;
+        box-shadow: 0 24px 70px rgba(4, 3, 12, 0.7);
+      }
+      #ov h2 {
+        margin: 0 0 6px;
+        font-size: 24px;
+        color: var(--gold);
+        letter-spacing: 1px;
+      }
+      #ov p {
+        margin: 8px 0;
+        color: var(--ink-dim);
+        font-size: 13.5px;
+        line-height: 1.7;
+      }
+      #ov .big {
+        font-size: 34px;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+        margin: 6px 0;
+      }
+      #ov button {
+        margin-top: 14px;
+        min-height: 46px;
+        padding: 0 26px;
+        border-radius: 12px;
+        border: 1px solid rgba(245, 196, 81, 0.55);
+        background: linear-gradient(150deg, rgba(245, 196, 81, 0.3), rgba(224, 50, 75, 0.32));
+        color: #ffe9c2;
+        font: inherit;
+        font-size: 15px;
+        cursor: pointer;
+      }
+      #ov button:focus-visible {
+        outline: 2px solid var(--gold);
+        outline-offset: 2px;
+      }
+      #ov[hidden] {
+        display: none;
+      }
+      @media (max-width: 900px) {
+        #panel {
+          right: 12px;
+          left: 12px;
+          width: auto;
+          top: auto;
+          bottom: 12px;
+          max-height: 42vh;
+        }
+        #brand {
+          left: 14px;
+          top: 12px;
+        }
+        #brand p {
+          display: none;
+        }
+        #top {
+          right: 12px;
+          top: 12px;
+        }
+        .tbtn span.lbl {
+          display: none;
+        }
+        #hud {
+          top: auto;
+          bottom: calc(42vh + 20px);
+          gap: 10px;
+          padding: 7px 12px;
+        }
+        #hp {
+          width: 80px;
+        }
+      }
+    </style>
+    <script type="importmap">
+      { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js" } }
+    </script>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <div id="vig"></div>
+    <div id="brand">
+      <div class="seal">B6</div>
+      <h1>A Day on <em>B612</em></h1>
+      <p>拔猴面包树 · 浇玫瑰 · 通火山。拖动旋转，滚轮缩放，点击发光的目标照料她的小星球。</p>
+      <div class="rule"></div>
+    </div>
+    <div id="top">
+      <button class="tbtn" id="sound" aria-pressed="true" title="静音/恢复">
+        <i class="dot"></i><span class="lbl">声音 开</span>
+      </button>
+      <button class="tbtn" id="hide" aria-pressed="false" title="隐藏/显示控制台">控制台</button>
+    </div>
+    <div id="hud">
+      <div class="stat"><b id="hScore">0</b><span>分数</span></div>
+      <div class="stat"><b id="hWave">1/6</b><span>波次</span></div>
+      <div class="stat"><b id="hTime">12</b><span>秒</span></div>
+      <div class="stat">
+        <div id="hp"><i></i></div>
+        <span>星球</span>
+      </div>
+    </div>
+    <aside id="panel">
+      <header><b>Gardener Console</b><span>点击发光目标照料 · 拖动旋转 · 滚轮缩放</span></header>
+      <div id="scroll">
+        <div class="grp">
+          <b>玩法 Rules</b>
+          <div class="legend">
+            <span><i style="background: var(--leaf)"></i>绿环=猴面包树幼苗：长大前拔掉。</span>
+            <span><i style="background: var(--info)"></i>蓝滴=玫瑰口渴：点击浇水。</span>
+            <span><i style="background: var(--amber)"></i>橙环=火山冒烟：点击疏通。</span>
+          </div>
+        </div>
+        <div class="grp">
+          <b>难度 Difficulty</b>
+          <div class="row">
+            <label for="diff">幼苗生长速度 <output id="diffO">1.0</output></label
+            ><input type="range" id="diff" min="0.5" max="2" step="0.1" value="1" />
+          </div>
+          <div class="row">
+            <label for="rate">幼苗出现频率 <output id="rateO">1.0</output></label
+            ><input type="range" id="rate" min="0.5" max="2" step="0.1" value="1" />
+          </div>
+        </div>
+        <div class="grp">
+          <b>镜头 Camera</b>
+          <div class="row">
+            <label for="zoom">远近 <output id="zoomO">1.0</output></label
+            ><input type="range" id="zoom" min="0.7" max="1.6" step="0.05" value="1" />
+          </div>
+          <div class="sw"><span>自动旋转</span><button id="spin" aria-pressed="true"></button></div>
+          <div class="sw">
+            <span>网格参考</span><button id="grid" aria-pressed="false"></button>
+          </div>
+        </div>
+        <div class="acts">
+          <button id="pause">暂停</button>
+          <button id="reset">重开</button>
+          <button id="shot" class="wide">导出画面 PNG</button>
+        </div>
+      </div>
+    </aside>
+    <div id="toast"></div>
+    <div id="ov">
+      <div class="card">
+        <h2 id="ovTitle">A Day on B612</h2>
+        <p id="ovText">
+          猴面包树的幼苗会悄悄顶开土壤——在绿环长大前拔掉；玫瑰渴了（蓝滴）要浇水；火山冒烟（橙环）要疏通。撑过六波，守住这颗小星球。
+        </p>
+        <div class="big" id="ovScore" hidden>0</div>
+        <button id="ovBtn">开始这一天</button>
+      </div>
+    </div>
+    <script type="module">
+      import * as THREE from 'three';
+      const $ = (id) => document.getElementById(id);
+      const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+      /* 渲染器 / 等距相机 */
+      const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+      renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      renderer.shadowMap.autoUpdate = false;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      $('stage').appendChild(renderer.domElement);
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0b0a1a);
+      scene.fog = new THREE.FogExp2(0x140f2c, 0.008);
+      let aspect = innerWidth / innerHeight,
+        view = 24;
+      const camera = new THREE.OrthographicCamera(
+        (-view * aspect) / 2,
+        (view * aspect) / 2,
+        view / 2,
+        -view / 2,
+        0.1,
+        300
+      );
+      /* 轨道:阻尼拖拽 + 滚轮 */
+      let yaw = 0.7,
+        pitch = 0.62,
+        yawT = 0.7,
+        pitchT = 0.62,
+        dist = 70;
+      function placeCam() {
+        const cp = Math.cos(pitch),
+          sp = Math.sin(pitch);
+        camera.position.set(Math.sin(yaw) * cp * dist, sp * dist, Math.cos(yaw) * cp * dist);
+        camera.lookAt(0, 1.5, 0);
+      }
+      placeCam();
+      const key = new THREE.DirectionalLight(0xffb478, 2.6);
+      key.position.set(18, 26, 12);
+      key.castShadow = true;
+      key.shadow.mapSize.set(2048, 2048);
+      const sc = key.shadow.camera;
+      sc.left = -16;
+      sc.right = 16;
+      sc.top = 16;
+      sc.bottom = -16;
+      sc.near = 1;
+      sc.far = 90;
+      key.shadow.bias = -0.0006;
+      key.shadow.normalBias = 0.4;
+      scene.add(key, key.target);
+      const rim = new THREE.DirectionalLight(0x5f7fd0, 1.1);
+      rim.position.set(-16, 10, -18);
+      scene.add(rim);
+      scene.add(new THREE.HemisphereLight(0xffd2b0, 0x241d40, 0.5));
+
+      /* 体素工具 */
+      const matVox = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.85,
+        metalness: 0,
+        flatShading: true,
+      });
+      const matGlow = new THREE.MeshBasicMaterial({ vertexColors: true });
+      function voxGeo(list) {
+        const g = new THREE.BoxGeometry(1, 1, 1);
+        const pos = [],
+          nor = [],
+          col = [],
+          idx = [];
+        let v = 0;
+        const c = new THREE.Color();
+        for (const [x, y, z, sx, sy, sz, hex] of list) {
+          c.set(hex);
+          const bp = g.attributes.position,
+            bn = g.attributes.normal,
+            bi = g.index;
+          for (let i = 0; i < bp.count; i++) {
+            pos.push(x + bp.getX(i) * sx, y + bp.getY(i) * sy, z + bp.getZ(i) * sz);
+            nor.push(bn.getX(i), bn.getY(i), bn.getZ(i));
+            col.push(c.r, c.g, c.b);
+          }
+          for (let i = 0; i < bi.count; i++) idx.push(bi.getX(i) + v);
+          v += bp.count;
+        }
+        const out = new THREE.BufferGeometry();
+        out.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        out.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+        out.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+        out.setIndex(idx);
+        out.computeBoundingSphere();
+        g.dispose();
+        return out;
+      }
+      const mesh = (list, mat = matVox) => {
+        const m = new THREE.Mesh(voxGeo(list), mat);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        return m;
+      };
+      const ring = (hex) => {
+        const m = new THREE.Mesh(
+          new THREE.TorusGeometry(0.7, 0.07, 8, 28),
+          new THREE.MeshBasicMaterial({ color: hex })
+        );
+        m.rotation.x = Math.PI / 2;
+        return m;
+      };
+      const hitbox = (r) => {
+        const m = new THREE.Mesh(
+          new THREE.SphereGeometry(r, 8, 8),
+          new THREE.MeshBasicMaterial({ visible: false })
+        );
+        return m;
+      };
+
+      /* 星球 */
+      const R = 7;
+      const planet = new THREE.Group();
+      scene.add(planet);
+      {
+        const list = [];
+        const ST = 0.5;
+        for (let x = -R; x <= R; x += ST)
+          for (let y = -R; y <= R; y += ST)
+            for (let z = -R; z <= R; z += ST) {
+              const d = Math.hypot(x, y, z);
+              if (d > R + 0.02) continue;
+              const up = y / Math.max(0.001, d);
+              const n = Math.sin(x * 0.7) * Math.cos(z * 0.6) + Math.sin(y * 0.8);
+              let hex = up > 0.3 ? (n > 0 ? 0xc8873f : 0xb0763a) : up < -0.3 ? 0x6d3520 : 0x8f4526;
+              if (n > 1.2 && up < 0.4) hex = 0x8b8794;
+              list.push([x, y, z, ST * 1.06, ST * 1.06, ST * 1.06, hex]);
+            }
+        planet.add(mesh(list));
+      }
+      const topY = (x, z) => Math.sqrt(Math.max(0, R * R - x * x - z * z));
+      /* 玫瑰 */
+      const rose = new THREE.Group();
+      rose.position.set(0, topY(0, 0) + 0.1, 0);
+      planet.add(rose);
+      {
+        const stem = [];
+        for (let i = 0; i < 8; i++)
+          stem.push([Math.sin(i * 0.4) * 0.08, i * 0.28, 0, 0.16, 0.2, 0.16, 0x4a8438]);
+        rose.add(mesh(stem));
+        const bloom = [];
+        for (let L = 0; L < 3; L++)
+          for (let j = 0; j < 6 + L * 2; j++) {
+            const a = (j / (6 + L * 2)) * 6.283 + L * 0.5;
+            const r = 0.28 + L * 0.22;
+            bloom.push([
+              Math.cos(a) * r,
+              2.3 + L * 0.12,
+              Math.sin(a) * r,
+              0.3 - L * 0.05,
+              0.22,
+              0.3 - L * 0.05,
+              L ? 0xf7a8bf : 0xe0324b,
+            ]);
+          }
+        rose.add(mesh(bloom));
+        rose.userData.heart = mesh([[0, 2.5, 0, 0.24, 0.24, 0.24, 0xf5c451]], matGlow);
+        rose.add(rose.userData.heart);
+        rose.userData.drop = mesh([[0, 3.4, 0, 0.22, 0.3, 0.22, 0x7fe3e8]], matGlow);
+        rose.userData.drop.visible = false;
+        rose.add(rose.userData.drop);
+        rose.userData.hit = hitbox(1.6);
+        rose.userData.hit.position.y = 2;
+        rose.add(rose.userData.hit);
+      }
+      {
+        const g = new THREE.Mesh(
+          new THREE.CylinderGeometry(1.5, 1.5, 3.4, 24, 1, true),
+          new THREE.MeshPhysicalMaterial({
+            color: 0xdff2f6,
+            transmission: 0.9,
+            roughness: 0.05,
+            transparent: true,
+            opacity: 0.3,
+            side: THREE.DoubleSide,
+          })
+        );
+        g.position.set(0, topY(0, 0) + 1.8, 0);
+        planet.add(g);
+      }
+      /* 火山 */
+      const volcanoes = [];
+      [
+        [-3.6, 2.4],
+        [3.4, 2.2],
+        [1.0, -4.0],
+      ].forEach(([x, z], i) => {
+        const g = new THREE.Group();
+        const by = topY(x, z) - 0.4;
+        g.position.set(x, by, z);
+        planet.add(g);
+        const list = [];
+        for (let L = 0; L < 4; L++) {
+          const r = 1.5 - L * 0.34;
+          for (let a = 0; a < 10; a++) {
+            const ang = (a / 10) * 6.283;
+            list.push([
+              Math.cos(ang) * r,
+              L * 0.5,
+              Math.sin(ang) * r,
+              0.5,
+              0.5,
+              0.5,
+              i === 2 ? 0x7d5a52 : 0x8d8478,
+            ]);
+          }
+        }
+        g.add(mesh(list));
+        const ember = mesh([[0, 1.9, 0, 0.7, 0.3, 0.7, 0xff7a30]], matGlow);
+        ember.visible = false;
+        g.add(ember);
+        const smoke = mesh(
+          [
+            [0, 2.6, 0, 0.4, 0.4, 0.4, 0xc9b2ac],
+            [0.3, 3.1, 0.1, 0.3, 0.3, 0.3, 0xd8c4bd],
+          ],
+          matVox
+        );
+        smoke.visible = false;
+        g.add(smoke);
+        const rg = ring(0xffb066);
+        rg.position.y = 2.1;
+        rg.visible = false;
+        g.add(rg);
+        const hit = hitbox(1.6);
+        hit.position.y = 1.4;
+        g.add(hit);
+        volcanoes.push({ g, ember, smoke, ring: rg, hit, x, z, smokeT: 0, need: false });
+      });
+      const grid = new THREE.GridHelper(24, 24, 0xf5c451, 0x4a3a5e);
+      grid.position.y = -R - 1;
+      grid.visible = false;
+      grid.material.transparent = true;
+      grid.material.opacity = 0.25;
+      scene.add(grid);
+
+      /* 幼苗 */
+      const sprouts = [];
+      const sproutGroup = new THREE.Group();
+      planet.add(sproutGroup);
+      function makeSprout() {
+        const a = Math.random() * 6.283,
+          d = 2.6 + Math.random() * 3.2;
+        const x = Math.cos(a) * d,
+          z = Math.sin(a) * d,
+          y = topY(x, z);
+        const g = new THREE.Group();
+        g.position.set(x, y, z);
+        const m = mesh([
+          [0, 0.3, 0, 0.3, 0.6, 0.3, 0x7ddb7a],
+          [0, 0.75, 0, 0.22, 0.4, 0.22, 0x9fe89a],
+        ]);
+        const rg = ring(0x7ddb7a);
+        rg.position.y = 0.1;
+        const hit = hitbox(1.1);
+        hit.position.y = 0.6;
+        g.add(m, rg, hit);
+        sproutGroup.add(g);
+        sprouts.push({ g, m, ring: rg, hit, x, z, y, t: 0, stage: 0, dead: false });
+      }
+      function growSprout(s) {
+        s.stage++;
+        const st = s.stage;
+        const h = st === 1 ? 1.1 : st === 2 ? 2.0 : 3.0,
+          w = st === 1 ? 0.4 : st === 2 ? 0.6 : 0.9;
+        const col = st === 1 ? 0x7ddb7a : st === 2 ? 0x8a6a3a : 0x6d4a2a;
+        s.g.remove(s.m);
+        s.m.geometry.dispose();
+        const list = [[0, h / 2, 0, w, h, w, col]];
+        if (st >= 2) list.push([0, h + 0.2, 0, w * 2.2, 0.5, w * 2.2, 0x5a7a3a]);
+        if (st >= 3) list.push([0, h + 0.6, 0, w * 3, 0.7, w * 3, 0x4a6a2a]);
+        s.m = mesh(list);
+        s.g.add(s.m);
+        s.ring.material.color.setHex(st === 1 ? 0xf5c451 : 0xe0324b);
+        s.ring.scale.setScalar(1 + st * 0.4);
+      }
+      const particles = [];
+      const partGroup = new THREE.Group();
+      scene.add(partGroup);
+      const partGeo = new THREE.BoxGeometry(0.16, 0.16, 0.16);
+      function burst(pos, hex, n = 10) {
+        for (let i = 0; i < n; i++) {
+          const m = new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({ color: hex }));
+          m.position.copy(pos);
+          const v = new THREE.Vector3(
+            (Math.random() - 0.5) * 4,
+            Math.random() * 4 + 1,
+            (Math.random() - 0.5) * 4
+          );
+          partGroup.add(m);
+          particles.push({ m, v, life: 0 });
+        }
+      }
+
+      /* 音效 */
+      const Sound = (() => {
+        let ctx = null,
+          master = null,
+          on = true;
+        function start() {
+          if (ctx) return;
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          ctx = new AC();
+          master = ctx.createGain();
+          master.gain.value = on ? 0.4 : 0;
+          master.connect(ctx.destination);
+        }
+        function blip(f, d = 0.12, type = 'sine', g = 0.2) {
+          if (!ctx || !on) return;
+          const t = ctx.currentTime;
+          const o = ctx.createOscillator(),
+            gn = ctx.createGain();
+          o.type = type;
+          o.frequency.value = f;
+          gn.gain.setValueAtTime(0, t);
+          gn.gain.linearRampToValueAtTime(g, t + 0.01);
+          gn.gain.exponentialRampToValueAtTime(0.001, t + d);
+          o.connect(gn);
+          gn.connect(master);
+          o.start(t);
+          o.stop(t + d + 0.02);
+        }
+        return {
+          start,
+          pull() {
+            blip(520, 0.1, 'triangle');
+            blip(760, 0.12, 'sine', 0.12);
+          },
+          water() {
+            blip(880, 0.15, 'sine', 0.15);
+            blip(1320, 0.2, 'sine', 0.08);
+          },
+          volcano() {
+            blip(200, 0.2, 'sawtooth', 0.12);
+          },
+          crack() {
+            blip(90, 0.4, 'sawtooth', 0.25);
+          },
+          win() {
+            [523, 659, 784, 1046].forEach((f, i) =>
+              setTimeout(() => blip(f, 0.25, 'triangle', 0.15), i * 120)
+            );
+          },
+          toggle() {
+            on = !on;
+            if (master) master.gain.setTargetAtTime(on ? 0.4 : 0, ctx.currentTime, 0.05);
+            return on;
+          },
+        };
+      })();
+      $('sound').addEventListener('click', () => {
+        Sound.start();
+        const on = Sound.toggle();
+        $('sound').setAttribute('aria-pressed', String(on));
+        $('sound').querySelector('.lbl').textContent = on ? '声音 开' : '声音 关';
+      });
+      ['pointerdown', 'keydown'].forEach((ev) =>
+        addEventListener(ev, () => Sound.start(), { once: true })
+      );
+
+      /* 状态 */
+      const G = {
+        running: false,
+        paused: false,
+        score: 0,
+        hp: 100,
+        wave: 1,
+        waveT: 0,
+        waveDur: 12,
+        spawnT: 0,
+        over: false,
+        diff: 1,
+        rate: 1,
+        roseThirst: 0,
+        roseT: 0,
+      };
+      const WAVES = 6;
+      function toast(msg) {
+        const t = $('toast');
+        t.textContent = msg;
+        t.classList.add('on');
+        clearTimeout(t._h);
+        t._h = setTimeout(() => t.classList.remove('on'), 1600);
+      }
+      function hud() {
+        $('hScore').textContent = G.score;
+        $('hWave').textContent = Math.min(G.wave, WAVES) + '/' + WAVES;
+        $('hTime').textContent = Math.max(0, Math.ceil(G.waveDur - G.waveT));
+        $('hp').firstElementChild.style.width = clamp(G.hp, 0, 100) + '%';
+      }
+      function reset() {
+        for (const s of sprouts) {
+          sproutGroup.remove(s.g);
+          s.m.geometry.dispose();
+        }
+        sprouts.length = 0;
+        for (const p of particles) {
+          partGroup.remove(p.m);
+          p.m.material.dispose();
+        }
+        particles.length = 0;
+        Object.assign(G, {
+          running: true,
+          paused: false,
+          score: 0,
+          hp: 100,
+          wave: 1,
+          waveT: 0,
+          spawnT: 0,
+          over: false,
+          roseThirst: 0,
+          roseT: 0,
+        });
+        volcanoes.forEach((v) => {
+          v.need = false;
+          v.smokeT = 0;
+          v.ember.visible = false;
+          v.smoke.visible = false;
+          v.ring.visible = false;
+        });
+        rose.userData.drop.visible = false;
+        $('pause').textContent = '暂停';
+        $('ov').hidden = true;
+        renderer.shadowMap.needsUpdate = true;
+        hud();
+      }
+      function end(win) {
+        G.running = false;
+        G.over = true;
+        $('ovTitle').textContent = win ? '你守住了 B612' : '星球被顶开了…';
+        $('ovText').textContent = win
+          ? '六波过去，玫瑰安然无恙。她单独一朵，就比你们全部更重要。'
+          : '猴面包树长大了。没关系，明天再来——园艺就是每天重新开始。';
+        $('ovScore').hidden = false;
+        $('ovScore').textContent = G.score;
+        $('ovBtn').textContent = '再来一天';
+        $('ov').hidden = false;
+        if (win) Sound.win();
+        else Sound.crack();
+        try {
+          parent.postMessage({ type: 'b612-game', score: G.score, win }, '*');
+        } catch (e) {}
+      }
+
+      /* 输入:拖拽旋转 / 滚轮 / 点击拾取 */
+      const ray = new THREE.Raycaster();
+      const ptr = new THREE.Vector2();
+      let down = null,
+        dragged = false;
+      const cv = renderer.domElement;
+      cv.addEventListener('pointerdown', (e) => {
+        down = { x: e.clientX, y: e.clientY };
+        dragged = false;
+        cv.classList.add('drag');
+        cv.setPointerCapture(e.pointerId);
+      });
+      cv.addEventListener('pointermove', (e) => {
+        if (!down) return;
+        const dx = e.clientX - down.x,
+          dy = e.clientY - down.y;
+        if (Math.abs(dx) + Math.abs(dy) > 6) dragged = true;
+        if (dragged) {
+          yawT -= dx * 0.005;
+          pitchT = clamp(pitchT + dy * 0.004, 0.2, 1.2);
+          down = { x: e.clientX, y: e.clientY };
+        }
+      });
+      cv.addEventListener('pointerup', (e) => {
+        cv.classList.remove('drag');
+        if (down && !dragged) pick(e);
+        down = null;
+      });
+      cv.addEventListener(
+        'wheel',
+        (e) => {
+          e.preventDefault();
+          view = clamp(view * (e.deltaY > 0 ? 1.08 : 0.92), 14, 40);
+          $('zoom').value = (view / 24).toFixed(2);
+          $('zoomO').textContent = (view / 24).toFixed(2);
+          resize();
+        },
+        { passive: false }
+      );
+      function pick(e) {
+        if (!G.running || G.paused) return;
+        const r = cv.getBoundingClientRect();
+        ptr.x = ((e.clientX - r.left) / r.width) * 2 - 1;
+        ptr.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+        ray.setFromCamera(ptr, camera);
+        const targets = [];
+        for (const s of sprouts) if (!s.dead) targets.push({ hit: s.hit, kind: 'sprout', ref: s });
+        if (G.roseThirst > 0) targets.push({ hit: rose.userData.hit, kind: 'rose' });
+        for (const v of volcanoes)
+          if (v.need) targets.push({ hit: v.hit, kind: 'volcano', ref: v });
+        const hits = ray.intersectObjects(
+          targets.map((t) => t.hit),
+          false
+        );
+        if (!hits.length) return;
+        const t = targets.find((t) => t.hit === hits[0].object);
+        if (t.kind === 'sprout') {
+          const s = t.ref;
+          s.dead = true;
+          sproutGroup.remove(s.g);
+          s.m.geometry.dispose();
+          burst(s.g.position.clone().add(new THREE.Vector3(0, 0.6, 0)), 0x7ddb7a);
+          G.score += 10;
+          Sound.pull();
+        } else if (t.kind === 'rose') {
+          G.roseThirst = 0;
+          rose.userData.drop.visible = false;
+          G.score += 25;
+          burst(rose.position.clone().add(new THREE.Vector3(0, 2.6, 0)), 0xf7a8bf, 14);
+          Sound.water();
+        } else {
+          const v = t.ref;
+          v.need = false;
+          v.smokeT = 0;
+          v.ember.visible = false;
+          v.smoke.visible = false;
+          v.ring.visible = false;
+          G.score += 15;
+          burst(v.g.position.clone().add(new THREE.Vector3(0, 2, 0)), 0xffb066, 12);
+          Sound.volcano();
+        }
+        hud();
+      }
+
+      /* 控制 */
+      function bindRange(id, key) {
+        const el = $(id),
+          out = $(id + 'O');
+        const upd = () => {
+          G[key] = parseFloat(el.value);
+          out.textContent = G[key].toFixed(1);
+        };
+        el.addEventListener('input', upd);
+        upd();
+      }
+      bindRange('diff', 'diff');
+      bindRange('rate', 'rate');
+      $('zoom').addEventListener('input', (e) => {
+        view = 24 * parseFloat(e.target.value);
+        $('zoomO').textContent = parseFloat(e.target.value).toFixed(2);
+        resize();
+      });
+      let spinOn = true;
+      $('spin').addEventListener('click', () => {
+        spinOn = !spinOn;
+        $('spin').setAttribute('aria-pressed', String(spinOn));
+      });
+      $('grid').addEventListener('click', () => {
+        grid.visible = !grid.visible;
+        $('grid').setAttribute('aria-pressed', String(grid.visible));
+      });
+      $('pause').addEventListener('click', () => {
+        if (!G.running) return;
+        G.paused = !G.paused;
+        $('pause').textContent = G.paused ? '继续' : '暂停';
+      });
+      $('reset').addEventListener('click', reset);
+      $('ovBtn').addEventListener('click', reset);
+      $('hide').addEventListener('click', () => {
+        const p = $('panel');
+        const h = p.style.display === 'none';
+        p.style.display = h ? 'flex' : 'none';
+        $('hide').setAttribute('aria-pressed', String(!h));
+      });
+      $('shot').addEventListener('click', () => {
+        renderer.render(scene, camera);
+        renderer.domElement.toBlob((b) => {
+          if (!b) return;
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(b);
+          a.download = 'B612-day-' + Date.now() + '.png';
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+          toast('已导出');
+        }, 'image/png');
+      });
+
+      /* 主循环 */
+      let prev = performance.now(),
+        rot = 0,
+        shadowT = 0;
+      function frame(now) {
+        requestAnimationFrame(frame);
+        const dt = Math.min(0.05, (now - prev) / 1000);
+        prev = now;
+        yaw += (yawT - yaw) * 0.12;
+        pitch += (pitchT - pitch) * 0.12;
+        placeCam();
+        if (spinOn && !G.paused) rot += dt * 0.1;
+        planet.rotation.y = rot;
+        shadowT += dt;
+        if (shadowT > 0.25) {
+          shadowT = 0;
+          renderer.shadowMap.needsUpdate = true;
+        }
+        if (G.running && !G.paused) {
+          G.waveT += dt;
+          G.spawnT += dt;
+          G.roseT += dt;
+          const interval = clamp(2.0 / G.rate - G.wave * 0.15, 0.5, 3);
+          if (G.spawnT >= interval) {
+            G.spawnT = 0;
+            makeSprout();
+          }
+          for (const s of sprouts) {
+            if (s.dead) continue;
+            s.t += dt * G.diff;
+            const th = s.stage === 0 ? 3 : s.stage === 1 ? 3 : 2.5;
+            if (s.t >= th) {
+              s.t = 0;
+              if (s.stage >= 2) {
+                s.dead = true;
+                sproutGroup.remove(s.g);
+                s.m.geometry.dispose();
+                burst(s.g.position.clone(), 0x8a6a3a, 16);
+                G.hp -= 12;
+                Sound.crack();
+                hud();
+                if (G.hp <= 0) {
+                  end(false);
+                  return;
+                }
+              } else growSprout(s);
+            }
+            s.ring.scale.setScalar((1 + s.stage * 0.4) * (1 + Math.sin(now * 0.006) * 0.12));
+          }
+          if (G.roseT > 9) {
+            G.roseT = 0;
+            G.roseThirst = 1;
+            rose.userData.drop.visible = true;
+          }
+          if (G.roseThirst > 0) {
+            G.roseThirst += dt;
+            rose.userData.drop.position.y = 3.4 + Math.sin(now * 0.006) * 0.2;
+            rose.userData.heart.material.color.setHex(
+              Math.sin(now * 0.01) > 0 ? 0xf5c451 : 0xe0324b
+            );
+            if (G.roseThirst > 8) {
+              G.roseThirst = 0;
+              rose.userData.drop.visible = false;
+              G.hp -= 6;
+              hud();
+              if (G.hp <= 0) {
+                end(false);
+                return;
+              }
+            }
+          } else rose.userData.heart.material.color.setHex(0xf5c451);
+          for (const v of volcanoes) {
+            if (!v.need && Math.random() < dt * 0.05 * (1 + G.wave * 0.15)) {
+              v.need = true;
+              v.smokeT = 0;
+              v.smoke.visible = true;
+              v.ring.visible = true;
+            }
+            if (v.need) {
+              v.smokeT += dt;
+              v.ember.visible = Math.sin(now * 0.012) > 0;
+              v.smoke.position.y = 2.6 + Math.sin(now * 0.004) * 0.2;
+              v.ring.scale.setScalar(1 + Math.sin(now * 0.006) * 0.12);
+              if (v.smokeT > 7) {
+                v.need = false;
+                v.ember.visible = false;
+                v.smoke.visible = false;
+                v.ring.visible = false;
+                G.hp -= 8;
+                burst(v.g.position.clone().add(new THREE.Vector3(0, 2, 0)), 0xff7a30, 14);
+                Sound.crack();
+                hud();
+                if (G.hp <= 0) {
+                  end(false);
+                  return;
+                }
+              }
+            }
+          }
+          if (G.waveT >= G.waveDur) {
+            G.waveT = 0;
+            G.wave++;
+            if (G.wave > WAVES) {
+              end(true);
+              return;
+            }
+            G.score += 30;
+            toast('第 ' + G.wave + ' 波');
+            hud();
+          }
+          hud();
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.life += dt;
+          p.v.y -= 9 * dt;
+          p.m.position.addScaledVector(p.v, dt);
+          p.m.rotation.x += dt * 4;
+          p.m.rotation.y += dt * 3;
+          if (p.life > 1) {
+            partGroup.remove(p.m);
+            p.m.material.dispose();
+            particles.splice(i, 1);
+          }
+        }
+        renderer.render(scene, camera);
+      }
+      function resize() {
+        aspect = innerWidth / innerHeight;
+        camera.left = (-view * aspect) / 2;
+        camera.right = (view * aspect) / 2;
+        camera.top = view / 2;
+        camera.bottom = -view / 2;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+      }
+      addEventListener('resize', resize);
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden && G.running) G.paused = true;
+      });
+      hud();
+      requestAnimationFrame(frame);
+    </script>
+  </body>
+</html>

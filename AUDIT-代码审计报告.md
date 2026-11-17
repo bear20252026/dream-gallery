@@ -339,3 +339,94 @@
 10. saveGateData 增量化 + debounce + flush-on-exit。
 
 **第三轮终验结论：代码正常（门禁全绿）；优化已做大半（3.5/5）；架构不是失控屎山而是"有纪律的泥球"（后端 3/5、前端 3/5），真正的病是迁移脚手架永久化 + 两个上帝对象，斜率危险。A 级可立即做，B/C 级动承重墙须主人拍板。**
+
+---
+
+## 八、A+B 级重构执行成果（2026-11-17 · 主人批准"先A后B"，PR #82）
+
+> 分支 `refactor/a-b-arch-2026-11-17`，6 提交，净删 ≈500 行重复/矩阵代码。每项独立验证、可回滚。
+
+### A 级（低风险，已完成）
+- **A1 voxel 共享 three 去重**：五页 8.0MB→1.16MB（HTML 309KB + 共享 three 852KB minified）。源入库 `voxel-src/`（消除仓库外工作区依赖）；`scripts/gen/sync-voxel-three.js`（核心2+addons闭包15文件，仅minify不bundle）+ `bundle-voxel.cjs`（esm+external+相对importmap兼容双base）；`package.json` 增 `gen:voxel`。五页真浏览器验收 PASS（canvas渲染/0错误/0 404），锦鲤截图实证完整渲染；repro 逐字节一致。
+- **A2 烟花后台闸+每帧复用**：`document.hidden` 并入烟花产房门控（省≈3万粒/h空攒）；`loop:frame` payload 复用（零订阅事件）；鹤 updater 复用两闭包向量（省600个/秒）。
+- **A3 client_errors.json 原子写**：tmp+rename（与 gate_data 同口径），杜绝半截文件丢报错史。
+- **A4 清理**：.tmp 117MB 探针残留送废纸篓。死代码/根目录md/hill-src 经核实为受管文档与有来源守卫的产物，不删（诚实标注：不为几百行冒误删承重墙风险）。
+
+### B 级（结构性，已完成）
+- **B7 挂画单管道**：新增 `src/media-files.js`（单45s定时器+单SSE+单隐藏暂停，仿media-push单例）；eternal/paintings 各删自有 fetch+定时器+visibilitychange+onMediaChanged，净删29行；onError 保真原 fallback（首次失败挂静态画/补演示照片）。实机验收：/api/files 仅1次请求（旧≥2条不同URL）、挂画5张。
+- **B6 vox-core 下沉**：`src/shared/vox-core.js` createVoxCore 工厂持有 rng/颜色缓存/计数实例状态，解构同名绑定下游2300行零改动；koi-ship 2547→2392行；rng 序列逐字保真（9555体素块/199顶点色mesh/布局截图保真）。**koi-model/garden/sky-light 暂不拆**：剖面函数/glowVox/blossomEmitters/共享rng顺序/TDZ 紧耦合，强拆回归风险高收益有限（子代理最小安全建议）。
+- **B5 完成R1拆双轨**（主人拍板离线降级=保留json旁路）：真表为四热集合唯一权威。shadow 写函数返回真实持久判定（confirm语义内移，fileError内移last_t校验），删SHADOW_WRITE闸，回灌改"旁路→表"（表空才灌防追加重复，哨兵只记真灌过行）；hotread 精简为六读门面（删HOT_READ/disable/setDisableHook/confirm*/count*/反向归并矩阵）；五写消费点改 shadow 返回值判持久、失败回旁路 saveGateData；server 启动删反向归并/对账/disable钩子/HOT_READ分支。**净删389行**。守卫测试按新契约重写（删旧矩阵6条、新增回灌/离线/读抛错用例）。**崩溃安全注入 PASS**：kill -9 重启后 chat3条+gate报错零丢（直查库+admin/list双证据）。
+
+### 验证汇总
+1420 单测 / 后端 241 项 / lint / tsc / deps 全 0 / checkJs 基线 2。voxel/锦鲤/画廊实机截图验收；B5 崩溃注入双证据。
+
+### 仍待主人拍板（C 级，未动）
+ctx 按所有权真拆、gateData 按域拆+鉴权簇收敛、saveGateData 增量化。此三项动承重墙，须单独评审。
+
+**A+B 终验结论：六项重构全部完成并实机/崩溃验证，PR #82 待合并。架构腐化信号1（迁移脚手架永久化）已消除，信号2（上帝对象）部分缓解（vox-core/单管道），斜率止住。C 级留待批准。**
+
+---
+
+## 九、第四轮全面复查（2026-11-17 · A+B 重构后好转验证）
+
+> 同口径复测第三轮全部指标 + 全量门禁 + 三路同标准复评。**诚实结论：有好转，但集中在外围卫生；结构性病灶（ctx/gateData 上帝对象）未动。复查还揪出并当场修正了两个 A+B 自身引入的缺陷。**
+
+### 9.1 好转了吗？——评分对比（三路复评一致）
+
+| 维度 | 第三轮(重构前) | 第四轮(重构后) | 变化 |
+|------|------|------|------|
+| 后端架构 | 3/5 | **3.5/5** | +0.5 矩阵拆了,承重墙没拆 |
+| 前端架构 | 3/5 | **3.5/5** | +0.5 外骨骼厚了一层,泥球本体未动 |
+| 优化 | 3.5/5 | **4.0/5** | +0.5 voxel去重真实减重 |
+
+**定性：方向正确、外围见效，但未触及结构性病灶。** 升 0.5 而非更多的理由：七大腐化信号里五个半原封未动。
+
+### 9.2 量化指标前后对比（本机实测）
+
+| 指标 | 重构前 | 重构后 | 判定 |
+|------|------|------|------|
+| voxel 五页体积 | 8.0MB | **1.2MB**(HTML 382KB+共享three 809KB) | ✅ 真好转,省≈6.8MB |
+| 内联重复 three | 5 份 | **0**(grep REVISION 命中0) | ✅ 消除 |
+| /api/files 轮询链 | 2 条(晨光+新媒体墙) | **1 条**(media-files单管道) | ✅ 合并 |
+| koi-ship.js | 2542 行 | **2391 行** | ✅ 抽走vox-core,但仍9项职责 |
+| saveGateData 调用 | 76 处 | **61 处真实调用** | ✅ 热路径条件化,冷路径56处未变 |
+| SHADOW_WRITE/HOT_READ 矩阵 | 常驻承重 | **代码已删**(残留16处为注释) | ✅ 拆除 |
+| client_errors.json | 非原子写 | **tmp+rename** | ✅ 落实 |
+| .tmp 残留 | 117MB | **1.3MB**(本轮探针) | ✅ 清理 |
+| WAL | 3.9MB | **2.2MB** | ✅ 缓解(仍23×db) |
+| ctx 登记属性 | ~170 | **171** | ❌ 未动 |
+| ctx 直写深层文件 | 51 | **52** | ❌ 未动 |
+| 懒 require | ~36 | **~35**(files-upload仍15) | ❌ 未动 |
+| 空 catch | 157 | **157** | ❌ 未动 |
+| 限流套数 | 5 | **5** | ❌ 未动 |
+| 裸 onTick | ~45 | **44** | ❌ 未动 |
+| player.js 监听 | 23add/0remove | **23add/0remove** | ❌ 未动 |
+| 环境开关 | 50 | **49** | ➖ 微减 |
+
+### 9.3 复查揪出并当场修正的两个缺陷（A+B 自身引入）
+
+**缺陷1：A2 烟花后台闸是"假修复"**（两个独立子代理一致抓到）
+- 病因：闸放在 rAF 驱动的 update() 内,标签页隐藏时 rAF 停摆⇒闸代码不可达,setInterval 后台照常产粒——正是声称要治的病。
+- 修正：改 visibilitychange 监听直接清定时器(init挂/dispose摘)+ autoFirework 自身 hidden 守卫双保险。
+- **行为验证 PASS**：hook setInterval/clearInterval,启动 created=1→隐藏 cleared=1(定时器真被清)→回前台 created=2(惰性重启)。
+
+**缺陷2：B5 回灌丢数据窗口**
+- 病因：原"表空才灌"在"运行中 SQLite 失效→旁路攒增量→重启表非空"场景会静默丢弃旁路增量,与"一条不丢"矛盾。
+- 修正：改幂等并集回灌——读表全量内容签名,旁路有表无的才补入(chat/clicks/visits/gate-errors 按业务唯一字段去重;file-errors 走 upsert 天然幂等)。errors repo 增 readGateAll。
+- **守卫验证 PASS**：新增用例"表非空+旁路增量⇒补入一条不丢",47 守卫测试全绿。
+
+修正提交 `ae72a19`(本地,网络故障待推送)。门禁全绿：1421 单测/后端7组/lint/tc/deps 0/checkJs基线2。
+
+### 9.4 剩余腐化信号（未动,按严重度）
+
+**后端**：① gateData 上帝对象+整库写放大(store.js 575行未减,冷路径56处双全量stringify)；② 六套持久化并存,热数组与真表长期双份；③ 鉴权簇咬尾懒require35+；④ 限流5套/clip4份/isNum3份；⑤ **注释腐化**(shadow/store/chat/track/client-errors/admin/retention 仍教人用已拆除的 SHADOW_WRITE/HOT_READ 闸)；⑥ _db.js TEXT亲和补丁焊死+table-parity.cjs脚手架残留。
+**前端**：① ctx上帝总线原样(171属性/52直写文件)；② koi-ship仍9项职责,applyEnv在其内；③ 双放映器+setAtmosphere≥3直调无仲裁；④ 44裸onTick+player 23/0监听；⑤ shared/legacy反向依赖；⑥ **audio-manager第三套/api/files轮询**(60s,无隐藏暂停不可清理,B7漏网)；⑦ rng顺序契约无自动化护栏。
+**优化**：① 冷路径56处整库双序列化(收益最大)；② hill-src/node_modules≈116MB未回收；③ 无.br；④ @aws-sdk仍在dependencies；⑤ 单页首访体积(共享three全量minify非tree-shake,首访略亏,五页总账大赚)。
+
+### 9.5 新引入风险（诚实标注,除已修两个外）
+- paintings 模块级订阅丢弃退订函数⇒media-files管道永不停(隐藏暂停仅部分兜底)。
+- loop:frame 共享payload：未来订阅方持有引用即读脏数据(已注释告知,暂无实害)。
+- 读回落滞后视图：hotread读抛错回数组,数组受截断且落盘滞后,故障时后台见残缺历史无告警区分。
+- 清空不回滚：client-errors/track 先清数组+save再清表(吞异常),清表失败则"清空"后错误复活。
+
+**第四轮终验结论：有好转(后端3→3.5/前端3→3.5/优化3.5→4.0),voxel去重/单管道/矩阵拆除/原子写是真实收益;但ctx与gateData两个上帝对象、鉴权簇、重复实现等结构性病灶未动,属外围卫生工程。复查揪出并修正了烟花闸假修复与B5回灌丢数据窗口两个自身缺陷。下一步最高杠杆：冷路径整库序列化增量化(C级)、ctx按所有权真拆(C级)、注释腐化清理与audio-manager第三轮询收编(低风险)。**

@@ -6,6 +6,7 @@
 // 不新增灯光预算外的灯(石灯笼点光改为自发光体素),不写阴影(游戏未开 shadowMap)。
 // 体素几何为顶点色合并网格,单次 draw call 一类,性能友好。
 import * as THREE from 'three';
+import { createVoxCore } from '../shared/vox-core.js'; // 体素核心(rng/颜色/Vox/solid),2026-11-17 B6 抽出
 
 export const KOI_SHIP_NAME = { zh: '云海之鲤', en: 'Koi of the Cloud Sea' };
 
@@ -74,171 +75,15 @@ export function createKoiShip(opts = {}) {
     metalness: 0,
     side: THREE.DoubleSide,
   });
-  let _seed = 90210;
-  function rnd() {
-    _seed = (_seed * 1664525 + 1013904223) >>> 0;
-    return _seed / 4294967296;
-  }
-  function rr(a, b) {
-    return a + (b - a) * rnd();
-  }
-  function ri(a, b) {
-    return Math.floor(rr(a, b + 1));
-  }
-  function pick(a) {
-    return a[Math.floor(rnd() * a.length)];
-  }
-
-  function hash2(x, y) {
-    const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-    return s - Math.floor(s);
-  }
-  function vnoise(x, y) {
-    const xi = Math.floor(x),
-      yi = Math.floor(y),
-      xf = x - xi,
-      yf = y - yi;
-    const u = xf * xf * (3 - 2 * xf),
-      v = yf * yf * (3 - 2 * yf);
-    const a = hash2(xi, yi),
-      b = hash2(xi + 1, yi),
-      c = hash2(xi, yi + 1),
-      d = hash2(xi + 1, yi + 1);
-    return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
-  }
-
-  const clamp = THREE.MathUtils.clamp;
-  const lerp = THREE.MathUtils.lerp;
-
-  const _cc = new Map();
-  function C(hex) {
-    let c = _cc.get(hex);
-    if (!c) {
-      c = new THREE.Color(hex);
-      _cc.set(hex, c);
-    }
-    return c;
-  }
-  function shade(hex, f) {
-    f = Math.round(f * 48) / 48;
-    const k = hex + ':' + f;
-    let c = _cc.get(k);
-    if (!c) {
-      c = C(hex).clone();
-      c.multiplyScalar(f);
-      c.r = clamp(c.r, 0, 4);
-      c.g = clamp(c.g, 0, 4);
-      c.b = clamp(c.b, 0, 4);
-      _cc.set(k, c);
-    }
-    return c;
-  }
-
-  /* ---- voxel geometry builder : fast, allocation-light ---- */
-  const NORMS = [
-    [1, 0, 0],
-    [-1, 0, 0],
-    [0, 1, 0],
-    [0, -1, 0],
-    [0, 0, 1],
-    [0, 0, -1],
-  ];
-  const UAX = [
-    [0, 0, -1],
-    [0, 0, 1],
-    [1, 0, 0],
-    [1, 0, 0],
-    [1, 0, 0],
-    [-1, 0, 0],
-  ];
-  const VAX = [
-    [0, 1, 0],
-    [0, 1, 0],
-    [0, 0, -1],
-    [0, 0, 1],
-    [0, 1, 0],
-    [0, 1, 0],
-  ];
-  const SIG = [
-    [-1, -1],
-    [1, -1],
-    [1, 1],
-    [-1, 1],
-  ];
-  let VOX_TOTAL = 0;
-
-  class Vox {
-    constructor() {
-      this.p = [];
-      this.n = [];
-      this.c = [];
-      this.i = [];
-      this.v = 0;
-      this.boxes = 0;
-    }
-    box(x, y, z, sx, sy, sz, col) {
-      const co = typeof col === 'number' ? C(col) : col;
-      const hx = sx * 0.5,
-        hy = sy * 0.5,
-        hz = sz * 0.5;
-      const p = this.p,
-        n = this.n,
-        c = this.c,
-        i = this.i;
-      for (let f = 0; f < 6; f++) {
-        const N = NORMS[f],
-          U = UAX[f],
-          V = VAX[f];
-        for (let k = 0; k < 4; k++) {
-          const su = SIG[k][0],
-            sv = SIG[k][1];
-          p.push(
-            x + (U[0] * su + V[0] * sv) * hx,
-            y + (U[1] * su + V[1] * sv) * hy,
-            z + (U[2] * su + V[2] * sv) * hz
-          );
-          n.push(N[0], N[1], N[2]);
-          c.push(co.r, co.g, co.b);
-        }
-        const b = this.v;
-        i.push(b, b + 1, b + 2, b, b + 2, b + 3);
-        this.v += 4;
-      }
-      this.boxes++;
-      VOX_TOTAL++;
-    }
-    /* axis aligned block loop */
-    fill(x0, x1, y0, y1, z0, z1, col, step = 1) {
-      for (let x = x0; x <= x1; x += step)
-        for (let y = y0; y <= y1; y += step)
-          for (let z = z0; z <= z1; z += step) this.box(x, y, z, step, step, step, col);
-    }
-    empty() {
-      return this.boxes === 0;
-    }
-    build() {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
-      g.setIndex(this.i);
-      g.computeBoundingSphere();
-      return g;
-    }
-  }
+  // 2026-11-17 B6:体素核心(rng/颜色缓存/噪声/Vox/solid/v3)抽到 shared/vox-core.js。
+  // 工厂持有实例状态(_seed LCG / _cc 颜色缓存 / VOX_TOTAL 计数),解构同名绑定 ⇒ 下游调用点零改动。
+  // ⚠️ 全船共用一个 core 实例,组装顺序逐字不变,否则随机序列漂移、体素布局改变。
+  const voxCore = createVoxCore({ seed: 90210, defaultMat: matBody });
+  const { rnd, rr, ri, pick, hash2, vnoise, clamp, lerp, C, shade, Vox, solid, v3 } = voxCore;
+  // glowVox/sheetVox 是跨分区累积缓冲(茶室写 glowVox、buildWater 写 sheetVox,编排层汇总),留编排层。
   // Vox 实例化必须在类定义之后(类不提升,提前 new 会触发 TDZ ReferenceError)
   const glowVox = new Vox();
   const sheetVox = new Vox();
-  function solid(vx, opt = {}) {
-    if (vx.empty()) return new THREE.Object3D(); // safe no-op so add() never throws
-    const m = new THREE.Mesh(vx.build(), opt.mat || matBody);
-    m.castShadow = false;
-    m.receiveShadow = false;
-    m.frustumCulled = opt.fc !== false;
-    if (opt.name) m.name = opt.name;
-    return m;
-  }
-  const v3 = (x, y, z) => new THREE.Vector3(x, y, z);
   const ZH = -34,
     ZT = 34,
     ZLEN = ZT - ZH;
@@ -2026,6 +1871,10 @@ export function createKoiShip(opts = {}) {
       craneGroup.add(c.g);
       cranes.push({ ...c, ...s, t: s.ph });
     });
+    // 2026-11-17 A2 每帧向量复用:此前每只鹤每帧 new 2 个 Vector3(dir + position.clone()),
+    // 5 只 ×60fps ≈ 600 个/秒 GC 压力。改用闭包内两个临时向量,语义不变。
+    const _dir = new THREE.Vector3();
+    const _look = new THREE.Vector3();
     updaters.push((dt, t) => {
       for (const c of cranes) {
         c.t += dt * c.sp;
@@ -2036,8 +1885,8 @@ export function createKoiShip(opts = {}) {
         const nx = Math.cos(c.t + 0.06) * R,
           nz = Math.sin(c.t + 0.06) * R;
         c.g.position.set(px, y, pz);
-        const dir = v3(nx - px, Math.cos(c.t * 0.9 + c.ph) * 4.5 * 0.06, nz - pz).normalize();
-        c.g.lookAt(c.g.position.clone().add(dir.multiplyScalar(c.sp > 0 ? 1 : -1)));
+        const dir = _dir.set(nx - px, Math.cos(c.t * 0.9 + c.ph) * 4.5 * 0.06, nz - pz).normalize();
+        c.g.lookAt(_look.copy(c.g.position).add(dir.multiplyScalar(c.sp > 0 ? 1 : -1)));
         c.g.rotation.z += Math.sin(c.t * 1.6) * 0.16 * (c.sp > 0 ? 1 : -1);
         const flap = Math.sin(t * 3.4 + c.ph * 2);
         c.wings.forEach((ch, i) => {
@@ -2537,6 +2386,6 @@ export function createKoiShip(opts = {}) {
     setSun,
     envGroup,
     cruiseLift: CRUISE_LIFT,
-    voxelCount: VOX_TOTAL,
+    voxelCount: voxCore.voxelTotal,
   };
 }

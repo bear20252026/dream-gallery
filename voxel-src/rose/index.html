@@ -1,0 +1,3003 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Rose Garden — Clay</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #f7dfe4;
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+        opacity: 0;
+        transition: opacity 2s ease;
+      }
+      body.ready canvas {
+        opacity: 1;
+      }
+      #veil {
+        position: fixed;
+        inset: 0;
+        background: #f7dfe4;
+        pointer-events: none;
+        z-index: 5;
+        transition: opacity 2.4s ease;
+      }
+      body.ready #veil {
+        opacity: 0;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="veil"></div>
+    <script type="module">
+      import * as THREE from 'three';
+      import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+      import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+      import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+      import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+      import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+      import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+      import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+      /* ============================================================ helpers
+   Exact layout, palette & camera of the rose pavilion and fountain,
+   crafted as tactile, welded, smooth-shaded low-poly clay. */
+      const TAU = Math.PI * 2;
+      const clamp = THREE.MathUtils.clamp,
+        lerp = THREE.MathUtils.lerp,
+        sstep = THREE.MathUtils.smoothstep;
+      let seed = 1234567;
+      const rand = () => {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        return seed / 4294967296;
+      };
+      const hash = (a, b, c = 0) => {
+        const s = Math.sin(a * 127.1 + b * 311.7 + c * 74.7) * 43758.5453;
+        return s - Math.floor(s);
+      };
+      const col = (h) => new THREE.Color(h);
+      const mix = (a, b, t) => col(a).lerp(col(b), clamp(t, 0, 1));
+      const rr = (a, b) => a + rand() * (b - a);
+
+      function vnoise2(x, z) {
+        const ix = Math.floor(x),
+          iz = Math.floor(z);
+        const fx = x - ix,
+          fz = z - iz;
+        const ux = fx * fx * (3 - 2 * fx),
+          uz = fz * fz * (3 - 2 * fz);
+        const a = hash(ix, iz, 1),
+          b = hash(ix + 1, iz, 1),
+          c = hash(ix, iz + 1, 1),
+          d = hash(ix + 1, iz + 1, 1);
+        return lerp(lerp(a, b, ux), lerp(c, d, ux), uz);
+      }
+      function fbm2(x, z) {
+        return (
+          vnoise2(x, z) * 0.58 +
+          vnoise2(x * 2.07 + 5.3, z * 2.07 - 3.1) * 0.29 +
+          vnoise2(x * 4.2 - 2.7, z * 4.2 + 8.4) * 0.13
+        );
+      }
+
+      const P = {
+        roseDeep: 0xc8406a,
+        rose: 0xe8779a,
+        roseLight: 0xf6adc1,
+        blush: 0xfbd6df,
+        cream: 0xfff3e2,
+        gold: 0xffcf7a,
+        white: 0xffffff,
+        leaf: 0x4f9a5a,
+        leafLight: 0x8fcf7e,
+        leafDark: 0x2f6b3c,
+        grass: 0x9ccf6e,
+        grassLight: 0xc7e58b,
+        grassDark: 0x6ea94f,
+        stone: 0xf3e6d8,
+        stoneDark: 0xd9c6b6,
+        path: 0xe9d2bd,
+        water: 0x7fd0e6,
+        waterDeep: 0x3f9ec4,
+        trunk: 0x8a5a3c,
+        trunkLight: 0xb07a52,
+      };
+      const HUES = [P.roseDeep, P.rose, P.roseLight, P.cream, P.gold];
+
+      /* ------------------------------------------------- clay mesh plumbing */
+      function strip(g) {
+        const ng = g.index ? g.toNonIndexed() : g.clone();
+        if (ng.attributes.normal) ng.deleteAttribute('normal');
+        if (ng.attributes.uv) ng.deleteAttribute('uv');
+        return ng;
+      }
+      function part(geo, color, matrix, vary = 0.045, gradTop = null) {
+        const g = strip(geo);
+        const p = g.attributes.position;
+        let minY = 1e9,
+          maxY = -1e9;
+        if (gradTop !== null) {
+          for (let i = 0; i < p.count; i++) {
+            const y = p.getY(i);
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+          }
+        }
+        const c0 = col(color),
+          c1 = gradTop !== null ? col(gradTop) : null,
+          tmpC = new THREE.Color();
+        const n = p.count,
+          arr = new Float32Array(n * 3);
+        const span = Math.max(1e-4, maxY - minY);
+        for (let i = 0; i < n; i++) {
+          if (c1) tmpC.copy(c0).lerp(c1, clamp((p.getY(i) - minY) / span, 0, 1));
+          else tmpC.copy(c0);
+          const j = 1 + (hash(i, n, 3) - 0.5) * vary;
+          arr[i * 3] = tmpC.r * j;
+          arr[i * 3 + 1] = tmpC.g * j;
+          arr[i * 3 + 2] = tmpC.b * j;
+        }
+        if (matrix) g.applyMatrix4(matrix);
+        g.setAttribute('color', new THREE.BufferAttribute(arr, 3));
+        return g;
+      }
+      const _m4 = new THREE.Matrix4(),
+        _q = new THREE.Quaternion(),
+        _e = new THREE.Euler();
+      const _v = new THREE.Vector3(),
+        _s = new THREE.Vector3();
+      function xform(px, py, pz, rx = 0, ry = 0, rz = 0, sx = 1, sy = 1, sz = 1) {
+        _e.set(rx, ry, rz);
+        _q.setFromEuler(_e);
+        _v.set(px, py, pz);
+        _s.set(sx, sy, sz);
+        return new THREE.Matrix4().compose(_v.clone(), _q.clone(), _s.clone());
+      }
+      function weldSmooth(geo, tol = 0.014) {
+        const pos = geo.attributes.position,
+          ca = geo.attributes.color;
+        const idx = geo.index,
+          n = idx ? idx.count : pos.count;
+        const q = 1 / tol,
+          map = new Map();
+        const Pp = [],
+          C = [],
+          W = [],
+          I = [];
+        for (let i = 0; i < n; i++) {
+          const vi = idx ? idx.getX(i) : i;
+          const x = pos.getX(vi),
+            y = pos.getY(vi),
+            z = pos.getZ(vi);
+          const key = `${Math.round(x * q)}|${Math.round(y * q)}|${Math.round(z * q)}`;
+          const cr = ca.getX(vi),
+            cg = ca.getY(vi),
+            cb = ca.getZ(vi);
+          let j = map.get(key);
+          if (j === undefined) {
+            j = W.length;
+            map.set(key, j);
+            W.push(1);
+            Pp.push(x, y, z);
+            C.push(cr, cg, cb);
+            I.push(j);
+          } else {
+            Pp[j * 3] += x;
+            Pp[j * 3 + 1] += y;
+            Pp[j * 3 + 2] += z;
+            C[j * 3] += cr;
+            C[j * 3 + 1] += cg;
+            C[j * 3 + 2] += cb;
+            W[j]++;
+            I.push(j);
+          }
+        }
+        for (let j = 0; j < W.length; j++) {
+          const w = W[j];
+          Pp[j * 3] /= w;
+          Pp[j * 3 + 1] /= w;
+          Pp[j * 3 + 2] /= w;
+          C[j * 3] /= w;
+          C[j * 3 + 1] /= w;
+          C[j * 3 + 2] /= w;
+        }
+        const out = new THREE.BufferGeometry();
+        out.setAttribute('position', new THREE.Float32BufferAttribute(Pp, 3));
+        out.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+        out.setIndex(I);
+        out.computeVertexNormals();
+        out.computeBoundingSphere();
+        return out;
+      }
+      function assemble(parts, tol = 0.014) {
+        if (!parts.length) return null;
+        const merged = mergeGeometries(parts, false);
+        parts.forEach((p) => p.dispose());
+        parts.length = 0;
+        const g = weldSmooth(merged, tol);
+        merged.dispose();
+        return g;
+      }
+
+      /* ------------------------------------------------- sculpted templates */
+      // Sculpted rose petal: pinched at base (y=-1), broad velvet heart-cup, gentle outward recurve at rim (y=+1).
+      function rosePetalShape(seg = 9, rings = 7) {
+        const g = new THREE.SphereGeometry(1, seg, rings);
+        const p = g.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i),
+            y = p.getY(i),
+            z = p.getZ(i);
+          const u = (y + 1) * 0.5; // 0 at base, 1 at top lip
+          const widthProfile = 0.38 + 0.78 * Math.sin(Math.pow(u, 0.72) * Math.PI * 0.86);
+          const cup = 0.42 * (x * x) * (1 - 0.25 * y * y);
+          const lipCurl = -0.34 * Math.pow(Math.max(0, u - 0.55) / 0.45, 2.0) * (1 - 0.35 * x * x);
+          const cleft = -0.05 * Math.pow(u, 3) * Math.exp(-x * x * 8.0);
+          p.setXYZ(i, x * widthProfile, y + cleft, z * 0.24 + cup + lipCurl);
+        }
+        g.computeVertexNormals();
+        return g;
+      }
+      // Pointed botanical leaf / sepal template
+      function leafShape(seg = 7, rings = 6) {
+        const g = new THREE.SphereGeometry(1, seg, rings);
+        const p = g.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i),
+            y = p.getY(i),
+            z = p.getZ(i);
+          const u = (y + 1) * 0.5;
+          const taper = Math.sin(Math.pow(u, 0.65) * Math.PI);
+          const arch = -0.22 * (y * y);
+          const vein = 0.14 * Math.abs(x) * taper;
+          p.setXYZ(i, x * 0.62 * taper + x * 0.18, y, z * 0.16 + arch + vein);
+        }
+        g.computeVertexNormals();
+        return g;
+      }
+      // Miniature clay rosette (5 cupped petals + bud) for bushes & climbing vines
+      function miniRoseParts(cx, cy, cz, scale, hue, rx, ry, rz) {
+        const out = [];
+        const matR = xform(cx, cy, cz, rx, ry, rz, scale, scale, scale);
+        out.push(
+          part(
+            BLOB_LO,
+            mix(hue, P.roseDeep, 0.28),
+            matR.clone().multiply(xform(0, 0.06, 0, 0, 0, 0, 0.42, 0.42, 0.42)),
+            0.04
+          )
+        );
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * TAU;
+          const pm = matR
+            .clone()
+            .multiply(
+              xform(
+                Math.cos(a) * 0.36,
+                0.04,
+                Math.sin(a) * 0.36,
+                0.55,
+                -a + Math.PI / 2,
+                0,
+                0.44,
+                0.42,
+                0.22
+              )
+            );
+          out.push(part(BLOB_LO, mix(hue, P.white, k % 2 ? 0.24 : 0.06), pm, 0.04));
+        }
+        return out;
+      }
+      // Flat V-notched clay lily pad lying cleanly in XZ plane
+      function lilyPadGeo(radius = 1, segs = 18) {
+        const pos = [],
+          idx = [];
+        const notch = 0.24;
+        pos.push(0, 0.015, 0);
+        for (let i = 0; i <= segs; i++) {
+          const a = notch + (i / segs) * (TAU - notch * 2);
+          const r = radius * (0.94 + 0.06 * Math.sin(a * 3.0));
+          pos.push(Math.cos(a) * r, 0.055, Math.sin(a) * r); // gently upturned rim
+        }
+        // bottom center + rim for soft clay thickness
+        const botStart = pos.length / 3;
+        pos.push(0, -0.045, 0);
+        for (let i = 0; i <= segs; i++) {
+          const a = notch + (i / segs) * (TAU - notch * 2);
+          const r = radius * 0.92 * (0.94 + 0.06 * Math.sin(a * 3.0));
+          pos.push(Math.cos(a) * r, -0.02, Math.sin(a) * r);
+        }
+        for (let i = 1; i <= segs; i++) {
+          idx.push(0, i + 1, i);
+          idx.push(botStart, botStart + i, botStart + i + 1);
+          idx.push(i, i + 1, botStart + i + 1, i, botStart + i + 1, botStart + i);
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setIndex(idx);
+        g.computeVertexNormals();
+        return g;
+      }
+
+      const ROSE_PETAL_UNIT = rosePetalShape(9, 7);
+      const LEAF_UNIT = leafShape(7, 6);
+      const BLOB = new THREE.IcosahedronGeometry(1, 1);
+      const BLOB_LO = new THREE.IcosahedronGeometry(1, 0);
+
+      /* ------------------------------------------------- renderer & camera */
+      const DPR = Math.min(devicePixelRatio || 1, 1.75);
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setPixelRatio(DPR);
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 0.9;
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      document.body.appendChild(renderer.domElement);
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0xeed9df, 0.0042);
+      const camera = new THREE.PerspectiveCamera(46, innerWidth / innerHeight, 0.3, 500);
+
+      const composer = new EffectComposer(
+        renderer,
+        new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: 4 })
+      );
+      composer.setPixelRatio(DPR);
+      composer.setSize(innerWidth, innerHeight);
+      composer.addPass(new RenderPass(scene, camera));
+      const depthOfField = new BokehPass(scene, camera, {
+        focus: 46,
+        aperture: 0.00028,
+        maxblur: 0.005,
+      });
+      // A broad focus band protects the entire pavilion; a small depth-aware gather
+      // softens distant trees and front grass without the stock 41-tap bokeh cost.
+      depthOfField.materialBokeh.fragmentShader = `
+  #include <common>
+  #include <packing>
+  uniform sampler2D tColor;
+  uniform sampler2D tDepth;
+  uniform float focus, aperture, maxblur, nearClip, farClip, aspect;
+  varying vec2 vUv;
+  float viewDistance(vec2 uv){
+    float packed = unpackRGBAToDepth(texture2D(tDepth, uv));
+    return -perspectiveDepthToViewZ(packed, nearClip, farClip);
+  }
+  void main(){
+    float centerDepth = viewDistance(vUv);
+    float distanceFromFocus = abs(centerDepth - focus);
+    float radius = clamp(max(distanceFromFocus - 10.0, 0.0) * aperture, 0.0, maxblur);
+    if(radius < 0.00005){
+      gl_FragColor = vec4(texture2D(tColor, vUv).rgb, 1.0);
+      return;
+    }
+    vec2 extent = vec2(radius, radius * aspect);
+    vec3 sum = texture2D(tColor, vUv).rgb * 2.0;
+    float weightSum = 2.0;
+    for(int i=0; i<12; i++){
+      float fi = float(i);
+      float angle = fi * 2.39996323;
+      float radial = sqrt((fi + 0.5) / 12.0);
+      vec2 uv = clamp(vUv + vec2(cos(angle), sin(angle)) * radial * extent,
+        vec2(0.001), vec2(0.999));
+      float sampleDepth = viewDistance(uv);
+      float w = 1.0 - 0.58 * smoothstep(1.5, 11.0, abs(sampleDepth - centerDepth));
+      sum += texture2D(tColor, uv).rgb * w;
+      weightSum += w;
+    }
+    gl_FragColor = vec4(sum / weightSum, 1.0);
+  }`;
+      depthOfField.materialBokeh.needsUpdate = true;
+      composer.addPass(depthOfField);
+      const bloom = new UnrealBloomPass(
+        new THREE.Vector2(innerWidth, innerHeight),
+        0.24,
+        0.55,
+        1.12
+      );
+      composer.addPass(bloom);
+      const grade = new ShaderPass({
+        uniforms: {
+          tDiffuse: { value: null },
+          uTime: { value: 0 },
+          uRes: { value: new THREE.Vector2(innerWidth * DPR, innerHeight * DPR) },
+        },
+        vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+        fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uTime; uniform vec2 uRes;
+    varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      float l = dot(c, vec3(0.2126,0.7152,0.0722));
+      c = mix(vec3(l), c, 1.05);
+      c = mix(c, c * vec3(1.03,0.99,0.95), smoothstep(0.45,1.25,l)*0.22);
+      c = mix(c, c * vec3(0.92,0.94,1.05), (1.0-smoothstep(0.02,0.28,l))*0.20);
+      vec2 q = vUv - 0.5;
+      float aspect = uRes.x/max(1.0,uRes.y);
+      float d = length(vec2(q.x*min(aspect,1.6), q.y));
+      c *= 1.0 - 0.24*smoothstep(0.42,0.96,d);
+      float g = fract(sin(dot(gl_FragCoord.xy + floor(uTime*12.0)*13.7, vec2(12.9898,78.233)))*43758.5453)-0.5;
+      c += g*0.0036;
+      gl_FragColor = vec4(max(c,0.0),1.0);
+    }`,
+      });
+      composer.addPass(grade);
+      composer.addPass(new OutputPass());
+
+      /* ------------------------------------------- procedural pastel PMREM env */
+      const SUN_DIR = new THREE.Vector3(0.45, 0.42, -0.79).normalize();
+      {
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        const envScene = new THREE.Scene();
+        const envDome = new THREE.Mesh(
+          new THREE.SphereGeometry(20, 32, 20),
+          new THREE.ShaderMaterial({
+            uniforms: { uSun: { value: SUN_DIR.clone() } },
+            vertexShader: `varying vec3 vD; void main(){ vD=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+            fragmentShader: `
+        uniform vec3 uSun; varying vec3 vD;
+        void main(){
+          vec3 d = normalize(vD);
+          float u = d.y;
+          vec3 ground = vec3(0.56,0.68,0.46);
+          vec3 horiz  = vec3(1.00,0.85,0.82);
+          vec3 sky    = vec3(0.56,0.74,0.98);
+          vec3 c = u < 0.0 ? mix(horiz, ground, 1.0-smoothstep(-0.45,0.0,u))
+                           : mix(horiz, sky, smoothstep(0.0,0.75,u));
+          float sd = max(dot(d, uSun), 0.0);
+          c += vec3(1.4,1.05,0.72)*pow(sd, 16.0);
+          gl_FragColor = vec4(c, 1.0);
+        }`,
+            side: THREE.BackSide,
+            depthWrite: false,
+          })
+        );
+        envScene.add(envDome);
+        const rt = pmrem.fromScene(envScene, 0.04);
+        scene.environment = rt.texture;
+        scene.environmentIntensity = 0.42;
+        envDome.geometry.dispose();
+        envDome.material.dispose();
+        pmrem.dispose();
+      }
+
+      /* ------------------------------------------------- tactile clay shader */
+      const sharedWind = { value: 0 };
+      function makeClayMaterial(key, opts) {
+        const {
+          roughness = 0.88,
+          metalness = 0,
+          envMapIntensity = 0.35,
+          vertexColors = true,
+          emissive = 0x000000,
+          emissiveIntensity = 0,
+          sssColor = new THREE.Color(0xffb8c8),
+          sssStrength = 0.14,
+          rimColor = new THREE.Color(0xfff1e4),
+          rimStrength = 0.12,
+          grain = 0.038,
+          wind = false,
+          side = THREE.FrontSide,
+        } = opts;
+        const mat = new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          vertexColors,
+          roughness,
+          metalness,
+          envMapIntensity,
+          emissive: new THREE.Color(emissive),
+          emissiveIntensity,
+          side,
+        });
+        mat.customProgramCacheKey = () => key;
+        mat.onBeforeCompile = (shader) => {
+          shader.uniforms.uWindTime = sharedWind;
+          shader.uniforms.uSunDir = { value: SUN_DIR };
+          shader.uniforms.uSssColor = { value: sssColor };
+          shader.uniforms.uSssStrength = { value: sssStrength };
+          shader.uniforms.uRimColor = { value: rimColor };
+          shader.uniforms.uRimStrength = { value: rimStrength };
+          shader.uniforms.uGrain = { value: grain };
+
+          shader.vertexShader = shader.vertexShader
+            .replace(
+              '#include <common>',
+              `#include <common>
+        uniform float uWindTime;
+        varying vec3 vClayWPos;
+        varying vec3 vClayWNorm;
+      `
+            )
+            .replace(
+              '#include <begin_vertex>',
+              `#include <begin_vertex>
+        ${
+          wind
+            ? `
+          vec3 clayOrig = (modelMatrix * vec4(0.0,0.0,0.0,1.0)).xyz;
+          #ifdef USE_INSTANCING
+            clayOrig = (modelMatrix * instanceMatrix * vec4(0.0,0.0,0.0,1.0)).xyz;
+          #endif
+          float hPos = max(0.0, position.y);
+          float bend = min(hPos, 2.8) * hPos * 0.0125;
+          float ph = clayOrig.x * 0.17 + clayOrig.z * 0.21;
+          float gust = sin(uWindTime * 1.15 + ph) + 0.42 * sin(uWindTime * 2.05 + ph * 1.6);
+          transformed.x += gust * bend * 0.58;
+          transformed.z += cos(uWindTime * 0.92 + ph * 1.35) * bend * 0.42;
+        `
+            : ''
+        }
+      `
+            )
+            .replace(
+              '#include <project_vertex>',
+              `#include <project_vertex>
+        vec4 clayWp = vec4(transformed, 1.0);
+        vec3 clayWn = objectNormal;
+        #ifdef USE_INSTANCING
+          clayWp = instanceMatrix * clayWp;
+          clayWn = mat3(instanceMatrix) * clayWn;
+        #endif
+        clayWp = modelMatrix * clayWp;
+        vClayWPos = clayWp.xyz;
+        vClayWNorm = normalize(mat3(modelMatrix) * clayWn);
+      `
+            );
+
+          shader.fragmentShader = shader.fragmentShader
+            .replace(
+              '#include <common>',
+              `#include <common>
+        uniform vec3 uSunDir;
+        uniform vec3 uSssColor;
+        uniform float uSssStrength;
+        uniform vec3 uRimColor;
+        uniform float uRimStrength;
+        uniform float uGrain;
+        varying vec3 vClayWPos;
+        varying vec3 vClayWNorm;
+        float clayMicro(vec3 p){
+          float a = sin(p.x*5.7 + sin(p.z*4.3))*sin(p.y*6.1 + cos(p.x*5.1));
+          float b = sin(p.z*13.3 + p.y*11.7)*cos(p.x*12.1);
+          return a*0.6 + b*0.4;
+        }
+      `
+            )
+            .replace(
+              '#include <roughnessmap_fragment>',
+              `#include <roughnessmap_fragment>
+        float cm = clayMicro(vClayWPos);
+        roughnessFactor = clamp(roughnessFactor + cm * uGrain, 0.22, 1.0);
+      `
+            )
+            .replace(
+              '#include <opaque_fragment>',
+              `
+        vec3 wn = normalize(vClayWNorm);
+        vec3 wv = normalize(cameraPosition - vClayWPos);
+        float ndl = dot(wn, uSunDir);
+        // soft clay subsurface wrap + backlit glow
+        float wrap = max(0.0, (ndl + 0.55) / 1.55) * (1.0 - max(0.0, ndl));
+        float back = pow(clamp(dot(wv, -uSunDir + wn*0.45), 0.0, 1.0), 2.6);
+        outgoingLight += diffuseColor.rgb * uSssColor * (wrap * 0.85 + back * 0.75) * uSssStrength;
+        // powdery velvet Fresnel rim sheen
+        float rim = pow(1.0 - max(0.0, dot(wn, wv)), 2.8) * (0.45 + 0.55 * max(0.0, ndl + 0.35));
+        outgoingLight += uRimColor * rim * uRimStrength;
+        outgoingLight *= 1.0 + clayMicro(vClayWPos * 1.4) * (uGrain * 0.45);
+        #include <opaque_fragment>
+      `
+            );
+        };
+        return mat;
+      }
+      function makeWindDepthMaterial() {
+        const dm = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+        dm.customProgramCacheKey = () => 'clay-wind-depth';
+        dm.onBeforeCompile = (shader) => {
+          shader.uniforms.uWindTime = sharedWind;
+          shader.vertexShader = shader.vertexShader
+            .replace('#include <common>', `#include <common>\nuniform float uWindTime;\n`)
+            .replace(
+              '#include <begin_vertex>',
+              `#include <begin_vertex>
+        vec3 clayOrig = (modelMatrix * vec4(0.0,0.0,0.0,1.0)).xyz;
+        #ifdef USE_INSTANCING
+          clayOrig = (modelMatrix * instanceMatrix * vec4(0.0,0.0,0.0,1.0)).xyz;
+        #endif
+        float hPos = max(0.0, position.y);
+        float bend = min(hPos, 2.8) * hPos * 0.0125;
+        float ph = clayOrig.x * 0.17 + clayOrig.z * 0.21;
+        float gust = sin(uWindTime * 1.15 + ph) + 0.42 * sin(uWindTime * 2.05 + ph * 1.6);
+        transformed.x += gust * bend * 0.58;
+        transformed.z += cos(uWindTime * 0.92 + ph * 1.35) * bend * 0.42;
+      `
+            );
+        };
+        return dm;
+      }
+
+      const clayGround = makeClayMaterial('clay-ground', {
+        roughness: 0.96,
+        envMapIntensity: 0.16,
+        sssColor: col(0xffdec8),
+        sssStrength: 0.05,
+        rimStrength: 0.03,
+        grain: 0.045,
+      });
+      const clayArch = makeClayMaterial('clay-arch', {
+        roughness: 0.84,
+        envMapIntensity: 0.24,
+        sssColor: col(0xffc9cf),
+        sssStrength: 0.1,
+        rimStrength: 0.08,
+        grain: 0.032,
+      });
+      const clayPlant = makeClayMaterial('clay-plant', {
+        roughness: 0.9,
+        envMapIntensity: 0.2,
+        sssColor: col(0xffd0c0),
+        sssStrength: 0.12,
+        rimStrength: 0.07,
+        grain: 0.036,
+        wind: true,
+      });
+      const clayStem = makeClayMaterial('clay-stem', {
+        roughness: 0.88,
+        envMapIntensity: 0.2,
+        sssColor: col(0xc8f0a4),
+        sssStrength: 0.1,
+        rimStrength: 0.07,
+        grain: 0.032,
+        wind: false,
+      });
+      const clayRose = makeClayMaterial('clay-rose', {
+        roughness: 0.58,
+        envMapIntensity: 0.34,
+        emissive: 0xc84572,
+        emissiveIntensity: 0.12,
+        sssColor: col(0xff8eb4),
+        sssStrength: 0.22,
+        rimColor: col(0xffe9f0),
+        rimStrength: 0.14,
+        grain: 0.024,
+      });
+      const clayGold = makeClayMaterial('clay-gold', {
+        roughness: 0.34,
+        metalness: 0.26,
+        envMapIntensity: 0.55,
+        emissive: 0xffad42,
+        emissiveIntensity: 0.22,
+        sssColor: col(0xffe2a4),
+        sssStrength: 0.06,
+        rimColor: col(0xfff5d6),
+        rimStrength: 0.12,
+        grain: 0.015,
+      });
+      const clayCloud = makeClayMaterial('clay-cloud', {
+        roughness: 0.96,
+        envMapIntensity: 0.16,
+        vertexColors: true,
+        sssColor: col(0xffcbb8),
+        sssStrength: 0.2,
+        rimColor: col(0xffffff),
+        rimStrength: 0.12,
+        grain: 0.02,
+      });
+      const glowMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        vertexColors: true,
+        toneMapped: false,
+      });
+      const windDepthMat = makeWindDepthMaterial();
+
+      /* ------------------------------------------------------------- sky */
+      const skyMat = new THREE.ShaderMaterial({
+        uniforms: { uTime: { value: 0 }, uSun: { value: SUN_DIR.clone() } },
+        vertexShader: `varying vec3 vD; void main(){ vD=position; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+        fragmentShader: `
+    uniform float uTime; uniform vec3 uSun; varying vec3 vD;
+    float h21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+    float vn(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
+      return mix(mix(h21(i),h21(i+vec2(1,0)),f.x),mix(h21(i+vec2(0,1)),h21(i+vec2(1,1)),f.x),f.y); }
+    float fbm(vec2 p){ float v=0.0,a=0.5; for(int i=0;i<5;i++){ v+=a*vn(p); p=p*2.1+3.7; a*=0.5; } return v; }
+    void main(){
+      vec3 d=normalize(vD); float up=d.y;
+      vec3 horizon=vec3(1.00,0.85,0.82), mid=vec3(0.80,0.89,1.00), zen=vec3(0.48,0.69,0.98);
+      vec3 c=mix(horizon,mid,smoothstep(-0.02,0.24,up));
+      c=mix(c,zen,smoothstep(0.24,0.88,up));
+      float sd=max(dot(d,uSun),0.0);
+      c+=vec3(1.0,0.82,0.56)*(pow(sd,7.0)*0.16 + pow(sd,90.0)*0.45 + pow(sd,700.0)*0.7);
+      vec2 uv=vec2(atan(d.z,d.x)*2.0, up*6.0)+vec2(uTime*0.010,0.0);
+      float cl=fbm(uv*1.4);
+      float mask=smoothstep(0.52,0.74,cl)*smoothstep(0.03,0.20,up)*(1.0-smoothstep(0.55,0.9,up));
+      vec3 cloud=mix(vec3(0.99,0.89,0.92),vec3(1.02,1.00,0.98),smoothstep(0.55,0.86,cl));
+      c=mix(c,cloud,mask*0.55);
+      gl_FragColor=vec4(c,1.0);
+    }`,
+        side: THREE.BackSide,
+        depthWrite: false,
+        fog: false,
+        toneMapped: false,
+      });
+      const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 48, 32), skyMat);
+      sky.renderOrder = -10;
+      scene.add(sky);
+
+      /* ------------------------------------------- warm sun halo in sky */
+      function softSprite(scale = 1) {
+        const c = document.createElement('canvas');
+        c.width = c.height = 128;
+        const x = c.getContext('2d');
+        const g = x.createRadialGradient(64, 64, 4, 64, 64, 62);
+        g.addColorStop(0, 'rgba(255,244,225,0.92)');
+        g.addColorStop(0.45, 'rgba(255,222,188,0.34)');
+        g.addColorStop(1, 'rgba(255,222,188,0.0)');
+        x.fillStyle = g;
+        x.fillRect(0, 0, 128, 128);
+        const tex = new THREE.CanvasTexture(c);
+        tex.colorSpace = THREE.SRGBColorSpace;
+        const m = new THREE.SpriteMaterial({
+          map: tex,
+          transparent: true,
+          depthWrite: false,
+          fog: false,
+          blending: THREE.AdditiveBlending,
+        });
+        const s = new THREE.Sprite(m);
+        s.scale.setScalar(scale);
+        s.renderOrder = -6;
+        return s;
+      }
+      const sunGlow = softSprite(120);
+      sunGlow.material.opacity = 0.42;
+      sunGlow.position.copy(SUN_DIR).multiplyScalar(330);
+      scene.add(sunGlow);
+
+      /* --------------------------------------- sculpted low-poly clay clouds */
+      const clouds = [];
+      {
+        const cloudArch = [];
+        for (let v = 0; v < 3; v++) {
+          const cp = [];
+          const blobs = 5 + v;
+          for (let b = 0; b < blobs; b++) {
+            const bx = (b - (blobs - 1) / 2) * 2.6 + rr(-0.6, 0.6);
+            const by = (1 - Math.abs(b - (blobs - 1) / 2) / (blobs * 0.6)) * 1.8 + rr(-0.3, 0.4);
+            const bz = rr(-1.4, 1.4);
+            const s = rr(2.0, 3.4);
+            cp.push(
+              part(
+                BLOB,
+                P.blush,
+                xform(bx, by, bz, rr(0, 3), rr(0, 3), rr(0, 3), s * 1.35, s * 0.78, s * 1.05),
+                0.02,
+                P.white
+              )
+            );
+          }
+          cloudArch.push(assemble(cp, 0.05));
+        }
+        for (let i = 0; i < 9; i++) {
+          const m = new THREE.Mesh(cloudArch[i % 3], clayCloud);
+          const a = (i / 9) * TAU + rr(-0.2, 0.2);
+          const dist = rr(115, 225);
+          m.position.set(Math.cos(a) * dist, rr(52, 92), Math.sin(a) * dist);
+          const sc = rr(1.8, 3.2);
+          m.scale.set(sc, sc * rr(0.75, 1.0), sc);
+          m.rotation.y = rr(0, TAU);
+          m.userData = {
+            a,
+            dist,
+            sp: rr(0.004, 0.009) * (i % 2 ? 1 : -1),
+            baseY: m.position.y,
+            ph: rand() * TAU,
+          };
+          scene.add(m);
+          clouds.push(m);
+        }
+      }
+      function updateClouds(dt, t) {
+        for (const c of clouds) {
+          c.userData.a += c.userData.sp * dt;
+          c.position.x = Math.cos(c.userData.a) * c.userData.dist;
+          c.position.z = Math.sin(c.userData.a) * c.userData.dist;
+          c.position.y = c.userData.baseY + Math.sin(t * 0.18 + c.userData.ph) * 1.2;
+        }
+      }
+
+      /* ------------------------------- volumetric sun shafts (faded both ends) */
+      const sunTravel = SUN_DIR.clone().negate();
+      const shaftMats = [],
+        shaftMeshes = [];
+      const shaftVS = `
+  varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vY;
+  void main(){
+    vUv = uv; vY = position.y;
+    vec4 mv = modelViewMatrix*vec4(position,1.0);
+    vN = normalize(normalMatrix*normal);
+    vV = normalize(-mv.xyz);
+    gl_Position = projectionMatrix*mv;
+  }`;
+      const shaftFS = `
+  uniform float uTime; uniform float uI; uniform float uPh; uniform float uHalf;
+  varying vec2 vUv; varying vec3 vN; varying vec3 vV; varying float vY;
+  void main(){
+    float edge   = pow(abs(dot(normalize(vN),normalize(vV))), 1.55);
+    float topIn  = 1.0-smoothstep(uHalf*0.42, uHalf, vY);
+    float botOut = smoothstep(-uHalf, -uHalf*0.12, vY);
+    float dust   = 0.80 + 0.20*sin(vUv.x*25.1327 + uTime*0.32 + uPh)
+                        * (0.85 + 0.15*sin(vY*0.35 - uTime*0.45 + uPh));
+    float a = edge * topIn * botOut * dust * uI;
+    vec3 col = mix(vec3(1.0,0.84,0.60), vec3(1.0,0.92,0.78), edge*0.5);
+    gl_FragColor = vec4(col, a);
+  }`;
+      function addSunShaft(tx, ty, tz, r0, r1, intensity, phase) {
+        const L = (ty + 2.0) / -sunTravel.y;
+        const geo = new THREE.CylinderGeometry(r0, r1, L, 28, 1, true);
+        const mat = new THREE.ShaderMaterial({
+          uniforms: {
+            uTime: { value: 0 },
+            uI: { value: intensity },
+            uPh: { value: phase },
+            uHalf: { value: L / 2 },
+          },
+          vertexShader: shaftVS,
+          fragmentShader: shaftFS,
+          transparent: true,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          toneMapped: false,
+          fog: false,
+        });
+        mat.userData = { base: intensity };
+        const mesh = new THREE.Mesh(geo, mat);
+        const top = new THREE.Vector3(tx, ty, tz);
+        mesh.position.copy(top).addScaledVector(sunTravel, L / 2);
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), SUN_DIR);
+        mesh.renderOrder = 5;
+        scene.add(mesh);
+        shaftMats.push(mat);
+        shaftMeshes.push(mesh);
+      }
+      // Aimed cleanly through the open crown and bays so rays bathe the rose and pool
+      addSunShaft(6.0, 25.0, -10.5, 1.8, 5.8, 0.07, 0.0);
+      addSunShaft(9.5, 22.5, -7.0, 1.3, 4.4, 0.055, 1.7);
+      addSunShaft(2.2, 24.0, -13.5, 1.2, 4.2, 0.055, 3.2);
+      addSunShaft(8.2, 23.5, -14.8, 1.5, 5.0, 0.05, 4.6);
+      addSunShaft(4.0, 21.5, -8.0, 1.0, 3.6, 0.065, 5.8);
+
+      /* ----------------------------------------------------------- lights */
+      const sun = new THREE.DirectionalLight(0xffe4b8, 1.6);
+      sun.position.copy(SUN_DIR).multiplyScalar(115);
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(2048, 2048);
+      Object.assign(sun.shadow.camera, {
+        left: -58,
+        right: 58,
+        top: 58,
+        bottom: -58,
+        near: 5,
+        far: 240,
+      });
+      sun.shadow.camera.updateProjectionMatrix();
+      sun.shadow.bias = -0.0005;
+      sun.shadow.normalBias = 0.045;
+      sun.shadow.radius = 4.5;
+      scene.add(sun, sun.target);
+
+      const coolFill = new THREE.DirectionalLight(0xb8d4ff, 0.34);
+      coolFill.position.set(-48, 24, 60);
+      scene.add(coolFill);
+      scene.add(new THREE.HemisphereLight(0xc8e1ff, 0x8bc26e, 0.55));
+      scene.add(new THREE.AmbientLight(0xdbe8ff, 0.16));
+
+      const roseLight = new THREE.PointLight(0xff8fb4, 30, 26, 2);
+      roseLight.position.set(0, 9.6, 0);
+      scene.add(roseLight);
+      const waterBounce = new THREE.PointLight(0x88dff0, 8, 15, 2);
+      waterBounce.position.set(0, 1.6, 0);
+      scene.add(waterBounce);
+      // Soft late-afternoon kicker catches only the back of the pink crown.
+      const roofKicker = new THREE.SpotLight(0xffc29c, 140, 55, 0.44, 0.92, 2);
+      roofKicker.position.set(-12, 28, -23);
+      roofKicker.target.position.set(0, 15, 0);
+      scene.add(roofKicker, roofKicker.target);
+
+      /* =========================================================== TERRAIN
+   Smooth continuous noise, anti-aliased paths, baked contact AO. */
+      const R_PAV = 9.0,
+        COLS = 8,
+        COL_H = 9.5;
+      const SEG = 144,
+        RINGS = 96,
+        RMAX = 72;
+      const radii = [];
+      for (let i = 0; i <= RINGS; i++) radii.push(Math.pow(i / RINGS, 1.28) * RMAX);
+
+      function groundY(r, a) {
+        const x = Math.cos(a) * r,
+          z = Math.sin(a) * r;
+        if (r < 6.35) {
+          const basin = sstep(r, 5.4, 6.35);
+          return (
+            lerp(-0.68, -0.08, basin * basin) + 0.04 * Math.sin(a * 3.0 + r * 0.8) * (1 - basin)
+          );
+        }
+        if (r < 7.05) return 0.04;
+        if (r < 10.6) return 0.0;
+        let y = 0;
+        y +=
+          sstep(r, 10.6, 24) *
+          (0.28 * Math.sin(x * 0.19 + z * 0.11) + 0.2 * Math.cos(z * 0.23 - x * 0.07));
+        y +=
+          sstep(r, 36, 70) *
+          (2.6 * (0.5 + 0.5 * Math.sin(x * 0.082) * Math.cos(z * 0.074)) +
+            0.5 * Math.sin(x * 0.28 + z * 0.24));
+        y +=
+          sstep(r, 10.6, 14.0) *
+          (0.15 * (fbm2(x * 0.3, z * 0.3) - 0.5) + 0.035 * Math.sin(x * 0.58 + z * 0.37));
+        return y;
+      }
+      function groundColor(r, a) {
+        const x = Math.cos(a) * r,
+          z = Math.sin(a) * r;
+        const n1 = fbm2(x * 0.16, z * 0.16);
+        const n2 = fbm2(x * 0.42 + 11, z * 0.42 - 7);
+
+        if (r < 6.35) {
+          const depth = clamp(r / 6.35, 0, 1);
+          return mix(P.waterDeep, P.water, 0.16 + 0.48 * depth + 0.22 * n2);
+        }
+        if (r < 7.05) {
+          return mix(P.cream, P.white, 0.35 + 0.35 * n2);
+        }
+        if (r < 10.6) {
+          let c = mix(P.stone, P.stoneDark, 0.14 + 0.34 * n2);
+          const goldInlay = Math.max(
+            1 - sstep(Math.abs(r - 7.35), 0.12, 0.36),
+            1 - sstep(Math.abs(r - 10.12), 0.12, 0.36)
+          );
+          c.lerp(col(P.gold), goldInlay * 0.48);
+          // baked soft AO under the 8 column plinths and outer rim
+          let ao = 1.0 - 0.1 * Math.exp(-Math.pow((r - 6.95) / 0.55, 2));
+          for (let k = 0; k < COLS; k++) {
+            const ca = (k / COLS) * TAU + Math.PI / 8;
+            const dx = x - Math.cos(ca) * R_PAV,
+              dz = z - Math.sin(ca) * R_PAV;
+            ao *= 1.0 - 0.24 * Math.exp(-(dx * dx + dz * dz) / 1.45);
+          }
+          return c.multiplyScalar(ao);
+        }
+
+        // Smooth anti-aliased paths (8 radial + 2 rings)
+        const radMask =
+          (1 - sstep(Math.abs(Math.sin(4 * a)), 0.042, 0.078)) *
+          sstep(r, 10.4, 11.4) *
+          (1 - sstep(r, 38.5, 40.8));
+        const ring1 = 1 - sstep(Math.abs(r - 20), 0.68, 1.25);
+        const ring2 = 1 - sstep(Math.abs(r - 32), 0.68, 1.25);
+        const pathMix = clamp(Math.max(radMask, ring1, ring2), 0, 1);
+
+        let grassC = mix(P.grassDark, P.grass, 0.35 + 0.55 * n1);
+        grassC.lerp(col(P.grassLight), sstep(n2, 0.52, 0.84) * 0.65);
+        if (r > 42) grassC.lerp(col(P.blush), sstep(r, 42, 59) * 0.56);
+
+        let pathC = mix(P.path, P.stone, 0.25 + 0.45 * n2);
+        if (ring1 > 0.15 || ring2 > 0.15) pathC.lerp(col(P.cream), 0.18);
+
+        const c = grassC.lerp(pathC, pathMix);
+        // subtle soft AO along outer terrace step & bush rings
+        let ao = 1.0 - 0.12 * Math.exp(-Math.pow((r - 10.7) / 0.65, 2));
+        return c.multiplyScalar(ao * (0.95 + 0.08 * n2));
+      }
+      function buildTerrain() {
+        const pos = [],
+          colr = [],
+          idx = [];
+        pos.push(0, groundY(0, 0), 0);
+        {
+          const c = groundColor(0.3, 0);
+          colr.push(c.r, c.g, c.b);
+        }
+        for (let i = 1; i <= RINGS; i++) {
+          const r = radii[i];
+          for (let j = 0; j < SEG; j++) {
+            const a = (j / SEG) * TAU;
+            pos.push(Math.cos(a) * r, groundY(r, a), Math.sin(a) * r);
+            const c = groundColor(r, a);
+            colr.push(c.r, c.g, c.b);
+          }
+        }
+        const at = (i, j) => 1 + (i - 1) * SEG + (j % SEG);
+        for (let j = 0; j < SEG; j++) idx.push(0, at(1, j + 1), at(1, j));
+        for (let i = 1; i < RINGS; i++) {
+          for (let j = 0; j < SEG; j++) {
+            const a = at(i, j),
+              b = at(i, j + 1),
+              c = at(i + 1, j),
+              d = at(i + 1, j + 1);
+            idx.push(a, b, d, a, d, c);
+          }
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
+        g.setIndex(idx);
+        g.computeVertexNormals();
+        g.computeBoundingSphere();
+        return g;
+      }
+      const terrain = new THREE.Mesh(buildTerrain(), clayGround);
+      terrain.receiveShadow = true;
+      scene.add(terrain);
+
+      /* ========================================================= ARCHITECTURE
+   Sculpted lathe columns with entasis, welded climbing rose vines,
+   true lofted crown petals, arch lanterns with cords & fairy garlands,
+   terrace curbing, 4 curved clay benches, pedestal & 16 ring lanterns. */
+      const arch = [],
+        glowParts = [],
+        goldParts = [],
+        vineParts = [];
+
+      // Continuous lathe column shaft with soft entasis + moulded plinth & collar
+      function columnLathe() {
+        const pts = [
+          new THREE.Vector2(0.01, 0.0),
+          new THREE.Vector2(0.92, 0.0),
+          new THREE.Vector2(0.9, 0.36),
+          new THREE.Vector2(0.76, 0.56),
+          new THREE.Vector2(0.72, 0.88),
+          new THREE.Vector2(0.56, 1.06),
+          new THREE.Vector2(0.47, 1.32),
+          new THREE.Vector2(0.48, 3.4), // gentle classical clay entasis swell
+          new THREE.Vector2(0.43, 6.2),
+          new THREE.Vector2(0.36, 9.2),
+          new THREE.Vector2(0.34, 10.2),
+          new THREE.Vector2(0.42, 10.48),
+          new THREE.Vector2(0.01, 10.52),
+        ];
+        return new THREE.LatheGeometry(pts, 14);
+      }
+      const COL_LATHE = columnLathe();
+
+      // True lofted sweeping clay petal rib for the pavilion crown (replaces bumpy sphere chains)
+      function buildCrownPetal(angle) {
+        const steps = 16,
+          ringSegs = 10;
+        const pos = [],
+          colr = [],
+          idx = [];
+        const cBase = col(P.rose),
+          cMid = col(P.roseLight),
+          cTip = col(P.cream),
+          tmpC = new THREE.Color();
+        const tx = -Math.sin(angle),
+          tz = Math.cos(angle);
+        const rx = Math.cos(angle),
+          rz = Math.sin(angle);
+
+        for (let s = 0; s <= steps; s++) {
+          const q = s / steps;
+          const rad = lerp(R_PAV - 0.15, 2.55, Math.pow(q, 0.9));
+          const y = COL_H + 3.3 + Math.sin(q * 1.5) * 4.7;
+          // derivative along curve for smooth local frame
+          const q2 = Math.min(1, q + 0.01);
+          const dr = lerp(R_PAV - 0.15, 2.55, Math.pow(q2, 0.9)) - rad;
+          const dy = COL_H + 3.3 + Math.sin(q2 * 1.5) * 4.7 - y;
+          const tang = new THREE.Vector3(rx * dr, dy, rz * dr).normalize();
+          const side = new THREE.Vector3(tx, 0, tz);
+          const norm = new THREE.Vector3().crossVectors(side, tang).normalize();
+
+          const width = lerp(0.55, 0.22, q) + Math.sin(Math.pow(q, 0.72) * Math.PI) * 1.18;
+          const thick = (0.16 + 0.18 * Math.sin(q * Math.PI)) * (1 - 0.35 * q);
+          if (q < 0.55) tmpC.copy(cBase).lerp(cMid, q / 0.55);
+          else tmpC.copy(cMid).lerp(cTip, (q - 0.55) / 0.45);
+
+          const cx = rx * rad,
+            cz = rz * rad;
+          for (let j = 0; j < ringSegs; j++) {
+            const phi = (j / ringSegs) * TAU;
+            const lx = Math.cos(phi) * width;
+            const ly =
+              Math.sin(phi) * thick - ((0.22 * (lx * lx)) / (width * width + 0.01)) * thick * 2.2;
+            const px = cx + side.x * lx + norm.x * ly;
+            const py = y + side.y * lx + norm.y * ly;
+            const pz = cz + side.z * lx + norm.z * ly;
+            pos.push(px, py, pz);
+            const shade = 0.96 - 0.07 * Math.sin(phi);
+            colr.push(tmpC.r * shade, tmpC.g * shade, tmpC.b * shade);
+          }
+        }
+        for (let s = 0; s < steps; s++) {
+          for (let j = 0; j < ringSegs; j++) {
+            const jn = (j + 1) % ringSegs;
+            const a = s * ringSegs + j,
+              b = s * ringSegs + jn;
+            const c = (s + 1) * ringSegs + j,
+              d = (s + 1) * ringSegs + jn;
+            idx.push(a, c, d, a, d, b);
+          }
+        }
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        g.setAttribute('color', new THREE.Float32BufferAttribute(colr, 3));
+        g.setIndex(idx);
+        const ni = g.toNonIndexed();
+        g.dispose();
+        return ni;
+      }
+
+      for (let k = 0; k < COLS; k++) {
+        const a = (k / COLS) * TAU + Math.PI / 8;
+        const x = Math.cos(a) * R_PAV,
+          z = Math.sin(a) * R_PAV;
+        arch.push(part(COL_LATHE, P.stone, xform(x, 0, z), 0.035, P.cream));
+        for (let b = 0; b < 3; b++) {
+          arch.push(
+            part(
+              new THREE.TorusGeometry(0.44 - b * 0.02, 0.055, 6, 16),
+              P.cream,
+              xform(x, 2.4 + b * 2.6, z, Math.PI / 2, 0, 0)
+            )
+          );
+        }
+        // lotus-flared gold capital
+        goldParts.push(
+          part(
+            new THREE.CylinderGeometry(0.66, 0.4, 0.56, 14),
+            P.gold,
+            xform(x, COL_H + 1.16, z),
+            0.02
+          )
+        );
+        goldParts.push(
+          part(
+            new THREE.TorusGeometry(0.62, 0.08, 6, 16),
+            P.gold,
+            xform(x, COL_H + 1.42, z, Math.PI / 2, 0, 0),
+            0.02
+          )
+        );
+
+        // smooth spiral climbing rose vine with leaves & mini rosettes
+        const side = rand() * TAU;
+        const vPts = [];
+        for (let s = 0; s <= 14; s++) {
+          const t = s / 14,
+            ang = side + t * 4.8,
+            y = 1.25 + t * (COL_H - 1.0),
+            rad = 0.49 - t * 0.1;
+          vPts.push(new THREE.Vector3(x + Math.cos(ang) * rad, y, z + Math.sin(ang) * rad));
+        }
+        const vCurve = new THREE.CatmullRomCurve3(vPts);
+        vineParts.push(
+          part(
+            new THREE.TubeGeometry(vCurve, 18, 0.048, 5, false),
+            mix(P.leafDark, P.leaf, 0.45),
+            null,
+            0.04
+          )
+        );
+        for (let s = 1; s < 14; s++) {
+          const t = s / 14,
+            pnt = vCurve.getPoint(t),
+            ang = side + t * 4.8;
+          vineParts.push(
+            part(
+              LEAF_UNIT,
+              mix(P.leaf, P.leafLight, rand() * 0.7),
+              xform(
+                pnt.x + Math.cos(ang) * 0.11,
+                pnt.y,
+                pnt.z + Math.sin(ang) * 0.11,
+                0.75,
+                -ang + Math.PI / 2,
+                rr(-0.4, 0.4),
+                0.16,
+                0.24,
+                0.12
+              )
+            )
+          );
+          if (s % 2 === 0) {
+            const rHue = s % 4 === 0 ? P.rose : P.roseLight;
+            vineParts.push(
+              ...miniRoseParts(
+                pnt.x + Math.cos(ang) * 0.15,
+                pnt.y + 0.08,
+                pnt.z + Math.sin(ang) * 0.15,
+                0.34,
+                rHue,
+                rr(-0.4, 0.4),
+                -ang,
+                rr(-0.3, 0.3)
+              )
+            );
+          }
+        }
+
+        // graceful arch spanning cleanly between capitals
+        const a2 = ((k + 1) / COLS) * TAU + Math.PI / 8,
+          amid = (a + a2) / 2;
+        const chord = 2 * R_PAV * Math.sin(Math.PI / COLS);
+        const archR = R_PAV * Math.cos(Math.PI / COLS);
+        const ax = Math.cos(amid) * archR,
+          az = Math.sin(amid) * archR;
+        const springY = COL_H + 1.08;
+        const torus = new THREE.TorusGeometry(chord / 2, 0.3, 8, 22, Math.PI);
+        const yaw = -amid - Math.PI / 2;
+        arch.push(
+          part(
+            torus,
+            mix(P.cream, P.roseLight, 0.22),
+            xform(ax, springY, az, 0, yaw, 0, 1, 0.58, 1)
+          )
+        );
+        // gold keystone + welded suspension rod + cap + hanging lantern orb
+        const apexY = springY + (chord / 2) * 0.58;
+        goldParts.push(part(BLOB, P.gold, xform(ax, apexY, az, 0, 0, 0, 0.3, 0.36, 0.3), 0.02));
+        goldParts.push(
+          part(
+            new THREE.CylinderGeometry(0.032, 0.032, 0.58, 6),
+            P.gold,
+            xform(ax, apexY - 0.36, az),
+            0.01
+          )
+        );
+        goldParts.push(
+          part(new THREE.ConeGeometry(0.24, 0.18, 10), P.gold, xform(ax, apexY - 0.62, az), 0.02)
+        );
+        glowParts.push(
+          part(new THREE.SphereGeometry(0.2, 10, 8), P.cream, xform(ax, apexY - 0.8, az), 0.0)
+        );
+
+        // delicate swooping warm fairy-light garland between capitals
+        const p1 = new THREE.Vector3(Math.cos(a) * R_PAV, COL_H + 0.95, Math.sin(a) * R_PAV);
+        const p2 = new THREE.Vector3(Math.cos(a2) * R_PAV, COL_H + 0.95, Math.sin(a2) * R_PAV);
+        const mid = p1.clone().add(p2).multiplyScalar(0.5);
+        mid.y -= 1.05;
+        const gCurve = new THREE.QuadraticBezierCurve3(p1, mid, p2);
+        goldParts.push(
+          part(new THREE.TubeGeometry(gCurve, 12, 0.022, 5, false), P.gold, null, 0.01)
+        );
+        for (let b = 1; b <= 5; b++) {
+          const bp = gCurve.getPoint(b / 6);
+          glowParts.push(
+            part(
+              BLOB_LO,
+              b % 2 === 0 ? P.gold : P.cream,
+              xform(bp.x, bp.y - 0.06, bp.z, 0, 0, 0, 0.085, 0.095, 0.085),
+              0.0
+            )
+          );
+        }
+      }
+
+      // double moulded cornice ring
+      goldParts.push(
+        part(
+          new THREE.TorusGeometry(R_PAV, 0.32, 8, 88),
+          mix(P.cream, P.gold, 0.34),
+          xform(0, COL_H + 3.32, 0, Math.PI / 2, 0, 0),
+          0.02
+        )
+      );
+      arch.push(
+        part(
+          new THREE.TorusGeometry(R_PAV - 0.38, 0.18, 6, 76),
+          P.roseLight,
+          xform(0, COL_H + 2.9, 0, Math.PI / 2, 0, 0)
+        )
+      );
+      arch.push(
+        part(
+          new THREE.TorusGeometry(R_PAV + 0.26, 0.14, 6, 76),
+          P.cream,
+          xform(0, COL_H + 3.54, 0, Math.PI / 2, 0, 0)
+        )
+      );
+
+      // eight true sculpted sweeping crown petals + delicate golden pearls along their spine
+      for (let p = 0; p < 8; p++) {
+        const a = (p / 8) * TAU + Math.PI / 8;
+        arch.push(buildCrownPetal(a));
+        for (let s = 1; s <= 3; s++) {
+          const q = s / 4;
+          const rad = lerp(R_PAV - 0.15, 2.55, Math.pow(q, 0.9));
+          const y = COL_H + 3.3 + Math.sin(q * 1.5) * 4.7 + 0.28;
+          glowParts.push(
+            part(
+              BLOB_LO,
+              P.gold,
+              xform(Math.cos(a) * rad, y, Math.sin(a) * rad, 0, 0, 0, 0.15, 0.15, 0.15),
+              0.0
+            )
+          );
+        }
+        arch.push(
+          part(
+            BLOB,
+            P.roseDeep,
+            xform(Math.cos(a) * 2.55, COL_H + 8.02, Math.sin(a) * 2.55, 0, 0, 0, 0.28, 0.34, 0.28)
+          )
+        );
+      }
+      // top golden lantern crown + sculpted cupola + finial bud
+      goldParts.push(
+        part(
+          new THREE.TorusGeometry(2.55, 0.2, 8, 36),
+          P.gold,
+          xform(0, COL_H + 8.02, 0, Math.PI / 2, 0, 0),
+          0.02
+        )
+      );
+      arch.push(
+        part(
+          new THREE.SphereGeometry(1.22, 16, 10, 0, TAU, 0, Math.PI * 0.56),
+          mix(P.cream, P.roseLight, 0.36),
+          xform(0, COL_H + 8.05, 0, 0, 0, 0, 1, 1.18, 1)
+        )
+      );
+      goldParts.push(
+        part(new THREE.ConeGeometry(0.28, 0.72, 10), P.gold, xform(0, COL_H + 9.75, 0), 0.02)
+      );
+      glowParts.push(
+        part(new THREE.SphereGeometry(0.68, 14, 10), P.cream, xform(0, COL_H + 8.58, 0), 0.0)
+      );
+
+      /* ---- rose pedestal: submerged drum + six tiers + 8 golden fountain spouts ---- */
+      const RB = 1.9;
+      arch.push(
+        part(
+          new THREE.CylinderGeometry(2.74, 3.15, 1.35, 24),
+          mix(P.stoneDark, P.stone, 0.42),
+          xform(0, -0.34, 0)
+        )
+      );
+      arch.push(
+        part(
+          new THREE.TorusGeometry(2.9, 0.13, 7, 36),
+          P.stone,
+          xform(0, -0.01, 0, Math.PI / 2, 0, 0)
+        )
+      );
+      for (let i = 0; i < 6; i++) {
+        const r = 2.6 - i * 0.35;
+        const target = i === 5 ? goldParts : arch;
+        target.push(
+          part(
+            new THREE.CylinderGeometry(r * 0.93, r, 0.34, 22),
+            i === 5 ? P.gold : mix(P.stone, P.cream, 0.48),
+            xform(0, 0.3 + i * 0.32, 0, 0, i * 0.16, 0)
+          )
+        );
+      }
+      goldParts.push(
+        part(
+          new THREE.TorusGeometry(2.62, 0.09, 6, 36),
+          P.gold,
+          xform(0, 0.16, 0, Math.PI / 2, 0, 0),
+          0.02
+        )
+      );
+      // 8 tiny sculpted golden fountain spouts around tier 2
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * TAU;
+        goldParts.push(
+          part(
+            new THREE.CylinderGeometry(0.06, 0.11, 0.38, 8),
+            P.gold,
+            xform(Math.cos(a) * 2.28, 0.98, Math.sin(a) * 2.28, 0, -a, Math.PI / 2 - 0.35),
+            0.02
+          )
+        );
+      }
+
+      /* ---- 4 sculpted curved clay benches in quiet garden alcoves ---- */
+      for (let i = 0; i < 4; i++) {
+        const a = (i * TAU) / 4 + Math.PI / 8;
+        const r = 16.4,
+          bx = Math.cos(a) * r,
+          bz = Math.sin(a) * r,
+          by = groundY(r, a);
+        const yaw = -a - Math.PI / 2;
+        const baseM = xform(bx, by, bz, 0, yaw, 0);
+        // two rounded stone legs
+        arch.push(
+          part(
+            new THREE.CylinderGeometry(0.24, 0.3, 0.56, 10),
+            P.stoneDark,
+            baseM.clone().multiply(xform(-0.95, 0.28, 0))
+          )
+        );
+        arch.push(
+          part(
+            new THREE.CylinderGeometry(0.24, 0.3, 0.56, 10),
+            P.stoneDark,
+            baseM.clone().multiply(xform(0.95, 0.28, 0))
+          )
+        );
+        // smooth pillowed cream seat + soft rose backrest bolster
+        arch.push(
+          part(
+            new THREE.CapsuleGeometry(0.28, 2.1, 6, 12),
+            P.cream,
+            baseM.clone().multiply(xform(0, 0.62, 0, 0, 0, Math.PI / 2, 0.65, 1, 1.35))
+          )
+        );
+        arch.push(
+          part(
+            new THREE.CapsuleGeometry(0.18, 1.9, 5, 10),
+            P.roseLight,
+            baseM.clone().multiply(xform(0, 1.02, -0.34, 0, 0, Math.PI / 2, 0.72, 1, 0.85))
+          )
+        );
+      }
+
+      /* ---- 16 sculpted lanterns along the ring path (r=21.6) ---- */
+      for (let i = 0; i < 16; i++) {
+        const a = (i / 16) * TAU + Math.PI / 16,
+          r = 21.6;
+        const x = Math.cos(a) * r,
+          z = Math.sin(a) * r,
+          y = groundY(r, a);
+        const lean = rr(-0.035, 0.035);
+        arch.push(
+          part(new THREE.CylinderGeometry(0.3, 0.46, 0.44, 10), P.stoneDark, xform(x, y + 0.2, z))
+        );
+        arch.push(
+          part(
+            new THREE.CylinderGeometry(0.085, 0.14, 2.42, 8),
+            mix(P.stoneDark, P.stone, 0.45),
+            xform(x, y + 1.44, z, lean, 0, lean * 0.6)
+          )
+        );
+        goldParts.push(
+          part(
+            new THREE.TorusGeometry(0.26, 0.068, 6, 14),
+            P.gold,
+            xform(x, y + 2.62, z, Math.PI / 2, 0, 0),
+            0.02
+          )
+        );
+        glowParts.push(
+          part(
+            new THREE.SphereGeometry(0.23, 10, 8),
+            P.cream,
+            xform(x, y + 2.85, z, 0, 0, 0, 1, 1.16, 1),
+            0.0
+          )
+        );
+        goldParts.push(
+          part(new THREE.ConeGeometry(0.35, 0.32, 10), P.gold, xform(x, y + 3.14, z), 0.02)
+        );
+      }
+
+      /* ============================================================ HERO ROSE
+   Curved thorny stem, 5 curled green calyx sepals cupping the bloom,
+   10 spiral whorls of recurved velvet-clay rose petals + golden stamens. */
+      const BLOOM_Y = RB + 6.2;
+      const stemParts = [],
+        roseParts = [],
+        stamenParts = [];
+
+      {
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, RB - 0.35, 0),
+          new THREE.Vector3(0.11, RB + 1.6, 0.06),
+          new THREE.Vector3(-0.12, RB + 3.4, -0.05),
+          new THREE.Vector3(0.05, RB + 5.0, 0.07),
+          new THREE.Vector3(0, BLOOM_Y - 0.55, 0),
+        ]);
+        stemParts.push(
+          part(new THREE.TubeGeometry(curve, 16, 0.21, 8, false), P.leafDark, null, 0.04, P.leaf)
+        );
+        // swollen green calyx receptacle right below the rose head
+        stemParts.push(
+          part(
+            new THREE.SphereGeometry(0.46, 12, 8),
+            mix(P.leafDark, P.leaf, 0.55),
+            xform(0, BLOOM_Y - 0.62, 0, 0, 0, 0, 1.0, 0.85, 1.0)
+          )
+        );
+        // 5 graceful outward-curled green sepal leaves cupping the bloom underside
+        for (let k = 0; k < 5; k++) {
+          const a = (k / 5) * TAU + 0.3;
+          const xa = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a));
+          const open = 1.48;
+          const ya = new THREE.Vector3(
+            Math.sin(open) * Math.cos(a),
+            Math.cos(open),
+            Math.sin(open) * Math.sin(a)
+          ).normalize();
+          const za = new THREE.Vector3().crossVectors(xa, ya).normalize();
+          _m4.makeBasis(xa, ya, za);
+          _q.setFromRotationMatrix(_m4);
+          const m = new THREE.Matrix4().compose(
+            new THREE.Vector3(Math.cos(a) * 0.82, BLOOM_Y - 0.68, Math.sin(a) * 0.82),
+            _q.clone(),
+            new THREE.Vector3(0.42, 0.92, 0.22)
+          );
+          stemParts.push(part(LEAF_UNIT, P.leafDark, m, 0.04, P.leafLight));
+        }
+        // sculpted thorns
+        for (let i = 0; i < 9; i++) {
+          const t = 0.12 + rand() * 0.68,
+            pnt = curve.getPoint(t),
+            ang = rand() * TAU;
+          stemParts.push(
+            part(
+              new THREE.ConeGeometry(0.075, 0.3, 6),
+              P.leafDark,
+              xform(
+                pnt.x + Math.cos(ang) * 0.19,
+                pnt.y,
+                pnt.z + Math.sin(ang) * 0.19,
+                0,
+                -ang,
+                (Math.PI / 2) * 0.8
+              )
+            )
+          );
+        }
+        // 5 lush leaf clusters welded seamlessly onto the stem
+        const clusters = [
+          [1, 0.4],
+          [-1, 1.25],
+          [0.6, 2.15],
+          [-0.7, 3.05],
+          [0.45, 4.0],
+        ];
+        clusters.forEach(([s, y], ci) => {
+          const base = new THREE.Vector3(s * 0.24, RB + y, 0.1 * Math.sin(ci));
+          const n = 4 + Math.floor(rand() * 3);
+          for (let i = 0; i < n; i++) {
+            const a = ci * 1.7 + (i / n) * TAU * 0.85 + s * 0.5;
+            const droop = rr(0.38, 0.92),
+              len = rr(0.78, 1.18);
+            const px = base.x + Math.cos(a) * len * 0.64,
+              pz = base.z + Math.sin(a) * len * 0.64;
+            const py = base.y + Math.sin(a * 0.7) * 0.1 - droop * 0.26 + i * 0.05;
+            stemParts.push(
+              part(
+                LEAF_UNIT,
+                P.leafDark,
+                xform(
+                  px,
+                  py,
+                  pz,
+                  droop * 0.58,
+                  -a + Math.PI / 2,
+                  rr(-0.28, 0.28),
+                  len * 0.56,
+                  len * 0.96,
+                  0.16
+                ),
+                0.04,
+                P.leafLight
+              )
+            );
+          }
+        });
+      }
+
+      // 10 lush Fibonacci-spiral whorls of recurved rose petals
+      for (let layer = 0; layer < 10; layer++) {
+        const q = layer / 9;
+        const count = 4 + layer * 3;
+        for (let k = 0; k < count; k++) {
+          const a = (k / count) * TAU + layer * 0.618 * TAU + rr(-0.04, 0.04);
+          const t = (k % 3) / 3;
+          const rad = lerp(0.14, 2.15, Math.pow(q, 0.85)) * (0.74 + 0.3 * t);
+          const y = BLOOM_Y + lerp(0.98, -0.58, q) + Math.sin(a * 2.0 + layer) * 0.08;
+          const len = lerp(0.58, 1.38, q) * (0.9 + 0.18 * hash(k, layer, 2));
+          const wid = lerp(0.42, 0.82, q);
+          const open = lerp(0.14, 1.24, Math.pow(q, 0.78));
+          let cBot =
+            layer < 3
+              ? mix(P.roseDeep, P.rose, 0.25 + 0.35 * q)
+              : mix(P.roseDeep, P.rose, 0.45 + 0.4 * q);
+          let cTop =
+            layer < 2 ? mix(P.rose, P.roseLight, 0.45) : mix(P.roseLight, P.blush, 0.25 + 0.65 * q);
+          if (q > 0.7) cTop.lerp(col(P.cream), ((q - 0.7) / 0.3) * 0.45);
+
+          const xa = new THREE.Vector3(-Math.sin(a), 0, Math.cos(a));
+          const ya = new THREE.Vector3(
+            Math.sin(open) * Math.cos(a),
+            Math.cos(open),
+            Math.sin(open) * Math.sin(a)
+          ).normalize();
+          const za = new THREE.Vector3().crossVectors(xa, ya).normalize();
+          _m4.makeBasis(xa, ya, za);
+          _q.setFromRotationMatrix(_m4);
+          const m = new THREE.Matrix4().compose(
+            new THREE.Vector3(Math.cos(a) * rad, y, Math.sin(a) * rad),
+            _q.clone(),
+            new THREE.Vector3(wid, len, wid * 0.42)
+          );
+          roseParts.push(part(ROSE_PETAL_UNIT, cBot, m, 0.035, cTop));
+        }
+      }
+      // glowing golden heart + tiny ring of golden stamen pearls
+      stamenParts.push(part(BLOB, P.gold, xform(0, 0, 0, 0, 0, 0, 0.42, 0.38, 0.42), 0.0));
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * TAU;
+        stamenParts.push(
+          part(
+            BLOB_LO,
+            P.cream,
+            xform(Math.cos(a) * 0.36, 0.12, Math.sin(a) * 0.36, 0, 0, 0, 0.11, 0.14, 0.11),
+            0.0
+          )
+        );
+      }
+
+      const archMesh = new THREE.Mesh(assemble(arch), clayArch);
+      archMesh.castShadow = archMesh.receiveShadow = true;
+      scene.add(archMesh);
+
+      const goldMesh = new THREE.Mesh(assemble(goldParts), clayGold);
+      goldMesh.castShadow = goldMesh.receiveShadow = true;
+      scene.add(goldMesh);
+
+      const vineMesh = new THREE.Mesh(assemble(vineParts), clayStem);
+      vineMesh.castShadow = vineMesh.receiveShadow = true;
+      scene.add(vineMesh);
+
+      const stemMesh = new THREE.Mesh(assemble(stemParts), clayStem);
+      stemMesh.castShadow = stemMesh.receiveShadow = true;
+      scene.add(stemMesh);
+
+      const bloomGroup = new THREE.Group();
+      const breathGroup = new THREE.Group();
+      breathGroup.position.y = BLOOM_Y;
+      bloomGroup.add(breathGroup);
+
+      const bloomGeo = assemble(roseParts);
+      bloomGeo.translate(0, -BLOOM_Y, 0);
+      const bloomMesh = new THREE.Mesh(bloomGeo, clayRose);
+      bloomMesh.castShadow = bloomMesh.receiveShadow = true;
+      breathGroup.add(bloomMesh);
+
+      const heartMat = new THREE.MeshBasicMaterial({
+        color: 0xffdca8,
+        vertexColors: true,
+        toneMapped: false,
+      });
+      const heart = new THREE.Mesh(assemble(stamenParts), heartMat);
+      heart.position.y = 0.36;
+      breathGroup.add(heart);
+      scene.add(bloomGroup);
+
+      /* ============================================================ PLANTING
+   Welded smooth clay archetypes rendered as InstancedMeshes with
+   real soft shadows AND real vertex-shader wind sway (~12 draw calls!). */
+      function makeBushArchetype(hue, variant) {
+        const parts = [];
+        const blobs = 4 + (variant % 2);
+        for (let i = 0; i < blobs; i++) {
+          const aa = (i / blobs) * TAU + rr(-0.4, 0.4),
+            rad = rr(0.18, 0.56);
+          const s = rr(0.46, 0.78);
+          parts.push(
+            part(
+              BLOB,
+              P.leafDark,
+              xform(
+                Math.cos(aa) * rad,
+                0.42 + i * 0.14 + rr(0, 0.15),
+                Math.sin(aa) * rad,
+                rr(0, 3),
+                rr(0, 3),
+                rr(0, 3),
+                s * 1.15,
+                s * rr(0.8, 0.98),
+                s * 1.08
+              ),
+              0.04,
+              P.leafLight
+            )
+          );
+        }
+        // central cushion so base sits heavy on the grass
+        parts.push(part(BLOB, P.leaf, xform(0, 0.34, 0, 0, 0, 0, 0.78, 0.42, 0.78), 0.04));
+        // sculpted mini clay rosettes perched across the foliage dome
+        const m = 6 + (variant % 3);
+        for (let i = 0; i < m; i++) {
+          const aa = (i / m) * TAU + rr(-0.25, 0.25),
+            rad = rr(0.32, 0.88);
+          const py = 0.56 + (1 - rad * 0.55) * 0.55 + rr(-0.08, 0.15);
+          parts.push(
+            ...miniRoseParts(
+              Math.cos(aa) * rad,
+              py,
+              Math.sin(aa) * rad,
+              rr(0.3, 0.44),
+              hue,
+              rr(-0.5, 0.5),
+              rr(0, TAU),
+              rr(-0.5, 0.5)
+            )
+          );
+        }
+        return assemble(parts, 0.018);
+      }
+      function makeStemArchetype(hue) {
+        const parts = [];
+        const h = 1.05;
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(rr(-0.08, 0.08), h * 0.5, rr(-0.08, 0.08)),
+          new THREE.Vector3(rr(-0.14, 0.14), h, rr(-0.14, 0.14)),
+        ]);
+        parts.push(
+          part(new THREE.TubeGeometry(curve, 6, 0.036, 5, false), P.leafDark, null, 0.03, P.leaf)
+        );
+        const mid = curve.getPoint(0.55),
+          top = curve.getPoint(1);
+        for (let side = -1; side <= 1; side += 2) {
+          const la = side * 1.3 + rr(-0.3, 0.3);
+          parts.push(
+            part(
+              LEAF_UNIT,
+              P.leaf,
+              xform(
+                mid.x + Math.cos(la) * 0.16,
+                mid.y,
+                mid.z + Math.sin(la) * 0.16,
+                0.85,
+                -la,
+                0,
+                0.14,
+                0.26,
+                0.06
+              ),
+              0.03,
+              P.leafLight
+            )
+          );
+        }
+        parts.push(
+          ...miniRoseParts(
+            top.x,
+            top.y + 0.06,
+            top.z,
+            0.34,
+            hue,
+            rr(-0.25, 0.25),
+            rr(0, TAU),
+            rr(-0.25, 0.25)
+          )
+        );
+        return assemble(parts, 0.014);
+      }
+      function makeCherryTreeArchetype(v) {
+        const parts = [];
+        const h = 5.2 + v * 0.32,
+          lean = rr(0.06, 0.13),
+          la = v * 2.1;
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(0, -0.25, 0),
+          new THREE.Vector3(
+            Math.cos(la) * lean * h * 0.38,
+            h * 0.46,
+            Math.sin(la) * lean * h * 0.38
+          ),
+          new THREE.Vector3(
+            Math.cos(la) * lean * h * 0.86,
+            h * 0.92,
+            Math.sin(la) * lean * h * 0.86
+          ),
+        ]);
+        parts.push(
+          part(new THREE.TubeGeometry(curve, 10, 0.34, 8, false), P.trunk, null, 0.04, P.trunkLight)
+        );
+        parts.push(
+          part(new THREE.CylinderGeometry(0.46, 0.84, 0.65, 10), P.trunk, xform(0, 0.12, 0), 0.04)
+        );
+        // 3 graceful clay limbs reaching into the blossom canopy
+        for (let b = 0; b < 3; b++) {
+          const ba = la + (b * TAU) / 3 + rr(-0.3, 0.3);
+          const limb = new THREE.CatmullRomCurve3([
+            curve.getPoint(0.58 + b * 0.08),
+            new THREE.Vector3(Math.cos(ba) * 1.2, h * 0.86, Math.sin(ba) * 1.2),
+            new THREE.Vector3(Math.cos(ba) * 2.1, h * 1.04 + rr(-0.1, 0.4), Math.sin(ba) * 2.1),
+          ]);
+          parts.push(
+            part(
+              new THREE.TubeGeometry(limb, 7, 0.15, 6, false),
+              mix(P.trunk, P.trunkLight, 0.45),
+              null,
+              0.04
+            )
+          );
+        }
+        const top = curve.getPoint(1);
+        // fluffy layered blossom clouds (rose undertones, pale blush tops)
+        for (let b = 0; b < 8; b++) {
+          const ba = (b / 8) * TAU + rr(-0.3, 0.3),
+            br = b === 0 ? 0.2 : rr(1.3, 2.8);
+          const by = b === 0 ? 1.45 : rr(-0.45, 1.35);
+          const s = b === 0 ? 2.15 : rr(1.25, 1.95);
+          parts.push(
+            part(
+              BLOB,
+              mix(P.rose, P.roseLight, rand() * 0.6),
+              xform(
+                top.x + Math.cos(ba) * br,
+                top.y + by,
+                top.z + Math.sin(ba) * br,
+                rr(0, 3),
+                rr(0, 3),
+                rr(0, 3),
+                s * 1.18,
+                s * rr(0.72, 0.92),
+                s * 1.12
+              ),
+              0.035,
+              P.blush
+            )
+          );
+        }
+        for (let b = 0; b < 9; b++) {
+          const ba = rand() * TAU,
+            br = Math.pow(rand(), 0.5) * 3.1;
+          parts.push(
+            part(
+              BLOB_LO,
+              mix(P.rose, P.white, rand() * 0.65),
+              xform(
+                top.x + Math.cos(ba) * br,
+                top.y + rr(-0.5, 1.6),
+                top.z + Math.sin(ba) * br,
+                rr(0, 3),
+                rr(0, 3),
+                rr(0, 3),
+                0.28,
+                0.24,
+                0.28
+              ),
+              0.03
+            )
+          );
+        }
+        return assemble(parts, 0.025);
+      }
+
+      const bushBuckets = HUES.map(() => []);
+      for (let ring = 0; ring < 4; ring++) {
+        const r = [14, 25, 37, 46][ring],
+          n = [18, 30, 42, 50][ring];
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * TAU + ring * 0.3 + rr(-0.06, 0.06);
+          if (Math.abs(Math.sin(4 * a)) < 0.09 && r < 40) continue;
+          const rad = r + rr(-1.1, 1.1);
+          const x = Math.cos(a) * rad,
+            z = Math.sin(a) * rad,
+            y = groundY(rad, a);
+          const sc = rr(0.82, 1.45);
+          bushBuckets[(i + ring) % HUES.length].push({
+            m: xform(
+              x,
+              y - 0.04,
+              z,
+              rr(-0.06, 0.06),
+              rr(0, TAU),
+              rr(-0.06, 0.06),
+              sc * rr(0.92, 1.12),
+              sc * rr(0.88, 1.1),
+              sc * rr(0.92, 1.12)
+            ),
+            tint: new THREE.Color().setRGB(rr(0.93, 1.06), rr(0.94, 1.05), rr(0.93, 1.06)),
+          });
+        }
+      }
+      bushBuckets.forEach((list, idx) => {
+        const im = new THREE.InstancedMesh(
+          makeBushArchetype(HUES[idx], idx),
+          clayPlant,
+          list.length
+        );
+        list.forEach((it, i) => {
+          im.setMatrixAt(i, it.m);
+          im.setColorAt(i, it.tint);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        im.instanceColor.needsUpdate = true;
+        im.castShadow = true;
+        im.receiveShadow = true;
+        im.customDepthMaterial = windDepthMat;
+        im.frustumCulled = false;
+        scene.add(im);
+      });
+
+      const stemBuckets = HUES.map(() => []);
+      for (let i = 0; i < 260; i++) {
+        const a = rand() * TAU,
+          r = 12 + rand() * 46;
+        if (Math.abs(Math.sin(4 * a)) < 0.08 || Math.abs(r - 20) < 1.3 || Math.abs(r - 32) < 1.3)
+          continue;
+        const x = Math.cos(a) * r,
+          z = Math.sin(a) * r,
+          y = groundY(r, a);
+        const sc = rr(0.7, 1.38);
+        stemBuckets[i % HUES.length].push({
+          m: xform(
+            x,
+            y - 0.02,
+            z,
+            rr(-0.1, 0.1),
+            rr(0, TAU),
+            rr(-0.1, 0.1),
+            sc,
+            sc * rr(0.88, 1.22),
+            sc
+          ),
+          tint: new THREE.Color().setRGB(rr(0.92, 1.08), rr(0.94, 1.06), rr(0.92, 1.08)),
+        });
+      }
+      stemBuckets.forEach((list, idx) => {
+        if (!list.length) return;
+        const im = new THREE.InstancedMesh(makeStemArchetype(HUES[idx]), clayPlant, list.length);
+        list.forEach((it, i) => {
+          im.setMatrixAt(i, it.m);
+          im.setColorAt(i, it.tint);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        im.instanceColor.needsUpdate = true;
+        im.castShadow = true;
+        im.receiveShadow = true;
+        im.customDepthMaterial = windDepthMat;
+        im.frustumCulled = false;
+        scene.add(im);
+      });
+
+      const treeArchs = [0, 1, 2].map((v) => makeCherryTreeArchetype(v));
+      const treeBuckets = [[], [], []];
+      const fallenPetals = [];
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU + rr(0.05, 0.28),
+          r = 52 + rand() * 4;
+        const x = Math.cos(a) * r,
+          z = Math.sin(a) * r,
+          y = groundY(r, a);
+        const sc = rr(0.86, 1.18);
+        treeBuckets[i % 3].push({
+          m: xform(
+            x,
+            y - 0.05,
+            z,
+            rr(-0.04, 0.04),
+            rr(0, TAU),
+            rr(-0.04, 0.04),
+            sc,
+            sc * rr(0.92, 1.12),
+            sc
+          ),
+          tint: new THREE.Color().setRGB(rr(0.94, 1.05), rr(0.94, 1.04), rr(0.95, 1.06)),
+        });
+        // delicate scattered blossom petals resting under each cherry tree
+        for (let p = 0; p < 10; p++) {
+          const pa = rand() * TAU,
+            pr = rr(1.2, 4.4);
+          const px = x + Math.cos(pa) * pr,
+            pz = z + Math.sin(pa) * pr;
+          const prR = Math.hypot(px, pz),
+            prA = Math.atan2(pz, px);
+          fallenPetals.push(
+            part(
+              BLOB_LO,
+              mix(P.blush, P.roseLight, rand()),
+              xform(
+                px,
+                groundY(prR, prA) + 0.04,
+                pz,
+                0,
+                rr(0, TAU),
+                0,
+                rr(0.24, 0.44),
+                0.045,
+                rr(0.18, 0.34)
+              ),
+              0.03
+            )
+          );
+        }
+      }
+      treeBuckets.forEach((list, idx) => {
+        if (!list.length) return;
+        const im = new THREE.InstancedMesh(treeArchs[idx], clayPlant, list.length);
+        list.forEach((it, i) => {
+          im.setMatrixAt(i, it.m);
+          im.setColorAt(i, it.tint);
+        });
+        im.instanceMatrix.needsUpdate = true;
+        im.instanceColor.needsUpdate = true;
+        im.castShadow = true;
+        im.receiveShadow = true;
+        im.customDepthMaterial = windDepthMat;
+        im.frustumCulled = false;
+        scene.add(im);
+      });
+
+      /* ---- sculpted clay flagstones along the paths + organic pebbles ---- */
+      const pathDetail = [];
+      // 8 radial paths: smooth hand-placed rounded clay flagstones
+      for (let p = 0; p < 8; p++) {
+        const baseA = (p * TAU) / 8;
+        for (let r = 11.8; r < 39.2; r += 1.65) {
+          if (Math.abs(r - 20) < 1.15 || Math.abs(r - 32) < 1.15) continue;
+          const jitterA = rr(-0.018, 0.018);
+          const a = baseA + jitterA,
+            rrPos = r + rr(-0.22, 0.22);
+          const x = Math.cos(a) * rrPos,
+            z = Math.sin(a) * rrPos,
+            y = groundY(rrPos, a);
+          const w = rr(0.55, 0.88),
+            d = rr(0.45, 0.72);
+          pathDetail.push(
+            part(
+              BLOB,
+              mix(P.stone, P.cream, rand() * 0.65),
+              xform(
+                x,
+                y + 0.02,
+                z,
+                rr(-0.05, 0.05),
+                -a + rr(-0.25, 0.25),
+                rr(-0.05, 0.05),
+                w,
+                0.11,
+                d
+              ),
+              0.04
+            )
+          );
+        }
+      }
+      // 2 concentric ring paths: curved stepping stones
+      [20, 32].forEach((ringR) => {
+        const count = Math.round(ringR * 3.1);
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * TAU + rr(-0.012, 0.012);
+          const rrPos = ringR + rr(-0.28, 0.28);
+          const x = Math.cos(a) * rrPos,
+            z = Math.sin(a) * rrPos,
+            y = groundY(rrPos, a);
+          pathDetail.push(
+            part(
+              BLOB,
+              mix(P.stone, P.path, rand() * 0.55),
+              xform(
+                x,
+                y + 0.02,
+                z,
+                rr(-0.04, 0.04),
+                -a + rr(-0.2, 0.2),
+                rr(-0.04, 0.04),
+                rr(0.42, 0.68),
+                0.1,
+                rr(0.55, 0.82)
+              ),
+              0.04
+            )
+          );
+        }
+      });
+      // scattered smooth pebbles & fallen cherry blossom clusters
+      for (let i = 0; i < 220; i++) {
+        const a = rand() * TAU;
+        const onRing = rand() < 0.45;
+        const r = onRing ? (rand() < 0.5 ? 20 : 32) + rr(-1.7, 1.7) : rr(7.4, 52);
+        const x = Math.cos(a) * r,
+          z = Math.sin(a) * r,
+          y = groundY(r, a);
+        const s = rr(0.08, 0.26);
+        pathDetail.push(
+          part(
+            BLOB_LO,
+            mix(rand() < 0.14 ? P.gold : P.stone, rand() < 0.5 ? P.path : P.cream, rand()),
+            xform(
+              x,
+              y + s * 0.36,
+              z,
+              rr(0, 3),
+              rr(0, 3),
+              rr(0, 3),
+              s * rr(0.9, 1.5),
+              s * rr(0.48, 0.82),
+              s * rr(0.9, 1.5)
+            ),
+            0.04
+          )
+        );
+      }
+      const detailMesh = new THREE.Mesh(assemble([...pathDetail, ...fallenPetals]), clayGround);
+      detailMesh.castShadow = true;
+      detailMesh.receiveShadow = true;
+      scene.add(detailMesh);
+
+      /* ---- loose river pebbles and tiny flowers tracing existing path edges ---- */
+      const edgePebbleLocations = [],
+        edgeFlowerLocations = [];
+      function scatterEdge(x, z, flowerChance) {
+        const rad = Math.hypot(x, z),
+          a = Math.atan2(z, x);
+        if (rad < 11.1 || rad > 40.4) return;
+        const y = groundY(rad, a);
+        edgePebbleLocations.push({
+          x: x + rr(-0.18, 0.18),
+          z: z + rr(-0.18, 0.18),
+          y,
+          s: rr(0.1, 0.24),
+          rot: rr(0, TAU),
+          color: [P.stoneDark, P.path, P.cream, P.stone][Math.floor(rand() * 4)],
+        });
+        if (rand() < flowerChance) {
+          edgeFlowerLocations.push({
+            x: x + rr(-0.23, 0.23),
+            z: z + rr(-0.23, 0.23),
+            y,
+            s: rr(0.72, 1.22),
+            rot: rr(0, TAU),
+          });
+        }
+      }
+      for (let p = 0; p < 8; p++) {
+        const a = (p * TAU) / 8,
+          sideX = -Math.sin(a),
+          sideZ = Math.cos(a);
+        for (let r = 12.2; r < 39.1; r += rr(1.0, 1.45)) {
+          if (Math.abs(r - 20) < 1.8 || Math.abs(r - 32) < 1.8) continue;
+          const side = rand() < 0.5 ? -1 : 1;
+          const offset = rr(0.86, 1.22) + r * 0.006;
+          scatterEdge(
+            Math.cos(a) * r + sideX * side * offset,
+            Math.sin(a) * r + sideZ * side * offset,
+            0.32
+          );
+        }
+      }
+      for (const radius of [20, 32]) {
+        const count = radius === 20 ? 62 : 94;
+        for (let i = 0; i < count; i++) {
+          const a = ((i + rr(-0.25, 0.25)) / count) * TAU;
+          const r = radius + (rand() < 0.5 ? -1 : 1) * rr(1.35, 1.85);
+          scatterEdge(Math.cos(a) * r, Math.sin(a) * r, 0.21);
+        }
+      }
+
+      const edgePebbleGeo = assemble([part(BLOB_LO, P.white, null, 0)]);
+      const edgePebbles = new THREE.InstancedMesh(
+        edgePebbleGeo,
+        clayGround,
+        edgePebbleLocations.length
+      );
+      const edgeObj = new THREE.Object3D();
+      edgePebbleLocations.forEach((stone, i) => {
+        edgeObj.position.set(stone.x, stone.y + stone.s * 0.19, stone.z);
+        edgeObj.rotation.set(0, stone.rot, 0);
+        edgeObj.scale.set(stone.s * 1.3, stone.s * 0.42, stone.s);
+        edgeObj.updateMatrix();
+        edgePebbles.setMatrixAt(i, edgeObj.matrix);
+        edgePebbles.setColorAt(i, col(stone.color));
+      });
+      edgePebbles.instanceMatrix.needsUpdate = true;
+      edgePebbles.instanceColor.needsUpdate = true;
+      edgePebbles.receiveShadow = true;
+      edgePebbles.frustumCulled = false;
+      scene.add(edgePebbles);
+
+      const edgeFlowerParts = [
+        part(
+          new THREE.CylinderGeometry(0.017, 0.024, 0.28, 6),
+          P.leafDark,
+          xform(0, 0.14, 0),
+          0.02,
+          P.leaf
+        ),
+        part(
+          LEAF_UNIT,
+          P.leaf,
+          xform(-0.065, 0.12, 0, 0.85, -0.45, 0, 0.09, 0.16, 0.037),
+          0.02,
+          P.leafLight
+        ),
+        part(
+          LEAF_UNIT,
+          P.leaf,
+          xform(0.065, 0.15, 0, 0.75, 0.65, 0, 0.085, 0.14, 0.035),
+          0.02,
+          P.leafLight
+        ),
+        ...miniRoseParts(0, 0.3, 0, 0.27, P.roseLight, 0, 0, 0),
+      ];
+      const edgeFlowerGeo = assemble(edgeFlowerParts, 0.01);
+      const edgeFlowers = new THREE.InstancedMesh(
+        edgeFlowerGeo,
+        clayStem,
+        edgeFlowerLocations.length
+      );
+      edgeFlowerLocations.forEach((flower, i) => {
+        edgeObj.position.set(flower.x, flower.y, flower.z);
+        edgeObj.rotation.set(rr(-0.09, 0.09), flower.rot, rr(-0.09, 0.09));
+        edgeObj.scale.setScalar(flower.s);
+        edgeObj.updateMatrix();
+        edgeFlowers.setMatrixAt(i, edgeObj.matrix);
+      });
+      edgeFlowers.instanceMatrix.needsUpdate = true;
+      edgeFlowers.castShadow = true;
+      edgeFlowers.receiveShadow = true;
+      edgeFlowers.frustumCulled = false;
+      scene.add(edgeFlowers);
+
+      /* ---- static glow (lantern orbs, fairy lights, crown pearls) ---- */
+      const glowMesh = new THREE.Mesh(assemble(glowParts), glowMat);
+      glowMesh.renderOrder = 3;
+      scene.add(glowMesh);
+
+      /* ============================================================ FOUNTAIN
+   Sculpted stone rim, translucent Fresnel clay water, 8 crystal water
+   arcs from pedestal spouts, flat notched lily pads + clay water lilies,
+   and ripple rings strictly constrained inside the basin. */
+      const rimParts = [];
+      rimParts.push(
+        part(
+          new THREE.TorusGeometry(6.55, 0.3, 10, 80),
+          mix(P.cream, P.stone, 0.35),
+          xform(0, 0.16, 0, Math.PI / 2, 0, 0)
+        )
+      );
+      rimParts.push(
+        part(
+          new THREE.TorusGeometry(6.96, 0.13, 7, 80),
+          P.gold,
+          xform(0, 0.03, 0, Math.PI / 2, 0, 0)
+        )
+      );
+      const rimMesh = new THREE.Mesh(assemble(rimParts), clayArch);
+      rimMesh.castShadow = rimMesh.receiveShadow = true;
+      scene.add(rimMesh);
+
+      // Properly flat notched lily pads + sculpted multi-petal clay water lilies
+      const lilyGeoUnit = lilyPadGeo(1, 18);
+      const lilyGroup = new THREE.Group();
+      const pondPads = [];
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * TAU + 0.36 + rr(-0.12, 0.12);
+        const rad = rr(3.55, 5.25);
+        const x = Math.cos(a) * rad,
+          z = Math.sin(a) * rad,
+          sc = rr(0.58, 0.92);
+        const parts = [];
+        parts.push(
+          part(
+            lilyGeoUnit,
+            P.leafDark,
+            xform(0, 0, 0, 0, rr(0, TAU), 0, sc, 1, sc * rr(0.88, 1.08)),
+            0.04,
+            P.leafLight
+          )
+        );
+        if (i % 2 === 0) {
+          // sculpted multi-petal clay water lily resting on the pad
+          const fCol = i % 4 === 0 ? P.blush : P.cream;
+          for (let p = 0; p < 6; p++) {
+            const pa = (p / 6) * TAU;
+            parts.push(
+              part(
+                ROSE_PETAL_UNIT,
+                fCol,
+                xform(
+                  Math.cos(pa) * 0.22,
+                  0.14,
+                  Math.sin(pa) * 0.22,
+                  0.85,
+                  -pa + Math.PI / 2,
+                  0,
+                  0.14,
+                  0.22,
+                  0.12
+                ),
+                0.03,
+                P.white
+              )
+            );
+          }
+          parts.push(part(BLOB_LO, P.gold, xform(0, 0.16, 0, 0, 0, 0, 0.12, 0.1, 0.12), 0.02));
+        }
+        const m = new THREE.Mesh(assemble(parts, 0.012), clayStem);
+        m.position.set(x, 0.045, z);
+        m.castShadow = true;
+        m.receiveShadow = true;
+        m.userData = { ph: rand() * TAU, y0: 0.045 };
+        lilyGroup.add(m);
+        pondPads.push(m);
+      }
+      scene.add(lilyGroup);
+
+      // 8 parabolic crystalline fountain water arcs + animated flowing water beads
+      const jetMats = [],
+        jetMeshes = [];
+      const jetLanding = [];
+      const jetVert = `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
+      const jetFrag = `
+  uniform float uTime; uniform float uPh;
+  varying vec2 vUv;
+  void main(){
+    float stream = 0.62 + 0.38*sin(vUv.x*26.0 - uTime*9.5 + uPh);
+    float ends = smoothstep(0.0, 0.08, vUv.x) * (1.0 - smoothstep(0.90, 1.0, vUv.x));
+    float core = 0.72 + 0.28*sin(vUv.y*3.14159);
+    vec3 col = mix(vec3(0.54,0.83,0.94), vec3(1.0,0.99,0.96), stream*0.62);
+    gl_FragColor = vec4(col, (0.26 + 0.36*stream)*ends*core);
+  }`;
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * TAU;
+        const p0 = new THREE.Vector3(Math.cos(a) * 2.42, 1.04, Math.sin(a) * 2.42);
+        const p1 = new THREE.Vector3(Math.cos(a) * 3.45, 1.78, Math.sin(a) * 3.45);
+        const p2 = new THREE.Vector3(Math.cos(a) * 4.45, 0.02, Math.sin(a) * 4.45);
+        const c = new THREE.QuadraticBezierCurve3(p0, p1, p2);
+        jetLanding.push({ x: p2.x, z: p2.z, ph: k * 0.85 });
+        const m = new THREE.ShaderMaterial({
+          uniforms: { uTime: { value: 0 }, uPh: { value: k * 0.9 } },
+          vertexShader: jetVert,
+          fragmentShader: jetFrag,
+          transparent: true,
+          depthWrite: false,
+          toneMapped: false,
+        });
+        jetMats.push(m);
+        const tube = new THREE.Mesh(new THREE.TubeGeometry(c, 18, 0.055, 6, false), m);
+        tube.renderOrder = 3;
+        scene.add(tube);
+        jetMeshes.push(tube);
+      }
+      // animated fountain splash droplets rising where the 8 jets hit the pool
+      const DROP_N = 80;
+      const dropMesh = new THREE.InstancedMesh(
+        new THREE.SphereGeometry(1, 8, 6),
+        new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.75,
+          depthWrite: false,
+          toneMapped: false,
+        }),
+        DROP_N
+      );
+      dropMesh.frustumCulled = false;
+      dropMesh.renderOrder = 4;
+      scene.add(dropMesh);
+      const drops = [],
+        dtO = new THREE.Object3D();
+      for (let i = 0; i < DROP_N; i++) {
+        const j = jetLanding[i % 8];
+        const a = rand() * TAU,
+          center = i >= 64;
+        drops.push({
+          bx: center ? Math.cos(a) * 3.0 : j.x,
+          bz: center ? Math.sin(a) * 3.0 : j.z,
+          a,
+          center,
+          spd: rr(0.45, 1.15),
+          h: rr(0.35, 0.78),
+          ph: rand(),
+          sc: rr(0.033, 0.07),
+        });
+        dropMesh.setColorAt(i, mix(P.water, P.white, rr(0.55, 0.95)));
+      }
+      dropMesh.instanceColor.needsUpdate = true;
+
+      // Constrained ripple rings centered on the 8 jet landings (never clip rim or pedestal)
+      const ripples = [];
+      const ripGeo = new THREE.TorusGeometry(1, 0.032, 6, 28);
+      for (let i = 0; i < 16; i++) {
+        const j = jetLanding[i % 8];
+        const m = new THREE.Mesh(
+          ripGeo,
+          new THREE.MeshBasicMaterial({
+            color: 0xfff8f2,
+            transparent: true,
+            opacity: 0.45,
+            depthWrite: false,
+            toneMapped: false,
+          })
+        );
+        m.rotation.x = Math.PI / 2;
+        m.position.set(j.x, 0.048, j.z);
+        m.renderOrder = 3;
+        m.userData = { ph: (i >= 8 ? 0.5 : 0.0) + (i % 8) * 0.12 };
+        scene.add(m);
+        ripples.push(m);
+      }
+      function updateFountain(t) {
+        for (let i = 0; i < jetMats.length; i++) jetMats[i].uniforms.uTime.value = t;
+        for (let i = 0; i < pondPads.length; i++) {
+          const m = pondPads[i];
+          m.position.y = m.userData.y0 + 0.018 * Math.sin(t * 1.4 + m.userData.ph);
+          m.rotation.z = 0.025 * Math.sin(t * 1.1 + m.userData.ph);
+        }
+        for (const m of ripples) {
+          const c = (t * 0.52 + m.userData.ph) % 1;
+          const rad = 0.16 + c * 1.18; // stays cleanly inside [2.9, 6.2]
+          m.scale.set(rad, rad, 1);
+          m.material.opacity = 0.52 * Math.sin(c * Math.PI) * (1 - c * 0.65);
+        }
+        for (let i = 0; i < DROP_N; i++) {
+          const d = drops[i];
+          const c = (t * 1.25 + d.ph) % 1;
+          const spread = c * (d.center ? 0.24 : 0.42) * d.spd;
+          const y = (d.center ? 0.2 : 0.05) + 4.0 * c * (1 - c) * d.h * (d.center ? 0.75 : 1);
+          dtO.position.set(d.bx + Math.cos(d.a) * spread, y, d.bz + Math.sin(d.a) * spread);
+          dtO.scale.setScalar(d.sc * Math.sin(c * Math.PI));
+          dtO.updateMatrix();
+          dropMesh.setMatrixAt(i, dtO.matrix);
+        }
+        dropMesh.instanceMatrix.needsUpdate = true;
+      }
+
+      // Translucent Fresnel stylized clay water surface with shoreline foam & caustics
+      const poolMat = new THREE.ShaderMaterial({
+        uniforms: { uTime: { value: 0 }, uSun: { value: SUN_DIR.clone() } },
+        transparent: true,
+        depthWrite: false,
+        vertexShader: `
+    varying vec2 vUv; varying vec3 vWPos;
+    uniform float uTime;
+    void main(){
+      vUv = uv;
+      vec3 surface = position;
+      float r = length(surface.xy);
+      surface.z += 0.010*sin(r*2.7-uTime*1.1)
+                + 0.006*sin(surface.x*2.1+surface.y*1.8+uTime*0.8);
+      vec4 wp = modelMatrix * vec4(surface, 1.0);
+      vWPos = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`,
+        fragmentShader: `
+    uniform float uTime; uniform vec3 uSun;
+    varying vec2 vUv; varying vec3 vWPos;
+    void main(){
+      vec2 p = (vUv - 0.5) * 12.7;
+      float r = length(p);
+      float t = uTime * 0.55;
+      // gentle caustic & wave pattern
+      float w1 = sin(p.x*1.55 + sin(p.y*1.25 + t)*1.35) + sin(p.y*1.85 + sin(p.x*1.15 - t*0.8)*1.25);
+      float caust = pow(max(0.0, 1.0 - abs(w1)*0.64), 7.0);
+      float rings = pow(max(0.0, sin(r*2.6 - t*1.9)), 13.0) * 0.27;
+      float splash = 0.0;
+      for(int i=0;i<8;i++){
+        float a=float(i)*0.785398163;
+        vec2 hit=vec2(cos(a),-sin(a))*4.45;
+        float d=length(p-hit);
+        float phase=fract(uTime*0.68+float(i)*0.19);
+        splash+=exp(-pow((d-phase*0.75)*13.0,2.0))*(1.0-phase)*0.19;
+      }
+
+      // view Fresnel reflection of pastel sky + warm rose tint near center
+      vec3 vDir = normalize(cameraPosition - vWPos);
+      vec3 n = normalize(vec3(
+        0.045*cos(p.x*2.4 + t*1.7) + 0.03*sin(p.y*3.1 - t),
+        1.0,
+        0.045*sin(p.y*2.2 - t*1.5) + 0.03*cos(p.x*2.9 + t)
+      ));
+      float fres = pow(1.0 - max(0.0, dot(n, vDir)), 3.0);
+      vec3 refl = reflect(-vDir, n);
+      vec3 halfDir=normalize(vDir+uSun);
+      float spec = pow(max(0.0, dot(n,halfDir)), 110.0);
+
+      vec3 deepCol  = vec3(0.24, 0.62, 0.78);
+      vec3 shalCol  = vec3(0.54, 0.86, 0.93);
+      vec3 skyRefl  = mix(vec3(0.98, 0.86, 0.88), vec3(0.74, 0.88, 1.0), clamp(refl.y*1.4, 0.0, 1.0));
+      float nearEdge = smoothstep(4.6, 6.25, r) + (1.0 - smoothstep(2.65, 3.6, r));
+      vec3 col = mix(deepCol, shalCol, clamp(nearEdge*0.75 + 0.25, 0.0, 1.0));
+      col = mix(col, skyRefl, 0.13 + 0.46*fres);
+      // warm pink glow reflection under the giant rose
+      col += vec3(1.0, 0.62, 0.78) * exp(-r*r*0.075) * 0.13;
+      // golden caustics + sun sparkle
+      col += vec3(1.0, 0.97, 0.90) * (caust*0.16 + rings*0.12 + splash*0.42 + spec*0.74);
+      // delicate shoreline & pedestal foam rings
+      float rimFoam = smoothstep(5.92, 6.26, r) * (0.65 + 0.35*sin(atan(p.y,p.x)*14.0 + t*2.0));
+      float pedFoam = (1.0 - smoothstep(2.74, 3.12, r)) * (0.65 + 0.35*sin(atan(p.y,p.x)*10.0 - t*2.4));
+      float foam = clamp(rimFoam + pedFoam, 0.0, 1.0);
+      col = mix(col, vec3(1.0, 0.98, 0.96), foam*0.35);
+
+      float edgeCut = 1.0 - smoothstep(6.22, 6.38, r);
+      float alpha = clamp((0.43 + 0.19*fres + foam*0.10 + splash*0.12 + spec*0.12) * edgeCut, 0.0, 0.74);
+      gl_FragColor = vec4(col, alpha);
+    }`,
+      });
+      const pool = new THREE.Mesh(new THREE.RingGeometry(0, 6.38, 96, 16), poolMat);
+      pool.rotation.x = -Math.PI / 2;
+      pool.position.y = 0.032;
+      pool.renderOrder = 2;
+      scene.add(pool);
+
+      /* ======================================================= FALLING PETALS */
+      const N = 230;
+      const fallGeo = ROSE_PETAL_UNIT.clone();
+      fallGeo.scale(0.14, 0.19, 0.09);
+      fallGeo.deleteAttribute('uv');
+      const petalsMesh = new THREE.InstancedMesh(
+        fallGeo,
+        new THREE.MeshStandardMaterial({
+          color: 0xffffff,
+          roughness: 0.64,
+          metalness: 0,
+          envMapIntensity: 0.4,
+          side: THREE.DoubleSide,
+        }),
+        N
+      );
+      petalsMesh.frustumCulled = false;
+      petalsMesh.castShadow = false;
+      petalsMesh.receiveShadow = false;
+      scene.add(petalsMesh);
+      const petals = [],
+        tmp = new THREE.Object3D();
+      for (let i = 0; i < N; i++) {
+        const nearRose = i < 55;
+        petals.push({
+          near: nearRose,
+          a: rand() * TAU,
+          r: nearRose ? rr(2.2, 8.2) : rr(2, 54),
+          y: rand() * 18,
+          v: nearRose ? rr(0.28, 0.52) : rr(0.38, 0.82),
+          s: rand() * 100,
+          sw: rr(0.5, 1.4),
+          tw: rr(0.28, 0.78),
+          sc: rr(0.82, 1.32),
+          c: mix(
+            i % 6 === 0 ? P.rose : i % 3 === 0 ? P.cream : P.roseLight,
+            P.white,
+            rand() * 0.32
+          ),
+        });
+        petalsMesh.setColorAt(i, petals[i].c);
+      }
+      petalsMesh.instanceColor.needsUpdate = true;
+      function updatePetals(dt, t) {
+        for (let i = 0; i < N; i++) {
+          const p = petals[i];
+          p.y -= p.v * dt;
+          p.a += dt * (p.near ? 0.11 : 0.045) * (0.55 + p.sw * 0.4);
+          let rad = p.r + 0.52 * Math.sin(t * 0.24 + p.s);
+          let x = rad * Math.cos(p.a) + 0.58 * Math.sin(t * p.sw * 0.7 + p.s);
+          let z = rad * Math.sin(p.a) + 0.58 * Math.cos(t * p.sw * 0.6 + p.s * 1.3);
+          const distance = Math.hypot(x, z);
+          const floor = distance < 6.2 ? 0.1 : groundY(distance, Math.atan2(z, x)) + 0.07;
+          if (p.y < floor) {
+            p.y = p.near ? rr(9.5, 15.5) : rr(14, 22);
+            p.r = p.near ? rr(2.2, 8.2) : rr(2, 54);
+            p.a = rand() * TAU;
+            rad = p.r + 0.52 * Math.sin(t * 0.24 + p.s);
+            x = rad * Math.cos(p.a) + 0.58 * Math.sin(t * p.sw * 0.7 + p.s);
+            z = rad * Math.sin(p.a) + 0.58 * Math.cos(t * p.sw * 0.6 + p.s * 1.3);
+          }
+          tmp.position.set(x, p.y + 0.09 * Math.sin(t * 1.1 + p.s), z);
+          tmp.rotation.set(
+            0.35 + 0.47 * Math.sin(t * p.tw * 2 + p.s),
+            p.a + t * p.tw * 0.55,
+            0.55 * Math.sin(t * p.tw * 1.5 + p.s)
+          );
+          tmp.scale.setScalar(p.sc);
+          tmp.updateMatrix();
+          petalsMesh.setMatrixAt(i, tmp.matrix);
+        }
+        petalsMesh.instanceMatrix.needsUpdate = true;
+      }
+      updatePetals(0, 0);
+
+      /* ------------------------------------------- tiny round golden fireflies */
+      const GN = 88;
+      const fireflyGeo = new THREE.SphereGeometry(1, 8, 6);
+      const glowPts = new THREE.InstancedMesh(
+        fireflyGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          transparent: true,
+          opacity: 0.54,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          toneMapped: false,
+        }),
+        GN
+      );
+      glowPts.frustumCulled = false;
+      glowPts.renderOrder = 4;
+      scene.add(glowPts);
+      const gpts = [],
+        gt = new THREE.Object3D(),
+        gc = new THREE.Color();
+      for (let i = 0; i < GN; i++) {
+        gpts.push({
+          a: rand() * TAU,
+          r: rr(3, 40),
+          y: rr(0.7, 10.5),
+          vy: rr(0.025, 0.11),
+          s: rand() * 100,
+          sz: rr(0.026, 0.065),
+          ph: rand() * TAU,
+        });
+      }
+      function updateGlowPts(dt, t) {
+        for (let i = 0; i < GN; i++) {
+          const p = gpts[i];
+          p.a += dt * 0.042;
+          p.y += p.vy * dt;
+          if (p.y > 11.5) p.y = 0.7;
+          const rrP = p.r + 0.65 * Math.sin(t * 0.3 + p.s);
+          const x = Math.cos(p.a) * rrP,
+            z = Math.sin(p.a) * rrP;
+          gt.position.set(x, p.y, z);
+          gt.scale.setScalar(p.sz * (0.72 + 0.28 * Math.sin(t * 1.6 + p.ph)));
+          gt.updateMatrix();
+          glowPts.setMatrixAt(i, gt.matrix);
+          const tw = 0.55 + 0.45 * Math.sin(t * 2.3 + p.s * 3);
+          const warm = Math.exp(-(rrP * rrP) / 220.0);
+          gc.setRGB(
+            1.02 + 0.34 * tw * (0.5 + warm),
+            0.78 + 0.18 * tw * (0.5 + warm),
+            0.48 + 0.11 * tw
+          );
+          glowPts.setColorAt(i, gc);
+        }
+        glowPts.instanceMatrix.needsUpdate = true;
+        glowPts.instanceColor.needsUpdate = true;
+      }
+      updateGlowPts(0, 0);
+
+      /* ------------------------------------------- articulated banking clay birds */
+      const BN = 9;
+      // Swept clay wing pivoted cleanly at the shoulder (x = 0); flip index winding when mirrored
+      function flipWinding(g) {
+        const idx = g.index;
+        for (let i = 0; i < idx.count; i += 3) {
+          const b = idx.getX(i + 1),
+            c = idx.getX(i + 2);
+          idx.setX(i + 1, c);
+          idx.setX(i + 2, b);
+        }
+        idx.needsUpdate = true;
+      }
+      function sweptWingGeo(sign) {
+        const g = new THREE.SphereGeometry(1, 7, 5);
+        const p = g.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i),
+            y = p.getY(i),
+            z = p.getZ(i);
+          const span = (x + 1) * 0.5; // 0 at shoulder, 1 at tip
+          const sweep = -0.45 * span * span;
+          const taper = 1.0 - 0.55 * span;
+          p.setXYZ(i, sign * span * 0.95, y * 0.08 * taper + 0.06 * span, z * 0.28 * taper + sweep);
+        }
+        if (sign < 0) flipWinding(g);
+        g.computeVertexNormals();
+        return g;
+      }
+      const birdBodyGeo = new THREE.SphereGeometry(1, 8, 6);
+      birdBodyGeo.scale(0.24, 0.22, 0.62);
+      const birdMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.82,
+        envMapIntensity: 0.35,
+      });
+      const wingMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.8,
+        envMapIntensity: 0.35,
+        emissive: new THREE.Color(0x883a56),
+        emissiveIntensity: 0.2,
+      });
+      const birdBody = new THREE.InstancedMesh(birdBodyGeo, birdMat, BN);
+      const birdWingL = new THREE.InstancedMesh(sweptWingGeo(-1), wingMat, BN);
+      const birdWingR = new THREE.InstancedMesh(sweptWingGeo(1), wingMat, BN);
+      [birdBody, birdWingL, birdWingR].forEach((m) => {
+        m.frustumCulled = false;
+        m.castShadow = true;
+        scene.add(m);
+      });
+
+      const birds = [],
+        bt = new THREE.Object3D();
+      for (let i = 0; i < BN; i++) {
+        birds.push({
+          R: rr(16, 33),
+          H: rr(17, 26),
+          sp: rr(0.11, 0.19),
+          ph: rand() * TAU,
+          fl: rr(6.2, 9.2),
+          body: mix(P.white, P.cream, rand()),
+          wing: mix(P.roseLight, P.blush, rand()),
+        });
+        birdBody.setColorAt(i, birds[i].body);
+        birdWingL.setColorAt(i, birds[i].wing);
+        birdWingR.setColorAt(i, birds[i].wing);
+      }
+      birdBody.instanceColor.needsUpdate =
+        birdWingL.instanceColor.needsUpdate =
+        birdWingR.instanceColor.needsUpdate =
+          true;
+
+      function updateBirds(t) {
+        for (let i = 0; i < BN; i++) {
+          const b = birds[i],
+            a = b.ph + t * b.sp;
+          const x = Math.cos(a) * b.R,
+            z = Math.sin(a) * b.R;
+          const y = b.H + 1.5 * Math.sin(a * 2.0 + b.fl);
+          // true flight heading tangent (+Z forward) + gentle banking roll into the turn
+          const vx = -Math.sin(a) * b.R * b.sp,
+            vz = Math.cos(a) * b.R * b.sp;
+          const vy = 1.5 * 2.0 * b.sp * Math.cos(a * 2.0 + b.fl);
+          const yaw = Math.atan2(vx, vz);
+          const pitch = -Math.atan2(vy, Math.hypot(vx, vz)) * 0.6;
+          const bank = 0.24;
+          const flap = Math.sin(t * b.fl + b.ph) * 0.62 + 0.14;
+
+          bt.position.set(x, y, z);
+          bt.rotation.set(pitch, yaw, bank, 'YXZ');
+          bt.scale.setScalar(1.0);
+          bt.updateMatrix();
+          birdBody.setMatrixAt(i, bt.matrix);
+
+          bt.rotation.set(pitch, yaw, bank - flap, 'YXZ');
+          bt.updateMatrix();
+          birdWingL.setMatrixAt(i, bt.matrix);
+
+          bt.rotation.set(pitch, yaw, bank + flap, 'YXZ');
+          bt.updateMatrix();
+          birdWingR.setMatrixAt(i, bt.matrix);
+        }
+        birdBody.instanceMatrix.needsUpdate =
+          birdWingL.instanceMatrix.needsUpdate =
+          birdWingR.instanceMatrix.needsUpdate =
+            true;
+      }
+      updateBirds(0);
+
+      /* ------------------------------------------- delicate garden butterflies */
+      const BFN = 14;
+      function butterflyWingGeo(sign) {
+        const g = new THREE.SphereGeometry(1, 6, 4);
+        const p = g.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i),
+            y = p.getY(i),
+            z = p.getZ(i);
+          const span = (x + 1) * 0.5;
+          p.setXYZ(i, sign * span * 0.28, y * 0.02, z * 0.24 * (0.4 + 0.7 * span));
+        }
+        if (sign < 0) flipWinding(g);
+        g.computeVertexNormals();
+        return g;
+      }
+      const bfMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.6,
+        emissive: new THREE.Color(0x9a4c68),
+        emissiveIntensity: 0.25,
+      });
+      const bfL = new THREE.InstancedMesh(butterflyWingGeo(-1), bfMat, BFN);
+      const bfR = new THREE.InstancedMesh(butterflyWingGeo(1), bfMat, BFN);
+      bfL.frustumCulled = bfR.frustumCulled = false;
+      scene.add(bfL, bfR);
+      const bflies = [];
+      for (let i = 0; i < BFN; i++) {
+        const c = mix(i % 3 === 0 ? P.gold : i % 2 === 0 ? P.roseLight : P.cream, P.white, 0.25);
+        bfL.setColorAt(i, c);
+        bfR.setColorAt(i, c);
+        bflies.push({
+          a: rand() * TAU,
+          r: rr(4.5, 24),
+          y: rr(1.2, 4.8),
+          sp: rr(0.18, 0.38) * (i % 2 ? 1 : -1),
+          ph: rand() * TAU,
+          fl: rr(12, 18),
+        });
+      }
+      bfL.instanceColor.needsUpdate = bfR.instanceColor.needsUpdate = true;
+      function updateButterflies(t) {
+        for (let i = 0; i < BFN; i++) {
+          const b = bflies[i];
+          const a = b.a + t * b.sp * 0.35;
+          const rad = b.r + 2.4 * Math.sin(t * 0.55 + b.ph);
+          const x = Math.cos(a) * rad,
+            z = Math.sin(a) * rad;
+          const y = Math.max(groundY(rad, a) + 0.8, b.y + 0.85 * Math.sin(t * 1.3 + b.ph));
+          const yaw = Math.atan2(-Math.sin(a) * b.sp, Math.cos(a) * b.sp);
+          const flap = Math.sin(t * b.fl + b.ph) * 0.72 + 0.36;
+          bt.position.set(x, y, z);
+          bt.scale.setScalar(1.0);
+          bt.rotation.set(0.15, yaw, -flap, 'YXZ');
+          bt.updateMatrix();
+          bfL.setMatrixAt(i, bt.matrix);
+          bt.rotation.set(0.15, yaw, flap, 'YXZ');
+          bt.updateMatrix();
+          bfR.setMatrixAt(i, bt.matrix);
+        }
+        bfL.instanceMatrix.needsUpdate = bfR.instanceMatrix.needsUpdate = true;
+      }
+      updateButterflies(0);
+
+      /* ------------------------------------------------------------ camera
+   Exact same initial view, target, zoom range, and smooth controls. */
+      const cam = {
+        th: 0.8,
+        tth: 0.8,
+        ph: 1.18,
+        tph: 1.18,
+        r: 46,
+        tr: 46,
+        drag: false,
+        lx: 0,
+        ly: 0,
+        last: -10,
+      };
+      const cv = renderer.domElement,
+        now = () => performance.now() / 1000;
+      cv.addEventListener('pointerdown', (e) => {
+        cam.drag = true;
+        cam.lx = e.clientX;
+        cam.ly = e.clientY;
+        cam.last = now();
+        cv.setPointerCapture(e.pointerId);
+      });
+      addEventListener('pointermove', (e) => {
+        if (!cam.drag) return;
+        cam.tth -= (e.clientX - cam.lx) * 0.005;
+        cam.tph = clamp(cam.tph + (e.clientY - cam.ly) * 0.003, 0.5, 1.45);
+        cam.lx = e.clientX;
+        cam.ly = e.clientY;
+        cam.last = now();
+      });
+      addEventListener('pointerup', () => {
+        cam.drag = false;
+        cam.last = now();
+      });
+      cv.addEventListener(
+        'wheel',
+        (e) => {
+          cam.tr = clamp(cam.tr + e.deltaY * 0.03, 18, 80);
+          cam.last = now();
+          e.preventDefault();
+        },
+        { passive: false }
+      );
+      function updateCamera(dt, t) {
+        if (!cam.drag && t - cam.last > 3) {
+          cam.tth += dt * 0.045;
+          cam.tph += (1.18 + 0.08 * Math.sin(t * 0.1) - cam.tph) * dt * 0.1;
+        }
+        const d = 1 - Math.exp(-dt * 4);
+        cam.th += (cam.tth - cam.th) * d;
+        cam.ph += (cam.tph - cam.ph) * d;
+        cam.r += (cam.tr - cam.r) * d;
+        const h = Math.sin(cam.ph) * cam.r,
+          ly = 7 + 0.6 * Math.sin(t * 0.07);
+        camera.position.set(
+          h * Math.cos(cam.th),
+          ly + Math.cos(cam.ph) * cam.r,
+          h * Math.sin(cam.th)
+        );
+        camera.lookAt(0, ly, 0);
+      }
+
+      const focusPoint = new THREE.Vector3(0, 7, 0);
+      const depthExclusions = [
+        sky,
+        sunGlow,
+        pool,
+        petalsMesh,
+        glowPts,
+        dropMesh,
+        ...shaftMeshes,
+        ...jetMeshes,
+        ...ripples,
+      ];
+      const renderDepthOfField = depthOfField.render.bind(depthOfField);
+      depthOfField.render = (...args) => {
+        const visibility = depthExclusions.map((object) => object.visible);
+        for (const object of depthExclusions) object.visible = false;
+        try {
+          renderDepthOfField(...args);
+        } finally {
+          depthExclusions.forEach((object, i) => {
+            object.visible = visibility[i];
+          });
+        }
+      };
+
+      addEventListener('resize', () => {
+        const dpr = Math.min(devicePixelRatio || 1, 1.75);
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setPixelRatio(dpr);
+        renderer.setSize(innerWidth, innerHeight);
+        composer.setPixelRatio(dpr);
+        composer.setSize(innerWidth, innerHeight);
+        grade.uniforms.uRes.value.set(innerWidth * dpr, innerHeight * dpr);
+      });
+
+      /* -------------------------------------------------------------- loop */
+      const clock = new THREE.Clock();
+      let first = true;
+      function frame() {
+        requestAnimationFrame(frame);
+        const dt = Math.min(clock.getDelta(), 0.05),
+          t = clock.elapsedTime;
+        sharedWind.value = t;
+        skyMat.uniforms.uTime.value = t;
+        poolMat.uniforms.uTime.value = t;
+        grade.uniforms.uTime.value = t;
+
+        const pulse = 0.5 + 0.5 * Math.sin(t * 1.1);
+        clayRose.emissiveIntensity = 0.1 + 0.12 * pulse;
+        clayGold.emissiveIntensity = 0.16 + 0.1 * pulse;
+        roseLight.intensity = 22 + 12 * pulse;
+        waterBounce.intensity = 7 + 3 * Math.sin(t * 1.6);
+        bloom.strength = 0.2 + 0.06 * pulse;
+
+        bloomGroup.rotation.y = t * 0.055;
+        breathGroup.scale.set(
+          1 + 0.016 * Math.sin(t * 1.1),
+          1 + 0.022 * Math.sin(t * 1.1 + 0.6),
+          1 + 0.016 * Math.sin(t * 1.1)
+        );
+        heart.scale.setScalar(1 + 0.18 * pulse);
+        heartMat.color.setRGB(1.0 + 0.26 * pulse, 0.8 + 0.14 * pulse, 0.48 + 0.1 * pulse);
+        glowMat.color.setRGB(
+          0.88 + 0.14 * Math.sin(t * 1.7),
+          0.86 + 0.13 * Math.sin(t * 1.7 + 0.4),
+          0.82 + 0.12 * Math.sin(t * 1.7 + 0.9)
+        );
+
+        updateClouds(dt, t);
+        updateFountain(t);
+        updatePetals(dt, t);
+        updateGlowPts(dt, t);
+        updateBirds(t);
+        updateButterflies(t);
+        shaftMats.forEach((m, i) => {
+          m.uniforms.uTime.value = t;
+          m.uniforms.uI.value = m.userData.base * (0.76 + 0.24 * Math.sin(t * 0.45 + i * 1.3));
+        });
+        updateCamera(dt, t);
+        depthOfField.uniforms.focus.value = camera.position.distanceTo(focusPoint);
+
+        composer.render();
+        if (first) {
+          first = false;
+          document.body.classList.add('ready');
+        }
+      }
+      frame();
+    </script>
+  </body>
+</html>

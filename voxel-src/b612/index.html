@@ -1,0 +1,1415 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#231c3e" />
+    <meta
+      name="description"
+      content="A tiny clay world, a precious rose, and a quiet twilight sky."
+    />
+    <title>Asteroid B612</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #231c3e;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        touch-action: none;
+        background: linear-gradient(#231c3e, #786078 62%, #c69b85);
+      }
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        outline: none;
+        cursor: grab;
+      }
+      canvas:active {
+        cursor: grabbing;
+      }
+      #fade {
+        position: fixed;
+        inset: 0;
+        background: #231c3e;
+        pointer-events: none;
+        opacity: 1;
+        transition: opacity 2.6s ease;
+        z-index: 20;
+      }
+      body.ready #fade {
+        opacity: 0;
+      }
+      #vignette {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 10;
+        background: radial-gradient(
+          ellipse at 50% 46%,
+          transparent 54%,
+          rgba(16, 11, 31, 0.24) 100%
+        );
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #fade {
+          transition-duration: 0.5s;
+        }
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <main id="app" aria-label="Asteroid B612, an interactive clay miniature"></main>
+    <div id="vignette" aria-hidden="true"></div>
+    <div id="fade" aria-hidden="true"></div>
+    <script type="module">
+      import * as THREE from 'three';
+      import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+      import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+      import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+      import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
+      import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+      import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+      import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+
+      const TAU = Math.PI * 2;
+      const UP = new THREE.Vector3(0, 1, 0);
+      // Preserve the established layout, including the former surface's top height.
+      const R = 3.8,
+        gY = 3.71,
+        STEM_H = 1.9;
+      const CAN = { x: 0.9, z: 1.75 };
+      const SCR = { x0: -1.75, x1: -1.15, z0: 0.95, z1: 1.45 };
+      const Ro = 1.32,
+        Hc = 2.1;
+      const PAL = {
+        sand: 0xc5ac92,
+        earth: 0xa18779,
+        shadow: 0x69616d,
+        crimson: 0xa13d58,
+        pink: 0xd97994,
+        blush: 0xf1b6c4,
+        green: 0x52765a,
+        leaf: 0x719773,
+        stone: 0x969398,
+        brass: 0xbba17b,
+        soil: 0x756052,
+        cyan: 0xcce4e8,
+      };
+      const clamp = THREE.MathUtils.clamp;
+      const smooth = THREE.MathUtils.smoothstep;
+      const lerp = THREE.MathUtils.lerp;
+      const now = () => performance.now() / 1000;
+      function randomSource(seed) {
+        return () => {
+          seed = (seed * 16807) % 2147483647;
+          return (seed - 1) / 2147483646;
+        };
+      }
+      const rnd = randomSource(20240612);
+      function hash(x, y, z) {
+        let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 1274126177);
+        h = Math.imul(h ^ (h >>> 13), 1274126177);
+        return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+      }
+      function noise(x, y, z) {
+        const ix = Math.floor(x),
+          iy = Math.floor(y),
+          iz = Math.floor(z);
+        const fx = smooth(x - ix, 0, 1),
+          fy = smooth(y - iy, 0, 1),
+          fz = smooth(z - iz, 0, 1);
+        return lerp(
+          lerp(
+            lerp(hash(ix, iy, iz), hash(ix + 1, iy, iz), fx),
+            lerp(hash(ix, iy + 1, iz), hash(ix + 1, iy + 1, iz), fx),
+            fy
+          ),
+          lerp(
+            lerp(hash(ix, iy, iz + 1), hash(ix + 1, iy, iz + 1), fx),
+            lerp(hash(ix, iy + 1, iz + 1), hash(ix + 1, iy + 1, iz + 1), fx),
+            fy
+          ),
+          fz
+        );
+      }
+      function fbm(x, y, z) {
+        return (
+          (noise(x, y, z) +
+            0.5 * noise(x * 2.03, y * 2.03, z * 2.03) +
+            0.25 * noise(x * 4.11, y * 4.11, z * 4.11)) /
+          1.75
+        );
+      }
+      const direction = (theta, phi) =>
+        new THREE.Vector3(
+          Math.sin(theta) * Math.cos(phi),
+          Math.cos(theta),
+          Math.sin(theta) * Math.sin(phi)
+        );
+
+      // Weld shared positions before computing normals, including sphere seams and polyhedron faces.
+      function smoothGeometry(geometry) {
+        geometry.deleteAttribute('normal');
+        geometry.deleteAttribute('uv');
+        const welded = mergeVertices(geometry, 0.00001);
+        geometry.dispose();
+        welded.computeVertexNormals();
+        welded.computeBoundingSphere();
+        welded.userData.smoothed = true;
+        return welded;
+      }
+      function clay(color, options = {}) {
+        return new THREE.MeshPhysicalMaterial({
+          color,
+          roughness: 0.94,
+          metalness: 0,
+          specularIntensity: 0.23,
+          envMapIntensity: 0.38,
+          flatShading: false,
+          ...options,
+        });
+      }
+      function mesh(geometry, material, parent, cast = true, depth = true) {
+        const object = new THREE.Mesh(
+          geometry.userData.smoothed ? geometry : smoothGeometry(geometry),
+          material
+        );
+        object.castShadow = cast;
+        object.receiveShadow = cast;
+        if (depth) object.layers.enable(1);
+        parent.add(object);
+        return object;
+      }
+      function paint(geometry, colorAt) {
+        const positions = geometry.attributes.position;
+        const colors = new Float32Array(positions.count * 3);
+        for (let i = 0; i < positions.count; i++) {
+          const color = colorAt(positions.getX(i), positions.getY(i), positions.getZ(i));
+          color.toArray(colors, i * 3);
+        }
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        return geometry;
+      }
+      function lathe(points, segments = 80, curved = false) {
+        let profile = points.map(([r, y]) => new THREE.Vector2(r, y));
+        if (curved) {
+          const curve = new THREE.CatmullRomCurve3(
+            points.map(([r, y]) => new THREE.Vector3(r, y, 0))
+          );
+          profile = curve.getPoints(80).map((p) => new THREE.Vector2(Math.max(0, p.x), p.y));
+        }
+        return new THREE.LatheGeometry(profile, segments);
+      }
+      const sphereGeometry = smoothGeometry(new THREE.SphereGeometry(1, 32, 24));
+      function ellipsoid(parent, material, position, scale, cast = true, depth = true) {
+        const object = mesh(sphereGeometry, material, parent, cast, depth);
+        object.position.set(...position);
+        object.scale.set(...scale);
+        return object;
+      }
+      function rod(parent, material, a, b, radius = 0.016) {
+        const start = new THREE.Vector3(...a),
+          end = new THREE.Vector3(...b);
+        const object = mesh(
+          new THREE.CylinderGeometry(radius, radius, start.distanceTo(end), 16),
+          material,
+          parent
+        );
+        object.position.copy(start).add(end).multiplyScalar(0.5);
+        object.quaternion.setFromUnitVectors(UP, end.sub(start).normalize());
+        return object;
+      }
+      function tube(parent, material, points, radius = 0.018) {
+        const curve = new THREE.CatmullRomCurve3(points.map((p) => new THREE.Vector3(...p)));
+        return mesh(new THREE.TubeGeometry(curve, 32, radius, 10, false), material, parent);
+      }
+      function ring(parent, material, radius, thickness, y) {
+        const object = mesh(new THREE.TorusGeometry(radius, thickness, 12, 96), material, parent);
+        object.rotation.x = Math.PI / 2;
+        object.position.y = y;
+        return object;
+      }
+      function glowTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = canvas.height = 128;
+        const context = canvas.getContext('2d');
+        const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+        [
+          [0, 1],
+          [0.12, 0.94],
+          [0.3, 0.38],
+          [0.62, 0.08],
+          [1, 0],
+        ].forEach(([r, alpha]) => gradient.addColorStop(r, `rgba(255,255,255,${alpha})`));
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 128, 128);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        return texture;
+      }
+      const particleTexture = glowTexture();
+
+      const renderer = new THREE.WebGLRenderer({
+        antialias: true,
+        powerPreference: 'high-performance',
+      });
+      renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+      renderer.setSize(innerWidth, innerHeight);
+      renderer.setClearColor(0x231c3e);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.02;
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.domElement.tabIndex = 0;
+      renderer.domElement.setAttribute('role', 'img');
+      renderer.domElement.setAttribute(
+        'aria-label',
+        'A rose under clear glass on Asteroid B612. Drag to orbit, scroll or pinch to zoom, double-click or press R to reset.'
+      );
+      document.getElementById('app').appendChild(renderer.domElement);
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x76627f, 0.006);
+      const camera = new THREE.PerspectiveCamera(38, innerWidth / innerHeight, 0.1, 300);
+      camera.position.set(4.6, 7.36, 6.4);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.055;
+      controls.enablePan = false;
+      controls.minDistance = 4.6;
+      controls.maxDistance = 24;
+      controls.minPolarAngle = 0.3;
+      controls.maxPolarAngle = 1.85;
+      controls.zoomSpeed = 0.65;
+      controls.rotateSpeed = 0.55;
+      controls.autoRotateSpeed = 0.42;
+      const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+      let dragging = false,
+        idleUntil = 0,
+        tween = null;
+      controls.addEventListener('start', () => {
+        dragging = true;
+        tween = null;
+      });
+      controls.addEventListener('end', () => {
+        dragging = false;
+        idleUntil = now() + 2.8;
+      });
+      function flyTo(position, target, duration) {
+        tween = {
+          p0: camera.position.clone(),
+          t0: controls.target.clone(),
+          p1: position.clone(),
+          t1: target.clone(),
+          start: now(),
+          duration,
+        };
+      }
+      const tiltGroup = new THREE.Group();
+      tiltGroup.rotation.set(0.09, 0, 0.18);
+      scene.add(tiltGroup);
+      const spin = new THREE.Group();
+      tiltGroup.add(spin);
+
+      // A broad dusk gradient replaces the hot, nearly uniform orange background.
+      const sunDir = new THREE.Vector3(-9, 2.2, 2).normalize();
+      const rimDir = new THREE.Vector3(7, 3.6, -6).normalize();
+      function skyMaterial() {
+        return new THREE.ShaderMaterial({
+          side: THREE.BackSide,
+          depthWrite: false,
+          fog: false,
+          uniforms: {
+            top: { value: new THREE.Color(0x231b43) },
+            middle: { value: new THREE.Color(0x79617e) },
+            horizon: { value: new THREE.Color(0xd5a28a) },
+            bottom: { value: new THREE.Color(0x342841) },
+            sun: { value: sunDir },
+          },
+          vertexShader: `varying vec3 worldPosition;
+          void main(){ vec4 world = modelMatrix * vec4(position, 1.0); worldPosition = world.xyz;
+            gl_Position = projectionMatrix * viewMatrix * world; }`,
+          fragmentShader: `varying vec3 worldPosition; uniform vec3 top, middle, horizon, bottom, sun;
+          void main(){
+            vec3 d = normalize(worldPosition - cameraPosition);
+            float t = smoothstep(-0.56, 0.13, d.y);
+            vec3 color = mix(horizon, middle, smoothstep(0.0, 0.65, t));
+            color = mix(color, top, smoothstep(0.32, 1.0, t));
+            color = mix(bottom, color, smoothstep(-0.96, -0.58, d.y));
+            color += vec3(0.16, 0.09, 0.045) * pow(max(dot(d, sun), 0.0), 10.0);
+            gl_FragColor = vec4(color, 1.0);
+          }`,
+        });
+      }
+      const sky = mesh(new THREE.SphereGeometry(140, 48, 32), skyMaterial(), scene, false, false);
+      sky.renderOrder = -100;
+      sky.frustumCulled = false;
+      {
+        const environment = new THREE.Scene();
+        mesh(new THREE.SphereGeometry(140, 32, 20), skyMaterial(), environment, false, false);
+        const panel = (width, height, color, intensity, direction) => {
+          const object = mesh(
+            new THREE.PlaneGeometry(width, height),
+            new THREE.MeshBasicMaterial({
+              color: new THREE.Color(color).multiplyScalar(intensity),
+              side: THREE.DoubleSide,
+            }),
+            environment,
+            false,
+            false
+          );
+          object.position.copy(direction).multiplyScalar(55);
+          object.lookAt(0, 0, 0);
+        };
+        panel(12, 30, 0xffead5, 2.2, sunDir);
+        panel(14, 26, 0xc1d7f1, 1.4, rimDir);
+        panel(34, 20, 0xe5deeb, 0.6, new THREE.Vector3(0.1, 1, 0.2).normalize());
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        scene.environment = pmrem.fromScene(environment, 0.025, 0.1, 300).texture;
+        pmrem.dispose();
+        environment.traverse((object) => {
+          if (object.isMesh) {
+            object.geometry.dispose();
+            object.material.dispose();
+          }
+        });
+      }
+      const keyLight = new THREE.DirectionalLight(0xffdfc3, 2.65);
+      keyLight.position.copy(sunDir).multiplyScalar(14);
+      keyLight.target.position.set(0, 2, 0);
+      keyLight.castShadow = true;
+      keyLight.shadow.mapSize.set(2048, 2048);
+      Object.assign(keyLight.shadow.camera, {
+        left: -6.4,
+        right: 6.4,
+        top: 6.4,
+        bottom: -6.4,
+        near: 2,
+        far: 32,
+      });
+      keyLight.shadow.camera.updateProjectionMatrix();
+      keyLight.shadow.bias = -0.0002;
+      keyLight.shadow.normalBias = 0.018;
+      scene.add(keyLight, keyLight.target);
+      const rim = new THREE.DirectionalLight(0xb2c7ed, 1.1);
+      rim.position.copy(rimDir).multiplyScalar(14);
+      scene.add(rim);
+      const camFill = new THREE.DirectionalLight(0xe0d9e7, 0.55);
+      const backRim = new THREE.DirectionalLight(0xc5d8ef, 0.95);
+      scene.add(
+        camFill,
+        backRim,
+        new THREE.AmbientLight(0xb0a8c4, 0.18),
+        new THREE.HemisphereLight(0xc6c7dd, 0x766354, 0.85)
+      );
+
+      // Soft particles still enter the opaque transmission capture, so glass can refract the stars.
+      const starPositions = [],
+        starColors = [],
+        starSizes = [],
+        starPhases = [];
+      const color = new THREE.Color();
+      for (let i = 0; i < 1400; i++) {
+        const theta = rnd() * TAU,
+          phi = Math.acos(2 * rnd() - 1),
+          radius = 68 + rnd() * 10;
+        starPositions.push(
+          radius * Math.sin(phi) * Math.cos(theta),
+          radius * Math.cos(phi),
+          radius * Math.sin(phi) * Math.sin(theta)
+        );
+        const size = 0.1 + Math.pow(rnd(), 4) * 0.36,
+          choice = rnd();
+        color
+          .set(choice < 0.6 ? 0xf5efff : choice < 0.82 ? 0xffe6c4 : 0xc9dffc)
+          .multiplyScalar(0.65 + rnd() * 0.9);
+        starColors.push(color.r, color.g, color.b);
+        starSizes.push(size);
+        starPhases.push(i * 2.39996);
+      }
+      const starGeometry = new THREE.BufferGeometry();
+      starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starPositions, 3));
+      starGeometry.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
+      starGeometry.setAttribute('size', new THREE.Float32BufferAttribute(starSizes, 1));
+      starGeometry.setAttribute('phase', new THREE.Float32BufferAttribute(starPhases, 1));
+      const starMaterial = new THREE.ShaderMaterial({
+        transparent: false,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        uniforms: {
+          time: { value: 0 },
+          pixelHeight: { value: innerHeight * renderer.getPixelRatio() },
+        },
+        vertexShader: `attribute vec3 color; attribute float size, phase; uniform float time, pixelHeight;
+        varying vec3 starColor; varying float brightness;
+        void main(){ vec4 view = modelViewMatrix * vec4(position, 1.0);
+          gl_Position = projectionMatrix * view;
+          gl_PointSize = clamp(size * pixelHeight * projectionMatrix[1][1] * 0.5 / max(0.1, -view.z), 1.0, 20.0);
+          starColor = color; brightness = 0.76 + 0.24 * sin(time * 0.55 + phase); }`,
+        fragmentShader: `varying vec3 starColor; varying float brightness;
+        void main(){ float r = length(gl_PointCoord - 0.5) * 2.0;
+          if(r > 1.0) discard;
+          float glow = exp(-r * r * 6.0) * (1.0 - smoothstep(0.7, 1.0, r));
+          gl_FragColor = vec4(starColor * brightness * 1.65, glow); }`,
+      });
+      const starfield = new THREE.Points(starGeometry, starMaterial);
+      starfield.renderOrder = -90;
+      scene.add(starfield);
+      const moon = mesh(
+        new THREE.SphereGeometry(6.4, 48, 32),
+        clay(0xa5a0b4, { fog: false, envMapIntensity: 0.14 }),
+        scene,
+        false,
+        false
+      );
+      moon.position.set(-0.5, -0.25, -0.83).normalize().multiplyScalar(80);
+
+      // Continuous sphere displacement and smooth color variation give the planet a sculpted clay surface.
+      const craters = [
+        [1.6, 3, 0.5, 0.2],
+        [1.95, 5.5, 0.45, 0.2],
+        [1.5, 5, 0.34, 0.15],
+        [2.2, 1, 0.5, 0.22],
+        [1.5, 0.95, 0.38, 0.16],
+        [2.5, 4, 0.6, 0.25],
+        [1.35, 3, 0.3, 0.12],
+        [2.05, 2.6, 0.4, 0.18],
+      ].map(([theta, phi, radius, depth]) => ({ direction: direction(theta, phi), radius, depth }));
+      function terrainPoint(unit, output) {
+        let radius = R + (fbm(unit.x * 2 + 11, unit.y * 2, unit.z * 2 + 5) - 0.5) * 0.19;
+        for (const crater of craters) {
+          const distance =
+            (Math.acos(clamp(unit.dot(crater.direction), -1, 1)) * R) / crater.radius;
+          if (distance < 1.6)
+            radius +=
+              crater.depth *
+              (0.15 * Math.exp(-Math.pow((distance - 1) * 5, 2)) -
+                0.65 * Math.exp(-distance * distance * 2.8));
+        }
+        output.copy(unit).multiplyScalar(radius);
+        if (output.y > 0) {
+          const garden = 1 - smooth(Math.hypot(output.x, output.z), 2.3, 3.4);
+          output.y = lerp(
+            output.y,
+            gY + 0.006 * Math.sin(output.x * 2) * Math.sin(output.z * 2),
+            garden
+          );
+        }
+        return output;
+      }
+      const planetGeometry = new THREE.SphereGeometry(1, 128, 88);
+      const pp = planetGeometry.attributes.position,
+        unit = new THREE.Vector3(),
+        point = new THREE.Vector3();
+      for (let i = 0; i < pp.count; i++) {
+        unit.fromBufferAttribute(pp, i).normalize();
+        terrainPoint(unit, point);
+        pp.setXYZ(i, point.x, point.y, point.z);
+      }
+      const sand = new THREE.Color(PAL.sand),
+        earth = new THREE.Color(PAL.earth),
+        shadeColor = new THREE.Color(PAL.shadow);
+      paint(planetGeometry, (x, y, z) => {
+        const amount = fbm(x * 0.7 + 3, y * 0.7, z * 0.7);
+        color
+          .copy(sand)
+          .lerp(earth, amount * 0.68)
+          .lerp(shadeColor, (1 - smooth(y, -3.8, 0.5)) * 0.3);
+        const contact = y > 3.3 ? Math.exp(-Math.pow((Math.hypot(x, z) - 1.48) / 0.23, 2)) : 0;
+        return color.multiplyScalar(1 - contact * 0.14);
+      });
+      mesh(
+        planetGeometry,
+        clay(0xffffff, { vertexColors: true, roughness: 1, envMapIntensity: 0.25 }),
+        spin
+      );
+
+      const brassMaterial = clay(PAL.brass, {
+        metalness: 0.64,
+        roughness: 0.49,
+        envMapIntensity: 0.65,
+      });
+      const soilMaterial = clay(PAL.soil);
+      const leafMaterial = clay(PAL.leaf, { roughness: 0.88 });
+      const stemMaterial = clay(PAL.green, { roughness: 0.9 });
+      const stoneMaterial = clay(PAL.stone);
+      const volcanoes = [
+        {
+          d: direction(1.12, 1.95),
+          radius: 0.95,
+          height: 1.05,
+          crater: 0.27,
+          depth: 0.32,
+          active: true,
+        },
+        { d: direction(1.28, 0.25), radius: 0.8, height: 0.8, crater: 0.24, depth: 0.24 },
+        { d: direction(1.22, 4.05), radius: 0.66, height: 0.62, crater: 0.19, depth: 0.2 },
+      ];
+      let emberMaterial, smokeBase;
+      for (const volcano of volcanoes) {
+        const group = new THREE.Group();
+        group.position.copy(volcano.d).multiplyScalar(R - 0.055);
+        group.quaternion.setFromUnitVectors(UP, volcano.d);
+        spin.add(group);
+        const r = volcano.radius,
+          c = volcano.crater;
+        const h = volcano.height * Math.pow(1 - c / r, 1.25);
+        const geometry = lathe(
+          [
+            [0, -0.1],
+            [r * 0.8, -0.1],
+            [r, -0.04],
+            [r * 0.9, 0.035],
+            [r * 0.7, h * 0.25],
+            [r * 0.49, h * 0.65],
+            [c * 1.2, h * 0.97],
+            [c, h],
+            [c * 0.84, h * 0.92],
+            [c * 0.72, h - volcano.depth],
+            [0, h - volcano.depth - 0.025],
+          ],
+          64,
+          true
+        );
+        const base = new THREE.Color(volcano.active ? 0x71616a : 0x97949e),
+          light = new THREE.Color(volcano.active ? 0x93817e : 0xb8b3b7);
+        paint(geometry, (x, y, z) => {
+          color.copy(base).lerp(light, smooth(y, 0, h) * 0.38);
+          const cavity =
+            (1 - smooth(Math.hypot(x, z), c * 0.7, c * 1.1)) * smooth(y, 0.02, h - 0.06);
+          return color.multiplyScalar(1 - cavity * 0.48);
+        });
+        mesh(geometry, clay(0xffffff, { vertexColors: true }), group);
+        if (volcano.active) {
+          emberMaterial = clay(0xa86742, {
+            emissive: 0xff9656,
+            emissiveIntensity: 0.65,
+            roughness: 0.78,
+          });
+          ellipsoid(
+            group,
+            emberMaterial,
+            [0, h - volcano.depth + 0.022, 0],
+            [c * 0.7, 0.035, c * 0.7],
+            false
+          );
+          smokeBase = volcano.d.clone().multiplyScalar(R + h - volcano.depth * 0.5);
+        }
+      }
+      function rockGeometry(seed, detail = 2) {
+        const geometry = new THREE.IcosahedronGeometry(1, detail);
+        const positions = geometry.attributes.position;
+        for (let i = 0; i < positions.count; i++) {
+          point.fromBufferAttribute(positions, i);
+          const radius = 0.92 + 0.14 * noise(point.x * 2 + seed, point.y * 2, point.z * 2 + seed);
+          positions.setXYZ(i, point.x * radius, point.y * radius * 0.82, point.z * radius * 0.91);
+        }
+        return smoothGeometry(geometry);
+      }
+      const surfaceRocks = [],
+        scatterRandom = randomSource(61209);
+      for (let i = 0; i < 160 && surfaceRocks.length < 15; i++) {
+        const d = direction(0.8 + scatterRandom() * 1.7, scatterRandom() * TAU);
+        if (
+          volcanoes.some((v) => v.d.angleTo(d) * R < v.radius + 0.55) ||
+          surfaceRocks.some((v) => v.angleTo(d) * R < 0.8)
+        )
+          continue;
+        surfaceRocks.push(d);
+        const stone = mesh(rockGeometry(i), stoneMaterial, spin);
+        terrainPoint(d, stone.position).addScaledVector(d, 0.025);
+        stone.quaternion.setFromUnitVectors(UP, d);
+        stone.scale.setScalar(0.14 + scatterRandom() * 0.2);
+      }
+
+      const platform = new THREE.Group();
+      platform.position.y = gY;
+      spin.add(platform);
+      mesh(
+        lathe(
+          [
+            [0, -0.025],
+            [1.4, -0.025],
+            [1.49, 0],
+            [1.52, 0.06],
+            [1.49, 0.12],
+            [1.4, 0.16],
+            [0, 0.16],
+          ],
+          96,
+          true
+        ),
+        brassMaterial,
+        platform
+      );
+      ellipsoid(platform, soilMaterial, [0, 0.14, 0], [1.265, 0.055, 1.265]);
+      ring(platform, brassMaterial, 1.355, 0.037, 0.205);
+      ring(platform, brassMaterial, 1.47, 0.018, 0.07);
+
+      // A gently curved cylinder, two smooth leaves, and exactly four small thorns.
+      function stemXZ(y) {
+        const h = clamp((y - gY) / STEM_H, 0, 1);
+        return [0.075 * Math.sin(h * 3.1) * (1 - h), 0.05 * Math.sin(h * 2.4 + 1) * (1 - h)];
+      }
+      const stemGeometry = new THREE.CylinderGeometry(0.031, 0.043, STEM_H, 20, 24);
+      const stemPositions = stemGeometry.attributes.position;
+      for (let i = 0; i < stemPositions.count; i++) {
+        const y = stemPositions.getY(i) + STEM_H * 0.5 + gY;
+        const [x, z] = stemXZ(y);
+        stemPositions.setXYZ(i, stemPositions.getX(i) + x, y, stemPositions.getZ(i) + z);
+      }
+      mesh(stemGeometry, stemMaterial, spin);
+      function leafGeometry(length = 0.62, width = 0.15) {
+        const geometry = new THREE.SphereGeometry(1, 28, 20);
+        const p = geometry.attributes.position;
+        for (let i = 0; i < p.count; i++) {
+          const x = p.getX(i),
+            y = p.getY(i),
+            z = p.getZ(i),
+            u = (y + 1) * 0.5;
+          p.setXYZ(
+            i,
+            x * width * (0.65 + 0.35 * u),
+            u * length,
+            z * 0.025 + Math.sin(u * Math.PI) * 0.045
+          );
+        }
+        return smoothGeometry(geometry);
+      }
+      [
+        [0.58, Math.PI * 0.96, 0.62],
+        [0.98, 0.42, 0.56],
+      ].forEach(([height, angle, length]) => {
+        const [x, z] = stemXZ(gY + height);
+        const leaf = mesh(leafGeometry(length), leafMaterial, spin);
+        leaf.position.set(x, gY + height, z);
+        leaf.quaternion.setFromUnitVectors(
+          UP,
+          new THREE.Vector3(Math.cos(angle), 0.25, Math.sin(angle)).normalize()
+        );
+        tube(
+          leaf,
+          stemMaterial,
+          [
+            [0, 0.015, 0.027],
+            [0, length * 0.48, 0.07],
+            [0, length * 0.92, 0.035],
+          ],
+          0.005
+        );
+      });
+      [
+        [0.38, 0],
+        [0.72, Math.PI],
+        [1.08, Math.PI / 2],
+        [1.42, -Math.PI / 2],
+      ].forEach(([height, angle]) => {
+        const [x, z] = stemXZ(gY + height);
+        const d = new THREE.Vector3(Math.cos(angle), 0.35, Math.sin(angle)).normalize();
+        const thorn = mesh(new THREE.ConeGeometry(0.025, 0.105, 16), stemMaterial, spin);
+        thorn.position.set(x, gY + height, z).addScaledVector(d, 0.061);
+        thorn.quaternion.setFromUnitVectors(UP, d);
+      });
+      const grassGeometry = leafGeometry(0.15, 0.025);
+      const grassRandom = randomSource(61234);
+      for (let i = 0; i < 34; i++) {
+        const angle = grassRandom() * TAU,
+          radius = i < 17 ? 0.5 + grassRandom() * 0.55 : 1.65 + grassRandom() * 0.5;
+        const x = Math.cos(angle) * radius,
+          z = Math.sin(angle) * radius;
+        if (
+          Math.hypot(x - CAN.x, z - CAN.z) < 0.5 ||
+          (x > SCR.x0 - 0.15 && x < SCR.x1 + 0.15 && z > SCR.z0 - 0.15 && z < SCR.z1 + 0.15)
+        )
+          continue;
+        const grass = mesh(grassGeometry, leafMaterial, spin);
+        grass.position.set(x, gY + (radius < 1.2 ? 0.18 : -0.035), z);
+        grass.rotation.set(0.18, angle, 0.2);
+        grass.scale.setScalar(0.65 + grassRandom() * 0.55);
+      }
+
+      // Each petal is a closed, curved sphere with a matte pink gradient, not a faceted shell.
+      function petalGeometry(width, height, curl, thickness, root, tip) {
+        const geometry = new THREE.SphereGeometry(1, 32, 24),
+          positions = geometry.attributes.position;
+        const colors = new Float32Array(positions.count * 3),
+          bottom = new THREE.Color(root),
+          top = new THREE.Color(tip);
+        for (let i = 0; i < positions.count; i++) {
+          const x = positions.getX(i),
+            y = positions.getY(i),
+            z = positions.getZ(i),
+            u = (y + 1) * 0.5;
+          positions.setXYZ(
+            i,
+            x * width * (0.65 + 0.35 * u),
+            u * height,
+            z * thickness + 0.1 * Math.sin((u * Math.PI) / 2) + curl * u * u * u + 0.035 * x * x
+          );
+          color
+            .copy(bottom)
+            .lerp(top, smooth(u, 0.08, 1))
+            .multiplyScalar(0.86 + 0.14 * u)
+            .toArray(colors, i * 3);
+        }
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        return smoothGeometry(geometry);
+      }
+      const bloom = new THREE.Group();
+      bloom.position.set(0, gY + STEM_H, 0);
+      spin.add(bloom);
+      const petalMaterial = clay(0xffffff, {
+        vertexColors: true,
+        roughness: 0.87,
+        specularIntensity: 0.18,
+        envMapIntensity: 0.32,
+      });
+      const layers = [];
+      const layerSpecs = [
+        [7, 0.14, 0.015, 0.36, 0.53, 0.3, 0.038, 0.2, 0x8d2948, 0xda7b94],
+        [6, 0.1, 0.1, 0.28, 0.52, 0.21, 0.032, 0.72, 0xb34568, 0xeaa0b4],
+        [5, 0.055, 0.2, 0.19, 0.47, 0.12, 0.025, 0.6, 0xcf6888, 0xf2becb],
+        [3, 0.03, 0.28, 0.115, 0.3, 0.055, 0.02, 0.1, 0xde8ba3, 0xf4c5ce],
+      ];
+      for (const [
+        count,
+        radius,
+        y,
+        width,
+        height,
+        curl,
+        thickness,
+        offset,
+        root,
+        tip,
+      ] of layerSpecs) {
+        const group = new THREE.Group();
+        bloom.add(group);
+        layers.push(group);
+        const geometry = petalGeometry(width, height, curl, thickness, root, tip);
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * TAU + offset;
+          const petal = mesh(geometry, petalMaterial, group);
+          petal.position.set(
+            Math.sin(angle) * radius,
+            y + Math.sin(i * 2.4) * 0.012,
+            Math.cos(angle) * radius
+          );
+          petal.rotation.y = angle;
+          petal.rotation.z = Math.sin(i * 1.7) * 0.035;
+        }
+      }
+      ellipsoid(bloom, stemMaterial, [0, -0.025, 0], [0.15, 0.12, 0.15]);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * TAU;
+        const sepal = mesh(leafGeometry(0.28, 0.045), stemMaterial, bloom);
+        sepal.position.set(Math.cos(a) * 0.06, -0.02, Math.sin(a) * 0.06);
+        sepal.quaternion.setFromUnitVectors(
+          UP,
+          new THREE.Vector3(Math.cos(a), 0.3, Math.sin(a)).normalize()
+        );
+      }
+      const heartMaterial = clay(0xe8bb66, {
+        emissive: 0xffc366,
+        emissiveIntensity: 0.8,
+        roughness: 0.8,
+      });
+      const heart = ellipsoid(bloom, heartMaterial, [0, 0.43, 0], [0.095, 0.11, 0.095], false);
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU;
+        ellipsoid(
+          bloom,
+          heartMaterial,
+          [Math.cos(a) * 0.07, 0.53 + 0.015 * Math.sin(i), Math.sin(a) * 0.07],
+          [0.018, 0.025, 0.018],
+          false
+        );
+      }
+      const heartLight = new THREE.PointLight(0xffd394, 0.1, 1.5, 2);
+      heartLight.position.set(0, 0.49, 0);
+      bloom.add(heartLight);
+      const looseMaterial = petalMaterial.clone();
+      looseMaterial.transparent = true;
+      looseMaterial.depthWrite = false;
+      const loosePetal = mesh(
+        petalGeometry(0.085, 0.17, 0.04, 0.012, 0xc56080, 0xf0b9c8),
+        looseMaterial,
+        spin,
+        false,
+        false
+      );
+      const roseLight = new THREE.PointLight(0xffe4d0, 0.7, 3.2, 2);
+      roseLight.position.set(0, gY + STEM_H + 1.05, 0.28);
+      spin.add(roseLight);
+      const domeLight = new THREE.PointLight(0xffe5be, 0.28, 3.8, 2);
+      domeLight.position.set(0, gY + 1.7, 0);
+      spin.add(domeLight);
+
+      // One continuous surface avoids double refraction and a milky overlap at the dome's shoulder.
+      const domeGroup = new THREE.Group();
+      domeGroup.position.y = gY + 0.12;
+      spin.add(domeGroup);
+      const domeProfile = [
+        [Ro, 0],
+        [Ro, Hc],
+      ];
+      for (let i = 1; i <= 64; i++) {
+        const a = ((i / 64) * Math.PI) / 2;
+        domeProfile.push([i === 64 ? 0 : Ro * Math.cos(a), Hc + Ro * Math.sin(a)]);
+      }
+      const domeMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        transmission: 1,
+        opacity: 1,
+        roughness: 0.1,
+        thickness: 0.12,
+        ior: 1.45,
+        metalness: 0,
+        specularIntensity: 0.65,
+        envMapIntensity: 0.7,
+        attenuationColor: new THREE.Color(0xf0f9fc),
+        attenuationDistance: 30,
+        flatShading: false,
+        side: THREE.FrontSide,
+        depthWrite: false,
+      });
+      const dome = mesh(lathe(domeProfile, 160), domeMaterial, domeGroup, false, false);
+      dome.renderOrder = 2;
+      ellipsoid(domeGroup, brassMaterial, [0, Hc + Ro + 0.035, 0], [0.11, 0.035, 0.11]);
+      rod(domeGroup, brassMaterial, [0, Hc + Ro + 0.04, 0], [0, Hc + Ro + 0.21, 0], 0.027);
+      ellipsoid(domeGroup, brassMaterial, [0, Hc + Ro + 0.24, 0], [0.085, 0.075, 0.085]);
+
+      const MOTES = 18,
+        motePositions = new Float32Array(MOTES * 3),
+        moteData = [];
+      for (let i = 0; i < MOTES; i++)
+        moteData.push({
+          r: 0.3 + rnd() * 0.8,
+          a: rnd() * TAU,
+          y: 0.25 + rnd() * 2.5,
+          speed: (0.1 + rnd() * 0.2) * (rnd() < 0.5 ? -1 : 1),
+          phase: rnd() * TAU,
+        });
+      const moteGeometry = new THREE.BufferGeometry();
+      moteGeometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(motePositions, 3).setUsage(THREE.DynamicDrawUsage)
+      );
+      const moteMaterial = new THREE.PointsMaterial({
+        map: particleTexture,
+        color: 0xffe2a9,
+        size: 0.046,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const motes = new THREE.Points(moteGeometry, moteMaterial);
+      motes.frustumCulled = false;
+      spin.add(motes);
+
+      const can = new THREE.Group();
+      can.position.set(CAN.x, gY + 0.02, CAN.z);
+      can.rotation.order = 'YXZ';
+      can.rotation.y = 0.47;
+      spin.add(can);
+      const canMaterial = clay(0x7c9c9f, { roughness: 0.8, metalness: 0.08 });
+      mesh(
+        lathe(
+          [
+            [0, 0],
+            [0.12, 0],
+            [0.165, 0.035],
+            [0.165, 0.21],
+            [0.145, 0.26],
+            [0.125, 0.26],
+            [0.13, 0.21],
+            [0.13, 0.045],
+            [0, 0.045],
+          ],
+          48,
+          true
+        ),
+        canMaterial,
+        can
+      );
+      ring(can, brassMaterial, 0.139, 0.012, 0.259);
+      ring(can, canMaterial, 0.164, 0.007, 0.115);
+      tube(
+        can,
+        canMaterial,
+        [
+          [0, 0.075, -0.13],
+          [0, 0.1, -0.25],
+          [0, 0.185, -0.35],
+          [0, 0.245, -0.44],
+        ],
+        0.027
+      );
+      ellipsoid(can, brassMaterial, [0, 0.245, -0.44], [0.065, 0.07, 0.025]);
+      tube(
+        can,
+        canMaterial,
+        [
+          [0, 0.055, 0.13],
+          [0, 0.095, 0.25],
+          [0, 0.24, 0.27],
+          [0, 0.3, 0.15],
+        ],
+        0.018
+      );
+      tube(
+        can,
+        brassMaterial,
+        [
+          [-0.1, 0.25, 0],
+          [-0.1, 0.33, 0],
+          [0, 0.36, 0],
+          [0.1, 0.33, 0],
+          [0.1, 0.25, 0],
+        ],
+        0.011
+      );
+      const nozzleMaterial = clay(0x455e64);
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 6) * TAU,
+          radius = i === 6 ? 0 : 0.032;
+        ellipsoid(
+          can,
+          nozzleMaterial,
+          [Math.cos(a) * radius, 0.245 + Math.sin(a) * radius, -0.464],
+          [0.004, 0.004, 0.002]
+        );
+      }
+      const spout = new THREE.Object3D();
+      spout.position.set(0, 0.245, -0.47);
+      can.add(spout);
+      const waterMaterial = new THREE.MeshPhysicalMaterial({
+        color: PAL.cyan,
+        transmission: 0.85,
+        roughness: 0.1,
+        thickness: 0.02,
+        ior: 1.33,
+        flatShading: false,
+      });
+      const drops = Array.from({ length: 3 }, () =>
+        ellipsoid(spin, waterMaterial, [0, 0, 0], [0.012, 0.023, 0.012], false, false)
+      );
+
+      function roundedPane(width, height) {
+        const r = 0.035,
+          x = -width / 2,
+          y = -height / 2,
+          shape = new THREE.Shape();
+        shape.moveTo(x + r, y);
+        shape.lineTo(x + width - r, y);
+        shape.quadraticCurveTo(x + width, y, x + width, y + r);
+        shape.lineTo(x + width, y + height - r);
+        shape.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+        shape.lineTo(x + r, y + height);
+        shape.quadraticCurveTo(x, y + height, x, y + height - r);
+        shape.lineTo(x, y + r);
+        shape.quadraticCurveTo(x, y, x + r, y);
+        const geometry = new THREE.ExtrudeGeometry(shape, {
+          depth: 0.012,
+          bevelEnabled: true,
+          bevelSegments: 3,
+          steps: 1,
+          bevelSize: 0.004,
+          bevelThickness: 0.004,
+          curveSegments: 10,
+        });
+        geometry.translate(0, 0, -0.006);
+        return geometry;
+      }
+      const paneMaterial = domeMaterial.clone();
+      paneMaterial.thickness = 0.025;
+      const screen = new THREE.Group();
+      screen.position.y = gY;
+      spin.add(screen);
+      [
+        [SCR.x0, SCR.z1],
+        [SCR.x1, SCR.z1],
+        [SCR.x0, SCR.z0],
+        [(SCR.x0 + SCR.x1) / 2, SCR.z1],
+      ].forEach(([x, z]) => {
+        ellipsoid(screen, stoneMaterial, [x, 0.025, z], [0.058, 0.035, 0.055]);
+        rod(screen, brassMaterial, [x, 0.05, z], [x, 0.425, z], 0.012);
+      });
+      [0.08, 0.42].forEach((y) => {
+        rod(screen, brassMaterial, [SCR.x0, y, SCR.z1], [SCR.x1, y, SCR.z1], 0.009);
+        rod(screen, brassMaterial, [SCR.x0, y, SCR.z0], [SCR.x0, y, SCR.z1], 0.009);
+      });
+      const frontPane = mesh(roundedPane(0.53, 0.32), paneMaterial, screen, false, false);
+      frontPane.position.set((SCR.x0 + SCR.x1) / 2, 0.25, SCR.z1);
+      const sidePane = mesh(roundedPane(0.43, 0.32), paneMaterial, screen, false, false);
+      sidePane.position.set(SCR.x0, 0.25, (SCR.z0 + SCR.z1) / 2);
+      sidePane.rotation.y = Math.PI / 2;
+
+      const av = volcanoes[0];
+      const smokeTangent = new THREE.Vector3().crossVectors(UP, av.d).normalize();
+      const smoke = [];
+      for (let i = 0; i < 14; i++) {
+        const puff = new THREE.Sprite(
+          new THREE.SpriteMaterial({
+            map: particleTexture,
+            color: 0xb3a8bd,
+            transparent: true,
+            opacity: 0.1,
+            depthWrite: false,
+          })
+        );
+        spin.add(puff);
+        smoke.push(puff);
+      }
+      const emberLight = new THREE.PointLight(0xffbc85, 0.55, 2, 2);
+      emberLight.position.copy(smokeBase);
+      spin.add(emberLight);
+
+      const drifters = [];
+      [0xffefd1, 0xf0eaff, 0xc8e4f4, 0xf9d89b, 0xf4c9d6, 0xffefd1, 0xc8e4f4, 0xf4f1ff].forEach(
+        (hex, i) => {
+          const material = new THREE.SpriteMaterial({
+            map: particleTexture,
+            color: new THREE.Color(hex).multiplyScalar(1.4),
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          });
+          const sprite = new THREE.Sprite(material);
+          sprite.scale.setScalar(0.19);
+          scene.add(sprite);
+          drifters.push({
+            sprite,
+            radius: 6.2 + rnd() * 3.4,
+            angle: rnd() * TAU,
+            y: 1.5 + rnd() * 6.5,
+            speed: (0.03 + rnd() * 0.04) * (i % 2 ? 1 : -1),
+            phase: rnd() * TAU,
+            twinkle: 1.4 + rnd() * 1.6,
+          });
+        }
+      );
+      const belt = new THREE.Group();
+      belt.rotation.set(0.38, 0, -0.22);
+      belt.position.y = 1.4;
+      scene.add(belt);
+      const beltMesh = new THREE.InstancedMesh(rockGeometry(16, 1), clay(0xffffff), 46);
+      beltMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      beltMesh.layers.enable(1);
+      beltMesh.frustumCulled = false;
+      belt.add(beltMesh);
+      const beltData = [],
+        debrisColors = [0x93909b, 0x7e7b88, 0xa8887c, 0xb59c87, 0xb1acb5];
+      for (let i = 0; i < 46; i++) {
+        beltData.push({
+          radius: 5.2 + rnd() * 2.4,
+          angle: rnd() * TAU,
+          speed: 0.018 + rnd() * 0.03,
+          y: (rnd() - 0.5) * 0.9,
+          size: (0.07 + rnd() * 0.16) * 0.6,
+          phase: rnd() * TAU,
+        });
+        beltMesh.setColorAt(i, color.set(debrisColors[i % debrisColors.length]));
+      }
+      const floaters = [];
+      for (let i = 0; i < 8; i++) {
+        const geometry = new THREE.DodecahedronGeometry(1, 2);
+        const rock = mesh(geometry, clay(debrisColors[i % debrisColors.length]), scene);
+        rock.scale.set(0.28 + rnd() * 0.16, 0.22 + rnd() * 0.12, 0.26 + rnd() * 0.12);
+        floaters.push({
+          rock,
+          angle: rnd() * TAU,
+          radius: 5.6 + rnd() * 3,
+          y: -1 + rnd() * 7,
+          speed: (0.01 + rnd() * 0.015) * (rnd() < 0.5 ? -1 : 1),
+          bob: 0.15 + rnd() * 0.3,
+          frequency: 0.3 + rnd() * 0.5,
+          phase: rnd() * TAU,
+          rx: (rnd() - 0.5) * 0.12,
+          ry: (rnd() - 0.5) * 0.12,
+          rz: (rnd() - 0.5) * 0.1,
+        });
+      }
+      const DUST = 160,
+        dustPositions = new Float32Array(DUST * 3),
+        dustData = [];
+      for (let i = 0; i < DUST; i++)
+        dustData.push({
+          angle: rnd() * TAU,
+          radius: 4.4 + rnd() * 4.2,
+          y: (rnd() - 0.4) * 6,
+          speed: (0.01 + rnd() * 0.03) * (rnd() < 0.5 ? -1 : 1),
+          phase: rnd() * TAU,
+        });
+      const dustGeometry = new THREE.BufferGeometry();
+      dustGeometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(dustPositions, 3).setUsage(THREE.DynamicDrawUsage)
+      );
+      const dust = new THREE.Points(
+        dustGeometry,
+        new THREE.PointsMaterial({
+          map: particleTexture,
+          color: 0xf3dfc7,
+          size: 0.036,
+          transparent: true,
+          opacity: 0.28,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      dust.frustumCulled = false;
+      scene.add(dust);
+
+      const target = new THREE.WebGLRenderTarget(1, 1, {
+        type: THREE.HalfFloatType,
+        samples: renderer.capabilities.isWebGL2 ? 4 : 0,
+      });
+      const composer = new EffectComposer(renderer, target);
+      composer.addPass(new RenderPass(scene, camera));
+      const bokeh = new BokehPass(scene, camera, { focus: 9, aperture: 0.00018, maxblur: 0.0035 });
+      // Glass and particles must not replace the rose's depth with the front of the dome.
+      const renderBokeh = bokeh.render.bind(bokeh);
+      bokeh.render = (...args) => {
+        const previousMask = camera.layers.mask;
+        camera.layers.set(1);
+        try {
+          renderBokeh(...args);
+        } finally {
+          camera.layers.mask = previousMask;
+        }
+      };
+      composer.addPass(bokeh);
+      composer.addPass(
+        new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.18, 0.35, 1.12)
+      );
+      composer.addPass(new OutputPass());
+      composer.setPixelRatio(renderer.getPixelRatio());
+      composer.setSize(innerWidth, innerHeight);
+
+      spin.updateWorldMatrix(true, true);
+      const HOME_T = new THREE.Vector3(0, gY + 1.15, 0);
+      spin.localToWorld(HOME_T);
+      const HOME_P = HOME_T.clone().add(new THREE.Vector3(4.6, 2.5, 6.4));
+      const INTRO_P = HOME_T.clone().add(new THREE.Vector3(4.6, 2.5, 6.4).multiplyScalar(2.3));
+      controls.target.copy(HOME_T);
+      camera.position.copy(reducedMotion.matches ? HOME_P : INTRO_P);
+      controls.update();
+      if (!reducedMotion.matches) flyTo(HOME_P, HOME_T, 11);
+      function resetView() {
+        if (reducedMotion.matches) {
+          camera.position.copy(HOME_P);
+          controls.target.copy(HOME_T);
+          tween = null;
+        } else flyTo(HOME_P, HOME_T, 1.8);
+        idleUntil = now() + 1;
+      }
+      renderer.domElement.addEventListener('dblclick', resetView);
+      addEventListener('keydown', (event) => {
+        if (event.key.toLowerCase() === 'r') resetView();
+      });
+      reducedMotion.addEventListener('change', (event) => {
+        if (event.matches) {
+          tween = null;
+          controls.autoRotate = false;
+        }
+      });
+      const clock = new THREE.Clock(),
+        dummy = new THREE.Object3D();
+      const focus = new THREE.Vector3(),
+        spoutPosition = new THREE.Vector3(),
+        pourDirection = new THREE.Vector2();
+      let time = 0,
+        firstFrame = true;
+      function heartbeat(t) {
+        const p = (t % 1.7) / 1.7;
+        return (
+          Math.exp(-Math.pow((p - 0.06) / 0.045, 2)) +
+          0.65 * Math.exp(-Math.pow((p - 0.24) / 0.055, 2))
+        );
+      }
+      function tick() {
+        requestAnimationFrame(tick);
+        const delta = Math.min(clock.getDelta(), 0.05),
+          dt = reducedMotion.matches ? 0 : delta;
+        time += dt;
+        const t = time,
+          tn = now();
+        spin.rotation.y += dt * 0.045;
+        if (tween) {
+          const k = clamp((tn - tween.start) / tween.duration, 0, 1);
+          const eased = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+          camera.position.lerpVectors(tween.p0, tween.p1, eased);
+          controls.target.lerpVectors(tween.t0, tween.t1, eased);
+          if (k >= 1) tween = null;
+        }
+        controls.autoRotate = !reducedMotion.matches && !tween && !dragging && tn > idleUntil;
+        controls.update(delta);
+        camera.updateMatrixWorld();
+        camFill.position.copy(camera.position).normalize().multiplyScalar(14);
+        backRim.position.copy(camera.position).sub(controls.target).normalize().multiplyScalar(-14);
+        backRim.position.y += 5;
+
+        layers.forEach((layer, i) =>
+          layer.scale.setScalar(1.012 + 0.01 * Math.sin(t * 0.9 + i * 0.8))
+        );
+        const beat = heartbeat(t),
+          glow = 0.5 + 0.5 * Math.sin(t * 0.9);
+        heartMaterial.emissiveIntensity = 0.75 + beat * 0.7;
+        heartLight.intensity = 0.065 + beat * 0.08;
+        heart.scale.set(0.095, 0.11, 0.095).multiplyScalar(1 + beat * 0.035);
+        roseLight.intensity = 0.65 + glow * 0.1;
+        domeLight.intensity = 0.22 + glow * 0.12;
+        moteMaterial.opacity = 0.32 + glow * 0.2;
+        for (let i = 0; i < MOTES; i++) {
+          const m = moteData[i],
+            a = m.a + t * m.speed;
+          motePositions[i * 3] = Math.cos(a) * m.r;
+          motePositions[i * 3 + 1] = gY + m.y + Math.sin(t * 0.6 + m.phase) * 0.08;
+          motePositions[i * 3 + 2] = Math.sin(a) * m.r;
+        }
+        moteGeometry.attributes.position.needsUpdate = true;
+        const flicker = 0.5 + 0.3 * Math.sin(t * 2.1) + 0.15 * Math.sin(t * 5.3);
+        emberMaterial.emissiveIntensity = 0.55 + flicker * 0.5;
+        emberLight.intensity = 0.38 + flicker * 0.22;
+        smoke.forEach((puff, i) => {
+          const life = (t * 0.09 + i / smoke.length) % 1;
+          puff.position
+            .copy(smokeBase)
+            .addScaledVector(av.d, 0.12 + life * 2.6)
+            .addScaledVector(
+              smokeTangent,
+              Math.sin(life * 5 + i * 0.7) * 0.13 * life + life * life * 0.5
+            );
+          puff.scale.setScalar(0.13 + life * 0.5);
+          puff.material.opacity = 0.19 * Math.sin(life * Math.PI) * (1 - life);
+          puff.material.rotation = life * 0.6 + i;
+        });
+        const cycle = t % 24,
+          a0 = 0.9;
+        if (cycle < 14) {
+          loosePetal.visible = true;
+          loosePetal.position.set(
+            Math.cos(a0) * 0.35,
+            bloom.position.y + 0.42,
+            Math.sin(a0) * 0.35
+          );
+          loosePetal.rotation.set(0.5, -a0 + Math.PI / 2, 0);
+          loosePetal.scale.setScalar(Math.max(0.01, smooth(cycle, 0, 0.8)));
+          looseMaterial.opacity = 1;
+        } else if (cycle < 22) {
+          const p = (cycle - 14) / 8,
+            a = a0 + p * 6,
+            radius = 0.35 + p * 0.38;
+          loosePetal.visible = true;
+          loosePetal.scale.setScalar(1);
+          loosePetal.position.set(
+            Math.cos(a) * radius,
+            lerp(bloom.position.y + 0.42, gY + 0.2, Math.pow(p, 1.6)),
+            Math.sin(a) * radius
+          );
+          loosePetal.rotation.set(0.5 + p * 2.2, -a + Math.PI / 2 + p * 3, Math.sin(p * 11) * 0.5);
+          looseMaterial.opacity = 1 - smooth(p, 0.8, 1);
+        } else loosePetal.visible = false;
+
+        const phase = t % 16,
+          pour = smooth(phase, 9, 10) * (1 - smooth(phase, 12.8, 13.8));
+        can.rotation.x = -0.28 * pour;
+        spout.getWorldPosition(spoutPosition);
+        spin.worldToLocal(spoutPosition);
+        pourDirection.set(-spoutPosition.x, -spoutPosition.z).normalize().multiplyScalar(0.22);
+        drops.forEach((drop, i) => {
+          const p = (t * 1.1 + i / drops.length) % 1;
+          drop.visible = pour > 0.3 && p < 0.98;
+          drop.position.set(
+            spoutPosition.x + pourDirection.x * p,
+            lerp(spoutPosition.y, gY + 0.04, p * p),
+            spoutPosition.z + pourDirection.y * p
+          );
+          drop.scale.set(0.012, 0.023, 0.012).multiplyScalar(1 - 0.3 * p);
+        });
+        starMaterial.uniforms.time.value = t;
+        for (const d of drifters) {
+          const angle = d.angle + t * d.speed,
+            twinkle = 0.5 + 0.5 * Math.sin(t * d.twinkle + d.phase);
+          d.sprite.position.set(
+            Math.cos(angle) * d.radius,
+            d.y + Math.sin(t * 0.5 + d.phase) * 0.45,
+            Math.sin(angle) * d.radius
+          );
+          d.sprite.material.opacity = 0.45 + twinkle * 0.5;
+          d.sprite.scale.setScalar(0.17 + 0.035 * twinkle);
+        }
+        for (let i = 0; i < beltData.length; i++) {
+          const b = beltData[i],
+            a = b.angle + t * b.speed;
+          dummy.position.set(
+            Math.cos(a) * b.radius,
+            b.y + Math.sin(t * (0.32 + i * 0.006) + b.phase) * 0.09,
+            Math.sin(a) * b.radius
+          );
+          dummy.rotation.set(t * 0.025 + b.phase, t * 0.04 + b.phase, t * 0.018);
+          dummy.scale.setScalar(b.size);
+          dummy.updateMatrix();
+          beltMesh.setMatrixAt(i, dummy.matrix);
+        }
+        beltMesh.instanceMatrix.needsUpdate = true;
+        for (const f of floaters) {
+          const a = f.angle + t * f.speed;
+          f.rock.position.set(
+            Math.cos(a) * f.radius,
+            f.y + Math.sin(t * f.frequency + f.phase) * f.bob,
+            Math.sin(a) * f.radius
+          );
+          f.rock.rotation.set(t * f.rx, t * f.ry, t * f.rz);
+        }
+        for (let i = 0; i < DUST; i++) {
+          const d = dustData[i],
+            a = d.angle + t * d.speed;
+          dustPositions[i * 3] = Math.cos(a) * d.radius;
+          dustPositions[i * 3 + 1] = d.y + Math.sin(t * 0.3 + d.phase) * 0.4;
+          dustPositions[i * 3 + 2] = Math.sin(a) * d.radius;
+        }
+        dustGeometry.attributes.position.needsUpdate = true;
+        bloom.localToWorld(focus.set(0, 0.4, 0));
+        focus.applyMatrix4(camera.matrixWorldInverse);
+        bokeh.uniforms.focus.value = Math.max(0.1, -focus.z);
+        composer.render();
+        if (firstFrame) {
+          firstFrame = false;
+          document.body.classList.add('ready');
+          setTimeout(() => document.getElementById('fade')?.remove(), 2800);
+        }
+      }
+      addEventListener('resize', () => {
+        camera.aspect = innerWidth / innerHeight;
+        camera.updateProjectionMatrix();
+        const ratio = Math.min(devicePixelRatio || 1, 2);
+        renderer.setPixelRatio(ratio);
+        renderer.setSize(innerWidth, innerHeight);
+        composer.setPixelRatio(ratio);
+        composer.setSize(innerWidth, innerHeight);
+        starMaterial.uniforms.pixelHeight.value = innerHeight * ratio;
+      });
+      tick();
+    </script>
+  </body>
+</html>

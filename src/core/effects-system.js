@@ -119,6 +119,10 @@ export function createEffectsSystem(deps = {}) {
   }
 
   function autoFirework() {
+    // 2026-11-17 A2 修正:后台/非主世界不产粒(双保险,配合 visibilitychange 清定时器)。
+    // setInterval 不受 rAF 停摆影响,必须在此自守卫,否则后台仍空攒。
+    if (typeof document !== 'undefined' && document.hidden) return;
+    if ((scene.activeWorld || 'main') !== 'main') return;
     const p = randomPyramidPoint();
     createFirework(p.x, p.y, p.z, 0);
   }
@@ -244,6 +248,24 @@ export function createEffectsSystem(deps = {}) {
   let autoTimer = null,
     autoFirst = null;
 
+  // 2026-11-17 A2 修正:后台闸此前放在 update() 内,但 update 由 rAF 驱动,标签页隐藏时
+  // rAF 停摆 ⇒ 闸不可达,setInterval 后台照常产粒(假修复)。正解:visibilitychange 监听
+  // 直接清定时器(不依赖 rAF),回前台由 update 惰性重启。autoFirework 自身亦加 hidden 守卫双保险。
+  function stopAuto() {
+    if (autoTimer) {
+      clearInterval(autoTimer);
+      autoTimer = null;
+    }
+    if (autoFirst) {
+      clearTimeout(autoFirst);
+      autoFirst = null;
+    }
+  }
+  function onVisibility() {
+    if (typeof document !== 'undefined' && document.hidden) stopAuto();
+    // 回前台不在此重启:交给 update 首帧惰性启动(与离开主世界同路径,避免开场电影期空攒)
+  }
+
   return defineSystem({
     name: 'effects',
     layer: 'engine',
@@ -255,21 +277,18 @@ export function createEffectsSystem(deps = {}) {
       initParticles();
       // 自动烟花的定时器改为惰性启动(update 首帧):开场电影期间主循环未启动,
       // 若在此起 setInterval 会空攒粒子,世界启动瞬间集中爆开
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', onVisibility);
+      }
     },
     update() {
-      // 多世界切割(2026-09-06):烟花/漂浮粒子属主世界金字塔,小世界里不再模拟与 GPU 上传
-      if ((scene.activeWorld || 'main') !== 'main') {
-        // 2026-10-07 修复只产不消:离开主世界连自动烟花产房一起停——此前只 return 模拟,
-        // autoTimer 仍每 2.8s 产 24 个粒子,小世界挂机 1 小时攒约 3 万颗,
-        // 回主世界当帧全部爆发(视觉错误 + 帧刺)。回主世界后由下方惰性重启。
-        if (autoTimer) {
-          clearInterval(autoTimer);
-          autoTimer = null;
-        }
-        if (autoFirst) {
-          clearTimeout(autoFirst);
-          autoFirst = null;
-        }
+      // 多世界切割(2026-09-06):烟花/漂浮粒子属主世界金字塔,小世界里不再模拟与 GPU 上传。
+      // 后台停产房的**正解在 visibilitychange 监听**(init 挂、dispose 摘):隐藏时 rAF 停摆,
+      // update 不执行,故帧内检查不可达——必须靠监听直接清定时器 + autoFirework 自守卫。
+      // 此处 hidden 分支仅作回前台首帧兜底(监听已先清),非主世界门控仍由本帧负责。
+      const hidden = typeof document !== 'undefined' && document.hidden;
+      if ((scene.activeWorld || 'main') !== 'main' || hidden) {
+        stopAuto(); // 离开主世界/后台:停自动产房,回主世界由下方惰性重启
         return;
       }
       if (!autoFirst && !autoTimer) {
@@ -280,9 +299,10 @@ export function createEffectsSystem(deps = {}) {
       updateParticles(performance.now());
     },
     dispose() {
-      if (autoTimer) clearInterval(autoTimer);
-      if (autoFirst) clearTimeout(autoFirst);
-      autoTimer = autoFirst = null;
+      stopAuto();
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibility);
+      }
       if (fwPoints) {
         root.remove(fwPoints);
         fwGeo && fwGeo.dispose();
