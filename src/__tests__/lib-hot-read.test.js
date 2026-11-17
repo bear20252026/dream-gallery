@@ -266,7 +266,7 @@ describe('⑤ 读表抛错 ⇒ 该次读回退旁路数组,不抛 500', () => {
   });
 });
 
-describe('⑥ 旁路→表回灌:表空才灌,防追加重复', () => {
+describe('⑥ 旁路→表幂等并集回灌:补表无的增量,去重表已有的', () => {
   // 哨兵在共享临时库跨用例持久:前面①用例真灌过行会写哨兵,这里先清掉才能验回灌
   function clearSentinel() {
     try {
@@ -285,15 +285,30 @@ describe('⑥ 旁路→表回灌:表空才灌,防追加重复', () => {
     expect(repoChat.count()).toBe(1);
     expect(repoChat.readTail(1)[0].t).toBe('旁路历史');
   });
-  it('表非空 ⇒ 不灌(权威已在表,防追加重复)', () => {
+  it('表非空+旁路全是表已有的滞后副本 ⇒ 不灌(签名去重防追加重复)', () => {
     clearSentinel();
     repoChat.removeAll();
     repoChat.insertMany([{ n: 'a', t: '表权威', ts: 2000, dk: 'd' }]);
-    g.chat = [{ n: 'a', t: '旁路滞后', ts: 1000, dk: 'd' }];
+    g.chat = [{ n: 'a', t: '表权威', ts: 2000, dk: 'd' }]; // 同一条(签名一致)
     shadow._dropSchemaReady();
     shadow.start(g);
-    expect(repoChat.count()).toBe(1); // 不追加
-    expect(repoChat.readTail(1)[0].t).toBe('表权威');
+    expect(repoChat.count()).toBe(1); // 不追加重复
+  });
+  it('表非空+旁路有表无的增量(运行中SQLite失效攒的)⇒ 补入,一条不丢', () => {
+    clearSentinel();
+    repoChat.removeAll();
+    repoChat.insertMany([{ n: 'a', t: '离线前旧行', ts: 1000, dk: 'd' }]);
+    // 旁路:旧行(表已有)+ 离线期间攒的新行(表无)
+    g.chat = [
+      { n: 'a', t: '离线前旧行', ts: 1000, dk: 'd' },
+      { n: 'a', t: '离线攒的新行', ts: 2000, dk: 'd' },
+    ];
+    shadow._dropSchemaReady();
+    shadow.start(g);
+    expect(repoChat.count()).toBe(2); // 旧行不重复,新行补入
+    const texts = repoChat.readAll().map((m) => m.t);
+    expect(texts).toContain('离线攒的新行');
+    expect(texts.filter((t) => t === '离线前旧行').length).toBe(1); // 旧行只一条
   });
 });
 
