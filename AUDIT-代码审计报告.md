@@ -258,3 +258,84 @@
 - **后续建议**（约 40 条，非阻断）：approve/reject 的镜像/广播 mock 断言、分片视频待审、尾巴 B 非公开名待审、启动对账子进程用例、voyage-scenes 单测（storyTick/quiet/postMessage 校验/gameMode/存档往返，约 10 条）、koi applyEnv 对称性（3 条）、palace-art 纯函数（4 条）、通关探针扩四幕放映断言。
 
 **第二轮终验结论：1 P1 + 5 P2 全部修复并实机验收 PASS；全量门禁绿（1426 单测 / 后端 185 项 / 0 漏洞）。遗留为测试覆盖补全（非阻断）与 admin 2 条点名类型例外。**
+
+---
+
+## 七、第三轮架构健康审计（2026-11-16 · 正常性 / 优化 / 屎山评估）
+
+> 视角切换：前两轮查"对不对"（安全/质量），本轮查"健不健康"。方法：本机量化指标 + 全量门禁 + 三路架构专项（后端分层 / 前端模块图 / 优化与死代码）。结论不粉饰。
+
+### 7.1 代码是否正常？——是，全量门禁绿（实测）
+
+| 门禁 | 结果 |
+|------|------|
+| eslint / tsc --noEmit | ✅ 0 错 |
+| checkJs | ✅ 2 = 基线 |
+| vitest | ✅ 122 文件 / 1426 项 |
+| 后端 npm test | ✅ 113 + 46 + 20 + 6 |
+| dependency-cruiser | ✅ 无环 |
+| npm audit --omit=dev | ✅ 0 漏洞 |
+
+**正常 ≠ 健康。** 门禁绿证明"没有坏"，不证明"长得好"。下面是结构判断。
+
+### 7.2 量化体检（本机实测）
+
+- 规模：src 243 文件 / 52,762 行；lib 52 文件 / 10,035 行；测试 143 文件 / 26,205 行（**测试/生产比 ≈ 0.42，偏高，是好事**）。641 次提交。
+- 巨型文件 TOP：`koi-ship.js` **2542 行**、`story-text.mjs` 1617（纯数据）、`eternal.js` 1023、`openfilm.js` 889、`ark.js` 870、`store.js` 575。
+- **ctx 上帝总线**：约 **170 个登记属性**，7 个 ctx-*.js 分片共享同一个 vault；**92 个模块 import ctx，51 个文件直写深层属性**；types/ctx.d.ts 825 行。
+- **gateData 上帝对象**：单内存对象承载 **29 种集合**；`saveGateData(` 在 lib 内 **76 处 / 20 个文件**。
+- 腐化味计数：函数内懒 require **33 处**（断环遮羞布，files-upload.js 独占 15）；空 catch **157 处**；环境开关 **50 个**；重复定义 clamp×8 / lerp×7 / 限流×9 / escapeHtml×4；注释掉的代码 286 行。
+- 体积：public/voxel 五页 **8.0MB**（每页内联一份 three，重复 ≈3MB raw / ≈920KB gz）；dist 57MB；node_modules 294MB + hill-src 116MB；**.tmp 114MB / 650 文件**（我历轮探针残留）；AGENTS.md **524KB / 2740 行**。
+
+### 7.3 是否屎山？——**不是失控的屎山，是"有纪律的泥球"，停在半山腰，斜率危险**
+
+屎山的判据是"依赖失控、无人能解释、改动不可预测"。本项目**三条全不成立**：
+
+**结构良好（真实运转的治理层，有证据）：**
+- 依赖方向单向 + 硬闸：repo/_db、migrate 是纯叶子；dependency-cruiser no-circular=error 真在拦。
+- 反向依赖用**参数注入**而非懒 require 遮丑：shadow.start(g)、hotread.setDisableHook、backfillFileErrors(list) 是真 DI。
+- 组合根是真的：composition-root 二次 init 拒绝 / failed 不 update / 逆序 dispose；main.js 集中 register 24 系统。
+- 启动真后置：three 7 条静态边改动态，闸门期不付 3D 字节；入口 102.8KB gz 不含 three（构建期硬断言）。
+- 漂移测试钉"声明指向写入方真实形状"，曾消 48 条假报错——是防腐不是焊死。
+- 错误处理分级：saveGateData 永不 reject 折成结论对象（防 85 处即发即忘被 unhandledRejection 杀进程）。
+- 每处怪癖有审计编号 + 日期 + 为什么不能改的注释，可追溯。
+
+**真正的腐化信号（按严重度）：**
+1. **迁移脚手架永久化（最危险）**：shadow / hotread / 归并 / 对账 / 回退本应是 R1 的**临时双轨**，如今开关、钩子、私有接口注入（生产调 `ce._getErrorList/_setErrorList`）全成了常驻承重结构。五套持久化并存（内存 gateData + kv 快照 + JSON 镜像 + 四真表 + client_errors.json + R2 台账），权威源靠运行时 _savedAt 仲裁。**再不拆脚手架，两年后就是屎山。**
+2. **两个上帝对象**：ctx（170 属性 / 51 写方文件，分片是切碎不是拆，存储与耦合面一点没减）+ gateData（29 集合 / 76 处写调用共享一个序列化瓶颈）。store.js 575 行身兼 ≥7 职责（持久化 + UA 解析 + CF 网段信任 + 会话 + 配额 + 统计）。
+3. **koi-ship.js 2542 行十项全能**：噪声/Vox/地形/鲤体/庭园/水/生态/天空灯光/云/氛围接管全在一文件，该拆。
+4. **重复造轮子**：两套挂画同步（eternal/paintings 各 45s 轮询同一 /api/files）、两套放映（openfilm 自建渲染器 vs voyage iframe）、限流 9 套、clamp/lerp/escapeHtml 各抄多份、氛围 setAtmosphere 三处直调无仲裁（后写覆盖）。
+5. **守卫把缺陷焊死**：_db.js TEXT 亲和 bug 因迁移校验和不可改，永远在读侧打补丁——测试钉住了缺陷本身。
+6. **名义分层**：defineSystem 只排序不约束依赖，18 系统 11 个挤 presentation/ui，约 45 处 onTick 绕过系统体系直挂总线；mount 式 UI 裸注册不接句柄（player.js 23 add/0 remove）。
+
+**结论**：核心是上帝总线 + 巨型文件 + 名义分层（符合屎山特征），但组合根 / 登记册 / 漂移测试 / 搁置机制 / HMR 捕获清理构成**真实运转的治理层**，每处腐化都被审计看见并部分偿还。这是"带着有效治理外骨骼的大泥球"，不是无人认领的屎山。**最大风险不是现状而是斜率**：ctx 属性与 onTick 绕过系统的数量仍在涨。
+
+### 7.4 是否优化？——**已优化过大半（3.5/5），剩余收益集中三处**
+
+**已做对（有实测断言护航）**：入口不含 three（102.8KB gz）；预压缩 33/33 全覆盖 + 构建期断言；热写免落盘；合并几何单 draw call + InstancedMesh；pixelRatio 上限 2 + 自适应 5 档；dispose 63 处 / 27 文件 + 贴图 8 槽去重；retention 原地裁剪保引用；烟花世界门控；10 个表索引；写盘串行队列不吞错。
+
+**真正的缺口（按收益）**：
+1. **voxel 五份重复 three**：8MB 里 ≈3MB raw / ≈920KB gz 是重复的 three。共享一份（importmap + 单本地 three.module.js）可省 ≈920KB gz + 跨页缓存 229KB/页。
+2. **冷路径整库序列化**：76 处 saveGateData 每次 2 次全量 stringify + 同步 fs。当前快照 305B 可忽略，但 4MB 时 ≈38ms/次阻塞 + WAL 膨胀（已 3.9MB vs db 92KB）。增量化 + debounce 是治本。
+3. **后台空转与泄漏面**：烟花无 document.hidden 闸（≈3 万粒/h 空攒）；头部文件 91 add/1 remove（世界切换闭包累积风险）；每帧小分配（loop:frame 对象 / 鹤 v3 clone）。
+4. 无 .br（three 229KB gz 上再省 ≈40KB）；@aws-sdk/client-s3 仅 scripts 用可移 devDependencies；.tmp 114MB / hill-src 116MB 可回收 ≈234MB。
+
+### 7.5 最高杠杆重构清单（分级，待主人拍板）
+
+**A. 低风险高收益（可立即做，不破坏契约）**
+1. voxel 共享 three：省 ≈920KB gz，需同步 voyage-scenes 路径回退。1~2 人日。
+2. 烟花 document.hidden 闸 + 热点监听器 AbortController 统一摘除 + 每帧对象复用。≈1 人日，逐项可回滚。
+3. 收敛横切原语：一个限流器 / 一个裁剪入口 / clamp/lerp/escapeHtml 归一；client_errors.json 改 tmp+rename 原子写。
+4. 清理 .tmp / hill-src 残留与死代码（保守 350~900 行）。
+
+**B. 中风险结构性（需设计 + 守卫测试护航）**
+5. **完成 R1 并拆双轨**：真表定为四热集合唯一权威，删 gateData 镜像数组 / kv 整库承载 / merge / 对账 / SHADOW_WRITE / HOT_READ 矩阵；saveGateData 退化为低频集合专用。一刀消掉腐化信号 1 的大半。
+6. **拆 koi-ship** 为 vox-core / koi-model / garden / sky-light，vox-core 下沉 shared，氛围写权交 light-mood 仲裁。
+7. 合并挂画同步为一条数据管道（一个轮询 + SSE 源，eternal/paintings 订阅同一事件）。
+
+**C. 高风险治本（须主人明确批准，动承重墙）**
+8. **ctx 按所有权真拆**：先收编 3 个多写属性（dayTimeSource/groundOverride/eternalHandlers）给单一 owner，跨域改事件 + 只读接口，新属性一律拒登记。把 170 属性隐式耦合降为显式接口。
+9. **按域拆 gateData + 收敛鉴权簇**：身份/会话、上传归属、站点配置、统计各自成模块；UA 解析与 realIP 迁出 store.js；admin/gate/siteconfig/security 合成单一 authz 模块，36 处懒 require 减到个位数。
+10. saveGateData 增量化 + debounce + flush-on-exit。
+
+**第三轮终验结论：代码正常（门禁全绿）；优化已做大半（3.5/5）；架构不是失控屎山而是"有纪律的泥球"（后端 3/5、前端 3/5），真正的病是迁移脚手架永久化 + 两个上帝对象，斜率危险。A 级可立即做，B/C 级动承重墙须主人拍板。**
