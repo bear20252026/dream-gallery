@@ -86,6 +86,9 @@ export class LoopManager {
     this._rafId = 0;
     /** 本模块起的定时器(目前无;stop 统一清,新增定时器 push 进来即可) */
     this._timers = [];
+    // 2026-11-17 A2 每帧对象复用:loop:frame 的 payload 此前每帧 new(60 个/秒 GC 压力)。
+    // 该事件当前零订阅方,复用同一对象安全;若未来有订阅方需长期持有,应自行拷贝快照。
+    this._framePayload = { dt: 0, now: 0, fps: 0 };
   }
 
   /**
@@ -245,8 +248,12 @@ export class LoopManager {
     // 执行游戏循环阶段
     this._executePhases(dt, now);
 
-    // 触发帧完成事件
-    eventBus.emit('loop:frame', { dt, now, fps: this.fps });
+    // 触发帧完成事件(2026-11-17 A2:复用 payload 对象,消除每帧 new 的 GC 压力)
+    const fp = this._framePayload;
+    fp.dt = dt;
+    fp.now = now;
+    fp.fps = this.fps;
+    eventBus.emit('loop:frame', fp);
   }
 
   /**

@@ -258,7 +258,11 @@ export function createEffectsSystem(deps = {}) {
     },
     update() {
       // 多世界切割(2026-09-06):烟花/漂浮粒子属主世界金字塔,小世界里不再模拟与 GPU 上传
-      if ((scene.activeWorld || 'main') !== 'main') {
+      // 2026-11-17 A2 后台闸:document.hidden 时主循环 rAF 已暂停,但 setInterval 仍每 2.8s
+      // 空产粒子,后台挂机 1 小时攒约 3 万颗,回前台集中爆发。并入同一门控,后台即停产房,
+      // 回前台由下方惰性重启(与离开主世界同路径)。typeof 守卫兼容无 document 的测试环境。
+      const hidden = typeof document !== 'undefined' && document.hidden;
+      if ((scene.activeWorld || 'main') !== 'main' || hidden) {
         // 2026-10-07 修复只产不消:离开主世界连自动烟花产房一起停——此前只 return 模拟,
         // autoTimer 仍每 2.8s 产 24 个粒子,小世界挂机 1 小时攒约 3 万颗,
         // 回主世界当帧全部爆发(视觉错误 + 帧刺)。回主世界后由下方惰性重启。

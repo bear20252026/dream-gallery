@@ -2026,6 +2026,10 @@ export function createKoiShip(opts = {}) {
       craneGroup.add(c.g);
       cranes.push({ ...c, ...s, t: s.ph });
     });
+    // 2026-11-17 A2 每帧向量复用:此前每只鹤每帧 new 2 个 Vector3(dir + position.clone()),
+    // 5 只 ×60fps ≈ 600 个/秒 GC 压力。改用闭包内两个临时向量,语义不变。
+    const _dir = new THREE.Vector3();
+    const _look = new THREE.Vector3();
     updaters.push((dt, t) => {
       for (const c of cranes) {
         c.t += dt * c.sp;
@@ -2036,8 +2040,8 @@ export function createKoiShip(opts = {}) {
         const nx = Math.cos(c.t + 0.06) * R,
           nz = Math.sin(c.t + 0.06) * R;
         c.g.position.set(px, y, pz);
-        const dir = v3(nx - px, Math.cos(c.t * 0.9 + c.ph) * 4.5 * 0.06, nz - pz).normalize();
-        c.g.lookAt(c.g.position.clone().add(dir.multiplyScalar(c.sp > 0 ? 1 : -1)));
+        const dir = _dir.set(nx - px, Math.cos(c.t * 0.9 + c.ph) * 4.5 * 0.06, nz - pz).normalize();
+        c.g.lookAt(_look.copy(c.g.position).add(dir.multiplyScalar(c.sp > 0 ? 1 : -1)));
         c.g.rotation.z += Math.sin(c.t * 1.6) * 0.16 * (c.sp > 0 ? 1 : -1);
         const flap = Math.sin(t * 3.4 + c.ph * 2);
         c.wings.forEach((ch, i) => {
