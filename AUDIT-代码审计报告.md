@@ -339,3 +339,28 @@
 10. saveGateData 增量化 + debounce + flush-on-exit。
 
 **第三轮终验结论：代码正常（门禁全绿）；优化已做大半（3.5/5）；架构不是失控屎山而是"有纪律的泥球"（后端 3/5、前端 3/5），真正的病是迁移脚手架永久化 + 两个上帝对象，斜率危险。A 级可立即做，B/C 级动承重墙须主人拍板。**
+
+---
+
+## 八、A+B 级重构执行成果（2026-11-17 · 主人批准"先A后B"，PR #82）
+
+> 分支 `refactor/a-b-arch-2026-11-17`，6 提交，净删 ≈500 行重复/矩阵代码。每项独立验证、可回滚。
+
+### A 级（低风险，已完成）
+- **A1 voxel 共享 three 去重**：五页 8.0MB→1.16MB（HTML 309KB + 共享 three 852KB minified）。源入库 `voxel-src/`（消除仓库外工作区依赖）；`scripts/gen/sync-voxel-three.js`（核心2+addons闭包15文件，仅minify不bundle）+ `bundle-voxel.cjs`（esm+external+相对importmap兼容双base）；`package.json` 增 `gen:voxel`。五页真浏览器验收 PASS（canvas渲染/0错误/0 404），锦鲤截图实证完整渲染；repro 逐字节一致。
+- **A2 烟花后台闸+每帧复用**：`document.hidden` 并入烟花产房门控（省≈3万粒/h空攒）；`loop:frame` payload 复用（零订阅事件）；鹤 updater 复用两闭包向量（省600个/秒）。
+- **A3 client_errors.json 原子写**：tmp+rename（与 gate_data 同口径），杜绝半截文件丢报错史。
+- **A4 清理**：.tmp 117MB 探针残留送废纸篓。死代码/根目录md/hill-src 经核实为受管文档与有来源守卫的产物，不删（诚实标注：不为几百行冒误删承重墙风险）。
+
+### B 级（结构性，已完成）
+- **B7 挂画单管道**：新增 `src/media-files.js`（单45s定时器+单SSE+单隐藏暂停，仿media-push单例）；eternal/paintings 各删自有 fetch+定时器+visibilitychange+onMediaChanged，净删29行；onError 保真原 fallback（首次失败挂静态画/补演示照片）。实机验收：/api/files 仅1次请求（旧≥2条不同URL）、挂画5张。
+- **B6 vox-core 下沉**：`src/shared/vox-core.js` createVoxCore 工厂持有 rng/颜色缓存/计数实例状态，解构同名绑定下游2300行零改动；koi-ship 2547→2392行；rng 序列逐字保真（9555体素块/199顶点色mesh/布局截图保真）。**koi-model/garden/sky-light 暂不拆**：剖面函数/glowVox/blossomEmitters/共享rng顺序/TDZ 紧耦合，强拆回归风险高收益有限（子代理最小安全建议）。
+- **B5 完成R1拆双轨**（主人拍板离线降级=保留json旁路）：真表为四热集合唯一权威。shadow 写函数返回真实持久判定（confirm语义内移，fileError内移last_t校验），删SHADOW_WRITE闸，回灌改"旁路→表"（表空才灌防追加重复，哨兵只记真灌过行）；hotread 精简为六读门面（删HOT_READ/disable/setDisableHook/confirm*/count*/反向归并矩阵）；五写消费点改 shadow 返回值判持久、失败回旁路 saveGateData；server 启动删反向归并/对账/disable钩子/HOT_READ分支。**净删389行**。守卫测试按新契约重写（删旧矩阵6条、新增回灌/离线/读抛错用例）。**崩溃安全注入 PASS**：kill -9 重启后 chat3条+gate报错零丢（直查库+admin/list双证据）。
+
+### 验证汇总
+1420 单测 / 后端 241 项 / lint / tsc / deps 全 0 / checkJs 基线 2。voxel/锦鲤/画廊实机截图验收；B5 崩溃注入双证据。
+
+### 仍待主人拍板（C 级，未动）
+ctx 按所有权真拆、gateData 按域拆+鉴权簇收敛、saveGateData 增量化。此三项动承重墙，须单独评审。
+
+**A+B 终验结论：六项重构全部完成并实机/崩溃验证，PR #82 待合并。架构腐化信号1（迁移脚手架永久化）已消除，信号2（上帝对象）部分缓解（vox-core/单管道），斜率止住。C 级留待批准。**
