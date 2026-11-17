@@ -219,31 +219,31 @@ server.listen(PORT, () => {
   // 两者都反向依赖 store/client-errors,接进底座会造出循环依赖(《npm run deps》是硬门禁)。
   // RETENTION_DISABLED=1 由 retention 自己守;两个 start 都幂等且定时器 unref。
   //
-  // 影子双写(R1 第 2 步)的启动点同样放在入口这一层:迁移建表 + 一次性历史回填。
-  // 必须先于 startRetention —— 回填把老数据灌进表,紧接着保留期按同一批 cutoff 裁一遍,
-  // 于是"搬表"不会把已经过保留期的历史又留在库里(隐私承诺 DG-PRIV-001 不打折)。
-  // shadow.start 内部全程 try/catch:表建不起来/回填炸了都只是影子层停用,服务照常。
+  // 热集合持久层(B5 拆双轨后)的启动点同样放在入口这一层:迁移建表 + 旁路→表幂等并集回灌。
+  // 必须先于 startRetention —— 回灌把旁路数据补进表,紧接着保留期按同一批 cutoff 裁一遍,
+  // 于是回灌不会把已经过保留期的历史又留在库里(隐私承诺 DG-PRIV-001 不打折)。
+  // shadow.start 内部全程 try/catch:表建不起来/回灌炸了都只是持久层停用(写读回旁路),服务照常。
   try {
     const shadow = require('./lib/shadow');
     const report = shadow.start(require('./lib/store').gateData);
     if (!report.enabled) {
-      console.log(`[shadow] 影子双写未启用(${report.reason}):四个热集合仍只走 gateData 老路径`);
+      console.log(`[shadow] 真表持久层未启用(${report.reason}):四个热集合走 json/kv 旁路,恢复后启动回灌`);
     } else {
       const s = shadow.shadowStats();
       const bf = Object.entries(report.backfill).filter(([, n]) => n > 0).map(([k, n]) => `${k}=${n}`);
       console.log(
-        `[shadow] 影子双写已启用:库结构 v${report.schema && report.schema.to}` +
-        `,回填 ${bf.length ? bf.join(' ') : '无(表里已有行或源数组为空)'}` +
+        `[shadow] 真表持久层已启用:库结构 v${report.schema && report.schema.to}` +
+        `,旁路回灌 ${bf.length ? bf.join(' ') : '无(旁路增量均已在表)'}` +
         `,当前表行数 ${JSON.stringify(s.tables)}`
       );
       // 2026-11-17 B5 拆双轨:真表是四热集合唯一权威。启动只做"旁路→表"回灌
-      // (shadow.start 内部:表空才灌,覆盖首次建表/离线崩溃旁路攒批),不再做反向
+      // (shadow.start 内部:幂等并集,旁路有表无的才补入,覆盖首次建表/运行中SQLite失效攒批),不再做反向
       // "表→数组归并"、启动对账、disable 回退、HOT_READ 闸——矩阵五件套原子拆除。
       // SQLite 不可用时 shadow.start 返回 enabled=false,热写自动回 json/kv 旁路
       // (数组+saveGateData),读门面返回 null 回旁路数组,"离线也能发"契约保住。
       console.log('[hotread] B5:真表为唯一权威,热写落表即免整库落盘;SQLite 不可用回 json/kv 旁路');
     }
-  } catch (e) { console.error('[startup] 影子双写启动失败(不影响服务):', e && (e.message || e)); }
+  } catch (e) { console.error('[startup] 真表持久层启动失败(不影响服务,写读回旁路):', e && (e.message || e)); }
   try { require('./lib/retention').startRetention(); } catch (e) { console.error('[startup] 保留期清扫启动失败(不影响服务):', e && (e.message || e)); }
   try { require('./lib/r2outbox').startOutbox(); } catch (e) { console.error('[startup] R2 待发台账启动失败(不影响服务):', e && (e.message || e)); }
   // 分片视频"空闲补转"(2026-10-13):启动扫一次 + 每小时一次,把走分片上传、直传通道本来会给它
