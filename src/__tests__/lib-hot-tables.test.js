@@ -3,7 +3,7 @@
 //   ① 迁移幂等:跑两次不重复建表、不重复灌数据(schema_version 单向前进 + 回填哨兵);
 //   ② 影子写:四个集合(chat / linkClicks / clientErrors 两条信道 / visits)在既有写入点旁边落表,
 //      **读路径一条没动** —— 所以每个用例都同时断言"响应码/响应体与整改前一致";
-//   ③ SHADOW_WRITE=0 与 USE_SQLITE=0 两道闸:整个影子层停用(不建表、不写、不回填、不裁表);
+//   ③ SQLite 不可用(USE_SQLITE=0/句柄关)⇒ 持久层停用,业务照写 json/kv 旁路(B5 后 SHADOW_WRITE 闸已拆);
 //   ④ 双写炸了绝不外抛、绝不改请求结论(同一条失败只 console.warn 一次,之后只计数);
 //   ⑤ 保留期(DG-PRIV-001)覆盖新表:表侧 DELETE 与数组侧同 cutoff、同轮清扫,
 //      且**表侧删除不产生第二次全库落盘**;RETENTION_DISABLED=1 时表侧一起闸住;
@@ -33,7 +33,7 @@ process.env.SQLITE_PATH = TMP_DB; // 影子表与 kv 快照同一个临时库
 process.env.CLIENT_ERRORS_FILE = TMP_ERRORS;
 process.env.TOKEN = process.env.TOKEN || 'vitest-token-abc';
 process.env.RETENTION_DISABLED = '1'; // 自动定时器不启;表侧裁剪由用例显式放开
-delete process.env.SHADOW_WRITE; // 影子写默认开(本文件验的就是默认态)
+delete process.env.SHADOW_WRITE; // 历史遗留:闸已随 B5 拆除,此清理仅防外部环境串扰(无实际效果)
 
 const require = createRequire(import.meta.url);
 const store = require('../../lib/store.js');

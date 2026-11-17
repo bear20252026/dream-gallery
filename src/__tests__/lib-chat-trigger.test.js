@@ -25,8 +25,7 @@ vi.setConfig({ testTimeout: 20000 });
 
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-chat-trigger-'));
 process.env.GATE_DATA_FILE = path.join(tmpDir, 'gate_data.json');
-process.env.USE_SQLITE = '0';
-process.env.SHADOW_WRITE = '0';
+process.env.USE_SQLITE = '0'; // 走 json/kv 旁路(历史遗留的 SHADOW_WRITE=0 已删:闸随 B5 拆除)
 process.env.TOKEN = 'vitest-chat-token';
 process.env.MULTI = 'off';
 process.env.PORT = '0';
