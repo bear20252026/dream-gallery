@@ -2412,11 +2412,36 @@ export function createKoiShip(opts = {}) {
     for (const u of updaters) u(dt, t);
   }
   function dispose() {
+    // 审计2修 P2:贴图也要释放(太阳辉光/光晕等 CanvasTexture 挂在 material.map 上),
+    // 共享材质/贴图去重,避免反复热重载泄显存。
+    const seenMat = new Set();
+    const seenTex = new Set();
+    const TEX_SLOTS = [
+      'map',
+      'normalMap',
+      'roughnessMap',
+      'metalnessMap',
+      'aoMap',
+      'emissiveMap',
+      'alphaMap',
+      'envMap',
+    ];
     root.traverse((o) => {
       const m = /** @type {THREE.Mesh} */ (o); // 资源释放遍历:非网格无 geometry/material,守卫短路
       if (m.geometry) m.geometry.dispose();
       if (m.material) {
-        (Array.isArray(m.material) ? m.material : [m.material]).forEach((x) => x.dispose());
+        (Array.isArray(m.material) ? m.material : [m.material]).forEach((x) => {
+          if (!x || seenMat.has(x)) return;
+          seenMat.add(x);
+          for (const s of TEX_SLOTS) {
+            const t = x[s];
+            if (t && t.isTexture && !seenTex.has(t)) {
+              seenTex.add(t);
+              t.dispose();
+            }
+          }
+          x.dispose();
+        });
       }
     });
   }
@@ -2426,10 +2451,17 @@ export function createKoiShip(opts = {}) {
   // 这里再把沙漠可见物隐藏、把船抬到云海之上,下机逐一还原。
   const CRUISE_LIFT = 120; // 巡航抬升:让原作品云海(船下 -60~-112)落到沙漠地面之上
   const saved = {};
+  // 审计2修 P1:applyEnv 是异步的(动态 import 地形),登机后立刻下机(E→Esc)会让
+  // else 分支先跑(saved 还是空 ⇒ background/fog 被置 undefined),挂起的 true 分支随后
+  // 保存脏值并隐藏沙漠,再无人还原 ⇒ 沙漠永久消失。用世代闸:每次调用领一个序号,
+  // await 回来后若世代已变(期间有过别的调用)就放弃本次生效;else 分支只在真存过值时还原。
+  let envGen = 0;
+  let envApplied = false; // true 分支是否真正生效过(else 据此判断要不要还原)
   // 地形模块顶层取 ctx.s,静态导入会与本模块形成循环依赖(ctx.s 未就绪即 s.add 崩)。
   // 改为登机时动态导入(此时 ctx 早已装配完毕),打断模块图回环。
   let desertRefs = null;
   async function applyEnv(on, ctxRef) {
+    const gen = ++envGen;
     envGroup.visible = on;
     const sc = ctxRef && ctxRef.scene;
     if (!sc || !sc.s) return;
@@ -2441,6 +2473,7 @@ export function createKoiShip(opts = {}) {
           desertRefs = {};
         }
       }
+      if (gen !== envGen) return; // await 期间已有新调用(如下机)⇒ 本次登机作废,不再生效
       const terrainMat = desertRefs.terrainMat,
         water = desertRefs.water;
       saved.bg = sc.s.background;
@@ -2481,13 +2514,19 @@ export function createKoiShip(opts = {}) {
       sc.setAtmosphere &&
         sc.setAtmosphere({ bloomStrength: 0.62, bloomThreshold: 0.78, exposure: 1.04 });
       setSun(0.2); // 原作品默认日落高度
+      envApplied = true;
     } else {
-      sc.s.background = saved.bg;
-      sc.s.fog = saved.fog;
-      if (saved.hidden)
-        saved.hidden.forEach((o) => {
-          o.visible = true;
-        });
+      // 审计2修 P1:只在 true 分支真正生效过时还原;saved.bg/fog 未存过(undefined)就不碰,
+      // 避免把背景/雾置成 undefined(快速上下机时 else 先于 true 的 await 到达)。
+      if (envApplied) {
+        if (saved.bg !== undefined) sc.s.background = saved.bg;
+        if (saved.fog !== undefined) sc.s.fog = saved.fog;
+        if (saved.hidden)
+          saved.hidden.forEach((o) => {
+            o.visible = true;
+          });
+        envApplied = false;
+      }
     }
   }
   return {

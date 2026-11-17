@@ -159,6 +159,9 @@ const SHUTDOWN_DRAIN_MS = 15000;
 let shuttingDown = false;
 function beginShutdown(exit) {
   try { flushTrack(); } catch (e) { console.error('[shutdown] 埋点批量落盘失败:', e && (e.message || e)); }
+  // 审计2修 P2-3:热写免落盘期间 stats.total/byDay 等聚合只在内存,靠冷路径 save 才落盘。
+  // 优雅关闭必须同步落一次,否则纯热写窗口内的计数重启即丢(崩溃仍靠启动归并兜底明细)。
+  try { require('./lib/store').saveGateDataSync(); } catch (e) { console.error('[shutdown] gateData 同步落盘失败:', e && (e.message || e)); }
   // AI 用量台账是合并写盘(5s / 20 条),退出前必须 stop() 收尾,否则窗口内最后几条丢盘。
   // stop() 现在走同步写并返回结论(2026-10-14 M-11:入队式的收尾在 SIGKILL 面前不可信)。
   try {
@@ -237,8 +240,33 @@ server.listen(PORT, () => {
       // 安全纪律:启动即对账(内存 gateData vs 表尾,覆盖回填后的全量),不一致 ⇒ hotread.disable()
       // 整体回退数组老路,服务照常;HOT_READ=0 可显式保持老路。判据工具 table-parity.cjs 仍可在盒子上跑。
       const hotread = require('./lib/hotread');
+      // 审计2修 P2-3:启动先把真表行归并回内存数组(幂等并集)——热写免落盘期间快照滞后,
+      // 不归并则重启+回退(HOT_READ=0/disable)会读旧、丢 stats 计数。归并后落一次盘让快照追上。
+      // 无论 HOT_READ 开关都归并:它是"数组追上真表"的一致性动作,与读源选择无关。
+      try {
+        const store = require('./lib/store');
+        const ce = require('./lib/client-errors');
+        const added = hotread.mergeTablesIntoArrays(store.gateData, {
+          fileErrors: { list: ce._getErrorList(), set: (l) => { ce._setErrorList(l); } },
+        });
+        const total = Object.values(added).reduce((a, b) => a + b, 0);
+        if (total > 0) {
+          store.saveGateDataSync();
+          console.log('[hotread] 启动归并:真表→数组补入 ' + JSON.stringify(added) + '(快照已落盘追上)');
+        }
+      } catch (e) { console.error('[startup] 表→数组归并失败(不影响服务,读表仍可用):', e && (e.message || e)); }
+      // 运行时 disable(对账不一致)也要归并+落盘:注入钩子,避免 hotread→store 成环
+      hotread.setDisableHook(() => {
+        const store = require('./lib/store');
+        const ce = require('./lib/client-errors');
+        const added = hotread.mergeTablesIntoArrays(store.gateData, {
+          fileErrors: { list: ce._getErrorList(), set: (l) => { ce._setErrorList(l); } },
+        });
+        store.saveGateDataSync();
+        console.log('[hotread] 回退归并:真表→数组补入 ' + JSON.stringify(added));
+      });
       if (process.env.HOT_READ === '0') {
-        console.log('[hotread] HOT_READ=0:读路径保持 gateData 数组老路(双写仍在)');
+        console.log('[hotread] HOT_READ=0:读路径保持 gateData 数组老路(双写仍在,启动已归并)');
       } else {
         const g = require('./lib/store').gateData;
         const repoChat = require('./lib/repo/chat');

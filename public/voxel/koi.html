@@ -41,6 +41,7 @@
         position: fixed;
         inset: 0;
         z-index: 0;
+        touch-action: none; /* 审计2修 P2:移动端轨道拖拽不被浏览器平移/缩放手势 pointercancel 打断 */
       }
       .vignette,
       .grain,

@@ -124,7 +124,7 @@ const STYLE = `
 #voyageScenes .vs-acts{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
 #voyageScenes .vs-acts button.primary{background:linear-gradient(150deg,rgba(245,196,81,.3),rgba(224,50,75,.32));
   border-color:rgba(245,196,81,.55);color:#ffe9c2}
-#vsEntry{position:fixed;right:18px;bottom:64px;z-index:35;width:46px;height:46px;border-radius:50%;
+#vsEntry{position:fixed;right:18px;bottom:64px;width:46px;height:46px;border-radius:50%;
   border:1px solid rgba(245,196,81,.5);background:radial-gradient(circle at 35% 30%,rgba(245,196,81,.35),rgba(23,18,44,.9));
   color:#f5c451;font-size:20px;cursor:pointer;box-shadow:0 4px 18px rgba(0,0,0,.5);transition:transform .18s}
 #vsEntry:hover{transform:scale(1.08)}
@@ -151,7 +151,8 @@ export function createVoyageScenes() {
   let gameMode = false, // 第一幕内正在玩「B612 的一天」
     gameBest = 0,
     gameWins = 0,
-    onGameMsg = null;
+    onGameMsg = null,
+    onVis = null; // 标签页可见性监听(隐藏时重置安静窗口)
 
   function readDone() {
     try {
@@ -323,7 +324,10 @@ export function createVoyageScenes() {
       !!ctx.ui.dialogOpen?.() ||
       !!ctx.overlay.anyOpen() ||
       !!ctx.kunlun.flightLock ||
-      !!ctx.scene.worldManager?.transitioning
+      !!ctx.scene.worldManager?.transitioning ||
+      // 审计2修 P2:开场电影 b612film 不走 overlay.register(直接 appendChild),
+      // 主循环在电影淡出期已启动 ⇒ 不查它会在交叉溶解窗口自动开幕盖住电影。
+      !!document.getElementById('b612film')
     );
   }
   function storyTick(dt) {
@@ -418,10 +422,15 @@ export function createVoyageScenes() {
           d.type !== 'b612-game' ||
           e.origin !== location.origin ||
           !frame ||
-          e.source !== frame.contentWindow
+          e.source !== frame.contentWindow ||
+          // 审计2修 P3:只在"第一幕游戏模式且放映开着"时收结算 —— 闭幕后 about:blank
+          // 窗口期/其它幕不该收成绩;score 钳位防 Infinity/巨值污染存档。
+          !gameMode ||
+          actIdx !== 0 ||
+          !(api && api.isOpen())
         )
           return;
-        const score = Math.max(0, Number(d.score) || 0);
+        const score = Math.min(1e6, Math.max(0, Math.floor(Number(d.score) || 0)));
         if (score > gameBest) gameBest = score;
         if (d.win) gameWins++;
         writeDone();
@@ -438,6 +447,12 @@ export function createVoyageScenes() {
         if (gameMode) renderCap();
       };
       window.addEventListener('message', onGameMsg);
+      // 审计2修 P3:标签页隐藏时 rAF 暂停但 performance.now() 照走,回页首帧即满足
+      // 1.5s 安静窗口立即开幕。隐藏时重置 quiet,回页重新计时。
+      onVis = () => {
+        if (document.hidden) quiet = 0;
+      };
+      document.addEventListener('visibilitychange', onVis);
       offTick = ctx.onTick(storyTick);
       ctx.ui.voyageScenes = {
         open: () => entry.onclick(),
@@ -448,10 +463,13 @@ export function createVoyageScenes() {
     dispose() {
       window.removeEventListener('script:lang', onLang);
       if (onGameMsg) window.removeEventListener('message', onGameMsg);
+      if (onVis) document.removeEventListener('visibilitychange', onVis);
       if (offWorld) offWorld();
       if (offFox) offFox();
       if (offTick) offTick();
       api?.unregister();
+      // 审计2修 P3:remove 前先置空 iframe,Safari 释放浏览上下文更及时
+      if (frame) frame.src = 'about:blank';
       root?.remove();
       entry?.remove();
       style?.remove();
