@@ -32268,7 +32268,9 @@ void main() {
           if (win) Sound.win();
           else Sound.crack();
           try {
-            parent.postMessage({ type: 'b612-game', score: G.score, win }, '*');
+            // 审计2修 P3:targetOrigin 用 location.origin —— 同源 iframe 下 parent 必同源;
+            // 被第三方跨源嵌入时不向任意嵌入者广播成绩。
+            parent.postMessage({ type: 'b612-game', score: G.score, win }, location.origin);
           } catch (e) {}
         }
         var ray = new Raycaster();

@@ -305,3 +305,74 @@ describe('⑦ 对外契约不变:响应码/响应体与影子期逐字一致', (
     expect(postClick({ link: 'c' }).code).toBe(200);
   });
 });
+
+// ===================== 审计2补钉(2026-11-16)=====================
+describe('⑧ 审计2修 P2-2:confirm 基线为 -1(COUNT 瞬时失败)恒走老路,不误判丢数据', () => {
+  it('countChat 首抛后恢复:发言仍 saveGateData 1 次(before=-1 不可信)', () => {
+    const realCount = repoChat.count;
+    let calls = 0;
+    repoChat.count = () => {
+      calls++;
+      if (calls === 1) throw new Error('count transient');
+      return realCount();
+    };
+    try {
+      const { res } = postChat('基线失败也要落盘');
+      expect(res.code).toBe(200);
+      // before=-1 ⇒ confirmChat 恒 false ⇒ 老路落盘,即使随后 count 恢复也不跳 save
+      expect(saveSpy).toHaveBeenCalledTimes(1);
+      expect(g.chat.length).toBe(1);
+    } finally {
+      repoChat.count = realCount;
+    }
+  });
+  it('confirmChat(-1)/confirmClicks(-1,n)/confirmVisit(-1)/confirmGateError(-1) 直接恒 false', () => {
+    expect(hotread.confirmChat(-1)).toBe(false);
+    expect(hotread.confirmClicks(-1, 3)).toBe(false);
+    expect(hotread.confirmVisit(-1)).toBe(false);
+    expect(hotread.confirmGateError(-1)).toBe(false);
+    expect(hotread.confirmFileError(-1, { id: 'x' })).toBe(false);
+  });
+});
+
+describe('⑨ 审计2修 P2-3:表→数组归并幂等并集(重启回退不读旧)', () => {
+  it('表有数组无的行补进数组;数组有表无的保留;重复归并不重复', () => {
+    // 表里灌 3 条,数组只有最近 1 条(模拟免落盘期间快照滞后)
+    const rows = [
+      { n: 'a', t: '旧1', ts: 1000, dk: 'd' },
+      { n: 'a', t: '旧2', ts: 2000, dk: 'd' },
+      { n: 'a', t: '新3', ts: 3000, dk: 'd' },
+    ];
+    repoChat.insertMany(rows);
+    g.chat = [{ n: 'a', t: '新3', ts: 3000, dk: 'd' }];
+    const added = hotread.mergeTablesIntoArrays(g, {});
+    expect(added.chat).toBe(2); // 旧1/旧2 补入
+    expect(g.chat.map((m) => m.t)).toEqual(['旧1', '旧2', '新3']); // 时间序
+    // 幂等:再归并一次不重复
+    const again = hotread.mergeTablesIntoArrays(g, {});
+    expect(again.chat).toBe(0);
+    expect(g.chat.length).toBe(3);
+  });
+  it('数组有表无的行(表写失败走老路)归并后保留', () => {
+    g.chat = [{ n: 'a', t: '只在数组', ts: 5000, dk: 'd' }];
+    repoChat.insertMany([{ n: 'a', t: '只在表', ts: 6000, dk: 'd' }]);
+    hotread.mergeTablesIntoArrays(g, {});
+    expect(g.chat.map((m) => m.t).sort()).toEqual(['只在数组', '只在表']);
+  });
+  it('visits/clicks/gateErrors 同样归并', () => {
+    repoVisits.insertMany([
+      { t: 100, id: 'v1' },
+      { t: 200, id: 'v2' },
+    ]);
+    g.visits = [{ t: 200, id: 'v2' }];
+    repoErrors.insertGateMany([
+      { t: 300, msg: 'e1', src: 's', dk: 'd', name: 'n', ip: '1', brand: '', ua: '' },
+    ]);
+    g.clientErrors = [];
+    const added = hotread.mergeTablesIntoArrays(g, {});
+    expect(added.visits).toBe(1);
+    expect(added.gateErrors).toBe(1);
+    expect(g.visits.length).toBe(2);
+    expect(g.clientErrors.length).toBe(1);
+  });
+});

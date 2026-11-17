@@ -569,6 +569,14 @@ export function createPlaneFlight({ input, vehicle = 'koi' }) {
       style?.remove();
       hud?.remove();
       promptEl?.remove();
+      // 审计2修 P2:飞行中拆场必须先还原沙漠氛围再释放锦鲤 —— 否则 saved.hidden 里的
+      // 沙漠对象永久 visible=false、雾停留 envFog。applyEnv 是异步的,这里同步触发即可
+      // (它内部世代闸保证与在途登机调用不冲突),不 await 也不影响释放顺序。
+      if (koiShip && driving) {
+        try {
+          koiShip.applyEnv(false, ctx);
+        } catch (e) {}
+      }
       if (root) {
         ctx.scene.s.remove(root);
         root = null;
