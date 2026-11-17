@@ -10,6 +10,7 @@ import { hotBegin, hotEnd } from '../hot.js';
 import { bigText } from '../ui/kit.js';
 import { qsBtn } from '../shared/dom-typed.js'; // #tcOk / #tcLater 是本文件那段卡片模板里的 <button>
 import { bell } from '../shared/audio-blip.js'; // 钟声统一实现(B1 整改)
+import { registerEternalHandler } from './eternal-handlers.js'; // C8:回调表单一owner,散写改注册API
 const bag = hotBegin('finale');
 const { s, onTick, iG } = ctx;
 
@@ -339,8 +340,8 @@ for (let k = 0; k < 6; k++) {
     gem.scale.setScalar(2);
   };
 }
-ctx.kunlun.eternalHandlers = ctx.kunlun.eternalHandlers || {};
-ctx.kunlun.eternalHandlers.spiritmark = function (cg) {
+// C8:经 owner 注册,off 配对收手
+const offSpiritmark = registerEternalHandler('spiritmark', function (cg) {
   const k = cg.userData.markIndex;
   cg.userData.pulse();
   const tts = ctx.kunlun.spiritsTTS && ctx.kunlun.spiritsTTS[k];
@@ -350,7 +351,7 @@ ctx.kunlun.eternalHandlers.spiritmark = function (cg) {
     ctx.store.setJson('marks', marksDone);
     if (marksDone.length >= 6 && !ctx.store.flag('marksDone')) finale();
   }
-};
+});
 function finale() {
   ctx.store.mark('marksDone');
   // 六色闪光
@@ -460,7 +461,7 @@ bag.custom.push(() => {
       if (i >= 0) iG.splice(i, 1);
     }
   wind(false);
-  if (ctx.kunlun.eternalHandlers) delete ctx.kunlun.eternalHandlers.spiritmark;
+  offSpiritmark(); // C8:注册API的off配对收手(幂等,不误删顶替者)
 });
 hotEnd('finale');
 if (import.meta.hot) import.meta.hot.accept();
