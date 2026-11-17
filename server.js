@@ -236,64 +236,12 @@ server.listen(PORT, () => {
         `,回填 ${bf.length ? bf.join(' ') : '无(表里已有行或源数组为空)'}` +
         `,当前表行数 ${JSON.stringify(s.tables)}`
       );
-      // R1 第 3 步(2026-11-16 主人批准切读):读路径走真表,落表成功即免整库落盘。
-      // 安全纪律:启动即对账(内存 gateData vs 表尾,覆盖回填后的全量),不一致 ⇒ hotread.disable()
-      // 整体回退数组老路,服务照常;HOT_READ=0 可显式保持老路。判据工具 table-parity.cjs 仍可在盒子上跑。
-      const hotread = require('./lib/hotread');
-      // 审计2修 P2-3:启动先把真表行归并回内存数组(幂等并集)——热写免落盘期间快照滞后,
-      // 不归并则重启+回退(HOT_READ=0/disable)会读旧、丢 stats 计数。归并后落一次盘让快照追上。
-      // 无论 HOT_READ 开关都归并:它是"数组追上真表"的一致性动作,与读源选择无关。
-      try {
-        const store = require('./lib/store');
-        const ce = require('./lib/client-errors');
-        const added = hotread.mergeTablesIntoArrays(store.gateData, {
-          fileErrors: { list: ce._getErrorList(), set: (l) => { ce._setErrorList(l); } },
-        });
-        const total = Object.values(added).reduce((a, b) => a + b, 0);
-        if (total > 0) {
-          store.saveGateDataSync();
-          console.log('[hotread] 启动归并:真表→数组补入 ' + JSON.stringify(added) + '(快照已落盘追上)');
-        }
-      } catch (e) { console.error('[startup] 表→数组归并失败(不影响服务,读表仍可用):', e && (e.message || e)); }
-      // 运行时 disable(对账不一致)也要归并+落盘:注入钩子,避免 hotread→store 成环
-      hotread.setDisableHook(() => {
-        const store = require('./lib/store');
-        const ce = require('./lib/client-errors');
-        const added = hotread.mergeTablesIntoArrays(store.gateData, {
-          fileErrors: { list: ce._getErrorList(), set: (l) => { ce._setErrorList(l); } },
-        });
-        store.saveGateDataSync();
-        console.log('[hotread] 回退归并:真表→数组补入 ' + JSON.stringify(added));
-      });
-      if (process.env.HOT_READ === '0') {
-        console.log('[hotread] HOT_READ=0:读路径保持 gateData 数组老路(双写仍在,启动已归并)');
-      } else {
-        const g = require('./lib/store').gateData;
-        const repoChat = require('./lib/repo/chat');
-        const repoVisits = require('./lib/repo/visits');
-        const repoClicks = require('./lib/repo/clicks');
-        const repoErrors = require('./lib/repo/errors');
-        let mismatch = null;
-        try {
-          // 逐集合:源数组每条必须能在表尾找到同 ts/t 的行(表是保留期全集,源受条数上限)
-          const tailMatch = (srcArr, tableRows, tk) => {
-            const pool = new Map();
-            for (const r of tableRows) pool.set(r[tk], (pool.get(r[tk]) || 0) + 1);
-            for (const s of srcArr || []) {
-              const n = pool.get(s[tk]) || 0;
-              if (n <= 0) return false;
-              pool.set(s[tk], n - 1);
-            }
-            return true;
-          };
-          if (!tailMatch(g.chat, repoChat.readTail(500), 'ts')) mismatch = 'chat';
-          else if (!tailMatch(g.visits, repoVisits.readTail(2000), 't')) mismatch = 'visits';
-          else if (!tailMatch(g.linkClicks, repoClicks.readTail(6000), 't')) mismatch = 'linkClicks';
-          else if (!tailMatch(g.clientErrors, repoErrors.readGateTail(1000), 't')) mismatch = 'clientErrors';
-        } catch (e) { mismatch = 'read-error: ' + (e && e.message); }
-        if (mismatch) hotread.disable(mismatch);
-        else console.log('[hotread] 启动对账一致:读路径已切真表,热写落表即免整库落盘(HOT_READ=0 回退)');
-      }
+      // 2026-11-17 B5 拆双轨:真表是四热集合唯一权威。启动只做"旁路→表"回灌
+      // (shadow.start 内部:表空才灌,覆盖首次建表/离线崩溃旁路攒批),不再做反向
+      // "表→数组归并"、启动对账、disable 回退、HOT_READ 闸——矩阵五件套原子拆除。
+      // SQLite 不可用时 shadow.start 返回 enabled=false,热写自动回 json/kv 旁路
+      // (数组+saveGateData),读门面返回 null 回旁路数组,"离线也能发"契约保住。
+      console.log('[hotread] B5:真表为唯一权威,热写落表即免整库落盘;SQLite 不可用回 json/kv 旁路');
     }
   } catch (e) { console.error('[startup] 影子双写启动失败(不影响服务):', e && (e.message || e)); }
   try { require('./lib/retention').startRetention(); } catch (e) { console.error('[startup] 保留期清扫启动失败(不影响服务):', e && (e.message || e)); }

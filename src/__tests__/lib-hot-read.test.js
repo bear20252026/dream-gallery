@@ -1,13 +1,16 @@
-// lib-hot-read.test.js — R1 第 3 步「只读切换」的验收(2026-11-16)
+// lib-hot-read.test.js — B5 拆双轨后的热集合验收(2026-11-17 重写)
 // ===================== 这个文件钉住什么 =====================
-//   ① R1 核心验收:一次发言 / 一批点击 / 一条 gate 报错 / 一次访问明细 / 一次 file 错误 upsert,
-//      落表确认后 saveGateData() 调用数 = **0**(影子期是每次 1);
-//   ② 读路径切真表:表里有、数组里没有的行(挤出去的历史)也能被读到;
-//   ③ HOT_READ=0 ⇒ 读回数组、写回"数组+整库落盘"老路(一键回退);
-//   ④ 表写失败(shadow mock 成不落表)⇒ confirm* 判未持久 ⇒ 老路落盘,一条不丢;
-//   ⑤ 读表抛错 ⇒ 该次读回退数组并计数,绝不把 500 抛给请求;
-//   ⑥ hotread.disable() ⇒ 整体回退(启动对账不一致的处置);
-//   ⑦ 响应码/响应体与影子期逐字一致(切读不改任何对外契约)。
+//   ① 核心验收:一次发言 / 一批点击 / 一条 gate 报错 / 一次访问明细 / 一次 file upsert,
+//      确实落表 ⇒ saveGateData() 调用数 = **0**(真表唯一权威,WAL 崩溃安全);
+//   ② 读路径走真表:表里有、数组里没有的行(挤出去的历史)也能被读到;
+//   ③ SQLite 不可用 ⇒ 读回旁路数组、写回"数组+整库落盘"旁路(json/kv 契约保住);
+//   ④ 表写失败(shadow 返回 false)⇒ 回旁路落盘,一条不丢;
+//   ⑤ 读表抛错 ⇒ 该次读回退旁路数组并计数,绝不把 500 抛给请求;
+//   ⑥ 旁路→表回灌:表空才灌(防追加重复),覆盖首次建表/离线崩溃旁路攒批;
+//   ⑦ 响应码/响应体与拆除前逐字一致(拆双轨不改任何对外契约)。
+//
+// 拆除的旧矩阵(不再测试):HOT_READ 闸 / SHADOW_WRITE 闸 / confirm* / count* /
+//   disable / setDisableHook / mergeTablesIntoArrays(表→数组反向归并)。
 //
 // ===================== 测试隔离(硬要求,与 lib-hot-tables 同款)=====================
 // GATE_DATA_FILE / SQLITE_PATH / CLIENT_ERRORS_FILE 全部重定向到系统临时目录,
@@ -24,13 +27,12 @@ process.env.SQLITE_PATH = path.join(tmpDir, 'gate_data.db');
 process.env.CLIENT_ERRORS_FILE = path.join(tmpDir, 'client_errors.json');
 process.env.TOKEN = process.env.TOKEN || 'vitest-token-abc';
 process.env.RETENTION_DISABLED = '1';
-delete process.env.SHADOW_WRITE;
-delete process.env.HOT_READ;
 
 const require = createRequire(import.meta.url);
 const store = require('../../lib/store.js');
 const shadow = require('../../lib/shadow.js');
 const hotread = require('../../lib/hotread.js');
+const sqlite = require('../../lib/sqlite-store.js');
 const repoChat = require('../../lib/repo/chat.js');
 const repoClicks = require('../../lib/repo/clicks.js');
 const repoErrors = require('../../lib/repo/errors.js');
@@ -109,29 +111,29 @@ function clearAll() {
   clientErrors._setErrorList([]);
   hotread._reset();
   shadow._resetStats();
+  shadow._dropSchemaReady();
 }
 
 let saveSpy;
 beforeEach(() => {
-  shadow.start(g); // 幂等:建表+回填哨兵
+  shadow.start(g); // 幂等:建表+旁路回灌哨兵
   clearAll();
   saveSpy = vi.spyOn(store, 'saveGateData');
 });
 afterEach(() => {
   saveSpy.mockRestore();
-  delete process.env.HOT_READ;
   vi.restoreAllMocks();
 });
 
-describe('① R1 核心验收:热写落表确认 ⇒ saveGateData 调用数 0', () => {
+describe('① 核心验收:热写确实落表 ⇒ saveGateData 调用数 0', () => {
   it('一次发言 → 0 次整库落盘,表行与数组同形', () => {
-    const { res } = postChat('切读后的第一条');
+    const { res } = postChat('拆双轨后的第一条');
     expect(res.code).toBe(200);
     expect(res.body).toBe('{"ok":true}');
     expect(saveSpy).toHaveBeenCalledTimes(0);
     expect(repoChat.count()).toBe(1);
-    expect(g.chat.length).toBe(1); // 内存数组照常维护(限流/对账/保留期依赖)
-    expect(repoChat.readTail(1)[0].t).toBe('切读后的第一条');
+    expect(g.chat.length).toBe(1); // 内存数组照常维护(限流/保留期依赖)
+    expect(repoChat.readTail(1)[0].t).toBe('拆双轨后的第一条');
   });
 
   it('一批点击 flush → 0 次整库落盘(攒批语义照旧:一批一次多行 insert)', () => {
@@ -167,10 +169,9 @@ describe('① R1 核心验收:热写落表确认 ⇒ saveGateData 调用数 0', 
   });
 
   it('file 错误 upsert(新增+合并)→ 0 次整文件重写,表行 count/lastT 跟上', () => {
-    // record 不导出(封装纪律):走公开上报端点,与线上同一入口
     const report = (payload) => {
       const req = mkReq('203.0.113.250', {});
-      req.method = 'POST'; // handleReport 先验方法,缺了直接 405 不读体
+      req.method = 'POST';
       const res = mkRes();
       clientErrors.handleReport(req, res);
       req._handlers.data(Buffer.from(JSON.stringify(payload)));
@@ -189,7 +190,7 @@ describe('① R1 核心验收:热写落表确认 ⇒ saveGateData 调用数 0', 
   });
 });
 
-describe('② 读路径切真表:保留期内被数组挤出去的历史也读得到', () => {
+describe('② 读路径走真表:保留期内被数组挤出去的历史也读得到', () => {
   it('chat 拉取:表里 150 条历史,数组只有最近 100 ⇒ API 返回最近 100 且含表侧历史', () => {
     const many = [];
     for (let i = 0; i < 150; i++)
@@ -204,64 +205,51 @@ describe('② 读路径切真表:保留期内被数组挤出去的历史也读�
     expect(body.msgs[0].t).toBe('历史50'); // tail(100) 从表取,不是数组
     expect(body.msgs[99].t).toBe('历史149');
   });
+});
 
-  it('HOT_READ=0 ⇒ 同一场景读回数组(老路)', () => {
-    const many = [];
-    for (let i = 0; i < 150; i++)
-      many.push({ n: 'a', t: '历史' + i, ts: Date.now() - 100000 + i, dk: 'd' });
-    repoChat.insertMany(many);
-    g.chat = many.slice(-100);
-    process.env.HOT_READ = '0';
+describe('③ SQLite 不可用 ⇒ 读回旁路数组、写回旁路落盘(json/kv 契约)', () => {
+  it('available=false:发言 → saveGateData 1 次,数组照旧,表 0 行', () => {
+    const spy = vi.spyOn(sqlite, 'available').mockReturnValue(false);
+    const { res } = postChat('离线也要发');
+    expect(res.code).toBe(200);
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+    expect(g.chat.length).toBe(1);
+    expect(repoChat.count()).toBe(0);
+    spy.mockRestore();
+  });
+  it('available=false:chat 拉取读回旁路数组', () => {
+    g.chat = [{ n: 'x', t: '旁路兜底', ts: Date.now(), dk: 'd' }];
+    const spy = vi.spyOn(sqlite, 'available').mockReturnValue(false);
     const req = mkReq('203.0.113.221', {});
     const res = mkRes();
     chat.handleChatList(req, res);
     const body = JSON.parse(res.body);
-    expect(body.msgs.length).toBe(100);
-    expect(hotread.enabled()).toBe(false);
+    expect(body.msgs[0].t).toBe('旁路兜底');
+    spy.mockRestore();
   });
 });
 
-describe('③ HOT_READ=0:写路径回"数组+整库落盘"老路', () => {
-  it('发言 → saveGateData 恰好 1 次(影子期行为)', () => {
-    process.env.HOT_READ = '0';
-    const { res } = postChat('老路发言');
+describe('④ 表写失败(shadow 返回 false)⇒ 回旁路落盘一条不丢', () => {
+  it('shadow.chat 返回 false ⇒ saveGateData 1 次,数组照旧', () => {
+    const spy = vi.spyOn(shadow, 'chat').mockReturnValue(false);
+    const { res } = postChat('表挂了也要发');
     expect(res.code).toBe(200);
     expect(saveSpy).toHaveBeenCalledTimes(1);
     expect(g.chat.length).toBe(1);
-    expect(repoChat.count()).toBe(1); // 双写仍在
+    spy.mockRestore();
+  });
+
+  it('shadow.clicks 返回 false ⇒ flush 走旁路 saveGateData 1 次', () => {
+    const spy = vi.spyOn(shadow, 'clicks').mockReturnValue(false);
+    for (let i = 0; i < 3; i++) postClick({ link: 'F' + i });
+    expect(track.flushTrack()).toBe(3);
+    expect(saveSpy).toHaveBeenCalledTimes(1);
+    expect(g.linkClicks.length).toBe(3);
+    spy.mockRestore();
   });
 });
 
-describe('④ 表写失败 ⇒ confirm 判未持久 ⇒ 老路落盘一条不丢', () => {
-  it('shadow.chat 不落表(mock)⇒ saveGateData 1 次,数组照旧', () => {
-    const real = shadow.chat;
-    shadow.chat = () => true; // "尝试过"但没落表
-    try {
-      const { res } = postChat('表挂了也要发');
-      expect(res.code).toBe(200);
-      expect(saveSpy).toHaveBeenCalledTimes(1);
-      expect(g.chat.length).toBe(1);
-      expect(repoChat.count()).toBe(0);
-    } finally {
-      shadow.chat = real;
-    }
-  });
-
-  it('点击批不落表(mock)⇒ flush 走老路 saveGateData 1 次', () => {
-    const real = shadow.clicks;
-    shadow.clicks = () => true;
-    try {
-      for (let i = 0; i < 3; i++) postClick({ link: 'F' + i });
-      expect(track.flushTrack()).toBe(3);
-      expect(saveSpy).toHaveBeenCalledTimes(1);
-      expect(g.linkClicks.length).toBe(3);
-    } finally {
-      shadow.clicks = real;
-    }
-  });
-});
-
-describe('⑤ 读表抛错 ⇒ 该次读回退数组,不抛 500', () => {
+describe('⑤ 读表抛错 ⇒ 该次读回退旁路数组,不抛 500', () => {
   it('repoChat.readTail 抛错 ⇒ chat 拉取仍 200 且内容来自数组', () => {
     g.chat = [{ n: 'x', t: '数组兜底', ts: Date.now(), dk: 'd' }];
     const spy = vi.spyOn(repoChat, 'readTail').mockImplementation(() => {
@@ -273,24 +261,43 @@ describe('⑤ 读表抛错 ⇒ 该次读回退数组,不抛 500', () => {
     expect(res.code).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.msgs[0].t).toBe('数组兜底');
-    expect(hotread.hotReadStats().fallbacks).toBe(1);
+    expect(hotread.hotReadStats().readFallbacks).toBe(1);
     spy.mockRestore();
   });
 });
 
-describe('⑥ disable() ⇒ 整体回退(启动对账不一致的处置)', () => {
-  it('disable 后读回数组、写回老路;_reset 恢复', () => {
-    hotread.disable('test-mismatch');
-    expect(hotread.enabled()).toBe(false);
-    const { res } = postChat('回退后发言');
-    expect(res.code).toBe(200);
-    expect(saveSpy).toHaveBeenCalledTimes(1);
-    hotread._reset();
-    expect(hotread.enabled()).toBe(true);
+describe('⑥ 旁路→表回灌:表空才灌,防追加重复', () => {
+  // 哨兵在共享临时库跨用例持久:前面①用例真灌过行会写哨兵,这里先清掉才能验回灌
+  function clearSentinel() {
+    try {
+      sqlite.getDb().prepare('DELETE FROM shadow_backfill').run();
+    } catch {
+      /* 表未建时忽略 */
+    }
+  }
+  it('表空+旁路有历史 ⇒ start 回灌进表', () => {
+    clearSentinel();
+    shadow._dropSchemaReady();
+    repoChat.removeAll();
+    g.chat = [{ n: 'a', t: '旁路历史', ts: 1000, dk: 'd' }];
+    const report = shadow.start(g);
+    expect(report.enabled).toBe(true);
+    expect(repoChat.count()).toBe(1);
+    expect(repoChat.readTail(1)[0].t).toBe('旁路历史');
+  });
+  it('表非空 ⇒ 不灌(权威已在表,防追加重复)', () => {
+    clearSentinel();
+    repoChat.removeAll();
+    repoChat.insertMany([{ n: 'a', t: '表权威', ts: 2000, dk: 'd' }]);
+    g.chat = [{ n: 'a', t: '旁路滞后', ts: 1000, dk: 'd' }];
+    shadow._dropSchemaReady();
+    shadow.start(g);
+    expect(repoChat.count()).toBe(1); // 不追加
+    expect(repoChat.readTail(1)[0].t).toBe('表权威');
   });
 });
 
-describe('⑦ 对外契约不变:响应码/响应体与影子期逐字一致', () => {
+describe('⑦ 对外契约不变:响应码/响应体与拆除前逐字一致', () => {
   it('发言/拉取/报错/点击四端点的码与体', () => {
     const post = postChat('契约');
     expect(post.res.code).toBe(200);
@@ -303,76 +310,5 @@ describe('⑦ 对外契约不变:响应码/响应体与影子期逐字一致', (
     expect(Object.keys(parsed.msgs[0]).sort()).toEqual(['me', 'n', 't', 'ts']);
     expect(postTrackError({ msg: 'e', src: 's' }).code).toBe(200);
     expect(postClick({ link: 'c' }).code).toBe(200);
-  });
-});
-
-// ===================== 审计2补钉(2026-11-16)=====================
-describe('⑧ 审计2修 P2-2:confirm 基线为 -1(COUNT 瞬时失败)恒走老路,不误判丢数据', () => {
-  it('countChat 首抛后恢复:发言仍 saveGateData 1 次(before=-1 不可信)', () => {
-    const realCount = repoChat.count;
-    let calls = 0;
-    repoChat.count = () => {
-      calls++;
-      if (calls === 1) throw new Error('count transient');
-      return realCount();
-    };
-    try {
-      const { res } = postChat('基线失败也要落盘');
-      expect(res.code).toBe(200);
-      // before=-1 ⇒ confirmChat 恒 false ⇒ 老路落盘,即使随后 count 恢复也不跳 save
-      expect(saveSpy).toHaveBeenCalledTimes(1);
-      expect(g.chat.length).toBe(1);
-    } finally {
-      repoChat.count = realCount;
-    }
-  });
-  it('confirmChat(-1)/confirmClicks(-1,n)/confirmVisit(-1)/confirmGateError(-1) 直接恒 false', () => {
-    expect(hotread.confirmChat(-1)).toBe(false);
-    expect(hotread.confirmClicks(-1, 3)).toBe(false);
-    expect(hotread.confirmVisit(-1)).toBe(false);
-    expect(hotread.confirmGateError(-1)).toBe(false);
-    expect(hotread.confirmFileError(-1, { id: 'x' })).toBe(false);
-  });
-});
-
-describe('⑨ 审计2修 P2-3:表→数组归并幂等并集(重启回退不读旧)', () => {
-  it('表有数组无的行补进数组;数组有表无的保留;重复归并不重复', () => {
-    // 表里灌 3 条,数组只有最近 1 条(模拟免落盘期间快照滞后)
-    const rows = [
-      { n: 'a', t: '旧1', ts: 1000, dk: 'd' },
-      { n: 'a', t: '旧2', ts: 2000, dk: 'd' },
-      { n: 'a', t: '新3', ts: 3000, dk: 'd' },
-    ];
-    repoChat.insertMany(rows);
-    g.chat = [{ n: 'a', t: '新3', ts: 3000, dk: 'd' }];
-    const added = hotread.mergeTablesIntoArrays(g, {});
-    expect(added.chat).toBe(2); // 旧1/旧2 补入
-    expect(g.chat.map((m) => m.t)).toEqual(['旧1', '旧2', '新3']); // 时间序
-    // 幂等:再归并一次不重复
-    const again = hotread.mergeTablesIntoArrays(g, {});
-    expect(again.chat).toBe(0);
-    expect(g.chat.length).toBe(3);
-  });
-  it('数组有表无的行(表写失败走老路)归并后保留', () => {
-    g.chat = [{ n: 'a', t: '只在数组', ts: 5000, dk: 'd' }];
-    repoChat.insertMany([{ n: 'a', t: '只在表', ts: 6000, dk: 'd' }]);
-    hotread.mergeTablesIntoArrays(g, {});
-    expect(g.chat.map((m) => m.t).sort()).toEqual(['只在数组', '只在表']);
-  });
-  it('visits/clicks/gateErrors 同样归并', () => {
-    repoVisits.insertMany([
-      { t: 100, id: 'v1' },
-      { t: 200, id: 'v2' },
-    ]);
-    g.visits = [{ t: 200, id: 'v2' }];
-    repoErrors.insertGateMany([
-      { t: 300, msg: 'e1', src: 's', dk: 'd', name: 'n', ip: '1', brand: '', ua: '' },
-    ]);
-    g.clientErrors = [];
-    const added = hotread.mergeTablesIntoArrays(g, {});
-    expect(added.visits).toBe(1);
-    expect(added.gateErrors).toBe(1);
-    expect(g.visits.length).toBe(2);
-    expect(g.clientErrors.length).toBe(1);
   });
 });

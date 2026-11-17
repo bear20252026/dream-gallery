@@ -396,47 +396,10 @@ describe('② 影子写:四个集合在既有写入点旁边落表', () => {
 });
 
 // =====================================================================
-describe('③ 两道总闸', () => {
-  it('SHADOW_WRITE=0:四个写入点全部不落表,响应结论与数组行为一条不变', () => {
-    process.env.SHADOW_WRITE = '0';
-    expect(shadow.on()).toBe(false);
-
-    expect(postChat('关掉影子也要发得出去').res.code).toBe(200);
-    expect(postClick({ link: 'L' }).code).toBe(200);
-    expect(track.flushTrack()).toBe(1);
-    expect(postTrackError({ msg: 'e' }).code).toBe(200);
-    expect(reportClientError({ type: 'js', message: 'm', source: 's' }).code).toBe(200);
-    store.recordVisit(mkReq('203.0.113.44', {}, ua('off')), 'vid-x', null);
-
-    expect(tableCounts()).toEqual({
-      chat_messages: 0,
-      click_events: 0,
-      client_errors: 0,
-      visits: 0,
-    });
-    // 数组侧一切照旧(读路径本来就只吃数组)
-    expect(g.chat.length).toBe(1);
-    expect(g.linkClicks.length).toBe(1);
-    expect(g.clientErrors.length).toBe(1);
-    expect(g.visits.length).toBe(1);
-    // 表侧清扫同样停用
-    expect(shadow.pruneTables({ now: NOW + 999 * DAY, keepMs: retention.RETENTION_MS })).toEqual({
-      chat: 0,
-      clicks: 0,
-      errors: 0,
-      visits: 0,
-    });
-    delete process.env.SHADOW_WRITE;
-  });
-
-  it('SHADOW_WRITE=0 时 shadow.start 不建表也不回填', () => {
-    process.env.SHADOW_WRITE = '0';
-    const rep = shadow.start({ chat: [{ n: 'a', t: 'x', ts: 1 }] });
-    expect(rep.enabled).toBe(false);
-    expect(rep.reason).toBe('SHADOW_WRITE=0');
-    delete process.env.SHADOW_WRITE;
-  });
-
+// 2026-11-17 B5 拆双轨:SHADOW_WRITE 闸拆除(真表唯一权威,SQLite 可用即写)。
+// 原"SHADOW_WRITE=0 四写入点不落表/不建表"两条用例随闸删除。
+// 保留下面两条:它们钉的正是 json/kv 旁路契约——SQLite 不可用时业务照写、不抛、不建库。
+describe('③ SQLite 不可用 ⇒ 旁路契约(USE_SQLITE=0 / 句柄关)', () => {
   it('USE_SQLITE=0(子进程实测):影子层自动停用,.db 压根不生成,业务照写 JSON', () => {
     const dir = fs.mkdtempSync(path.join(tmpDir, 'nosqlite-'));
     const json = path.join(dir, 'gate_data.json');
