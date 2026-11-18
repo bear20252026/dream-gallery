@@ -392,7 +392,28 @@ async function refreshMode() {
   }
 }
 refreshMode();
-setInterval(refreshMode, 60000);
+// 2026-11-18 第五轮审计:补隐藏闸(照 media-files 模式)——后台标签页不空拉,回前台立即补一次。
+// 定时器句柄入 bag,HMR 热替对称清(原 setInterval 无人持有,热替会叠第二条)。
+let modePollTimer = setInterval(refreshMode, 60000);
+function onModeVisibility() {
+  if (document.hidden) {
+    if (modePollTimer) {
+      clearInterval(modePollTimer);
+      modePollTimer = null;
+    }
+  } else {
+    refreshMode();
+    if (!modePollTimer) modePollTimer = setInterval(refreshMode, 60000);
+  }
+}
+document.addEventListener('visibilitychange', onModeVisibility);
+bag.custom.push(function () {
+  if (modePollTimer) {
+    clearInterval(modePollTimer);
+    modePollTimer = null;
+  }
+  document.removeEventListener('visibilitychange', onModeVisibility);
+});
 
 ctx.mode.renderCustomLinks = renderCustomLinks; // 2026-09-20 收编登记册(mode 域)
 ctx.mode.applyTexGate = applyTexGate;

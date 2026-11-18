@@ -11,7 +11,10 @@
 import { ctx } from '../ctx.js';
 
 // 表建一次,挂上 ctx(派发契约不变:eternal.js `const h = ctx.kunlun.eternalHandlers[act]`)
-const handlers = {};
+// 2026-11-18 第五轮审计修正:HMR 热替本文件会重新求值——无条件新建表会把未重执行注册方的
+// 回调静默丢掉(旧 off 闭包指旧表成空操作)。ctx 上已有表则**沿用同一张**,注册方 off/重注册
+// 都落在同一对象上,热替不再丢回调。
+const handlers = ctx.kunlun.eternalHandlers || {};
 ctx.kunlun.eternalHandlers = handlers;
 
 /**

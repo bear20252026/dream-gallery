@@ -200,7 +200,7 @@ let chapter = clampChapter(ctx.store.num('planetsChapter')); // 0..6(6=全部完
 ctx.kunlun.planetsMode = true; // spirits.js:沙漠光柱系统休眠,questActive 恒真
 
 /* ===================== groundOverride 链式注册(浮空岛地面) ===================== */
-const prevOverride = ctx.kunlun.groundOverride; // 可能是 eternal 的链(导入顺序在其后)
+const prevOverride = ctx.kunlun.groundOverride; // 核心链先加载,此刻通常为空;eternal 在后台链随后链式包装(2026-11-18 更正:旧注释把加载序说反了)
 ctx.kunlun.groundOverride = function (x, z) {
   const active = ctx.scene.activeWorld;
   if (active === 'b612') return homeSurface?.height(x, z);
