@@ -42,11 +42,13 @@ const htmlMinify = () => ({
   },
 });
 
-// 构建期预压缩(2026-11-13 发布优化):给 dist 里的大文本资源产出 .gz 旁文件。
-// 为什么:lib/files-static.js 原先对每个 >20KB 的文本首次请求做 gzipSync(level 6),
-// three chunk 876KB 同步压缩会阻塞事件循环几十毫秒,冷启动首屏尤其明显。
-// 预压缩后服务端直接读旁文件发送(它按 mtime 比对,源文件一变即退回实时压缩,不会发陈旧内容)。
-// 只压 >20KB 的 js/mjs/css/html/json/svg —— 与服务端阈值一致;媒体(m4a/mp3/glb/图)不压(已是压缩格式)。
+// 构建期预压缩(2026-11-13 发布优化;2026-11-18 F1 升级):给 dist 文本资源产出 .gz + .br 旁文件。
+// 为什么:lib/files-static.js 原先对每个大文本首次请求做同步压缩,three chunk 876KB
+// 会阻塞事件循环几十毫秒,冷启动首屏尤其明显。预压缩后服务端直接读旁文件发送
+// (按 mtime 比对,源文件一变即退回实时压缩,不会发陈旧内容)。
+// F1:阈值 20KB→5KB(中小 chunk 也受益,与服务端 COMPRESS_MIN 同口径);
+//     增 .br(brotli quality 11,比 gz 再省 ≈15-20%,服务端 br 优先协商)。
+// 媒体(m4a/mp3/glb/图)不压(已是压缩格式)。
 const precompress = () => ({
   name: 'precompress-assets',
   apply: 'build',
@@ -54,10 +56,12 @@ const precompress = () => ({
   closeBundle() {
     const dir = resolve(__dirname, 'dist');
     if (!fs.existsSync(dir)) return;
+    const zlib = require('zlib');
     const exts = new Set(['.js', '.mjs', '.css', '.html', '.json', '.svg']);
     let n = 0,
       before = 0,
-      after = 0;
+      afterGz = 0,
+      afterBr = 0;
     const walk = (d) => {
       for (const e of fs.readdirSync(d, { withFileTypes: true })) {
         const p = resolve(d, e.name);
@@ -68,28 +72,42 @@ const precompress = () => ({
         }
         if (!exts.has(require('path').extname(e.name).toLowerCase())) continue;
         const src = fs.readFileSync(p);
-        if (src.length < 20 * 1024) continue;
-        const gz = require('zlib').gzipSync(src, { level: 9 });
-        // 只在真的更小时才写(极小或已压缩内容可能反而变大)
-        if (gz.length >= src.length) continue;
-        fs.writeFileSync(p + '.gz', gz);
-        // mtime 对齐源文件:服务端判据是 pst.mtimeMs >= st.mtimeMs
+        if (src.length < 5 * 1024) continue;
         const st = fs.statSync(p);
-        fs.utimesSync(p + '.gz', st.atime, st.mtime);
+        const gz = zlib.gzipSync(src, { level: 9 });
+        // 只在真的更小时才写(极小或已压缩内容可能反而变大)
+        if (gz.length < src.length) {
+          fs.writeFileSync(p + '.gz', gz);
+          // mtime 对齐源文件:服务端判据是 pst.mtimeMs >= st.mtimeMs
+          fs.utimesSync(p + '.gz', st.atime, st.mtime);
+          afterGz += gz.length;
+        }
+        const br = zlib.brotliCompressSync(src, {
+          params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 11 },
+        });
+        if (br.length < src.length) {
+          fs.writeFileSync(p + '.br', br);
+          fs.utimesSync(p + '.br', st.atime, st.mtime);
+          afterBr += br.length;
+        }
         n++;
         before += src.length;
-        after += gz.length;
       }
     };
     walk(dir);
     const kb = (b) => (b / 1024).toFixed(0) + 'KB';
-    console.log('[precompress] ' + n + ' 个文本资源已预压缩:' + kb(before) + ' → ' + kb(after));
+    console.log(
+      '[precompress] ' + n + ' 个文本资源已预压缩:' + kb(before) + ' → gz ' + kb(afterGz) + ' / br ' + kb(afterBr)
+    );
     // 自检:three chunk 必须被压到(它是最大的一份,漏了等于优化没生效)
     const assets = resolve(dir, 'assets');
     if (fs.existsSync(assets)) {
       const three = fs.readdirSync(assets).find((f) => /^three-.*\.js$/.test(f));
       if (three && !fs.existsSync(resolve(assets, three + '.gz'))) {
         throw new Error('[precompress] three chunk 没有 .gz 旁文件 ⇒ 首屏仍会走同步压缩,优化未生效');
+      }
+      if (three && !fs.existsSync(resolve(assets, three + '.br'))) {
+        throw new Error('[precompress] three chunk 没有 .br 旁文件 ⇒ br 协商优化未生效');
       }
     }
   },
