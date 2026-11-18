@@ -640,3 +640,25 @@ ctx 171 属性本体按域真拆（最大工程）；koi-ship 2391 行 9 职责�
 ctx 171 属性本体按域真拆（最大工程）；koi-ship 2391 行 9 职责（vox-core 已抽，余下紧耦合）；双放映器（openfilm 自建渲染器 vs voyage iframe，目的不同）；gateData 存储逐域表化（快照 KB 级收益有限，留待数据量变大）。
 
 **G 级终验结论：setAtmosphere 从"三方抢后写覆盖"变"base+override 中央仲裁"，下机不还原缺陷修复、每帧压住 workaround 废除；table-parity 脚手架真正退役（净删 569 行），制度性焊死病根消除。PR #90 待合并。**
+
+---
+
+## 十六、H1：锦鲤天空子系统抽出（2026-11-18 · 并入 PR #90）
+
+> G 级后同分支继续（PR #90 未合并期间叠加 H1，一并审阅）。commit a24b918。
+
+### 拆分内容
+- **新增 src/scene/koi-env.js**（353 行）：setSun / radialTexture / buildSky / buildLights / cloudCluster / buildClouds / 云漂移 updater 整体搬入 `createKoiEnv` 工厂——B6 调研时已认定的内聚子系统（setSun 一处驱动 sunDir/四灯/天穹 uniforms/太阳盘三层）。
+- **koi-ship 2408→2085 行（-323）**：编排层只留 `createKoiEnv({voxCore, scene, koiGroup, cloudGroup, matSoft, updaters})` + 解构使用；八键对外接口（root/update/dispose/applyEnv/setSun/envGroup/cruiseLift/voxelCount）不动。
+- **保真三关键**：①共享 voxCore——rnd 调用序列逐字不变，体素外观零变化；②组装顺序 sky→lights→clouds→… 原样；③sunDir 同一 Vector3 实例供水面 uniforms.uSunDir，setSun 改向即同步。
+- **sunLight 实时 getter**：applyEnv 隐藏沙漠灯时须放行锦鲤自己的太阳灯；getter 在 buildLights 前返回 undefined，与原 let 提升语义一致。
+- **守卫批次 6-6**：天空四函数定义只许 koi-env.js；编排层 skyMat/sunDisc/radialTexture/cloudCluster 细节绝迹（防拆分回退）；env.sunLight 实时引用钉死。
+
+### 验证
+- **实机 16 项 PASS**（.tmp/h1-koienv.cjs，含 G1 仲裁回归 9 项）：登机推层/曝光 1.04/下机还原/进厅 0.92/离厅还原 + 天穹 shader(uZenith) 在位/太阳盘双辉光 sprite=2/云簇≥40/顶点色 mesh>0/uSunDir 归一化日落向 + 0 运行时错误。
+- 门禁：1425 单测（+2 守卫）/ lint 0 / **tsc 真实退出码 0**（前轮 `npm run tc` 是脚本名笔误，正确名 typecheck，本轮已用 npx tsc --noEmit 直验）/ deps 0 / 后端 7 组。
+
+### 剩余（诚实标注）
+ctx 171 属性本体按域真拆（最大工程）；koi-ship 2085 行（vox-core/koi-env 已抽，余下鲤身/庭园/水面/鹤/花瓣构建紧耦合）；双放映器（目的不同）；gateData 存储逐域表化（收益有限，留待数据量变大）。
+
+**H1 终验结论：锦鲤最大文件再减 323 行，天空子系统单一归属且守卫防回退，rng 保序外观零变化，实机含 G1 回归全绿。PR #90（G+H 级，4 提交）待合并。**
