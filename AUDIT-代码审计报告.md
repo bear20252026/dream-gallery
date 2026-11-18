@@ -463,3 +463,39 @@ ctx 按所有权真拆、gateData 按域拆+鉴权簇收敛、saveGateData 增�
 - 冷路径 per-collection kv 增量：当前快照 KB 级收益有限，留待数据量真正变大后与逐行化一起做。
 
 **C 级终验结论：三项治本重构完成并验证，PR #85 待合并。写放大最高频根源已根治（无变更请求零写盘+突发合并），ctx 三个多写属性全部有了 owner（含一个真 bug 修复），store 职责收敛 -132 行。上帝对象本体拆分是下一座山。**
+
+---
+
+## 十一、D 级：鉴权簇收敛 + gateData 按域拆（2026-11-17 · 主人批准"先合并再继续"，PR #86）
+
+> 前置：PR #85（C 级）已合并主干（merge a56a0c8）。D 级在分支 refactor/d-gatedata-authz-2026-11-17，7 提交，每阶段独立验证可回滚。这是第三轮审计标注的"下一座山"——改动面最大的一项。
+
+### D1 鉴权簇收敛（五阶段，懒 require 36 → 个位数）
+
+调研先实跑 depcruise 确认基线口径，发现审计所述四环咬尾**已被早期叶子拆分断开大部分**，现存唯一真环对是 admin↔files-upload 互指；多数懒 require 是惯性而非断环。据此分五阶段：
+
+1. **authz.js**（阶段1）：admin 会话族（sidHash/issue/ok/cookie）+ token 判定（sameToken/tokenOk/tokenOkPage）从 admin.js 迁出为纯判定叶子（只依赖 config/util/store/local-request/crypto）。新增 **adminWrite 统一判据**（tokenOk ‖ 未配TOKEN时本地），收敛 files-upload 三处 + routes 一份共 **4 份重复表达式**；逐字保留原式（覆盖"曾配 TOKEN 签发会话后撤掉"的边缘场景）。admin re-export 保形状，6 个纯 tokenOk 消费方（abuse/track/bigscreen/client-errors/chat/siteconfig）改直依赖 authz，不再拖 admin handler 链。
+2. **sse-bus.js**（阶段2）：SSE 推送通道（注册/通知/踢出+资源闸）拆叶子，**admin→gate 环核心边消失**；admin.sseNotify 与 publish.sseKick 改直依赖。
+3. **r2-mirror.js**（阶段3）：镜像三门面（r2Mirror/r2HealMedia/r2PendingMedia，进程内待补推集合+持久台账接线）拆叶子，**admin↔files-upload 唯一真环对消失**；admin 批量批准/拒绝分支 9 处懒 require 顶部化。接线口径守卫测试随实现迁改钉（syncPut 必经台账断言移到 r2-mirror，语义不变）。
+4. **media-access.js**（阶段4）：媒体归属/可见性门禁（isMineUpload/canServeMedia+认领合并落盘）拆叶子，security/files-upload 懒加载消除；可见性判定仍只此一处（吃 mediarules.mjs 决策表）。
+5. **阶段5**：files-upload 六处 store / transcode 三处 / chunks 一处 / client-errors+tts-stats 的 clientIp（改直依赖 request-identity）/ chat ratelimit / util CORS 常量，惯性懒 require 批量顶部化。
+
+**结果**：核心簇懒 require 从 36 处收敛至个位数（残余仅 r2outbox→r2sync 四处单测打桩刻意留 + retention 两处 store→retention 环警示保守留 + server 启动生命周期合理懒加载）。四个新叶子均只依赖低位，depcruise no-circular 硬闸每阶段验绿。
+
+### D2 gateData 按域拆（试点 + 内容域）
+
+调研给出 29 集合消费矩阵与独立性排序。**存储机制（kv 快照+JSON 镜像+写队列）不动，域拆是接口收窄不是存储重构**；store 导出形状一字不改，守卫测试零改动。
+
+- **身份处置域门面 domain/identity.js**（试点）：收编 kick/approve/note 处置（写动作内含落盘+SSE 秒级通知+踢出历史裁剪）+ blockIp/unblockIp/isIpBlocked 拉黑 + blockedList/kickLogTail 读口径。admin 处置三分支与拉黑分支改门面调用（不再内联写档案字段+各自 save）；gate.isIpBlocked 改门面读口径（判定与写入收归同一处）。**实机隔离验证 12 项全 PASS**：kick→403+历史入账 / approve→恢复放行 / block→403 / unblock→恢复 / note 写入。
+- **跨域昵称读口径 nickOf**（内容域）：chat/wishes 此前各写一份**逐字同构**的 nickOf（扫 applicants 取雅号）——重复实现+跨域直读档案。收编进 identity.nickOf 单一口径，两模块改调用。**实机验证**：起名后 chat 发言与 wishes 一念同取雅号，两域一致 PASS。
+
+### 诚实标注（本期不收，留待单独评审）
+- **applicants 档案本体**：8 文件 25+ 处直写（含 gate.js 两处整档覆写），跨域引用最密，强收编改动面大、回归风险高。
+- **uploads/photoCaptions**：10 文件，上传/转码/审核竞态契约密集，不宜盲动。
+- **四热集合数组侧 / 四张 rate 表**：B5 双轨+回填签名 / capKeys 与 retention 清扫耦合，收益低，不动。
+- watchIps 无业务写点（半死键），建议单独确认后废弃而非收编。
+
+### 验证汇总
+1422 单测 / 后端 7 组 / lint / deps 环闸 0 / 部署清单 62 可达 ✅。D2 处置流 12 项 + 昵称两域一致实机 PASS。每阶段独立跑 depcruise+vitest 可回滚。
+
+**D 级终验结论：鉴权簇四叶子拆分完成，admin→gate 与 admin↔files-upload 两条环边消失，懒 require 36→个位数，adminWrite 4 份重复归一；gateData 按域拆落地身份处置域+昵称口径（接口收窄，存储不动）。applicants/uploads 两个最密域诚实留待单独评审。PR #86 待合并。**
