@@ -7,6 +7,7 @@
 // 体素几何为顶点色合并网格,单次 draw call 一类,性能友好。
 import * as THREE from 'three';
 import { createVoxCore } from '../shared/vox-core.js'; // 体素核心(rng/颜色/Vox/solid),2026-11-17 B6 抽出
+import { pushAtmosphereOverride } from './atmosphere-arbiter.js'; // 氛围中央仲裁(G1:登机推层/下机off还原)
 
 export const KOI_SHIP_NAME = { zh: '云海之鲤', en: 'Koi of the Cloud Sea' };
 
@@ -2293,6 +2294,11 @@ export function createKoiShip(opts = {}) {
         });
       }
     });
+    // G1 兜底:dispose 未经 applyEnv(false) 直达时(异常路径),氛围层也不残留
+    if (saved.offAtmos) {
+      saved.offAtmos();
+      saved.offAtmos = null;
+    }
   }
   // —— 飞行氛围:登机接管 / 下机还原(复用游戏渲染器,视觉与原作品一致) ——
   // 原作品是「云海上的锦鲤」:云在船体下方 y≈-60~-112,没有地面。游戏沙漠地形/天穹/灯光
@@ -2360,8 +2366,14 @@ export function createKoiShip(opts = {}) {
         }
       });
       sc.s.fog = envFog; // 复用同一 Fog 实例,setSun 改色即同步到游戏场景
-      sc.setAtmosphere &&
-        sc.setAtmosphere({ bloomStrength: 0.62, bloomThreshold: 0.78, exposure: 1.04 });
+      // G1:飞行调性经中央仲裁推层(不再直调 setAtmosphere 与昼夜层抢后写覆盖);
+      // 下机 off 即还原最新昼夜基准——修"下机不还原氛围"缺陷(原靠昼夜恢复后每帧覆盖兜底)。
+      if (saved.offAtmos) saved.offAtmos(); // 防重入叠层(快速上下机)
+      saved.offAtmos = pushAtmosphereOverride('koi-flight', {
+        bloomStrength: 0.62,
+        bloomThreshold: 0.78,
+        exposure: 1.04,
+      });
       setSun(0.2); // 原作品默认日落高度
       envApplied = true;
     } else {
@@ -2374,6 +2386,11 @@ export function createKoiShip(opts = {}) {
           saved.hidden.forEach((o) => {
             o.visible = true;
           });
+        // G1:氛围层对称退订——off 即落回最新昼夜基准(修"下机不还原"缺陷)
+        if (saved.offAtmos) {
+          saved.offAtmos();
+          saved.offAtmos = null;
+        }
         envApplied = false;
       }
     }

@@ -27,6 +27,7 @@ import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { onMediaFiles } from '../media-files.js'; // 共享媒体列表管道:单轮询+SSE+隐藏暂停,与新媒体墙共用(2026-11-17 B7)
 import { addGroundLayer } from '../shared/ground-resolver.js'; // 地面中央层栈(E1:off按身份移除,不依赖LIFO)
+import { pushAtmosphereOverride } from '../scene/atmosphere-arbiter.js'; // 氛围中央仲裁(G1:进厅推层/离厅off)
 import {
   marbleTexture,
   floorInlayTexture,
@@ -936,9 +937,11 @@ function setUnlocked(announce) {
 // 所以这里**只做两件小事**,不动灯光/天穹(那些是排查途中基于误判的改动,已收回):
 //   ① 背景换星夜蓝:展厅在 400m 高空,窗外不该是沙漠暖色;
 //   ② 曝光略降 + 辉光收敛:星夜画廊的调性,画作不被 Bloom 冲淡。
-// ⚠️ 昼夜层每帧写曝光/辉光 ⇒ 厅内要持续压住;背景没人管,离厅时自己还原。
+// 2026-11-18 G1:厅内调性经中央氛围仲裁推层——override 在位时昼夜基准只记录不生效,
+// **不再需要每帧压住**(旧 workaround 废除);离厅 off 即落回最新昼夜基准。背景仍自管。
 let hallMoodOn = false;
 let savedBg = null;
+let offHallAtmos = null;
 const HALL_MOOD = { bloomStrength: 0.16, bloomThreshold: 0.88, exposure: 0.92 };
 function applyHallMood(inHallNow) {
   if (inHallNow === hallMoodOn) return;
@@ -947,11 +950,15 @@ function applyHallMood(inHallNow) {
   if (inHallNow) {
     savedBg = sc ? sc.background : null;
     if (sc) sc.background = new THREE.Color(0x0a0f1e);
-    ctx.scene.setAtmosphere && ctx.scene.setAtmosphere(HALL_MOOD);
+    if (offHallAtmos) offHallAtmos(); // 防重入叠层
+    offHallAtmos = pushAtmosphereOverride('hall', HALL_MOOD);
   } else {
     if (sc) sc.background = savedBg;
     savedBg = null;
-    // 曝光/辉光交回昼夜层(它每帧都写,下一帧自然覆盖)
+    if (offHallAtmos) {
+      offHallAtmos();
+      offHallAtmos = null;
+    } // 落回最新昼夜基准(无需等下一帧)
   }
 }
 
@@ -968,8 +975,7 @@ onTick(function () {
   // 永远盖在不透明几何之上。玩家进厅后相机距它仅 1.6m ⇒ 整屏被暖光糊满,
   // 星空顶与画作全被洗白。隐藏它之后夜蓝星图立刻显现(实机截图对比确认)。
   halo.visible = unlocked && !inHallNow;
-  // 昼夜层每帧覆写曝光/辉光 ⇒ 厅内必须持续压住,否则下一帧又被推回沙漠调性
-  if (hallMoodOn) ctx.scene.setAtmosphere && ctx.scene.setAtmosphere(HALL_MOOD);
+  // (G1:原"厅内每帧压住氛围"workaround 已废——中央仲裁 override 在位时昼夜基准不生效)
   if (unlocked) doorMat.emissiveIntensity = 0.45 + Math.sin(t * 2) * 0.15;
   for (let i = 0; i < shaftMats.length; i++)
     shaftMats[i].opacity = 0.42 + Math.sin(t * 1.2 + i * 1.7) * 0.08;
