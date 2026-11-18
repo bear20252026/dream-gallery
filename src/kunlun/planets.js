@@ -28,6 +28,7 @@ import { tt } from '../shared/story-text.mjs';
 import { legacyOn } from '../shared/legacy.mjs';
 import { errText } from '../shared/err-text.mjs'; // loader 的 onError 形参由 three 声明成 unknown,不能假定它有 .message
 import { planetMesh, box, cyl, numSprite } from './planets-mesh.js'; // 网格工厂(2026-11-11 巨型文件拆分抽离)
+import { addGroundLayer } from '../shared/ground-resolver.js'; // 地面中央层栈(E1:off按身份移除,不依赖LIFO)
 const bag = hotBegin('planets');
 const { s, onTick } = ctx;
 
@@ -199,20 +200,20 @@ function loadWorldAsset(url, world, opts = {}) {
 let chapter = clampChapter(ctx.store.num('planetsChapter')); // 0..6(6=全部完成;脏数据钳制,2026-09-24 下沉 story-progress.mjs)
 ctx.kunlun.planetsMode = true; // spirits.js:沙漠光柱系统休眠,questActive 恒真
 
-/* ===================== groundOverride 链式注册(浮空岛地面) ===================== */
-const prevOverride = ctx.kunlun.groundOverride; // 核心链先加载,此刻通常为空;eternal 在后台链随后链式包装(2026-11-18 更正:旧注释把加载序说反了)
-ctx.kunlun.groundOverride = function (x, z) {
+/* ===================== 地面层栈注册(浮空岛/星球地面,2026-11-18 E1) ===================== */
+// 中央层栈(ground-resolver):命中返回高度,未命中 undefined 交还下层。
+// off 按层身份移除,不依赖 LIFO——与 eternal/resetview/museum 的注册/热替顺序解耦。
+const offPlanetGround = addGroundLayer(function (x, z) {
   const active = ctx.scene.activeWorld;
   if (active === 'b612') return homeSurface?.height(x, z);
   if (active && /^king\d+$/.test(active)) {
     return planetByNum(active.replace('king', '')) ? R * 0.42 : 0;
   }
   const top = islandTopAt(x, z); // 浮空岛顶面(命中返回 y,未命中 null)
-  if (top !== null) return top;
-  return prevOverride ? prevOverride.call(this, x, z) : undefined;
-};
+  return top !== null ? top : undefined;
+}, 'planets-islands');
 bag.custom.push(function () {
-  ctx.kunlun.groundOverride = prevOverride; // HMR 解链
+  offPlanetGround(); // HMR 对称退订(只摘自己这层)
 });
 
 /* ===================== 材质工具(零 PointLight:顶亮底暗顶点色;2026-11-11 抽离至 planets-mesh.js) ===================== */

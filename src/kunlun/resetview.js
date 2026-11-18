@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { registerEternalHandler } from './eternal-handlers.js'; // C8:回调表单一owner,散写改注册API
+import { addGroundLayer } from '../shared/ground-resolver.js'; // 地面中央层栈(E1:off按身份移除,不依赖LIFO)
 const bag = hotBegin('resetview');
 const { s, onTick, iG } = ctx;
 
@@ -41,14 +42,12 @@ pg.add(hit);
 pg.userData = { eternalAction: 'resetview' };
 s.add(pg);
 iG.push(pg);
-// 平台可踩(链式包装 eternal.js 的地面:平台面 +0.15,其余原样)
-const prevOver = ctx.kunlun.groundOverride;
-ctx.kunlun.groundOverride = function (x, z) {
+// 平台可踩(地面层栈注册,E1:平台面 +0.15,其余 undefined 交还下层;off 按身份移除)
+const offPlatformGround = addGroundLayer(function (x, z) {
   const dx = x - HX,
     dz = z - HZ;
-  if (dx * dx + dz * dz < 0.81) return FLOOR + 0.15;
-  return prevOver ? prevOver(x, z) : undefined;
-};
+  return dx * dx + dz * dz < 0.81 ? FLOOR + 0.15 : undefined;
+}, 'resetview-platform');
 
 // ===================== 光粒拖尾(天青) =====================
 const TN = 20,
@@ -216,7 +215,7 @@ bag.custom.push(() => {
   const gi = iG.indexOf(pg);
   if (gi >= 0) iG.splice(gi, 1);
   document.removeEventListener('mousedown', skipEv, true);
-  ctx.kunlun.groundOverride = prevOver; // 解链,归还 eternal.js 原地面
+  offPlatformGround(); // E1:层栈对称退订(只摘自己这层,其他层原样)
   if (plane && home) {
     const fg = oldestFrame();
     if (fg) {

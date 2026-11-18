@@ -26,6 +26,7 @@ import { ctx } from '../ctx.js';
 import { eventBus } from '../event-bus.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { onMediaFiles } from '../media-files.js'; // 共享媒体列表管道:单轮询+SSE+隐藏暂停,与新媒体墙共用(2026-11-17 B7)
+import { addGroundLayer } from '../shared/ground-resolver.js'; // 地面中央层栈(E1:off按身份移除,不依赖LIFO)
 import {
   marbleTexture,
   floorInlayTexture,
@@ -53,14 +54,11 @@ const DOME_R = 15.4; // 穹顶半径(略小于墙圈,坐在檐口内)
 const DOME_H = 11; // 穹顶起拱高度
 const inHall = (x, z) => (x - HX) * (x - HX) + (z - HZ) * (z - HZ) < 18.5 * 18.5; // 含南侧平台
 // 物理接管(player.js groundY 每帧询问):厅内地面=展厅地板;走出平台边缘=回到沙漠引力(可滑翔落地)
-// 2026-11-17 C8 修复抹链 bug:实际加载序 planets(核心链)→eternal(后台链),此前裸赋值会
-// 整个抹掉 planets 已注册的浮空岛/星球地面链。改链式包装(照 planets.js 同款):厅内命中
-// 返回 FLOOR,未命中交还下层(prevOverride),不再吞掉别人的地面。
-const prevGroundOverride = ctx.kunlun.groundOverride;
-ctx.kunlun.groundOverride = function (x, z) {
-  if (inHall(x, z)) return FLOOR;
-  return prevGroundOverride ? prevGroundOverride.call(this, x, z) : undefined;
-};
+// 2026-11-18 E1:改中央层栈注册(ground-resolver)——厅内命中返回 FLOOR,未命中 undefined
+// 交还下层。off 按层身份移除,不依赖 LIFO:单独热替本模块不再抹掉上层(resetview/museum)。
+const offHallGround = addGroundLayer(function (x, z) {
+  return inHall(x, z) ? FLOOR : undefined;
+}, 'eternal-hall');
 // 小地图禁区(player.js 传送前询问):万镜画廊只能从金门进入
 ctx.kunlun.eternalKeepOut = function (x, z) {
   return inHall(x, z);
@@ -1007,8 +1005,8 @@ bag.custom.push(() => {
   ctx.scene.removeBounds && ctx.scene.removeBounds(myBounds);
   ctx.kunlun.eternalClick = null;
   ctx.kunlun.eternalKeepOut = null;
-  // C8:链式包装的对称解链——还原下层(planets 的岛面链),不是置 null 抹掉整条链
-  ctx.kunlun.groundOverride = prevGroundOverride || null;
+  // E1:层栈对称退订——只摘自己这层,其他层(planets/resetview/museum)原样保留
+  offHallGround();
   ctx.kunlun.eternalTeleport = null;
   offTeleportEvt();
   ctx.kunlun.eternalWelcome = null;
