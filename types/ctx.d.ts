@@ -356,8 +356,9 @@ export interface MediaNamespace {
   startVidSeq: () => void;
   /** 播放第 i 条画廊音轨 ← src/scene/media/gallery-audio.js:83 */
   playGalleryAudio: (i: number) => Promise<void>;
-  /** 当前(或补间中)的日照小时 ← src/scene/time-shift.js:32,38 */
-  dayTimeSource: () => number;
+  /** 当前(或补间中)的日照小时。单一 owner=src/scene/time-shift.js(shiftDayTo/lockDayAt/releaseDay);
+   *  null=放回自动循环(releaseDay 写入),其他模块只读、要锁时经 owner 接口(2026-11-17 C8 收编) */
+  dayTimeSource: (() => number) | null;
 }
 
 export interface GalleryNamespace {

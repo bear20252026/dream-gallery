@@ -295,19 +295,33 @@ describe('批次6-4 eternalHandlers:值签名照派发契约写,不照某个 han
     expect(raw).toBe('Record<string, (cg: Object3D) => void>');
   });
 
-  it('五个注册者参数最多一个、有的必须叫 cg,且各自都配了 delete 收手', () => {
-    const regs = scan(/^ctx\.kunlun\.eternalHandlers\.(\w+)\s*=\s*function\s*\(([^)]*)\)\s*\{?/);
+  // 2026-11-17 C8 收编:散写形态(键赋值+delete)改为 owner 注册 API。
+  // 断言语义不变:键集恰为五个/参数≤1且名叫cg/注册必配 off 收手;另钉散写形态绝迹。
+  it('五个注册者经 registerEternalHandler 注册,参数最多一个、有的必须叫 cg,且各自都配了 off 收手', () => {
+    const regs = scan(/registerEternalHandler\('(\w+)',\s*function\s*\(([^)]*)\)\s*\{?/);
     const keys = regs.map((r) => r.match[1]).sort();
     expect(keys).toEqual(['chime', 'fireplace', 'resetview', 'snowwin', 'spiritmark']);
     for (const r of regs) {
       const ps = paramsOf(r.match[2]);
       expect(ps.length).toBeLessThanOrEqual(1);
       if (ps.length === 1) expect(ps[0].name).toBe('cg');
-      const off = read(r.rel).match(
-        new RegExp(`delete ctx\\.kunlun\\.eternalHandlers\\.${r.match[1]}`)
+      // off 配对:注册句柄 const offXxx = registerEternalHandler(...) 且拆场调用 offXxx()
+      const handle = read(r.rel).match(
+        new RegExp(`const (off\\w+)\\s*=\\s*registerEternalHandler\\('${r.match[1]}'`)
       );
-      if (!off) throw new Error(`${r.rel} 注册了 ${r.match[1]} 但没有 delete —— 拆场景会留活引用`);
+      if (!handle)
+        throw new Error(`${r.rel} 注册 ${r.match[1]} 没接住 off 句柄 —— 拆场景会留活引用`);
+      const called = read(r.rel).match(new RegExp(`${handle[1]}\\(\\)`));
+      if (!called) throw new Error(`${r.rel} 注册了 ${r.match[1]} 但没调用 ${handle[1]}() 收手`);
     }
+  });
+
+  it('散写形态绝迹:除 owner(eternal-handlers.js)外,任何文件不得直写 eternalHandlers 表', () => {
+    const writes = scan(
+      /ctx\.kunlun\.eternalHandlers\s*=|ctx\.kunlun\.eternalHandlers\.\w+\s*=|delete ctx\.kunlun\.eternalHandlers\./
+    );
+    const rogue = writes.filter((w) => w.rel !== 'src/kunlun/eternal-handlers.js');
+    expect(rogue.map((w) => `${w.rel}:${w.line}`)).toEqual([]);
   });
 });
 

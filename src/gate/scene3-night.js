@@ -10,7 +10,7 @@ import { SCENE3, tt, whoSpk } from '../shared/story-text.mjs';
 import { replyChoices } from '../shared/dialog-replies.mjs';
 import { spawnFloatArrow, tickArrow, removeFloatArrow } from '../scene/guide-arrow.js';
 import { createBeaconKeeper, pulseBeacon } from '../shared/beacon-manager.js';
-import { shiftDayTo } from '../scene/time-shift.js';
+import { shiftDayTo, lockDayAt } from '../scene/time-shift.js'; // C8:dayTimeSource 单一 owner,散写改经接口
 import { DAY_HOURS } from '../shared/dayphase-logic.mjs';
 import { ENDING_GATE_CHAPTER } from '../shared/ending-logic.mjs'; // 结局线门槛(2026-10-03)
 
@@ -69,10 +69,9 @@ function armNight() {
     shiftDayTo(DAY_HOURS.NIGHT, 5000);
   } catch (e) {
     console.debug('[scene3-night] 转夜快切失败(回退瞬锁):', e);
+    // 2026-11-17 C8:dayTimeSource 收编单一 owner=time-shift.js,散写改经 lockDayAt
     try {
-      ctx.media.dayTimeSource = function () {
-        return DAY_HOURS.NIGHT;
-      };
+      lockDayAt(DAY_HOURS.NIGHT);
     } catch (e2) {}
   }
   buildBox();
