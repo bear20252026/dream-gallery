@@ -120,8 +120,11 @@ function ensureMusic() {
   mA.volume = 0.5;
   mA.preload = 'auto';
   // 订阅共享管道(订阅即喂缓存/首订即拉一次;music 目录 SSE 变更也触发,见 media-files.js)。
-  // 模块级订阅与 paintings 同款:页面生命周期常驻,隐藏暂停由管道统一负责。
-  onMediaFiles(applyMusicList);
+  // 2026-11-18 E2:接住 off 挂世界退订钩(与 paintings 同款),重装配前摘除不叠双份。
+  const offMusicMedia = onMediaFiles(applyMusicList);
+  if (typeof window !== 'undefined' && window.__onWorldTeardown) {
+    window.__onWorldTeardown(offMusicMedia);
+  }
   if (!musicEndedBound) {
     musicEndedBound = true;
     mA.addEventListener('ended', function () {
