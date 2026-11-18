@@ -586,3 +586,29 @@ lint/tsc 0、checkJs 基线 2、1422 单测(122文件)、后端 7 组全过、de
 - .br 预压缩 + gz 覆盖扩面（优化旧账）；ctx 171 属性本体按域真拆（最大工程）；koi-ship 2391 行 9 职责；双放映器；setAtmosphere 3 直调无仲裁；table-parity 制度性焊死。
 
 **E 级终验结论：groundOverride 从"四写者 LIFO 纪律链"变"中央层栈单一 owner"，HMR 解链顺序病根治，C8 守卫欠账补齐；订阅对称收手落地（真实泄漏面已修，player 监听经核实非泄漏诚实不动）。PR #88 待合并。**
+
+---
+
+## 十四、F 级：.br 预压缩 + applicants 写面第二刀（2026-11-18 · PR #89）
+
+> 前置：PR #88（E 级）已合并（远端 merge 557d746）。F 级在分支 refactor/f-br-applicants-2026-11-18，2 提交。
+
+### F1 .br 预压缩 + 协商升级（优化旧账清零）
+- **vite precompress**：增 .br（brotli quality 11）+ 阈值 20KB→5KB。**73 个文本资源双旁文件**（原 35 个仅 gz），gz 2969KB → br 2285KB（**再省 23%**）；中小 chunk（5-20KB）从不压变 br 压。自检扩到 three .br 必在；**repro 逐字节一致（324 文件）**——br 确定性满足 R6 不变发布前提。
+- **files-static tryGzip→tryCompress**：Accept-Encoding 含 br 优先 .br 旁文件/实时 br（q5 折中防阻塞事件循环），gzip 兜底；缓存键带编码防 br/gz 串内容；mtime 陈旧防护保留（源变即实时压新内容）。
+- **单元验证 9 项 PASS**：br 优先/br 可解等于源/br 比 gz 小（实测样本 42.6%）/仅 gz 客户端回 gz/identity 回原文流式/Vary 含 Accept-Encoding/源变更不送陈旧/8KB 也压。
+
+### F2 applicants 写面第二刀（D2 续，12.6 第 3 项落地）
+- **identity 门面增 7 写函数**：markSuspicious/clearSuspicious/clearAllSuspicious（反刷打标清标）、markKickedByMerge（强信号归并踢出）、applyReentry（重进申请 60 字裁剪）、attachFingerprint（指纹补采自带 save）、touchVisit（访问计数）。
+- **abuse/track/gate 字段级散写收编**：abuse 三处打标清标改门面，**dismiss+清标合并一次落盘（原两次）**；track 指纹补采改门面；gate 归并踢出与重进申请改门面。
+- **落盘纪律**：noSave 函数注明——调用方事务收口统一落盘，避免一请求多次整库写。
+- **诚实标注不收**：整档覆写（建档/归并 Object.assign）是身份建立语义，留 gate；store.recordVisit 两行留原地（identity 依赖 store，反向 require 即成环，depcruise 硬闸）。
+- **验证**：实机 4 项（指纹 fph 写入/重进受理/裁剪写入/approve 恢复）+ 预警门面直测 4 项（打标/理由/昵称读口径分离不丢/全 dismiss 清标）全 PASS。
+
+### 验证汇总
+1424 单测 / 后端 7 组 / lint / tsc / deps 环闸 0 / 构建可复现（324 文件）。
+
+### 剩余（诚实标注）
+ctx 171 属性本体按域真拆（最大工程）；koi-ship 2391 行 9 职责；双放映器；setAtmosphere 3 直调无仲裁；table-parity 制度性焊死；gateData 存储逐域表化（快照 KB 级收益有限，留待数据量变大）。
+
+**F 级终验结论：.br 优化旧账清零（73 资源双旁文件再省 23%，repro 保持）；applicants 字段级写面收编 identity 门面（abuse/track/gate 三模块，dismiss 落盘 2→1），整档覆写与底座环约束诚实留置。PR #89 待合并。**
