@@ -696,15 +696,21 @@ describe('接线口径(不许再退回裸 fire-and-forget)', () => {
   it('files-upload / bigscreen 的镜像与删除全部改走 r2outbox,不再直连 r2sync', () => {
     const fuSrc = codeOnly(fs.readFileSync(path.join(ROOT, 'lib', 'files-upload.js'), 'utf8'));
     const bsSrc = codeOnly(fs.readFileSync(path.join(ROOT, 'lib', 'bigscreen.js'), 'utf8'));
-    // 三个上传镜像点 + 压缩后镜像都经 r2Mirror → r2outbox.syncPut;删除经 syncDelete
+    // 2026-11-17 D1 阶段3:镜像三门面(r2Mirror/r2HealMedia/r2PendingMedia)迁 lib/r2-mirror.js
+    // 叶子(断 admin↔files-upload 真环对)。"syncPut 必经台账"的断言随实现迁到新家,语义不变;
+    // files-upload 仍须 re-export 三门面(内部调用与消费方形状)且删除仍经 syncDelete。
+    const rmSrc = codeOnly(fs.readFileSync(path.join(ROOT, 'lib', 'r2-mirror.js'), 'utf8'));
+    expect(rmSrc).toContain("require('./r2outbox')");
+    expect(rmSrc).toContain('r2outbox.syncPut(dir, name, filePath)');
+    expect(fuSrc).toContain("require('./r2-mirror')"); // 门面经叶子,不再自持实现
     expect(fuSrc).toContain("require('./r2outbox')");
-    expect(fuSrc).toContain('r2outbox.syncPut(dir, name, filePath)');
     expect(fuSrc).toContain('r2outbox.syncDelete(dir, name)');
+    expect(bsSrc).toContain("require('./r2-mirror')");
     expect(bsSrc).toContain("require('./r2outbox')");
     expect(bsSrc).toContain('r2outbox.syncPut(dir, keyName, filePath)');
     expect(bsSrc).toContain("r2outbox.syncDelete('videos', BSCREEN_KEY + '/' + old)");
     // 旧的"吞掉失败"写法一个都不许留(那正是"永久缺席 R2"的成因),也不再直连 r2sync
-    for (const s of [fuSrc, bsSrc]) {
+    for (const s of [fuSrc, bsSrc, rmSrc]) {
       expect(s).not.toMatch(/r2(Put|Delete)\([^)]*\)\s*\.catch\(\(\)\s*=>\s*\{\}\)/);
       expect(s).not.toMatch(/require\('\.\/r2sync'\)/);
     }
