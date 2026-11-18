@@ -402,6 +402,31 @@ describe('批次6-4c setAtmosphere:场景接管经中央仲裁,散写绝迹(G1)'
   });
 });
 
+// H1:锦鲤天空/太阳/环境灯/云抽 koi-env.js。钉死拆分不回退:
+// 编排层不许再长回天空实现;setSun 单一定义在 koi-env;水面 uSunDir 与 env 共享同一实例。
+describe('批次6-6 koi-env:天空子系统单一归属,编排层只组装(H1)', () => {
+  it('setSun/buildSky 定义只在 koi-env.js;koi-ship 只解构使用', () => {
+    const defs = scan(/function (setSun|buildSky|buildLights|buildClouds)\s*\(/);
+    expect(defs.map((w) => w.rel).filter((r, i, a) => a.indexOf(r) === i)).toEqual([
+      'src/scene/koi-env.js',
+    ]);
+    const k = read('src/scene/koi-ship.js');
+    expect(k).toMatch(
+      /const env = createKoiEnv\(\{ voxCore, scene, koiGroup, cloudGroup, matSoft, updaters \}\)/
+    );
+    expect(k).toMatch(/const \{ setSun, buildSky, buildLights, buildClouds, sunDir \} = env/);
+    // 天空实现细节绝迹于编排层(防拆分回退)
+    expect(k).not.toMatch(/skyMat|sunDisc|radialTexture|cloudCluster/);
+  });
+
+  it('applyEnv 沙漠灯判定用 env.sunLight 实时 getter(buildLights 前 undefined 也安全)', () => {
+    const k = read('src/scene/koi-ship.js');
+    expect(k).toMatch(/o !== env\.sunLight/);
+    const e = read('src/scene/koi-env.js');
+    expect(e).toMatch(/get sunLight\(\)/);
+  });
+});
+
 describe('批次6-5 navigator.deviceMemory:声明文件必须真的在 checkJs 程序里', () => {
   const BG = 'types/browser-globals.d.ts';
 
