@@ -427,6 +427,25 @@ describe('批次6-6 koi-env:天空子系统单一归属,编排层只组装(H1)',
   });
 });
 
+// H2:花瓣粒子/鹤群抽 koi-ambient.js。同 H1 纪律:单一归属+编排层细节绝迹;
+// blossomEmitters 必须同引用注入(buildTrees 填、respawnPetal 读,拷一份就断时序)。
+describe('批次6-7 koi-ambient:装饰子系统单一归属,发射点同引用(H2)', () => {
+  it('buildPetals/buildCranes/makeCrane/respawnPetal 定义只在 koi-ambient.js', () => {
+    const defs = scan(/function (buildPetals|buildCranes|makeCrane|respawnPetal)\s*\(/);
+    expect(defs.map((w) => w.rel).filter((r, i, a) => a.indexOf(r) === i)).toEqual([
+      'src/scene/koi-ambient.js',
+    ]);
+    const k = read('src/scene/koi-ship.js');
+    expect(k).toMatch(
+      /const ambient = createKoiAmbient\(\{ voxCore, root, craneGroup, matPetal, blossomEmitters, updaters \}\)/
+    );
+    expect(k).toMatch(/const \{ buildPetals, buildCranes \} = ambient/);
+    // 装饰实现细节绝迹于编排层(防拆分回退);blossomEmitters 仍在编排层(buildTrees 填)
+    expect(k).not.toMatch(/makeCrane|respawnPetal|_dummy|petals/);
+    expect(k).toMatch(/blossomEmitters\.push/);
+  });
+});
+
 describe('批次6-5 navigator.deviceMemory:声明文件必须真的在 checkJs 程序里', () => {
   const BG = 'types/browser-globals.d.ts';
 

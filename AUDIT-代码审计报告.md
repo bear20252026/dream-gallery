@@ -662,3 +662,24 @@ ctx 171 属性本体按域真拆（最大工程）；koi-ship 2391 行 9 职责�
 ctx 171 属性本体按域真拆（最大工程）；koi-ship 2085 行（vox-core/koi-env 已抽，余下鲤身/庭园/水面/鹤/花瓣构建紧耦合）；双放映器（目的不同）；gateData 存储逐域表化（收益有限，留待数据量变大）。
 
 **H1 终验结论：锦鲤最大文件再减 323 行，天空子系统单一归属且守卫防回退，rng 保序外观零变化，实机含 G1 回归全绿。PR #90（G+H 级，4 提交）待合并。**
+
+---
+
+## 十七、H2：锦鲤装饰子系统抽出（2026-11-18 · PR #91）
+
+> 前置：PR #90（G+H1）已合并（远端 merge 750ae77），本地 main 快进对齐。H2 在分支 refactor/h2-koi-ambient-2026-11-18。
+
+### 拆分内容
+- **新增 src/scene/koi-ambient.js**（224 行）：buildPetals（400 粒 InstancedMesh 花瓣）/ respawnPetal / _dummy / makeCrane（体素鹤建模）/ buildCranes（5 只绕飞）及两条动画 updater 整体搬入 `createKoiAmbient` 工厂——两个纯装饰动画子系统，与鲤身/庭园构建零耦合。
+- **koi-ship 2085→1895 行（-190）**：编排层只留工厂调用 + 解构；八键接口不动。**累计瘦身 2700+→1895 行**（vox-core / koi-env / koi-ambient 三模块抽出）。
+- **保真关键**：①blossomEmitters **同引用注入**——buildTrees 填、respawnPetal 读，拷一份就断时序；②petals 收归模块内 let（原外层声明区内独占，dispose 走 root.traverse 释放无需外持）；③共享 voxCore 保 rng 序，组装序 cranes→petals 不变。
+- **守卫批次 6-7**：四函数定义只许 koi-ambient.js；编排层 makeCrane/respawnPetal/_dummy/petals 细节绝迹；blossomEmitters.push 仍在编排层（buildTrees 归属不变）。
+
+### 验证
+- **实机 18 项 PASS**（.tmp/h2-ambient.cjs，含 H1 天空结构 6 项 + G1 仲裁回归 9 项）：花瓣 400 粒 InstancedMesh / 鹤群 5 只 / 0 运行时错误。首跑登机 2 项 FAIL 为 earth-day 旅程抢锁瞬时抖动（G1 时已知门槛），复跑全绿。
+- 门禁：1426 单测（+1 守卫）/ lint 0 / tsc 真实 0 / deps 0 / 后端 7 组。
+
+### 剩余（诚实标注）
+ctx 171 属性本体按域真拆（最大工程）；koi-ship 1895 行（余下鲤身/庭园/水面构建共享 KW 剖面表与 glowVox/sheetVox 跨区缓冲，紧耦合，拆分收益/风险比下降，建议止步）；双放映器（目的不同）；gateData 存储逐域表化（收益有限）。
+
+**H2 终验结论：锦鲤装饰子系统单一归属，发射点同引用保时序，rng 保序外观零变化，实机含 H1/G1 回归全绿。koi-ship 拆分至此收口（三模块抽出，余下紧耦合区诚实止步）。PR #91 待合并。**
