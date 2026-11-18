@@ -557,3 +557,32 @@ lint/tsc 0、checkJs 基线 2、1422 单测(122文件)、后端 7 组全过、de
 4. .br 预压缩 + @aws-sdk 移 devDeps（优化旧账，低风险）。
 
 **第五轮终验结论：五轮持续好转（后端3→4/前端3→3.75/优化3.5→4.3），写放大31→0、两条环边真断、WAL失衡已治是本轮最大实收益。当场修复4个实锤问题（免审query收窄/WAL/热替丢回调/漏网轮询）并行为验证。结构性病灶（ctx与gateData本体、监听泄漏面）仍在，是下一阶段的明确目标。修复在 fix/audit5-findings-2026-11-18 分支待合并。**
+
+---
+
+## 十三、E 级：地面层栈 + 订阅对称收手（2026-11-18 · 第五轮 12.6 杠杆落地，PR #88）
+
+> 前置：PR #87（第五轮 4 实锤修复）已合并（远端 merge dddd243）。E 级在分支 refactor/e-ground-listeners-2026-11-18，2 提交。
+
+### E1 ground-resolver 中央层栈（12.6 第 1 项，前端最高杠杆）
+- **新增 src/shared/ground-resolver.js**：`addGroundLayer(fn, name) → off`——off 按**层身份** splice 移除，不依赖 LIFO；合成函数栈顶优先、第一个返回 ≠undefined 的层胜出（与旧链语义逐字一致）；全栈未命中返回 undefined，player 回退沙漠地形。
+- **四写者收编**：eternal（厅内 FLOOR）/planets（浮空岛/星球）/resetview（平台 +0.15）改注册 + off 对称退订；museum 运行时接管改 `takeGround()` 压栈顶（幂等防叠层）/`giveGroundBack()` 只摘自己——不再"捕获 prev→裸赋值→还原 prev"（旧模式在中间层热替后还原的是过期引用）。
+- **根治第五轮实锤**：单独热替中间层（eternal）不再抹掉上层包装；上层 off 不再复活死链。层表经 `import.meta.hot.data` 承接 + self-accept 防注册方重执行叠层。
+- **契约不变**：ctx.kunlun.groundOverride 保留合成函数只读别名（player.groundY 每帧询问、4 个探针按函数取用、ctx-bus-probe `'groundOverride' in ctx.kunlun` 全满足）。
+- **守卫补 C8 欠账**：ctx-writer-shapes 新增批次 6-4b——dayTimeSource 单写方=time-shift、groundOverride 单写方=resolver 断言（剔除整行注释教学示例防误报）；四注册方 off 必接必调 + museum take/give 形态钉死。**回潮从此有告警。**
+- **实机 8 项 PASS**：三层在栈/厅内 400/平台 400.15/远区 undefined/非 LIFO 先拆底层上层仍命中/off 幂等/0 错误。
+
+### E2 订阅对称收手 + 依赖归位（12.6 第 2/4 项）
+- **main.js teardownWorldWiring 增世界退订钩注册表**（expose `onWorldTeardown`）：重装配前统一摘除模块订阅，逐钩 try/catch 不阻断其余，摘后清表幂等。
+- **paintings/audio-manager 接住 onMediaFiles 的 off 挂退订钩**（原丢弃 off，二次装配叠双份回调——第五轮实锤）。实机 6 项 PASS：钩子暴露/teardown 可调/不抛/幂等/接线已摘/0 错误。
+- **@aws-sdk/client-s3 移 devDependencies**：仅 scripts 运维脚本用（lib/src/server 零引用），部署不跑 prod install 核实无影响；audit --omit=dev 仍 0 漏洞。
+- **player.js 23 监听诚实标注不动**：核实为一次性装配模块（无 HMR accept、无重装配路径），生产是整页刷新式应用，监听随页面销毁——**非泄漏**，盲加 AbortController 是增噪不是修复。第五轮"泄漏面最大"的判断据此修正：真实泄漏面是 paintings/audio-manager 订阅（已修），player 监听是页面级生命周期。
+
+### 验证汇总
+1424 单测（+2 守卫）/ 后端 7 组 / lint / tsc / deps 0 / checkJs 基线 2。E1 实机 8 项 + E2 实机 6 项 PASS。
+
+### 剩余（诚实标注）
+- **D2 第二刀 applicants 写面**（12.6 第 3 项）：gate/abuse/track 档案字段直写收进 identity 门面——跨域引用密，留待单独评审。
+- .br 预压缩 + gz 覆盖扩面（优化旧账）；ctx 171 属性本体按域真拆（最大工程）；koi-ship 2391 行 9 职责；双放映器；setAtmosphere 3 直调无仲裁；table-parity 制度性焊死。
+
+**E 级终验结论：groundOverride 从"四写者 LIFO 纪律链"变"中央层栈单一 owner"，HMR 解链顺序病根治，C8 守卫欠账补齐；订阅对称收手落地（真实泄漏面已修，player 监听经核实非泄漏诚实不动）。PR #88 待合并。**
