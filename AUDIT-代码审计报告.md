@@ -499,3 +499,61 @@ ctx 按所有权真拆、gateData 按域拆+鉴权簇收敛、saveGateData 增�
 1422 单测 / 后端 7 组 / lint / deps 环闸 0 / 部署清单 62 可达 ✅。D2 处置流 12 项 + 昵称两域一致实机 PASS。每阶段独立跑 depcruise+vitest 可回滚。
 
 **D 级终验结论：鉴权簇四叶子拆分完成，admin→gate 与 admin↔files-upload 两条环边消失，懒 require 36→个位数，adminWrite 4 份重复归一；gateData 按域拆落地身份处置域+昵称口径（接口收窄，存储不动）。applicants/uploads 两个最密域诚实留待单独评审。PR #86 待合并。**
+
+---
+
+## 十二、第五轮全方位审计（2026-11-18 · A~D 全部落地后现状复查 + 当场修复）
+
+> PR #86 已合并（远端 merge 5b2d0e7；本地经分支快进对齐，内容一致）。同口径复测 + 全量门禁 + 三路同标准复评。**结论：五轮持续好转，评分全线上升；本轮揪出 4 个实锤问题并当场修复验证。**
+
+### 12.1 五轮评分走势
+
+| 维度 | 三轮(重构前) | 四轮(A+B后) | **五轮(A~D后)** |
+|------|------|------|------|
+| 后端架构 | 3/5 | 3.5/5 | **4/5** |
+| 前端架构 | 3/5 | 3.5/5 | **3.75/5** |
+| 优化 | 3.5/5 | 4.0/5 | **4.3/5** |
+
+### 12.2 量化指标五轮对比（本机实测）
+
+| 指标 | 三轮 | 五轮 | 判定 |
+|------|------|------|------|
+| 核心簇懒 require | 36 | **14**(残余全为刻意桩/保守/琐碎) | ✅ D1 收敛属实 |
+| saveGateData 调用 | 76 | **56** | ✅ 持续收窄 |
+| 典型会话整库写盘(1HTML+30静态) | ≈31 次 | **0 次**(同IP 1h内) | ✅ C10 最大实收益 |
+| 懒 require 环边 | admin↔gate/files-upload 咬尾 | **两条环边消失**(依赖面逐行可验) | ✅ 真断环非遮羞 |
+| WAL | 3.9MB≈40×db | **本轮已治**(checkpoint 5min+close TRUNCATE,实测3.94MB→0) | ✅ |
+| ctx 登记属性 | ~170 | ~171(持平,3属性有owner) | ➖ 本体未动 |
+| 空 catch | 157 | 157 | ➖ 未动 |
+| voxel | 8.0MB | 1.2MB | ✅ 保持 |
+| hill-src/node_modules | 116MB | **已删回收** | ✅ |
+| .tmp | 117MB | ≈1.7MB | ✅ |
+| koi-ship | 2542 | 2391(仍9职责) | ➖ |
+| player.js 监听 | 23add/0remove | 23add/0remove | ❌ 泄漏面未动 |
+
+### 12.3 门禁现状（全绿）
+lint/tsc 0、checkJs 基线 2、1422 单测(122文件)、后端 7 组全过、deps 无环、audit 0 漏洞、构建可复现(212文件逐字节)、预压缩 35 资源、部署清单 62 可达 ✅。
+
+### 12.4 本轮揪出并当场修复的 4 个实锤问题（fix/audit5-findings 分支 f16cec7）
+
+1. **免审判据 query 收窄（历史缺陷，D1 暴露）**：handlePublicUpload 签名只收 dir/name，直传/分片 onFinish 传 `{dir,name}` 而非完整 query ⇒ `?token=` 直传视频的主人被误判匿名进待审（x-token 头/cookie 不受影响）。修复：签名透传 query + 两处改 adminWrite(req, query)。**回归验证：?token= 免审 PASS + 匿名 fail-closed 保留**。git 对照确认是历史收窄非 D1 引入，但 D1 统一判据时未察觉，本轮补上。
+2. **WAL 40× 失衡**：单行 kv 反复 REPLACE 只追加 WAL，无显式 checkpoint。修复：sqlite-store 增 checkpoint(passive/truncate) + startCheckpoint(5min unref) + close 时 TRUNCATE，store 开库即启动。**行为验证：3.94MB→0、数据完整、幂等、close 干净**。
+3. **eternal-handlers 热替丢回调**：表无条件新建，HMR 重求值会把未重执行注册方的回调静默丢掉。修复：`ctx.kunlun.eternalHandlers || {}` 沿用同一张表。
+4. **两条漏网常驻轮询无隐藏闸**：quizgate 5s（剩余最大后台空转源）+ mode 60s。修复：照 media-files 模式补 visibilitychange 闸 + 句柄入 bag HMR 对称清（原 setInterval 无人持有，热替会叠第二条）。
+
+另更正两处注释腐化：store 防环路径（D1 后不再经 admin）、planets 地面链加载序（旧注释说反）。
+
+### 12.5 剩余腐化与风险（诚实标注，未动）
+
+**后端**：gateData 上帝对象本体（25集合/56落盘点，D2 只收最窄一片）；双轨持久化+TEXT亲和焊死；table-parity.cjs 被测试与部署清单**制度性焊死**（拆除成本递增）；限流 4-5 套；store.js 472行仍兼约8职。
+**前端**：ctx 171属性仅3个有owner；**dayTimeSource/groundOverride 无守卫断言**（C8 收尾欠账，回潮无告警）；groundOverride 仍4写者链式纪律（HMR 中栈热替有解链顺序隐患，dev-only）；player.js 23/0 监听 + paintings 模块级订阅不退订（泄漏面最大）；koi-ship 2391行9职责；双放映器；setAtmosphere 3直调无仲裁；~43裸onTick；shared→state 反向依赖；releaseDay 零调用方。
+**优化**：冷路径双全量序列化未治本（WAL已止血）；.br 仍0、gz覆盖≈18%；@aws-sdk 仍在 dependencies；player 步态对象每帧new（微）。
+**安全**：D1/D2 新代码矩阵六格等价、常量时间比较/fail-closed/裁剪全保留，**未发现漏洞**；低危观察：trustedProxy 信任一切私网 socket（换非CF反代时需复查）。
+
+### 12.6 下一步最高杠杆（三路复评共识）
+1. **ground-resolver 栈式合成**（前端）：中央栈 push/pop 带 token，一次解决 groundOverride 多写/HMR中栈热替/museum运行时接管，并补 dayTimeSource/groundOverride 守卫断言（C8 欠账）。
+2. **监听/订阅对称收手专项**（前端）：player 23监听挂bag + paintings/audio-manager 退订对称——泄漏收益最大，为 ctx 按域真拆扫清生命周期障碍。
+3. **D2 第二刀收 applicants 写面**（后端）：gate/abuse/track 档案字段直写收进 identity 门面，56落盘点压到域内，为按域拆存储铺路。
+4. .br 预压缩 + @aws-sdk 移 devDeps（优化旧账，低风险）。
+
+**第五轮终验结论：五轮持续好转（后端3→4/前端3→3.75/优化3.5→4.3），写放大31→0、两条环边真断、WAL失衡已治是本轮最大实收益。当场修复4个实锤问题（免审query收窄/WAL/热替丢回调/漏网轮询）并行为验证。结构性病灶（ctx与gateData本体、监听泄漏面）仍在，是下一阶段的明确目标。修复在 fix/audit5-findings-2026-11-18 分支待合并。**
