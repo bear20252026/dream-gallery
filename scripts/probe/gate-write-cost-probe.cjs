@@ -2,7 +2,7 @@
 // gate-write-cost-probe.cjs — 切读前的写盘成本测量(2026-10-14 第五轮审计 C)
 // ===================== 为什么先量再切 =====================
 // R1 的账是"整库 JSON 快照写一次很贵",但"贵多少、多久一次"一直没人读过数,只有推断。
-// "连续 7 天 table-parity exit 0" 只证明**影子写的形状对**,不证明**切到真表能省下多少**,
+// (历史语境:table-parity 已随 B5 拆双轨退役,G2。当年"连续 7 天 exit 0"只证明影子写形状对,不证明切真表省多少,
 // 也不证明切读不会把延迟挪到别处。这条探针补的就是这一段证据。
 //
 // ===================== 它测什么、不测什么(边界要说全)=====================
@@ -122,5 +122,5 @@ while (Date.now() < deadline) {
 const mins = MTIME_SECONDS / 60;
 console.log('观测到 ' + writes + ' 次写 / ' + MTIME_SECONDS + 's ⇒ ≈' + r2(writes / mins) + ' 次/分,每次约 ' + kb + 'KB ⇒ ≈' + r2((writes * kb) / mins / 1024) + ' MB/分的整库快照写放大(仅这段窗口)');
 console.log('文件 mtime 从 ' + new Date(startMs).toISOString() + ' 走到 ' + new Date(last).toISOString());
-console.log('结论怎么读:上面那三个数(单次成本 × 频率)才是"要不要切真表"的依据;' + 'table-parity 的连绿天数只证明影子写形状对,不替代这条。');
+console.log('结论怎么读:上面那三个数(单次成本 × 频率)才是"要不要切真表"的依据;(table-parity 已退役,历史判据不再适用)');
 process.exit(0);

@@ -234,7 +234,10 @@ async function preloadWorld() {
     // 2026-11-12 画质修复:画质档变化时必须同步 composer 的 pixelRatio,
     // 否则后处理缓冲与画布分辨率错位 ⇒ 越降档越糊(LoopManager._applyPixelRatio 调它)。
     ctx.scene.syncPostProcessingPixelRatio = pp.syncPostProcessingPixelRatio;
-    ctx.scene.setAtmosphere = pp.setAtmosphere; // 氛围参数(Bloom/曝光),供昼夜与画质档调用
+    // 2026-11-18 G1:氛围别名指向中央仲裁的基准层入口(形状不变,light-mood 零改动)。
+    // 场景接管(锦鲤飞行/展厅)走 pushAtmosphereOverride,不再与昼夜层抢后写覆盖。
+    const atmos = await import('./scene/atmosphere-arbiter.js');
+    ctx.scene.setAtmosphere = atmos.applyBase;
     // 2026-11-13 首屏兜底清理挂到 finishIntro()(影片交棒完成处),**不能挂在这里**:
     // 影片是在世界加载之后才播的(见下方 playOpeningFilm),本行执行时影片还没开始,
     // 在此立刻清会把正在播的影片误杀。真实浏览器首屏曾残留相框/纸飞机/暗层

@@ -366,6 +366,67 @@ describe('批次6-4b dayTimeSource/groundOverride:单一 owner 钉死(C8 欠账�
   });
 });
 
+// 2026-11-18 G1:氛围仲裁收编后钉死散写绝迹——场景接管只许 pushAtmosphereOverride,
+// 直调 setAtmosphere 只许昼夜基准层(light-mood 经 ctx.scene.setAtmosphere 别名=applyBase)。
+describe('批次6-4c setAtmosphere:场景接管经中央仲裁,散写绝迹(G1)', () => {
+  it('直调 setAtmosphere 只许 light-mood(基准层);koi/eternal 等接管方一律经 pushAtmosphereOverride', () => {
+    const calls = scan(/\.setAtmosphere\s*\(/).filter((w) => !/^\s*(\/\/|\*|\/\*)/.test(w.text));
+    const rogue = calls.filter((w) => w.rel !== 'src/scene/desert/light-mood.js');
+    expect(rogue.map((w) => `${w.rel}:${w.line}`)).toEqual([]);
+    expect(calls.length).toBeGreaterThan(0); // 基准层必须在调(判据不空转)
+  });
+
+  it('ctx.scene.setAtmosphere 赋值只许 main.js 接线到仲裁 applyBase(不许再接裸 pp.setAtmosphere)', () => {
+    const m = read('src/main.js');
+    expect(m).toMatch(/ctx\.scene\.setAtmosphere\s*=\s*atmos\.applyBase/);
+    const assigns = scan(/ctx\.scene\.setAtmosphere\s*=/).filter(
+      (w) => !/^\s*(\/\/|\*|\/\*)/.test(w.text)
+    );
+    expect(assigns.map((w) => w.rel)).toEqual(['src/main.js']);
+  });
+
+  it('两个接管方(koi-flight/hall)都经 pushAtmosphereOverride 且 off 配对收手', () => {
+    const regs = scan(/pushAtmosphereOverride\('([\w-]+)'/);
+    const names = regs.map((r) => r.match[1]).sort();
+    expect(names).toEqual(['hall', 'koi-flight']);
+    // koi:saved.offAtmos 接住,下机与 dispose 都调 off
+    const k = read('src/scene/koi-ship.js');
+    expect(k).toMatch(/saved\.offAtmos\s*=\s*pushAtmosphereOverride\('koi-flight'/);
+    expect(k.match(/saved\.offAtmos\(\)/g).length).toBeGreaterThanOrEqual(2); // 下机还原+dispose兜底
+    // eternal:offHallAtmos 接住,离厅调 off
+    const e = read('src/kunlun/eternal.js');
+    expect(e).toMatch(/offHallAtmos\s*=\s*pushAtmosphereOverride\('hall'/);
+    expect(e).toMatch(/offHallAtmos\(\)/);
+    // 每帧压住 workaround 必须绝迹(仲裁后不需要)
+    expect(e).not.toMatch(/if \(hallMoodOn\) ctx\.scene\.setAtmosphere/);
+  });
+});
+
+// H1:锦鲤天空/太阳/环境灯/云抽 koi-env.js。钉死拆分不回退:
+// 编排层不许再长回天空实现;setSun 单一定义在 koi-env;水面 uSunDir 与 env 共享同一实例。
+describe('批次6-6 koi-env:天空子系统单一归属,编排层只组装(H1)', () => {
+  it('setSun/buildSky 定义只在 koi-env.js;koi-ship 只解构使用', () => {
+    const defs = scan(/function (setSun|buildSky|buildLights|buildClouds)\s*\(/);
+    expect(defs.map((w) => w.rel).filter((r, i, a) => a.indexOf(r) === i)).toEqual([
+      'src/scene/koi-env.js',
+    ]);
+    const k = read('src/scene/koi-ship.js');
+    expect(k).toMatch(
+      /const env = createKoiEnv\(\{ voxCore, scene, koiGroup, cloudGroup, matSoft, updaters \}\)/
+    );
+    expect(k).toMatch(/const \{ setSun, buildSky, buildLights, buildClouds, sunDir \} = env/);
+    // 天空实现细节绝迹于编排层(防拆分回退)
+    expect(k).not.toMatch(/skyMat|sunDisc|radialTexture|cloudCluster/);
+  });
+
+  it('applyEnv 沙漠灯判定用 env.sunLight 实时 getter(buildLights 前 undefined 也安全)', () => {
+    const k = read('src/scene/koi-ship.js');
+    expect(k).toMatch(/o !== env\.sunLight/);
+    const e = read('src/scene/koi-env.js');
+    expect(e).toMatch(/get sunLight\(\)/);
+  });
+});
+
 describe('批次6-5 navigator.deviceMemory:声明文件必须真的在 checkJs 程序里', () => {
   const BG = 'types/browser-globals.d.ts';
 
