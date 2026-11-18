@@ -612,3 +612,31 @@ lint/tsc 0、checkJs 基线 2、1422 单测(122文件)、后端 7 组全过、de
 ctx 171 属性本体按域真拆（最大工程）；koi-ship 2391 行 9 职责；双放映器；setAtmosphere 3 直调无仲裁；table-parity 制度性焊死；gateData 存储逐域表化（快照 KB 级收益有限，留待数据量变大）。
 
 **F 级终验结论：.br 优化旧账清零（73 资源双旁文件再省 23%，repro 保持）；applicants 字段级写面收编 identity 门面（abuse/track/gate 三模块，dismiss 落盘 2→1），整档覆写与底座环约束诚实留置。PR #89 待合并。**
+
+---
+
+## 十五、G 级：氛围中央仲裁 + 对账脚手架退役（2026-11-18 · PR #90）
+
+> 前置：PR #89（F 级）已合并（远端 merge 744d552）。G 级在分支 refactor/g-atmos-parity-2026-11-18，2 提交。
+
+### G1 setAtmosphere 中央仲裁（剩余项"3 直调无仲裁"清零）
+- **新增 atmosphere-arbiter.js**：base + override 栈——`applyBase(opts)` 昼夜基准层（light-mood 经 ctx.scene.setAtmosphere 别名走这里，**形状不变零改动**）；`pushAtmosphereOverride(name, opts) → off` 场景接管层，栈顶胜出，off 按身份移除（不依赖 LIFO，同 ground-resolver 模式）；override 在位时 base 每帧更新只记录不生效，off 落回**最新**基准（无需等下一帧）。hot.data 承接 + self-accept 防热替丢层。
+- **koi-ship**：登机推 koi-flight 层 / 下机 off 还原——**修"下机不还原氛围"缺陷**（原靠昼夜恢复后每帧覆盖兜底）；dispose 兜底 off（异常路径不残留）。
+- **eternal**：进厅推 hall 层 / 离厅 off；**废除"厅内每帧压住"workaround**（旧注释自认的抢所有权写法，仲裁后不需要，省一次每帧调用）。
+- **守卫批次 6-4c**：直调 setAtmosphere 只许 light-mood 基准层；两接管方 pushOverride + off 配对钉死；每帧压住 workaround 绝迹断言。
+- **实机 10 项 PASS**：登机曝光 1.04 / 下机还原 / 进厅 0.92 / 离厅还原 / 0 错误。（探针需清 earth-day mission phase 锁 + 关对话 + 近机位才可登机——这是游戏真实门槛，非仲裁缺陷。）
+
+### G2 table-parity 对账脚手架退役（净删 569 行，"制度性焊死"病根消除）
+- B5 拆双轨后真表是四热集合唯一权威，数组侧只是 json/kv 旁路滞后副本，**"源 vs 表对账"失去对象**。
+- `git rm scripts/admin/table-parity.cjs`（历史可恢复）；lib-hot-tables.test **⑦段（四种退出码）随脚本退役删除**，插退役说明；**⑧形状差测试保留**（钉的是真表永久性质：TEXT 亲和归一 / brand 对象归一，与对账无关）。
+- backend-files.sh 删部署条目（它是"唯一被点名带上服务器的脚本"）；test-backup 造文件与恢复集断言同步；gate-write-cost-probe 历史语境注释标注退役。
+- **第五轮审计"table-parity 被测试与部署清单制度性焊死，拆除成本递增"的病根就此消除**——脚手架在完成历史使命后真正退役，不再永久承重。
+- AGENTS.md 历史账本段落不动（用户维护文件；其 R1 判据工具描述已过时，在此标注）。
+
+### 验证汇总
+1423 单测（⑦退役 -4）/ 后端 7 组（含备份 34 项）/ lint / tsc / deps 0 / 部署清单 62 可达 ✅。G1 实机 10 项 PASS。
+
+### 剩余（诚实标注）
+ctx 171 属性本体按域真拆（最大工程）；koi-ship 2391 行 9 职责（vox-core 已抽，余下紧耦合）；双放映器（openfilm 自建渲染器 vs voyage iframe，目的不同）；gateData 存储逐域表化（快照 KB 级收益有限，留待数据量变大）。
+
+**G 级终验结论：setAtmosphere 从"三方抢后写覆盖"变"base+override 中央仲裁"，下机不还原缺陷修复、每帧压住 workaround 废除；table-parity 脚手架真正退役（净删 569 行），制度性焊死病根消除。PR #90 待合并。**
