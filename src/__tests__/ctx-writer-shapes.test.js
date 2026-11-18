@@ -411,8 +411,9 @@ describe('批次6-6 koi-env:天空子系统单一归属,编排层只组装(H1)',
       'src/scene/koi-env.js',
     ]);
     const k = read('src/scene/koi-ship.js');
+    // 格式无关:pre-commit prettier 会把长参数列表折行(批次6-7 曾因此假红),\s+ 兼容两种形态
     expect(k).toMatch(
-      /const env = createKoiEnv\(\{ voxCore, scene, koiGroup, cloudGroup, matSoft, updaters \}\)/
+      /const env = createKoiEnv\(\{\s*voxCore,\s*scene,\s*koiGroup,\s*cloudGroup,\s*matSoft,\s*updaters,?\s*\}\)/
     );
     expect(k).toMatch(/const \{ setSun, buildSky, buildLights, buildClouds, sunDir \} = env/);
     // 天空实现细节绝迹于编排层(防拆分回退)
@@ -436,8 +437,9 @@ describe('批次6-7 koi-ambient:装饰子系统单一归属,发射点同引用(H
       'src/scene/koi-ambient.js',
     ]);
     const k = read('src/scene/koi-ship.js');
+    // 格式无关:prettier 折行兼容(H2 提交时钩子折行曾致本断言假红)
     expect(k).toMatch(
-      /const ambient = createKoiAmbient\(\{ voxCore, root, craneGroup, matPetal, blossomEmitters, updaters \}\)/
+      /const ambient = createKoiAmbient\(\{\s*voxCore,\s*root,\s*craneGroup,\s*matPetal,\s*blossomEmitters,\s*updaters,?\s*\}\)/
     );
     expect(k).toMatch(/const \{ buildPetals, buildCranes \} = ambient/);
     // 装饰实现细节绝迹于编排层(防拆分回退);blossomEmitters 仍在编排层(buildTrees 填)
