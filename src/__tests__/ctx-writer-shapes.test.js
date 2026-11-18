@@ -325,6 +325,47 @@ describe('批次6-4 eternalHandlers:值签名照派发契约写,不照某个 han
   });
 });
 
+// 2026-11-18 E1:C8 收尾欠账——dayTimeSource/groundOverride 两属性的单一 owner 此前只靠
+// 人工 grep,无测试钉死,回潮无告警。这里补上(与 eternalHandlers 同款"散写绝迹"口径)。
+describe('批次6-4b dayTimeSource/groundOverride:单一 owner 钉死(C8 欠账补)', () => {
+  it('dayTimeSource 写入方只许 time-shift.js(owner),其他文件一律经 lockDayAt/shiftDayTo 接口', () => {
+    // 注释里的教学示例(loop-manager:365 "经 ctx.media.dayTimeSource = () => 12 覆盖")不算写:
+    // 行首 // 或 * 开头的整行注释剔除,只钉真代码。
+    const writes = scan(/ctx\.media\.dayTimeSource\s*=/).filter(
+      (w) => !/^\s*(\/\/|\*|\/\*)/.test(w.text)
+    );
+    const rogue = writes.filter((w) => w.rel !== 'src/scene/time-shift.js');
+    expect(rogue.map((w) => `${w.rel}:${w.line}`)).toEqual([]);
+    expect(writes.length).toBeGreaterThan(0); // owner 自己必须在写(判据不空转)
+  });
+
+  it('groundOverride 写入方只许 ground-resolver.js(合成别名),四模块经 addGroundLayer 注册', () => {
+    const writes = scan(/ctx\.kunlun\.groundOverride\s*=/);
+    const rogue = writes.filter((w) => w.rel !== 'src/shared/ground-resolver.js');
+    expect(rogue.map((w) => `${w.rel}:${w.line}`)).toEqual([]);
+    expect(writes.length).toBeGreaterThan(0);
+    // 四个层注册方都必须经 addGroundLayer 且接住 off(防"注册了不收手"回潮)
+    const regs = scan(/const (off\w+)\s*=\s*addGroundLayer\(/);
+    const byFile = new Map(regs.map((r) => [r.rel, r.match[1]]));
+    for (const rel of [
+      'src/kunlun/eternal.js',
+      'src/kunlun/planets.js',
+      'src/kunlun/resetview.js',
+    ]) {
+      const h = byFile.get(rel);
+      if (!h) throw new Error(`${rel} 没有经 addGroundLayer 注册地面层`);
+      if (!read(rel).match(new RegExp(`${h}\\(\\)`)))
+        throw new Error(`${rel} 注册了地面层但没调用 ${h}() 收手`);
+    }
+    // museum 是运行时接管:takeGround/giveGroundBack 包装,两函数都必须在且被调用
+    const m = read('src/museum/museum.js');
+    expect(m).toMatch(/function takeGround\(\)/);
+    expect(m).toMatch(/function giveGroundBack\(\)/);
+    expect(m).toMatch(/takeGround\(\);/);
+    expect(m).toMatch(/giveGroundBack\(\);/);
+  });
+});
+
 describe('批次6-5 navigator.deviceMemory:声明文件必须真的在 checkJs 程序里', () => {
   const BG = 'types/browser-globals.d.ts';
 

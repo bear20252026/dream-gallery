@@ -11,6 +11,7 @@ import { createGLTFLoader } from '../scene/gltf-loader.js';
 import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { goldenTeleport } from '../shared/teleport-fx.js';
+import { addGroundLayer } from '../shared/ground-resolver.js'; // 地面中央层栈(E1:运行时接管改压栈/退订)
 
 // 2026-08-31 副作用标记(vite/rolldown tree-shake 会跳过没有调用到入口函数的模块):
 // 立即调用 hotBegin 把 museum 模块注册到 hot 系统;hot 模块本身被 main.js 调用,
@@ -267,8 +268,9 @@ function restoreGalleryBounds() {
 }
 
 // ---------- 地面接管 ----------
-// 注意:eternal.js 在本模块之后加载,会覆盖 ctx.kunlun.groundOverride。
-// 因此接管动作在 enterHall/enterRoom 运行时执行(此时 eternal 已就绪),退出画廊时恢复。
+// 2026-11-18 E1:接管改中央层栈(ground-resolver)——enterHall/enterRoom 运行时 takeGround()
+// 压栈顶(天然盖住 eternal/planets 层,与加载序无关),退出 giveGroundBack() 只摘自己。
+// 旧"捕获 prev→裸赋值→还原 prev"模式在中间层热替后会还原过期引用,已废。
 //
 // 2026-09-01 大修(楼梯掉落根因修复):旧高度场是"假坡道(x -179~-122 沿 Z 插值 20.8→33.6)
 // + 假二层(33.6)"——射线实测证明假坡道下方视觉全是 1F 平地(玩家悬空/穿模),
@@ -347,7 +349,19 @@ function museumGround(x, z) {
   }
   return h;
 }
-let prevOverride = null;
+// E1:运行时接管改层栈注册——museumGround 压栈顶天然盖住下层(等价原裸赋值接管语义),
+// 退出 off 只摘自己;不再捕获/还原 prev(旧模式在中间层热替后还原的是过期引用)。
+let offMuseumGround = null;
+function takeGround() {
+  if (offMuseumGround) offMuseumGround(); // 防重入叠层
+  offMuseumGround = addGroundLayer(museumGround, 'museum');
+}
+function giveGroundBack() {
+  if (offMuseumGround) {
+    offMuseumGround();
+    offMuseumGround = null;
+  }
+}
 
 // ---------- 门框(发光,走近触发) ----------
 const portals = [];
@@ -448,8 +462,7 @@ async function enterHall() {
     obj.visible = true;
     place(obj, HALL);
     swapBounds(buildBounds(HALL));
-    prevOverride = ctx.kunlun.groundOverride; // 保存 eternal 的接管
-    ctx.kunlun.groundOverride = museumGround; // 运行时接管(此时 eternal 已加载完)
+    takeGround(); // E1:层栈压顶接管(等价原裸赋值语义,退出 off 只摘自己)
     current = 'hall';
     // 2026-08-31:大堂 X 是长轴(±61.8m 宽 130m),Z 是深度(±27.4m);玩家默认传送站 Z 边缘(yaw 朝 -X),
     // 第一眼沿长轴看到远端拱廊/钢架天窗(用户认可的标志性视角)
@@ -478,7 +491,7 @@ async function enterRoom(id) {
     obj.visible = true;
     place(obj, cfg);
     swapBounds(buildBounds(cfg));
-    ctx.kunlun.groundOverride = museumGround;
+    takeGround(); // E1:幂等压栈(已在栈则不叠层)
     current = 'room:' + id;
     // 离开大堂视觉(保留缓存,回大厅再显示)
     const hall = cache.get(HALL.url);
@@ -505,7 +518,7 @@ async function exitToHall() {
   if (hall) hall.visible = true;
   for (const p of portals) p.gp.visible = p.world === 'hall';
   swapBounds(buildBounds(HALL));
-  ctx.kunlun.groundOverride = museumGround;
+  takeGround(); // E1:幂等压栈
   current = 'hall';
   await teleportTo(HALL.X + 2, HALL.Z + 4, Math.PI / 2);
 }
@@ -518,7 +531,7 @@ async function exitToGallery() {
   if (hall) hall.visible = false;
   for (const p of portals) p.gp.visible = p.world === 'gallery';
   restoreGalleryBounds();
-  ctx.kunlun.groundOverride = prevOverride; // 还给 eternal
+  giveGroundBack(); // E1:只摘 museum 层,下层(eternal/planets)原样——不再还原可能过期的 prev
   current = 'gallery';
   await teleportTo(6, 24.5, Math.PI);
 }
@@ -532,6 +545,7 @@ bag.custom.push(function () {
   for (const obj of cache.values()) s.remove(obj);
   if (museumLight) s.remove(museumLight);
   restoreGalleryBounds();
+  giveGroundBack(); // E1:HMR 热替对称退订(人在馆内热替时不残留 museum 层)
 });
 
 if (typeof window !== 'undefined')

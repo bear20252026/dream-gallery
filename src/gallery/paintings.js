@@ -423,12 +423,16 @@ function applyMediaFiles(d) {
   }
 }
 // 订阅共享管道;onError 保真原 fallback:首次拉取失败仍挂静态画
-onMediaFiles(applyMediaFiles, function () {
+// 2026-11-18 E2:接住 off 挂世界退订钩——重装配前摘除,不再叠双份回调(原丢弃 off)。
+const offPaintingsMedia = onMediaFiles(applyMediaFiles, function () {
   if (firstSync) {
     firstSync = false;
     hangPaintings();
   }
 });
+if (typeof window !== 'undefined' && window.__onWorldTeardown) {
+  window.__onWorldTeardown(offPaintingsMedia);
+}
 // 按 URL 移除动态上墙的挂画(含视频清理),用于后台删除后游戏内同步消失
 function removePaintByUrl(url) {
   const idx = paintGroups.findIndex(function (g) {

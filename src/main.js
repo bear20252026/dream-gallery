@@ -160,6 +160,13 @@ function onWindowResize() {
   cam.updateProjectionMatrix();
   if (ctx.scene.resizePostProcessing) ctx.scene.resizePostProcessing(w, h);
 }
+// 2026-11-18 E2:世界期模块的退订钩注册表——paintings/audio-manager 等一次性装配模块
+// 把订阅退订函数挂进来,重装配前统一摘除(此前模块级订阅丢弃 off,二次装配叠双份回调)。
+const _worldTeardownHooks = new Set();
+expose('onWorldTeardown', (fn) => {
+  if (typeof fn === 'function') _worldTeardownHooks.add(fn);
+  return () => _worldTeardownHooks.delete(fn);
+});
 function teardownWorldWiring() {
   if (_unregisterRootTick) {
     _unregisterRootTick();
@@ -168,6 +175,14 @@ function teardownWorldWiring() {
   if (_resizeBound) {
     window.removeEventListener('resize', onWindowResize);
     _resizeBound = false;
+  }
+  for (const fn of [..._worldTeardownHooks]) {
+    try {
+      fn();
+    } catch (e) {
+      console.warn('[teardown] 世界退订钩抛错(不阻断其余):', e && e.message);
+    }
+    _worldTeardownHooks.delete(fn);
   }
 }
 expose('teardownWorldWiring', teardownWorldWiring); // 显式出口:window.__teardownWorldWiring()
