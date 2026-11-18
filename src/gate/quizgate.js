@@ -60,7 +60,7 @@ function lockGallery(reason) {
 
 // 权限监视:每5秒检查一次(仅更新状态,不再有墙体操作)
 let quizPollFails = 0; // 连续失败计数(≥3 告警一次,自愈重试不刷屏)
-setInterval(async function () {
+async function pollQuizState() {
   try {
     const r = await fetch('/api/quiz/state');
     const d = await r.json();
@@ -71,7 +71,29 @@ setInterval(async function () {
     // 瞬时失败无害(5s 后自愈重试);连续失败说明通过状态同步已断,告警一次留痕
     if (++quizPollFails === 3) console.warn('[quizgate] 通过状态轮询连续失败', e);
   }
-}, 5000);
+}
+// 2026-11-18 第五轮审计:补隐藏闸(5s 轮询是剩余最大后台空转源)——隐藏即停,回前台立即补一次。
+// 句柄入 bag,HMR 热替对称清(原 setInterval 无人持有)。
+let quizPollTimer = setInterval(pollQuizState, 5000);
+function onQuizVisibility() {
+  if (document.hidden) {
+    if (quizPollTimer) {
+      clearInterval(quizPollTimer);
+      quizPollTimer = null;
+    }
+  } else {
+    pollQuizState();
+    if (!quizPollTimer) quizPollTimer = setInterval(pollQuizState, 5000);
+  }
+}
+document.addEventListener('visibilitychange', onQuizVisibility);
+bag.custom.push(function () {
+  if (quizPollTimer) {
+    clearInterval(quizPollTimer);
+    quizPollTimer = null;
+  }
+  document.removeEventListener('visibilitychange', onQuizVisibility);
+});
 
 // ===================== 悬浮答题屏(3D) =====================
 const panelCv = document.createElement('canvas');
