@@ -13,15 +13,13 @@
 #   传错一次就是源码或数据外泄的起点(本仓库有 .bak 被公网回传的前科)。
 #   公网侧整个 lib/ 目录段由 lib/security.js 的 staticDenied() 按首段挡成 404,子目录同样在射程内。
 #
-# scripts/admin/table-parity.cjs 是唯一被点名带上服务器的脚本(R1"切读"的判据工具):
-#   它按 __dirname/../.. 解析仓库根,只有放在 <根>/scripts/admin/ 才跑得起来,而线上读的是
-#   服务器上的 gate_data.db —— 不在盒子上就没法判"能不能切读"。它只读(readonly + fileMustExist),
-#   不写不锁;公网侧 `scripts` 首段与 `*.cjs` 后缀被 staticDenied() 各挡一次,双重。
+# (2026-11-18 G2:scripts/admin/table-parity.cjs 已退役——B5 拆双轨后真表是四热集合唯一权威,
+#   数组侧只是 json/kv 旁路滞后副本,"源 vs 表对账"失去对象。脚本与部署条目一并移除。)
 # ⚠️ src/shared/*.mjs 里**被后端 require 的每一个**都必须点名在这里(2026-10-17 加 chat-words.mjs:
 #   lib/chat.js 与前端 chat-room.js 共用那张召唤词表)。`find lib …` 只覆盖 lib 目录树,
 #   跨到 src/ 的依赖一条都不会自动进清单 —— 这条由 scripts/admin/check-backend-manifest.cjs
 #   按 depcruise 的可达集反查清单,漏一个就 exit 1(2026-10-12 那次 502 事故立的闸,正好管住这种新形态)。
 backend_files() {
-  printf '%s\n' server.js src/shared/mediarules.mjs src/shared/chat-words.mjs src/shared/link-models.mjs scripts/admin/table-parity.cjs
+  printf '%s\n' server.js src/shared/mediarules.mjs src/shared/chat-words.mjs src/shared/link-models.mjs
   find lib -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' -o -name '*.sql' \) 2>/dev/null | sort
 }

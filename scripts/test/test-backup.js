@@ -87,7 +87,6 @@ function resetFixture(keepOldBackups) {
   w('ADMIN_GUIDE.md', '#');
   w('AGENTS.md', '#');
   w('lib/store.js', '//');
-  w('scripts/admin/table-parity.cjs', '//');
   w('src/state/store-api.js', '//');
   w('photos/p.txt', 'x');
   w('music/m.txt', 'x');
@@ -141,11 +140,10 @@ seedOldArchives(3, 'data', 'daily');
     'gate_data.json',
     '.r2-outbox.json',
     'data.js',
-    'scripts/admin/table-parity.cjs',
   ];
   const miss = need.filter((x) => !m.includes(x));
   ok(
-    '恢复集含权威 SQLite 三件 + 镜像 + R2 台账 + data.js + scripts',
+    '恢复集含权威 SQLite 三件 + 镜像 + R2 台账 + data.js',
     miss.length === 0,
     '缺:' + miss.join(',')
   );

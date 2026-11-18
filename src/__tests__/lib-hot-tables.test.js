@@ -53,7 +53,7 @@ const ratelimit = require('../../lib/ratelimit.js');
 const g = store.gateData;
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.UTC(2026, 9, 12, 12, 0, 0);
-const PARITY = path.join(ROOT, 'scripts/admin/table-parity.cjs');
+// (PARITY 常量随⑦对账段退役删除,G2)
 
 // ---------- 假请求 / 假响应(与 lib-track-rate.test.js 同一套形态)----------
 function mkRes() {
@@ -729,106 +729,9 @@ describe('⑥ 保留期覆盖新表(DG-PRIV-001 的表侧)', () => {
 });
 
 // =====================================================================
-describe('⑦ 对账脚本 scripts/admin/table-parity.cjs 的三种退出码', () => {
-  function runParity(env) {
-    try {
-      const out = execFileSync(process.execPath, [PARITY], {
-        cwd: ROOT,
-        env: {
-          ...process.env,
-          GATE_DATA_FILE: TMP_JSON,
-          SQLITE_PATH: TMP_DB,
-          CLIENT_ERRORS_FILE: TMP_ERRORS,
-          ...(env || {}),
-        },
-        encoding: 'utf8',
-        stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      return { status: 0, out };
-    } catch (e) {
-      // 退出码直接来自 process.exit(e.status):判据不是管道尾巴的 $?
-      return {
-        status: typeof e.status === 'number' ? e.status : 2,
-        out: (e.stdout || '') + (e.stderr || ''),
-      };
-    }
-  }
-
-  /** 两边都从"同一个写入点"落一次,然后 await 快照写盘(让 kv/JSON 与表同时到货) */
-  async function makeBothSidesAgree() {
-    clearTables();
-    g.chat = [];
-    g.visits = [];
-    g.linkClicks = [];
-    g.clientErrors = [];
-    clientErrors._setErrorList([]);
-    expect(postChat('对账发言').res.code).toBe(200);
-    store.recordVisit(mkReq('203.0.113.71', {}, ua('par')), 'vid-parity', null);
-    expect(postClick({ link: 'L', url: 'https://e.com', pos: { x: 1, y: 1, z: 1 } }).code).toBe(
-      200
-    );
-    track.flushTrack();
-    expect(postTrackError({ msg: 'boom', src: 'a.js', line: 3 }).code).toBe(200);
-    expect(reportClientError({ type: 'js', message: '聚合错', source: 's.js' }).code).toBe(200);
-    await store.saveGateData();
-    // R1 切读后:file 信道 upsert 落表确认即免整文件重写(这正是被验收的行为)。
-    // 对账脚本读的是 client_errors.json 源侧 ⇒ 这里显式落一次源文件,模拟"冷路径 save 已到货"。
-    fs.writeFileSync(TMP_ERRORS, JSON.stringify({ list: clientErrors._getErrorList() }));
-    expect(fs.existsSync(TMP_ERRORS)).toBe(true);
-    expect(fs.existsSync(TMP_JSON)).toBe(true);
-  }
-
-  it('一致 ⇒ 退出码 0', async () => {
-    await makeBothSidesAgree();
-    const out = runParity();
-    expect(out.out).toContain('结果: 一致');
-    expect(out.status).toBe(0);
-  });
-
-  it('表缺行 ⇒ 退出码 1(是"有差异",不是"无法比对")', async () => {
-    await makeBothSidesAgree();
-    repoChat.removeAll(); // 制造"源有、表没有"
-    const out = runParity();
-    expect(out.status).toBe(1);
-    expect(out.out).toContain('有差异');
-    expect(out.out).toContain('chat_messages');
-  });
-
-  it('表比源多(条数上限之外的历史行)⇒ 仍判 0,只报信息', async () => {
-    await makeBothSidesAgree();
-    // 灌 200 条:源数组 MAX_MSG=100 会挤掉最旧的,表不受条数上限约束(只受保留期)
-    const many = [];
-    for (let i = 0; i < 200; i++) many.push({ n: 'a', t: '挤出去的' + i, ts: NOW - 10 * DAY + i });
-    repoChat.insertMany(many);
-    const out = runParity();
-    expect(out.status).toBe(0);
-    expect(out.out).toMatch(/表多 \d+ 行/);
-  });
-
-  it('连不上库 / 表还没建 / SQLite 未启用 ⇒ 退出码 2', async () => {
-    await makeBothSidesAgree();
-    // (a) 库文件读不到
-    const missing = runParity({ SQLITE_PATH: path.join(tmpDir, 'nope', 'none.db') });
-    expect(missing.status).toBe(2);
-    expect(missing.out).toContain('无法比对');
-    // (b) USE_SQLITE=0 ⇒ 没有可比的东西
-    const off = runParity({ USE_SQLITE: '0' });
-    expect(off.status).toBe(2);
-    expect(off.out).toContain('SQLite 未启用');
-    // (c) 库能打开、快照读得出,但影子表没建(迁移从未跑过)
-    const bare = path.join(tmpDir, 'bare.db');
-    const Database = require('better-sqlite3');
-    const fresh = new Database(bare);
-    fresh.exec('CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
-    fresh
-      .prepare("INSERT INTO kv (key, value) VALUES ('gateData', ?)")
-      .run(JSON.stringify({ chat: [], visits: [] }));
-    fresh.close();
-    const noTables = runParity({ SQLITE_PATH: bare });
-    expect(noTables.status).toBe(2);
-    expect(noTables.out).toContain('表尚未建立');
-  });
-});
+// ⑦ 已退役(2026-11-18 G2):对账脚本 scripts/admin/table-parity.cjs 随 B5 拆双轨退役——
+// 真表是四热集合唯一权威,数组侧只是 json/kv 旁路滞后副本,"源 vs 表对账"失去对象。
+// 脚本与本段四种退出码测试一并移除(git 历史可恢复);⑧形状差测试钉的是真表永久性质,保留。
 
 // =====================================================================
 // ⑧ 线上第一次真数据对账暴露的两处形状差(2026-10-13)
