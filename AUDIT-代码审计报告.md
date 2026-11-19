@@ -837,3 +837,71 @@ markers.js 是**混合身份**（既 import 总线、又在回调里遮蔽），
 | table-parity 制度性焊死 | G2 脚手架退役净删 569 行 | PR #90 ✅ |
 
 **K 级终验结论：审计遗留项全部处置完毕——能修的修（K1 断链实锤）、该收的收（ctx 所有权制度闭环）、核实后不该动的定性关闭（K2/K3）。PR #94 待合并。**
+
+---
+
+## 二十二、第六轮全方位审计（2026-11-19 · PR #95）
+
+> 前置：PR #94（K 级）已合并，主干 99f7677。第六轮三路并行复评（后端/前端/工程优化，同前五轮标准）+ 本机全量门禁与量化指标；发现逐项核实后 **8 项实锤当场修复**（commit 56141d0），核实后不动的定性记录。
+
+### 22.1 六轮评分走势
+| 维度 | 一 | 二 | 三 | 四 | 五 | **六** |
+|---|---|---|---|---|---|---|
+| 后端 | 3 | 3 | 3.5 | 3.5 | 4 | **4.5** |
+| 前端 | 3 | 3 | 3.5 | 3.5 | 3.75 | **4** |
+| 工程优化 | 3.5 | 3.5 | 4 | 4 | 4.3 | **4.5** |
+
+### 22.2 量化指标（本机实测，2026-11-19）
+| 指标 | 第五轮 | 第六轮 | 说明 |
+|---|---|---|---|
+| vitest | 1422 | **1444**（123 文件） | R6 +3 守卫；K1 +2；J1 +3 等累计 |
+| 后端 7 组 | 全绿 | 全绿（上传安全 20→**27**） | R6 +7 回归 |
+| lint / tsc / deps | 0/0/0 | 0/0/0 | tsc 真实退出码直验 |
+| checkJs 基线 | 2 | 2 | 硬闸 |
+| npm audit --omit=dev | 0 | **0** | |
+| 构建 repro | 可复现 | **328 文件逐字节一致** | 守卫转硬闸 |
+| 部署清单 | 62 可达 | 62 可达（清单 63） | |
+| 登记册 | — | **169 属性一致** | J1 净化后口径 |
+| 最大文件 | koi-ship 2085 | **koi-ship 1901** | eternal 1027 / openfilm 889 / planets 870 |
+| saveGateData 调用 | 56 | **63**（口径含 gate/） | 注释"85 处"已过时→更正 |
+| 懒 require（lib+server） | 14 | 24（口径含 gate/ 全量） | 绝大多数刻意桩，坏味道仅 3 处惰性 crypto/fs |
+| 空 catch | 157 | 前端 101 + 后端 75 | 唯一安全相关者（quota）已修 |
+| WAL | 3.9MB 失衡已修 | **0 字节**（checkpoint 在位） | db 196KB / 快照 12KB |
+| .tmp | 1.7MB | 2.5MB / 39 探针 | token 均测试值，无真实凭据 |
+
+### 22.3 当场修复 8 项（全部核实后动手）
+1. **quota 反刷 fail-open→fail-closed**（lib/upload/quota.js:62,70）：abuse 判定抛错原 `catch(e){}` 吞成 null 静默放行——全仓 75 处后端空 catch 中**唯一安全相关者**。改硬拒（bigfile/rate）+ console.error 出声。注入故障回归钉死。
+2. **publish 归属落盘读结论**（lib/upload/publish.js:69）：原即发即忘，持久失败仍回 201，重启丢归属。改 await 结果，写坏带 warning（与 DELETE 路径 M-11 同纪律），201/202 两出口都带。
+3. **chat 管理员 query token 透传**（lib/chat.js:64 + routes.js:60）：`tokenOk(req,{})` 丢 query ⇒ 管理员 ?token= 发言误标访客。改透传 c.query（第五轮免审修复同口径）；TOKEN_QUERY=0 公网仍拒，fail-closed 纪律不放松。
+4. **SM Walking→Gliding 补 jumpHold 门槛**（PlayerStates.js:57）：与物理权威 player-physics.js:60 三条件逐字对齐。原无按键坠崖也进 GlidingState 置 pl.gliding=true，下一帧被物理覆写 ⇒ 单帧动画抖动（Airborne 分支本来就带，Walking 是漏网）。
+5. **main.js SM tick 接住 unregister**（main.js:325）：原匿名注册丢弃 ⇒ 二次装配叠双份 SM tick。teardown 摘除 + 装配前摘旧 + worldWiringState.smTick 暴露（与 rootTick 同纪律，E2 同病收尽）。
+6. **video-wall 订阅 off 挂 teardown**（video-wall.js:53）：E2 注册表收尽第三家（原仅 paintings/audio-manager），防重装配叠双份 reloadBigscreen。
+7. **repro 守卫转硬闸**（test.yml:126）：本地实测 328 文件逐字节一致，"非阻断起步先积累稳定性"前提已满足，摘 continue-on-error；backup-gallery.sh 陈旧"不可复现"注释同步更正。
+8. **store.js 过时计数注释**："85 处"→"数十处"（实测 63），文档可信度。
+
+### 22.4 核实后不动（定性记录，非搁置）
+- **bigscreen 内层 tokenOk 弱于 adminWrite**（lib/bigscreen.js:72,116）：现靠 routes.js:174-175 auth:'write' 外层兜住——**潜在非现行**，若改挂 public 即成洞，已在报告钉住前提。
+- **stats 聚合 SIGKILL 丢计数**（store.js:454）：server.js:162-164 已自认，崩溃回灌保明细不保聚合——已知取舍，非新发现。
+- **arbiter base=null 边缘**：off 时 base 必已由 light-mood 每帧 applyBase 填充，核实非缺陷。
+- **three/hls.js 在 dependencies**：vendor 同步链（sync-vendor.js:17）需要，刻意归位。
+- **gate_data.json 泄漏面**：git 全历史核查**从未提交**（.gitignore:25 覆盖），secret 零泄漏。
+- **koi-ship 1901 行止步**：余 ~29 个建造函数纯组装+几何，职责单一，拆分收益/风险比已到拐点（H2 结论维持）。
+- **类型债**：ctx.d.ts 394 成员行中 typeof import 仅 12 处（~3%），手写形状占多数——checkJs 基线 2 硬闸兜底，真拆时逐域换装（I1 施工图已就绪）。
+
+### 22.5 测试过程踩坑（如实记录）
+authz 的 TOKEN 是 config **模块加载时捕获的常量**——R6 回归首版在 require 链之后设 env 无效（config 已固化空 TOKEN），隔离验证定位后把预设挪到文件头（任何 require 之前）。教训：**测试 env 必须赶在被测模块的常量捕获之前**。
+
+### 22.6 验证
+1444 单测 / lint / tsc 真实 0 / deps 0 / 后端 7 组（上传安全 27 项）/ 登记册 169 一致 / 部署清单 62 可达 / **实机 10 项 PASS**（SM 滑翔全链：idle→空格→离地→gliding→松开→回 idle，0 错误）/ repro 328 文件一致。
+
+### 22.7 剩余欠账（第六轮后）
+| 项 | 性质 | 建议 |
+|---|---|---|
+| 空 catch 前端 101/后端 75 | 多数良性（audio.play/localStorage），危险点已修 | 按域分批收编，error-report.js 自身吞错优先 |
+| 类型债 typeof import ~3% | checkJs 基线 2 硬闸兜底 | ctx 真拆时逐域换装 |
+| ctx 真拆本体 | 施工图就绪（169 属性 9 域，多写方 4 全合法） | loop→gallery→player 小域先行 |
+| publish 其余 5 处 saveGateData | 低频管理操作（复核/删除），失败面小 | 下轮按需收编 |
+| .tmp 39 探针无回收机制 | 均测试值无凭据，.gitignore 覆盖 | 会话结束清理约定 |
+| 报告 vN 副本 12 份 ~660KB | 交付历史，git 未跟踪 | 用户决定保留/归档 |
+
+**第六轮终验结论：三路评分全线上升（4.5/4/4.5），8 项实锤当场修复（含唯一安全相关空 catch 的 fail-closed 收编），repro 转硬闸，核实后不动项全部定性记录。PR #95 待合并。**
