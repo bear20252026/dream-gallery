@@ -62,3 +62,53 @@ describe('I1 ctx 属性域登记册:写点全量登记,漂移即红', () => {
     expect(rows.size).toBeGreaterThan(150); // 规模哨兵:口径漏扫一半会在这里红
   });
 });
+
+// J1:登记册假阳性治理。同名 ctx 未必是总线 —— markers.js 的 canvasTexture 回调参数是
+// Canvas2D、visitor-fp.js 的 `var ctx = new OfflineAudioContext` 是音频上下文。
+// 这两处曾把 fillStyle/font/textAlign/textBaseline/lineWidth/strokeStyle/oncomplete
+// 共 7 个假属性登进册子,污染真拆施工图(把 Canvas API 当总线属性去收编)。
+describe('J1 登记册口径:同名局部 ctx 不得当成总线属性', () => {
+  const { scanDetailed } = require('../../scripts/admin/ctx-registry.cjs');
+
+  it('7 个 Canvas/Audio 假属性绝迹于登记册', () => {
+    const keys = new Set(scanDetailed().rows.map((r) => r.key));
+    const fake = [
+      'fillStyle',
+      'font',
+      'textAlign',
+      'textBaseline',
+      'lineWidth',
+      'strokeStyle',
+      'oncomplete',
+    ].filter((k) => keys.has(k));
+    expect(fake).toEqual([]);
+  });
+
+  it('依赖注入型文件不算遮蔽:核心写方必须在册(防口径过宽误排除)', () => {
+    // 首版遮蔽正则把 replyChoices(ctx,…)/new LoopManager(ctx)/constructor(ctx)
+    // 当成绑定,误排除 14 个合法文件,属性数 176→145、loop.timeScale 直接丢失。
+    const keys = new Set(scanDetailed().rows.map((r) => r.key));
+    const must = [
+      'loop.timeScale', // loop-manager.js constructor(ctx) 注入
+      'tickers', // ctx.js 总线本体
+      'scene.s',
+      'player.pl',
+      'media.vidEl',
+      'kunlun.groundOverride',
+      'scene.renderPostProcessing',
+      'gallery.hangOne',
+      'ui.kunlunSpeak',
+    ].filter((k) => !keys.has(k));
+    expect(must).toEqual([]);
+  });
+
+  it('遮蔽文件清单钉死:只许真局部对象绑定的文件进榜(新增须人工复核)', () => {
+    const { shadowed } = scanDetailed();
+    // markers/visitor-fp/quiz 是真遮蔽(Canvas2D 回调、AudioContext、画字助手形参);
+    // 其余为注入型或混合身份,列在榜上但块外仍照常扫描。
+    expect(shadowed).toContain('src/gallery/markers.js');
+    expect(shadowed).toContain('src/visitor-fp.js');
+    expect(shadowed).not.toContain('src/ctx.js'); // 总线本体永不遮蔽
+    expect(shadowed.length).toBeLessThanOrEqual(12); // 规模哨兵:口径失控会暴涨
+  });
+});
