@@ -745,3 +745,50 @@ ctx 按域真拆本体（I1 已给出精确施工图：9 域 175 属性 + 8 个�
 ctx 按域真拆本体（施工图已就绪：9 域 176 属性、多写方降至 4 且全为合法共写；建议 loop→gallery→player 小域先行，scene 60 属性最后）；双放映器（目的不同）；gateData 逐域表化（收益有限）。
 
 **I2 终验结论：违规第二写方清零（多写方 8→4，余下全为带配对还原的合法共写）；冻结白名单盲区被实机咬出并补上制度守卫。PR #92（I1+I2）待合并。**
+
+---
+
+## 二十、J1：登记册假阳性治理（2026-11-18 · PR #93）
+
+> 前置：PR #92（I1+I2）已合并（远端 merge d6466c6），本地 main 快进对齐。J1 在分支 refactor/j1-ctx-split-2026-11-18，commit f40e5f6。
+
+### 为什么真拆前先做这个
+按施工图准备拆小域时，发现登记册里 `ctx.fillStyle` / `font` / `textAlign` / `oncomplete` 等来自 markers.js、visitor-fp.js——**这些是 Canvas2D / AudioContext 的属性名，不是总线属性**。假属性会污染真拆施工图（把 Canvas API 当总线属性去收编），故先净化口径再动刀。
+
+### 实锤假阳性 7 个
+| 来源 | 真相 |
+|---|---|
+| `markers.js` `canvasTexture(w,h,(ctx)=>{…})` | ctx 是 **Canvas2D 回调参数**，遮蔽了 import 进来的总线 |
+| `visitor-fp.js` `var ctx = new AC(1,4410,44100)` | ctx 是 **OfflineAudioContext**（音频指纹） |
+
+→ `fillStyle` / `font` / `textAlign` / `textBaseline` / `lineWidth` / `strokeStyle` / `oncomplete` 全部剔除。**176 → 169 属性**，差值正是这 7 个。
+
+### 修法：行级作用域遮蔽跟踪（不整文件排除）
+markers.js 是**混合身份**（既 import 总线、又在回调里遮蔽），整文件排除会连真写点一起漏掉。改为按花括号配平逐行判定三类遮蔽：
+- `decl`（var/let/const ctx=）：遮蔽到**所在外层块**收口
+- `block`（回调/函数形参）：遮蔽到函数体收口
+- `line`（单行箭头）：仅本行
+
+**依赖注入不算遮蔽**：boot-check / light-sweep / coord-hud / story-compass / loop-manager / dialog-replies 这 6 个文件不 import 总线，ctx 由调用方传入——传进来的就是总线本体，必须扫。
+
+### 两次口径失误（过程如实记录，不掩盖）
+1. **首版正则过宽**：把调用实参 `replyChoices(ctx,…)` / `new LoopManager(ctx)` / `constructor(ctx)` 当成绑定，误排除 **14 个合法文件**（含 ctx.js / main.js / loop-manager.js），属性数 176→145、`loop.timeScale` 直接丢失 ⇒ 收窄为只认真绑定位置。
+2. **decl 收口判定错**：用 `outer<=endDepth`，而声明行无花括号时 outer 恰等于 endDepth ⇒ 当场弹出、`oncomplete` 漏剔 ⇒ 改 `endDepth=outer-1` 严格下降判定。
+
+两次都是**先核验锚点再改**发现的（真属性丢失/假属性残留），不是靠猜。
+
+### 守卫 3 条
+7 假属性绝迹 / 9 个核心写方必须在册（防口径过宽误排除）/ 遮蔽清单钉死 + 规模哨兵 ≤12。
+
+### 验证
+**1439 单测**（123 文件，+3 守卫）/ lint 0 / tsc 真实 0 / deps 0 / 后端 7 组 / 登记册一致 **169 属性**（多写方 4，全为 I2 认定的合法共写）。
+
+### 真拆施工图（净化后）
+| 域 | 属性数 | 写方集中度 |
+|---|---|---|
+| loop | 1 | loop-manager 独占 ✅ 最内聚 |
+| player | 9 | player.js 独占 8 + quizgate 1（分数线，已认定合法） |
+| gallery | 8 | paintings 4 + scene 2 + housecolor 1 + painting-zoom 1 |
+| scene | 60 | 分散，最后动 |
+
+**J1 终验结论：登记册从"混着 Canvas API 的 176 项"净化为"169 项真总线属性"，行级遮蔽跟踪 + 3 条守卫钉死口径，真拆施工图可信。PR #93 待合并。**
