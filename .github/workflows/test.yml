@@ -120,10 +120,9 @@ jobs:
         run: npm run build
 
       # 构建可复现性(2026-11-11 技术债整改:R6 不变发布的本地前提)。连续两次构建逐字节比对,
-      # 不一致即红。非阻断起步(continue-on-error):先积累跨平台稳定性,确认无误报后再转阻断。
-      # 背景:2026-10-12 曾实测不可复现(79 chunk 全变),依赖升级后 2026-11-11 实测已可复现。
-      - name: Build reproducibility check (non-blocking — R6 immutable-release prerequisite)
-        continue-on-error: true
+      # 不一致即红。R6(2026-11-18 第六轮审计)转硬闸:本地实测 328 文件逐字节一致,
+      # "非阻断起步先积累稳定性"的前提已满足,再漂移回不可复现必须当场红。
+      - name: Build reproducibility check (blocking — R6 immutable-release prerequisite)
         run: npm run test:repro
 
       - name: Backend atomic-write regression (no media assets needed)

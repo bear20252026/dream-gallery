@@ -662,3 +662,34 @@ describe('批次6-9 冻结命名空间:登记册里的域属性必须在白名�
     expect(read('src/ctx-kunlun.js')).toMatch(/'spiritsDecorate',/);
   });
 });
+
+// R6(2026-11-18 第六轮审计):三项前端修复钉死——SM tick 防双份、video-wall 退订配对、
+// Walking→Gliding 与物理权威三条件对齐。判据钉语义不钉排版(H2 教训)。
+describe('批次6-10 R6修复:SM tick收编/订阅退订/双轨语义对齐', () => {
+  it('main.js SM tick 接住 unregister,teardown 摘除,重装配防双份', () => {
+    const m = read('src/main.js');
+    expect(m).toMatch(/_unregisterSmTick\s*=\s*ctx\.onTick/);
+    // teardown 里必须摘(与 rootTick 同纪律)
+    expect(m).toMatch(/if \(_unregisterSmTick\)\s*\{\s*_unregisterSmTick\(\)/);
+    // 装配前摘旧的
+    expect(m).toMatch(/if \(_unregisterSmTick\) _unregisterSmTick\(\);/);
+    expect(m).toMatch(/smTick: !!_unregisterSmTick/);
+  });
+
+  it('video-wall onMediaChanged 接住 off 挂世界退订注册表(E2 收尽)', () => {
+    const v = read('src/scene/media/video-wall.js');
+    expect(v).toMatch(/const offVideoWallMedia = onMediaChanged/);
+    expect(v).toMatch(/window\.__onWorldTeardown\(offVideoWallMedia\)/);
+  });
+
+  it('Walking→Gliding 三条件与 player-physics 逐字对齐(jumpHold 门槛不许再丢)', () => {
+    const sm = read('src/player/states/PlayerStates.js');
+    const phys = read('src/scene/player-physics.js');
+    // 物理权威:空中+按住+有余量
+    expect(phys).toMatch(/!s\.onGround && input\.jumpHold && s\.glideEnergy > 0/);
+    // 状态机 Walking 分支必须同三条件(原缺 jumpHold ⇒ 无按键坠崖单帧动画抖动)
+    expect(sm).toMatch(/!pl\.onGround && pl\.glideEnergy > 0 && ctx\.player\.jumpHold/);
+    // Airborne 分支本来就带 jumpHold,保持
+    expect(sm).toMatch(/if \(ctx\.player\.jumpHold\)/);
+  });
+});

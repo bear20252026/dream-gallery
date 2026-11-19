@@ -15,7 +15,7 @@
 # 刻意不进 daily(是决定,不是漏做,恢复时按这三条另行处理):
 #   `.env`    密钥,主人手工管(与数据同盘再滚 14 份不划算)
 #   `models/` 约 495M,线上为源 + R2 镜像;恢复走 scripts/r2-upload*.cjs 重镜像
-#   `dist/`   构建产物,可由源码重建(本项目构建**不可复现**,存产物没有意义)
+#   `dist/`   构建产物,可由源码重建(2026-11-11 起构建已可复现并钉成 CI 硬闸;存产物仍无意义——源码+锁文件即完整重建配方)
 # 调度(cron): 17 3 * * * daily / 23 4 * * 0 weekly(错峰分钟,服务器 CST)
 # 离线演练注入口(与 deploy.sh 的 SSH_BIN/SCP_BIN 同一手法):
 #   GALLERY_DIR BACKUP_DIR TAR_BIN SQLITE_BIN KEEP_DAILY KEEP_WEEKLY REQUIRED REQUIRE_DB
