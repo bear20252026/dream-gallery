@@ -4,31 +4,39 @@
 > 新属性/新写方/写方变更必须重新生成登记册并在 PR 里说明——这是 ctx 按域真拆前的所有权制度地基。
 > ⚠️ 标记 = 多写方(真拆时须先收编单一 owner)。注释行/解构读不计;动态键 ctx[k] 全仓必须保持 0。
 
-**总计 176 个属性,4 个多写方。**
+**总计 169 个属性,4 个多写方。**
 
-## _root(21)
+### 遮蔽文件(已排除,须人工复核)
+
+这些文件里存在 `ctx` 的**局部遮蔽块**(Canvas2D 回调参数 / AudioContext / 画字助手形参)。遮蔽块内的 `ctx.*` 不计入登记册(否则 `fillStyle`/`oncomplete` 会被当成总线属性);块外照常扫描 —— 依赖注入型文件(ctx 由调用方传入)不算遮蔽。
+
+- `src/core/boot-check.js`
+- `src/core/light-sweep.js`
+- `src/core/state-system.js`
+- `src/gallery/markers.js`
+- `src/gate/quiz.js`
+- `src/loop-manager.js`
+- `src/shared/dialog-replies.mjs`
+- `src/ui/coord-hud.js`
+- `src/ui/story-compass.js`
+- `src/visitor-fp.js`
+
+## _root(14)
 
 | 属性 | 写方 | |
 |---|---|---|
 | `ctx._jumpHold` | `src/scene/player.js` |  |
 | `ctx.ent` | `src/ctx.js` |  |
 | `ctx.events` | `src/ctx.js` |  |
-| `ctx.fillStyle` | `src/gallery/markers.js` |  |
-| `ctx.font` | `src/gallery/markers.js` |  |
 | `ctx.gallery` | `src/ctx.js` |  |
 | `ctx.input` | `src/ctx.js` |  |
 | `ctx.kunlun` | `src/ctx.js` |  |
-| `ctx.lineWidth` | `src/gallery/markers.js` |  |
 | `ctx.loop` | `src/ctx.js` |  |
 | `ctx.media` | `src/ctx.js` |  |
 | `ctx.mode` | `src/ctx.js` |  |
 | `ctx.onTick` | `src/ctx.js`<br>`src/hot.js` | ⚠️多写方 |
-| `ctx.oncomplete` | `src/visitor-fp.js` |  |
 | `ctx.player` | `src/ctx.js` |  |
 | `ctx.scene` | `src/ctx.js` |  |
-| `ctx.strokeStyle` | `src/gallery/markers.js` |  |
-| `ctx.textAlign` | `src/gallery/markers.js` |  |
-| `ctx.textBaseline` | `src/gallery/markers.js` |  |
 | `ctx.tickers` | `src/ctx.js` |  |
 | `ctx.ui` | `src/ctx.js` |  |
 

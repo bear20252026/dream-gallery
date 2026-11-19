@@ -19,18 +19,6 @@
       ]
     },
     {
-      "key": "fillStyle",
-      "writers": [
-        "src/gallery/markers.js"
-      ]
-    },
-    {
-      "key": "font",
-      "writers": [
-        "src/gallery/markers.js"
-      ]
-    },
-    {
       "key": "gallery",
       "writers": [
         "src/ctx.js"
@@ -265,12 +253,6 @@
       ]
     },
     {
-      "key": "lineWidth",
-      "writers": [
-        "src/gallery/markers.js"
-      ]
-    },
-    {
       "key": "loop",
       "writers": [
         "src/ctx.js"
@@ -473,12 +455,6 @@
       "writers": [
         "src/ctx.js",
         "src/hot.js"
-      ]
-    },
-    {
-      "key": "oncomplete",
-      "writers": [
-        "src/visitor-fp.js"
       ]
     },
     {
@@ -907,24 +883,6 @@
       "key": "scene.worldStack",
       "writers": [
         "src/core/scene-manager.js"
-      ]
-    },
-    {
-      "key": "strokeStyle",
-      "writers": [
-        "src/gallery/markers.js"
-      ]
-    },
-    {
-      "key": "textAlign",
-      "writers": [
-        "src/gallery/markers.js"
-      ]
-    },
-    {
-      "key": "textBaseline",
-      "writers": [
-        "src/gallery/markers.js"
       ]
     },
     {
