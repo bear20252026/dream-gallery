@@ -709,3 +709,39 @@ pre-commit prettier 把 createKoiAmbient 长参数列表折成多行，而守卫
 ctx 按域真拆本体（I1 已给出精确施工图：9 域 175 属性 + 8 个须先收编的多写方；建议按 loop→gallery→player 小域先行，scene 60 属性最后）；双放映器（目的不同）；gateData 逐域表化（收益有限）。
 
 **I1 终验结论：ctx 所有权从"没人知道谁在写"变"175 属性全量在册、漂移即红、多写方精确标出"，真拆施工图就绪。PR #92 待合并。**
+
+---
+
+## 十九、I2：多写方收编 8→4（2026-11-18 · 并入 PR #92）
+
+> I1 登记册标出的 8 个 ⚠️ 逐个核写点：**4 个是违规第二写方（已收编）**，**4 个是合法共写（守卫钉死语义，防被误当违规收掉）**。commit c27bc9f。
+
+### 收编 4 项（违规共写清零）
+| 属性 | 原状 | 收法 |
+|---|---|---|
+| `tickers` | ctx.js 建 + loop.register `if(!ctx.tickers)` 兜底再建 | 删兜底；唯一 owner=ctx.js（ESM 模块体先执行，缺失属装配序 bug 就该炸） |
+| `player.quizPassed` | player.js 默认 + quizgate.js 第二份默认 | 删 quizgate 那份；分数线 quizPassScore 仍归 quizgate（服务端单源），未误伤 |
+| `scene.renderPostProcessing` | scene-manager.syncCtx + main.js 直写 | **新增 `provideMainPost` 门面**（scene-manager 唯一写方）。门面覆盖两种时序：manager 已建直接转 setMainPost；未建则暂存，initSceneManager 建成后补注入——**不静默丢管线** |
+| `kunlun.spiritsState` | spirits.js 注册 + planets.js 捕获 prev 覆写 | planets 改注册 `spiritsDecorate` 装饰器，由唯一 owner spirits.js **读时咨询**；bag.custom 对称退订。消除热替叠链隐患 |
+
+### 合法共写 4 项（守卫写明语义，不许被收掉）
+- `onTick`：ctx.js 建 + hot.js HMR 捕获包装 → uninstallCaptures 必须还原
+- `scene.avatar`：player 程序化小人（默认）+ kunlun/avatar GLB **显式**升级（`window.__useGlbAvatar`，USE_GLB_BY_DEFAULT=false）
+- `scene.s`：scene.js 首建 + scene-manager.syncCtx 世界切换换引用（46 处读者的唯一渲染入口）
+- `ui.kunlunSpeak`：audio-manager 基础实现 + gameshell 对话升级 → dispose 必须还原
+
+### 实机踩到的真坑 → 新增制度守卫（本轮最有价值的发现）
+`ctx.<域>` 是 **Object.freeze 的白名单代理**，新属性不登记就**静默失败**：planets 加载报 `Cannot add property spiritsDecorate, object is not extensible` ⇒ **整个星球世界加载失败、FPS=0**。
+- 补 ctx-kunlun 白名单 + types/ctx.d.ts 声明（形状取自真实写点，不猜）
+- **新增批次 6-9 守卫**：登记册里的域属性必须在对应白名单内——I1 能扫出写点，但扫不出"白名单没登记"，这条补上盲区
+- 守卫正则兼容紧凑首行写法（`const properties = [ 'a', 'b',`）：**首版误报 media/mode 四项，核实后确认原已登记，未误加重复条目**（一度误判为"真漏登记"并加了重复项，发现后立即撤销）。教训与 H2 同源：**守卫钉语义不钉排版**
+
+### 验证
+- **实机 11 项 PASS**（.tmp/i2-verify.cjs）：后处理管线在位（provideMainPost 未丢）/ tickers 单表 / quizPassed 布尔（gameState 绑定，服务端权威）/ 分数线兜底在位 / spiritsState 6 行 / 装饰器已注册 / **装饰生效（place 为"325 号小行星·国王"等星球版）** / 切 b612 摘管线 null / 回主世界复管线 function / 0 错误
+- 探针两处假设错误已纠正（世界 id 是 `b612` 非 `space`；quizPassed 由 gameState 绑定，false 是合法值）——非代码缺陷
+- 门禁：**1436 单测**（123 文件，+7 守卫）/ lint 0 / tsc 真实 0 / deps 0 / 后端 7 组 / 登记册一致 176 属性
+
+### 剩余（诚实标注）
+ctx 按域真拆本体（施工图已就绪：9 域 176 属性、多写方降至 4 且全为合法共写；建议 loop→gallery→player 小域先行，scene 60 属性最后）；双放映器（目的不同）；gateData 逐域表化（收益有限）。
+
+**I2 终验结论：违规第二写方清零（多写方 8→4，余下全为带配对还原的合法共写）；冻结白名单盲区被实机咬出并补上制度守卫。PR #92（I1+I2）待合并。**
