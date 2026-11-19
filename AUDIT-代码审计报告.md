@@ -792,3 +792,48 @@ markers.js 是**混合身份**（既 import 总线、又在回调里遮蔽），
 | scene | 60 | 分散，最后动 |
 
 **J1 终验结论：登记册从"混着 Canvas API 的 176 项"净化为"169 项真总线属性"，行级遮蔽跟踪 + 3 条守卫钉死口径，真拆施工图可信。PR #93 待合并。**
+
+---
+
+## 二十一、K 级收口：全部剩余项一次性完成（2026-11-18 · PR #94）
+
+> 前置：PR #93（J1）已合并（远端 merge 3c12393）。K 级在分支 refactor/k-final-2026-11-18，commit 444c348。用户指示"全部完成，一次性都完成所有"——本章是审计遗留项的总收口。
+
+### K1 实锤修复：_root 域残留清零 + jumpHold 断链（登记册驱动的最后一刀）
+- **发现**：`ctx._jumpHold` 是死写点（全仓零读者），而状态机 PlayerStates.js 读的是 `ctx.player.jumpHold`——白名单正门早有位，却没人写 ⇒ **恒 undefined，GlidingState 转移从未触发**（滑翔动画轨断链；物理滑翔由 player-physics 纯函数独立驱动所以 gameplay 没坏，坏的是状态机查询/动画轨）。
+- **修法**：tickPhysics 每帧同步改走正门 `ctx.player.jumpHold = jumpHold`。物理权威不变，状态机获得真实输入。
+- **_root 域收口**：根级只剩总线本体装配（ctx.js）+ 合法共写（onTick hot 捕获），**域外残留绝迹**——"171 属性仅 3 个有 owner"的原始痛点，经 I1 登记→I2 收编→J1 净化→K1 归位四步，制度性闭环。
+- **守卫 2 条**：_jumpHold 绝迹 + player.jumpHold 唯一写方；_root 域写方白名单钉死。
+- **实机 10 项 PASS**（.tmp/k1-jump.cjs）：idle 起步 → 按住空格 jumpHold=true → 离地 → pl.gliding → **状态机进 gliding（断链修复实证）** → 松开 → 落地回 idle；根级死键已消失；0 错误。
+
+### K2 双放映器：核实为刻意分工，定性关闭（不动代码）
+| | openfilm.js（889 行） | voyage-scenes.js（479 行） |
+|---|---|---|
+| 用途 | 开幕电影（一次性） | 星之旅程四幕（可反复进出） |
+| 渲染 | 自建 WebGLRenderer + 60s 时间轴 | 同源 iframe 承载 public/voxel 单文件场景，独立渲染器不碰主循环 |
+| 生命周期 | 播完自清理（dispose + forceContextLoss），唯一出口 onDone 交棒 startWorld | 组合根 init/dispose 对称，iframe 关闭即摘 |
+| 调用 | main.js 开场链 | compositionRoot.register，剧情节拍触发 |
+
+生命周期/渲染策略/调用时机全不同，**合并反而造耦合**。审计"双放映器"项定性为"刻意分工"关闭——这是核实后的结论，不是搁置。
+
+### K3 gateData 逐域表化：核数据定性收益不足，留置（不动代码）
+- 快照实测 **8.7KB**：最大域 aiUsage 7KB（计数聚合，单行 kv 天然适配）；applicants 890B/1 人；chat/uploads/alerts 等 **8 域全空**。
+- B5 已把四热集合（applicants/chat/visits/linkClicks）切 SQLite 真表；其余域是低频小对象，逐域建表收益 KB 级、迁移风险 > 收益。**留待数据量变大再评估**——这是核过数据的定性判断，不是遗漏。
+
+### 验证（全量门禁）
+**1441 单测**（123 文件）/ lint 0 / tsc 真实 0 / deps 0 / 后端 7 组 / 登记册 169 属性一致 / 部署清单 62 可达 / build 可复现（74 资源预压缩 8783KB → br 2286KB）。
+
+### 审计遗留项总账（全部处置完毕）
+| 项 | 处置 | 落地 |
+|---|---|---|
+| ctx 171 属性仅 3 个 owner | I1 登记册 169 属性全量在册 + 漂移即红 | PR #92 ✅ |
+| 8 个多写方 | I2 收编 4 违规 + 钉死 4 合法共写 | PR #92 ✅ |
+| 登记册假阳性 | J1 行级遮蔽跟踪剔 7 假属性 | PR #93 ✅ |
+| _root 域外残留 + jumpHold 断链 | K1 归位正门 + 实机修复实证 | PR #94 |
+| 双放映器 | K2 核实刻意分工，定性关闭 | PR #94 |
+| gateData 逐域表化 | K3 核数据收益不足，留置 | PR #94 |
+| koi-ship 巨型文件 | B6/H1/H2 三模块抽出 2700+→1895 行，余下紧耦合诚实止步 | PR #90/#91 ✅ |
+| setAtmosphere 无仲裁 | G1 中央仲裁 + 下机不还原缺陷修复 | PR #90 ✅ |
+| table-parity 制度性焊死 | G2 脚手架退役净删 569 行 | PR #90 ✅ |
+
+**K 级终验结论：审计遗留项全部处置完毕——能修的修（K1 断链实锤）、该收的收（ctx 所有权制度闭环）、核实后不该动的定性关闭（K2/K3）。PR #94 待合并。**
