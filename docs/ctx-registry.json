@@ -235,6 +235,12 @@
       ]
     },
     {
+      "key": "kunlun.spiritsDecorate",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
       "key": "kunlun.spiritsGot",
       "writers": [
         "src/kunlun/spirits.js"
@@ -249,7 +255,6 @@
     {
       "key": "kunlun.spiritsState",
       "writers": [
-        "src/kunlun/planets.js",
         "src/kunlun/spirits.js"
       ]
     },
@@ -521,7 +526,6 @@
     {
       "key": "player.quizPassed",
       "writers": [
-        "src/gate/quizgate.js",
         "src/scene/player.js"
       ]
     },
@@ -817,8 +821,7 @@
     {
       "key": "scene.renderPostProcessing",
       "writers": [
-        "src/core/scene-manager.js",
-        "src/main.js"
+        "src/core/scene-manager.js"
       ]
     },
     {
@@ -927,7 +930,6 @@
     {
       "key": "tickers",
       "writers": [
-        "src/core/loop.js",
         "src/ctx.js"
       ]
     },

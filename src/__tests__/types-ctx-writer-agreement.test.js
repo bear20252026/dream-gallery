@@ -415,7 +415,9 @@ describe('2026-10-15 第五刀:被写成 `() => void` 的成员,参数表 ≡ �
     expect(DTS).not.toMatch(/^ {2}spiritsState: unknown\[\];$/m);
     const sp = read('src/kunlun/spirits.js');
     const m = sp.match(
-      /function spiritsState\(\)[\s\S]{0,600}?return SPIRITS\.map\(\(sp, i\) => \(\{([\s\S]*?)\}\)\);/
+      // I2:spiritsState 改为 const rows = SPIRITS.map(...)(读时咨询星球装饰器),
+      // 锚点跟着改 —— 钉的是「交出去的键集合」,不是 return 这个排版
+      /function spiritsState\(\)[\s\S]{0,600}?(?:return|const rows =) SPIRITS\.map\(\(sp, i\) => \(\{([\s\S]*?)\}\)\);/
     );
     expect(m, 'spirits.js 里 function spiritsState() 的写法变了,这条钉子要跟着改').not.toBe(null);
     const wrote = m[1]

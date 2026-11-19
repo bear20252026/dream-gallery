@@ -21,7 +21,8 @@ export function getLoop() {
 
 // 注册每帧回调(进入唯一循环的 UPDATE 阶段)
 export function register(fn) {
-  if (!ctx.tickers) ctx.tickers = [];
+  // I2:tickers 唯一 owner=ctx.js(模块体无条件先建,ESM 时序保证先于任何 import 方执行);
+  // 原 if(!ctx.tickers) 兜底是第二写方假象,删。ctx.tickers 缺失属装配序 bug,就该炸出来。
   ctx.tickers.push(fn);
   return () => {
     const i = ctx.tickers.indexOf(fn);

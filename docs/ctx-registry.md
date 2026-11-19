@@ -4,7 +4,7 @@
 > 新属性/新写方/写方变更必须重新生成登记册并在 PR 里说明——这是 ctx 按域真拆前的所有权制度地基。
 > ⚠️ 标记 = 多写方(真拆时须先收编单一 owner)。注释行/解构读不计;动态键 ctx[k] 全仓必须保持 0。
 
-**总计 175 个属性,8 个多写方。**
+**总计 176 个属性,4 个多写方。**
 
 ## _root(21)
 
@@ -29,7 +29,7 @@
 | `ctx.strokeStyle` | `src/gallery/markers.js` |  |
 | `ctx.textAlign` | `src/gallery/markers.js` |  |
 | `ctx.textBaseline` | `src/gallery/markers.js` |  |
-| `ctx.tickers` | `src/core/loop.js`<br>`src/ctx.js` | ⚠️多写方 |
+| `ctx.tickers` | `src/ctx.js` |  |
 | `ctx.ui` | `src/ctx.js` |  |
 
 ## gallery(8)
@@ -45,7 +45,7 @@
 | `ctx.gallery.zG` | `src/gallery/painting-zoom.js` |  |
 | `ctx.gallery.zoomIn` | `src/gallery/paintings.js` |  |
 
-## kunlun(27)
+## kunlun(28)
 
 | 属性 | 写方 | |
 |---|---|---|
@@ -72,9 +72,10 @@
 | `ctx.kunlun.setChapter` | `src/kunlun/planets.js` |  |
 | `ctx.kunlun.spiritMark` | `src/kunlun/spirits.js` |  |
 | `ctx.kunlun.spiritsCollectExternal` | `src/kunlun/spirits.js` |  |
+| `ctx.kunlun.spiritsDecorate` | `src/kunlun/planets.js` |  |
 | `ctx.kunlun.spiritsGot` | `src/kunlun/spirits.js` |  |
 | `ctx.kunlun.spiritsNextKey` | `src/kunlun/spirits.js` |  |
-| `ctx.kunlun.spiritsState` | `src/kunlun/planets.js`<br>`src/kunlun/spirits.js` | ⚠️多写方 |
+| `ctx.kunlun.spiritsState` | `src/kunlun/spirits.js` |  |
 | `ctx.kunlun.spiritsTTS` | `src/kunlun/spirits.js` |  |
 
 ## loop(1)
@@ -132,7 +133,7 @@
 | `ctx.player.pl` | `src/scene/player.js` |  |
 | `ctx.player.playerSM` | `src/scene/player.js` |  |
 | `ctx.player.quizPassScore` | `src/gate/quizgate.js` |  |
-| `ctx.player.quizPassed` | `src/gate/quizgate.js`<br>`src/scene/player.js` | ⚠️多写方 |
+| `ctx.player.quizPassed` | `src/scene/player.js` |  |
 | `ctx.player.tickAvatarGait` | `src/scene/player.js` |  |
 | `ctx.player.viewMode` | `src/scene/player.js` |  |
 
@@ -185,7 +186,7 @@
 | `ctx.scene.pyrHeight` | `src/scene/scene.js` |  |
 | `ctx.scene.ray` | `src/scene/scene.js` |  |
 | `ctx.scene.removeBounds` | `src/scene/scene.js` |  |
-| `ctx.scene.renderPostProcessing` | `src/core/scene-manager.js`<br>`src/main.js` | ⚠️多写方 |
+| `ctx.scene.renderPostProcessing` | `src/core/scene-manager.js` |  |
 | `ctx.scene.resizePostProcessing` | `src/main.js` |  |
 | `ctx.scene.rnd` | `src/scene/scene.js` |  |
 | `ctx.scene.s` | `src/core/scene-manager.js`<br>`src/scene/scene.js` | ⚠️多写方 |

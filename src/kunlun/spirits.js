@@ -470,7 +470,7 @@ onTick(function () {
 function spiritsState() {
   const keys = gotKeys(),
     ti = nextIdx();
-  return SPIRITS.map((sp, i) => ({
+  const rows = SPIRITS.map((sp, i) => ({
     name: sp.name,
     en: sp.en,
     emotion: sp.emotion,
@@ -478,6 +478,9 @@ function spiritsState() {
     place: sp.place,
     state: keys.includes(sp.key) ? 'got' : i === ti && questActive() ? 'open' : 'locked',
   }));
+  // I2:星球版 place/name 装饰由 planets 注册的装饰器合成(它是唯一数据源扩展点,
+  // 不再反向覆写本函数);planets 未加载/已卸载 ⇒ 原样返回沙漠版。
+  return ctx.kunlun.spiritsDecorate ? ctx.kunlun.spiritsDecorate(rows) : rows;
 }
 function refreshSpiritsPage() {
   if (window.__refreshSpirits) window.__refreshSpirits();

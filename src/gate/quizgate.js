@@ -31,8 +31,8 @@ window.quizToast = function (msg, force) {
 };
 
 // ===================== 通行证状态 =====================
-// 2026-07-31:默认允许进入建筑,答题只用于天穹进度
-ctx.player.quizPassed = true; // 默认允许进入建筑
+// I2(2026-11-18):quizPassed 默认值唯一 owner=scene/player.js(玩家域,无条件先建)。
+// 此处原第二份默认值删除——答题门只消费通行证与下发分数线,不再写通行证。
 if (ctx.player.quizPassScore === undefined) ctx.player.quizPassScore = 60; // 分数线(服务端单源下发前的兜底,与 lib/quiz.js 一致)
 fetch('/api/quiz/state')
   .then((r) => r.json())

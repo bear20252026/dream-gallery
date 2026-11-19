@@ -29,6 +29,8 @@
 //   `any` 比这一刀之前的 `unknown` 更糟(unknown 至少让每个读数点报一条,any 让所有读数点失去检查)。
 //   所以 typeof import 这条路必须配一个"绑定名/导出确实在"的钉子,不能只信编译器。
 import { describe, it, expect } from 'vitest';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -553,5 +555,110 @@ describe('批次6-7 地板(第十刀·批次0 起改成了"上限"而不是"等�
     if (n > CEILING)
       throw new Error(`基线被抬到 ${n} > 上限 ${CEILING} —— 新增的类型债要修,不是把数字改大`);
     expect(n).toBeLessThanOrEqual(CEILING);
+  });
+});
+
+// I2(2026-11-18):多写方收编。I1 登记册标出的 8 个 ⚠️ 里,4 个是真·第二写方(已收编),
+// 4 个是合法共写(在此逐个钉死语义与配对,防被误当违规收掉)。
+describe('批次6-8 多写方收编:违规共写绝迹,合法共写钉死(I2)', () => {
+  it('tickers 唯一 owner=ctx.js;loop.register 只消费不再兜底建表', () => {
+    const w = scan(/ctx\.tickers\s*=(?!=)/).filter((x) => !/^\s*(\/\/|\*|\/\*)/.test(x.text));
+    expect(w.map((x) => x.rel)).toEqual(['src/ctx.js']);
+    expect(read('src/core/loop.js')).not.toMatch(/if \(!ctx\.tickers\)/);
+  });
+
+  it('quizPassed 唯一默认 owner=player.js;答题门只消费通行证与下发分数线', () => {
+    const w = scan(/ctx\.player\.quizPassed\s*=(?!=)/).filter(
+      (x) => !/^\s*(\/\/|\*|\/\*)/.test(x.text)
+    );
+    expect(w.map((x) => x.rel)).toEqual(['src/scene/player.js']);
+    // 分数线仍归答题门(服务端单源),不被本次收编误伤
+    expect(read('src/gate/quizgate.js')).toMatch(/ctx\.player\.quizPassScore = d\.passScore/);
+  });
+
+  it('renderPostProcessing 唯一写方=scene-manager;main 经 provideMainPost 门面注入', () => {
+    const w = scan(/ctx\.scene\.renderPostProcessing\s*=(?!=)/).filter(
+      (x) => !/^\s*(\/\/|\*|\/\*)/.test(x.text)
+    );
+    expect(w.map((x) => x.rel).filter((r, i, a) => a.indexOf(r) === i)).toEqual([
+      'src/core/scene-manager.js',
+    ]);
+    const m = read('src/main.js');
+    expect(m).toMatch(/provideMainPost\(pp\.renderPostProcessing\)/);
+    // 门面必须覆盖 manager 未建时序(暂存+补注入),否则加载序一变就静默丢管线
+    const sm = read('src/core/scene-manager.js');
+    expect(sm).toMatch(/let pendingMainPost = null/);
+    expect(sm).toMatch(/if \(pendingMainPost\) \{\s*manager\.setMainPost\(pendingMainPost\)/);
+  });
+
+  it('spiritsState 唯一写方=spirits.js;星球版经 spiritsDecorate 装饰器(不捕获prev覆写)', () => {
+    // 判据取登记册扫描器(单一事实源):spiritsState 是 Object.assign 平铺注册,
+    // 直写正则扫不到 —— 两套口径会漂,统一以 ctx-registry 为准。
+    const { scan: scanCtx } = require('../../scripts/admin/ctx-registry.cjs');
+    const row = scanCtx().find((r) => r.key === 'kunlun.spiritsState');
+    expect(row && row.writers).toEqual(['src/kunlun/spirits.js']);
+    const p = read('src/kunlun/planets.js');
+    expect(p).not.toMatch(/const prevSpiritsState = ctx\.kunlun\.spiritsState/);
+    expect(p).toMatch(/ctx\.kunlun\.spiritsDecorate = \(rows\) =>/);
+    expect(p).toMatch(/ctx\.kunlun\.spiritsDecorate = null/); // bag.custom 对称退订
+    expect(read('src/kunlun/spirits.js')).toMatch(
+      /return ctx\.kunlun\.spiritsDecorate \? ctx\.kunlun\.spiritsDecorate\(rows\) : rows/
+    );
+  });
+
+  it('4 个合法共写:hot捕获还原/GLB显式升级/世界切换/对话升级,各自配对不许被收掉', () => {
+    // onTick:ctx.js 建 + hot.js HMR 捕获包装,uninstallCaptures 必须还原
+    const h = read('src/hot.js');
+    expect(h).toMatch(/saved\.prevOnTick = prev/);
+    expect(h).toMatch(/ctx\.onTick = saved\.prevOnTick/);
+    // scene.avatar:player 程序化小人(默认) + kunlun/avatar GLB 显式升级(window.__useGlbAvatar)
+    const av = read('src/kunlun/avatar.js');
+    expect(av).toMatch(/const USE_GLB_BY_DEFAULT = false/);
+    expect(av).toMatch(/window\.__useGlbAvatar = function/);
+    // scene.s:scene.js 首建 + scene-manager.syncCtx 世界切换换引用(46 处读者的唯一渲染入口)
+    expect(read('src/core/scene-manager.js')).toMatch(/ctx\.scene\.s = world\.scene/);
+    // ui.kunlunSpeak:audio-manager 基础实现 + gameshell 对话升级,dispose 必须还原
+    const gs = read('src/core/gameshell-system.js');
+    expect(gs).toMatch(/prevKunlunSpeak = ctx\.ui\.kunlunSpeak/);
+    expect(gs).toMatch(/if \(prevKunlunSpeak\) ctx\.ui\.kunlunSpeak = prevKunlunSpeak/);
+  });
+});
+
+// I2 实机踩到的真坑:ctx.<域> 是 Object.freeze 的白名单代理,新属性不登记就静默失败
+// (planets 加载报 "Cannot add property spiritsDecorate, object is not extensible",
+//  整个星球世界加载失败 ⇒ FPS=0)。登记册能扫出写点,但扫不出"白名单没登记"——这条补上。
+describe('批次6-9 冻结命名空间:登记册里的域属性必须在白名单内(I2)', () => {
+  const NS = {
+    kunlun: 'src/ctx-kunlun.js',
+    scene: 'src/ctx-scene.js',
+    player: 'src/ctx-player.js',
+    media: 'src/ctx-media.js',
+    ui: 'src/ctx-ui.js',
+    gallery: 'src/ctx-gallery.js',
+    mode: 'src/ctx-mode.js',
+  };
+
+  it('每个已冻结域的登记属性都在对应白名单里(漏登记=运行时静默失败)', () => {
+    const { scan: scanCtx } = require('../../scripts/admin/ctx-registry.cjs');
+    const rows = scanCtx();
+    const missing = [];
+    for (const [domain, file] of Object.entries(NS)) {
+      const src = read(file);
+      if (!/Object\.freeze\(proxy\)/.test(src)) continue; // 只查真冻结的域
+      // 白名单条目形如 'propName', (可带行尾注释)
+      // 白名单条目可能独占行,也可能紧凑排在 properties 首行(ctx-mode.js)——只钉语义不钉排版
+      const allow = new Set([...src.matchAll(/'([A-Za-z_$][\w$]*)'\s*,/g)].map((m) => m[1]));
+      for (const r of rows) {
+        if (!r.key.startsWith(domain + '.')) continue;
+        const prop = r.key.slice(domain.length + 1);
+        if (prop.includes('.')) continue; // 更深层不属本白名单
+        if (!allow.has(prop)) missing.push(`${r.key} ← ${r.writers.join(',')} (${file} 未登记)`);
+      }
+    }
+    expect(missing).toEqual([]);
+  });
+
+  it('spiritsDecorate 已登记(I2 新增装饰器的白名单钉子)', () => {
+    expect(read('src/ctx-kunlun.js')).toMatch(/'spiritsDecorate',/);
   });
 });

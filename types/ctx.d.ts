@@ -533,6 +533,13 @@ export interface KunlunNamespace {
    * 而包装方 `planets.js:861` 报 TS2322 —— 数组形状连"能不能调用"都答错了。
    */
   spiritsState: () => SpiritItem[];
+  /**
+   * I2(2026-11-18)星球版罗盘装饰器 —— 唯一写入方 `src/kunlun/planets.js`
+   * `(rows) => decorateSpiritsState(rows, PLANETS, chapter)`;由 spirits.js 的 spiritsState
+   * 读时咨询(未加载/已卸载 ⇒ null,回落沙漠版)。取代原先 planets 捕获 prev 覆写
+   * spiritsState 的第二写方(热替会叠链)。形状取自真实赋值点,不是猜的。
+   */
+  spiritsDecorate: ((rows: SpiritItem[]) => SpiritItem[]) | null;
   checkSkyMs: () => void;
   fadeTeleport: (target: Vector3, yaw: number) => void;
   rebuildEternalPicks: () => void;

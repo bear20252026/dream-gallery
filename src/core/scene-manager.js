@@ -403,6 +403,11 @@ export class SceneManager {
 export function initSceneManager(options) {
   if (manager) return manager;
   manager = new SceneManager(options);
+  // I2:门面先于 manager 到达时暂存的管线在此补注入(时序兜底,不静默丢)
+  if (pendingMainPost) {
+    manager.setMainPost(pendingMainPost);
+    pendingMainPost = null;
+  }
   ctx.scene.worldManager = manager;
   ctx.scene.activeWorld = 'main';
   ctx.scene.worldStack = manager.worldStack;
@@ -414,4 +419,18 @@ export function initSceneManager(options) {
 }
 export function getSceneManager() {
   return manager;
+}
+
+// I2(2026-11-18):主世界后处理管线注入的唯一入口。
+// ctx.scene.renderPostProcessing 的写方收归本模块(syncCtx 世界切换 + 本门面),
+// main.js 不再直写。两种时序都覆盖:manager 已建(planets 在核心链,常态)直接转 setMainPost;
+// 未建(加载序变化/星球世界被裁)先暂存,initSceneManager 建成后补注入 —— 不会静默丢管线。
+let pendingMainPost = null;
+export function provideMainPost(fn) {
+  if (manager) {
+    manager.setMainPost(fn);
+    pendingMainPost = null;
+    return;
+  }
+  pendingMainPost = fn || null;
 }
