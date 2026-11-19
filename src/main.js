@@ -229,7 +229,8 @@ async function preloadWorld() {
     // ===================== 后处理管线初始化(2026-08-22) =====================
     const pp = await import('./scene/postprocessing.js'); // 已在上方链加载,此处取缓存
     pp.initPostProcessing(rnd, s, cam);
-    ctx.scene.renderPostProcessing = pp.renderPostProcessing;
+    // I2:renderPostProcessing 唯一写方=core/scene-manager.js(syncCtx 世界切换 + provideMainPost 门面)。
+    // 此处不再直写;注入在下方统一走 provideMainPost(它覆盖 manager 已建/未建两种时序)。
     ctx.scene.resizePostProcessing = pp.resizePostProcessing;
     // 2026-11-12 画质修复:画质档变化时必须同步 composer 的 pixelRatio,
     // 否则后处理缓冲与画布分辨率错位 ⇒ 越降档越糊(LoopManager._applyPixelRatio 调它)。
@@ -243,8 +244,8 @@ async function preloadWorld() {
     // 在此立刻清会把正在播的影片误杀。真实浏览器首屏曾残留相框/纸飞机/暗层
     // (fFrame/fPlaneDom/fDark)把主世界染成灰白老照片,故在交棒后再兜一次。
     // 多世界:把主世界后处理管线注入 SceneManager(切世界时由它接管挂/摘)
-    if (ctx.scene.worldManager && ctx.scene.worldManager.setMainPost)
-      ctx.scene.worldManager.setMainPost(pp.renderPostProcessing);
+    const { provideMainPost } = await import('./core/scene-manager.js');
+    provideMainPost(pp.renderPostProcessing);
     compositionRoot.register(createPerfMonitorSystem({ renderer: rnd }));
     initSentry();
     compositionRoot.register(

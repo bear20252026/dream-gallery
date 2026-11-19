@@ -833,11 +833,12 @@ onTick(function (dt) {
 /* ===================== 拾取 → 章节推进 ===================== */
 
 /* ===================== 对外接口(spirits/罗盘页/小地图) ===================== */
-// 罗盘页:覆盖 spiritsState 的 place/name(星球版);顺序与 SPIRITS 一致
-const prevSpiritsState = ctx.kunlun.spiritsState;
-ctx.kunlun.spiritsState = function () {
-  return decorateSpiritsState(prevSpiritsState(), PLANETS, chapter);
-};
+// 罗盘页星球版装饰:I2 收编——不再捕获 prev 覆写 ctx.kunlun.spiritsState(第二写方+热替叠链隐患),
+// 改注册装饰器,由唯一 owner spirits.js 在读取时咨询(未加载/卸载时自然回落沙漠版)。
+ctx.kunlun.spiritsDecorate = (rows) => decorateSpiritsState(rows, PLANETS, chapter);
+bag.custom.push(() => {
+  ctx.kunlun.spiritsDecorate = null;
+});
 // 小地图标记:当前目标(星门或当前岛)
 ctx.kunlun.planetsMark = function () {
   if (chapter >= 6) return null;

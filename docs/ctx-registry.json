@@ -1,0 +1,1064 @@
+{
+  "rows": [
+    {
+      "key": "_jumpHold",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "ent",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "events",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "fillStyle",
+      "writers": [
+        "src/gallery/markers.js"
+      ]
+    },
+    {
+      "key": "font",
+      "writers": [
+        "src/gallery/markers.js"
+      ]
+    },
+    {
+      "key": "gallery",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "gallery.hangOne",
+      "writers": [
+        "src/gallery/paintings.js"
+      ]
+    },
+    {
+      "key": "gallery.houseMats",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "gallery.onC3D",
+      "writers": [
+        "src/gallery/paintings.js"
+      ]
+    },
+    {
+      "key": "gallery.openHouseColor",
+      "writers": [
+        "src/gate/housecolor.js"
+      ]
+    },
+    {
+      "key": "gallery.paintGroups",
+      "writers": [
+        "src/gallery/paintings.js"
+      ]
+    },
+    {
+      "key": "gallery.wallSpecs",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "gallery.zG",
+      "writers": [
+        "src/gallery/painting-zoom.js"
+      ]
+    },
+    {
+      "key": "gallery.zoomIn",
+      "writers": [
+        "src/gallery/paintings.js"
+      ]
+    },
+    {
+      "key": "input",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "kunlun",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "kunlun.arkTeleportToPeak",
+      "writers": [
+        "src/kunlun/ark.js"
+      ]
+    },
+    {
+      "key": "kunlun.checkSkyMs",
+      "writers": [
+        "src/gate/settings/sky-progress.js"
+      ]
+    },
+    {
+      "key": "kunlun.eternalClick",
+      "writers": [
+        "src/kunlun/eternal.js"
+      ]
+    },
+    {
+      "key": "kunlun.eternalHandlers",
+      "writers": [
+        "src/kunlun/eternal-handlers.js"
+      ]
+    },
+    {
+      "key": "kunlun.eternalKeepOut",
+      "writers": [
+        "src/kunlun/eternal.js"
+      ]
+    },
+    {
+      "key": "kunlun.eternalTeleport",
+      "writers": [
+        "src/kunlun/eternal.js"
+      ]
+    },
+    {
+      "key": "kunlun.eternalWelcome",
+      "writers": [
+        "src/kunlun/eternal.js"
+      ]
+    },
+    {
+      "key": "kunlun.fadeTeleport",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "kunlun.flyAudio",
+      "writers": [
+        "src/kunlun/peaks.js"
+      ]
+    },
+    {
+      "key": "kunlun.groundOverride",
+      "writers": [
+        "src/shared/ground-resolver.js"
+      ]
+    },
+    {
+      "key": "kunlun.hidePlanetMote",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
+      "key": "kunlun.hideSproutMote",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
+      "key": "kunlun.isDone",
+      "writers": [
+        "src/kunlun/spirits.js"
+      ]
+    },
+    {
+      "key": "kunlun.isStarGateOut",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
+      "key": "kunlun.letgoRecall",
+      "writers": [
+        "src/kunlun/letgo.js"
+      ]
+    },
+    {
+      "key": "kunlun.peakVidEl",
+      "writers": [
+        "src/kunlun/peaks.js"
+      ]
+    },
+    {
+      "key": "kunlun.planetsMark",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
+      "key": "kunlun.planetsMode",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
+      "key": "kunlun.rebuildEternalPicks",
+      "writers": [
+        "src/kunlun/eternal.js"
+      ]
+    },
+    {
+      "key": "kunlun.revealStarGate",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
+      "key": "kunlun.setChapter",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
+      "key": "kunlun.spiritMark",
+      "writers": [
+        "src/kunlun/spirits.js"
+      ]
+    },
+    {
+      "key": "kunlun.spiritsCollectExternal",
+      "writers": [
+        "src/kunlun/spirits.js"
+      ]
+    },
+    {
+      "key": "kunlun.spiritsDecorate",
+      "writers": [
+        "src/kunlun/planets.js"
+      ]
+    },
+    {
+      "key": "kunlun.spiritsGot",
+      "writers": [
+        "src/kunlun/spirits.js"
+      ]
+    },
+    {
+      "key": "kunlun.spiritsNextKey",
+      "writers": [
+        "src/kunlun/spirits.js"
+      ]
+    },
+    {
+      "key": "kunlun.spiritsState",
+      "writers": [
+        "src/kunlun/spirits.js"
+      ]
+    },
+    {
+      "key": "kunlun.spiritsTTS",
+      "writers": [
+        "src/kunlun/spirits.js"
+      ]
+    },
+    {
+      "key": "lineWidth",
+      "writers": [
+        "src/gallery/markers.js"
+      ]
+    },
+    {
+      "key": "loop",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "loop.timeScale",
+      "writers": [
+        "src/loop-manager.js"
+      ]
+    },
+    {
+      "key": "media",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "media.audioManager",
+      "writers": [
+        "src/scene/media/audio-manager.js"
+      ]
+    },
+    {
+      "key": "media.bigScreenHold",
+      "writers": [
+        "src/kunlun/peaks.js"
+      ]
+    },
+    {
+      "key": "media.dayHour",
+      "writers": [
+        "src/loop-manager.js"
+      ]
+    },
+    {
+      "key": "media.dayTimeSource",
+      "writers": [
+        "src/scene/time-shift.js"
+      ]
+    },
+    {
+      "key": "media.desert",
+      "writers": [
+        "src/scene/desert.js"
+      ]
+    },
+    {
+      "key": "media.drawMusicCanvas",
+      "writers": [
+        "src/scene/media/music-canvas.js"
+      ]
+    },
+    {
+      "key": "media.guideMesh",
+      "writers": [
+        "src/gallery/signs.js"
+      ]
+    },
+    {
+      "key": "media.mA",
+      "writers": [
+        "src/scene/media/audio-manager.js"
+      ]
+    },
+    {
+      "key": "media.mpMesh",
+      "writers": [
+        "src/gallery/signs.js"
+      ]
+    },
+    {
+      "key": "media.playGalleryAudio",
+      "writers": [
+        "src/scene/media/gallery-audio.js"
+      ]
+    },
+    {
+      "key": "media.scrollLink",
+      "writers": [
+        "src/gallery/links.js"
+      ]
+    },
+    {
+      "key": "media.signMesh",
+      "writers": [
+        "src/gallery/signs.js"
+      ]
+    },
+    {
+      "key": "media.startVidSeq",
+      "writers": [
+        "src/scene/media/video-wall.js"
+      ]
+    },
+    {
+      "key": "media.v45Tex",
+      "writers": [
+        "src/scene/media/video-wall.js"
+      ]
+    },
+    {
+      "key": "media.vidEl",
+      "writers": [
+        "src/scene/media/video-wall.js"
+      ]
+    },
+    {
+      "key": "media.vidMesh",
+      "writers": [
+        "src/scene/media/video-wall.js"
+      ]
+    },
+    {
+      "key": "mode",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "mode.LINK_MODEL_TYPES",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.MOUNTABLE_ICONS",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.applyMode",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.applyPaintMode",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.applyTexGate",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.linkGuard",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.myUploadTokens",
+      "writers": [
+        "src/gate/upload.js"
+      ]
+    },
+    {
+      "key": "mode.openUpload",
+      "writers": [
+        "src/gate/upload.js"
+      ]
+    },
+    {
+      "key": "mode.refreshMode",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.renderCustomLinks",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.spawnLinkModel",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.texAllowed",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "mode.trackClick",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "onTick",
+      "writers": [
+        "src/ctx.js",
+        "src/hot.js"
+      ]
+    },
+    {
+      "key": "oncomplete",
+      "writers": [
+        "src/visitor-fp.js"
+      ]
+    },
+    {
+      "key": "player",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "player.drawMap",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "player.ks",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "player.orbit",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "player.pl",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "player.playerSM",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "player.quizPassScore",
+      "writers": [
+        "src/gate/quizgate.js"
+      ]
+    },
+    {
+      "key": "player.quizPassed",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "player.tickAvatarGait",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "player.viewMode",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "scene",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "scene.IL",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.IR",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.IRB",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.IRT",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.L",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.OBE",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.OBR",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.OL",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.OR",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.OT",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.WH",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.aB",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.activeWorld",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.addBounds",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.ambL",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.avatar",
+      "writers": [
+        "src/kunlun/avatar.js",
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "scene.bD",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.bW",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.bounds",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.cam",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.earthDayApi",
+      "writers": [
+        "src/kunlun/earth-day.js"
+      ]
+    },
+    {
+      "key": "scene.endingApi",
+      "writers": [
+        "src/kunlun/ending-journey.js"
+      ]
+    },
+    {
+      "key": "scene.enterWorld",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.floorD",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.floorW",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.foxApi",
+      "writers": [
+        "src/kunlun/scene10-fox.js"
+      ]
+    },
+    {
+      "key": "scene.getActiveBounds",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.getActiveGround",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.getActiveRoot",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.groundUniforms",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.hemiL",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.iG",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.jB",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.jT",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.kintsugiOn",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.layout",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.leaveWorld",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.loadTexCapped",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.loopManager",
+      "writers": [
+        "src/main.js"
+      ]
+    },
+    {
+      "key": "scene.mP2",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.planeApi",
+      "writers": [
+        "src/scene/plane-flight.js"
+      ]
+    },
+    {
+      "key": "scene.pls",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.pyrHeight",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.ray",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.removeBounds",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.renderPostProcessing",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.resizePostProcessing",
+      "writers": [
+        "src/main.js"
+      ]
+    },
+    {
+      "key": "scene.rnd",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.s",
+      "writers": [
+        "src/core/scene-manager.js",
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.setAtmosphere",
+      "writers": [
+        "src/main.js"
+      ]
+    },
+    {
+      "key": "scene.setLowQuality",
+      "writers": [
+        "src/main.js"
+      ]
+    },
+    {
+      "key": "scene.setTime",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.skyUniforms",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.startWorld",
+      "writers": [
+        "src/main.js"
+      ]
+    },
+    {
+      "key": "scene.syncPostProcessingPixelRatio",
+      "writers": [
+        "src/main.js"
+      ]
+    },
+    {
+      "key": "scene.tL",
+      "writers": [
+        "src/scene/scene.js"
+      ]
+    },
+    {
+      "key": "scene.toMainWorld",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.worldChanged",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.worldManager",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "scene.worldStack",
+      "writers": [
+        "src/core/scene-manager.js"
+      ]
+    },
+    {
+      "key": "strokeStyle",
+      "writers": [
+        "src/gallery/markers.js"
+      ]
+    },
+    {
+      "key": "textAlign",
+      "writers": [
+        "src/gallery/markers.js"
+      ]
+    },
+    {
+      "key": "textBaseline",
+      "writers": [
+        "src/gallery/markers.js"
+      ]
+    },
+    {
+      "key": "tickers",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "ui",
+      "writers": [
+        "src/ctx.js"
+      ]
+    },
+    {
+      "key": "ui.advanceDialog",
+      "writers": [
+        "src/core/gameshell-system.js"
+      ]
+    },
+    {
+      "key": "ui.announceAchievements",
+      "writers": [
+        "src/gate/settings.js"
+      ]
+    },
+    {
+      "key": "ui.cancelDialogScope",
+      "writers": [
+        "src/core/gameshell-system.js"
+      ]
+    },
+    {
+      "key": "ui.chapterMap",
+      "writers": [
+        "src/ui/chapter-map.js"
+      ]
+    },
+    {
+      "key": "ui.dialogOpen",
+      "writers": [
+        "src/core/gameshell-system.js"
+      ]
+    },
+    {
+      "key": "ui.gentleTest",
+      "writers": [
+        "src/gate/quiz.js"
+      ]
+    },
+    {
+      "key": "ui.journey",
+      "writers": [
+        "src/core/journey-system.js"
+      ]
+    },
+    {
+      "key": "ui.kunlunSpeak",
+      "writers": [
+        "src/core/gameshell-system.js",
+        "src/scene/media/audio-manager.js"
+      ]
+    },
+    {
+      "key": "ui.modeToast",
+      "writers": [
+        "src/gallery/mode.js"
+      ]
+    },
+    {
+      "key": "ui.openDialog",
+      "writers": [
+        "src/core/gameshell-system.js"
+      ]
+    },
+    {
+      "key": "ui.overlay",
+      "writers": [
+        "src/ui/overlay.js"
+      ]
+    },
+    {
+      "key": "ui.portfolio",
+      "writers": [
+        "src/ui/portfolio.js"
+      ]
+    },
+    {
+      "key": "ui.showGuideCard",
+      "writers": [
+        "src/main.js"
+      ]
+    },
+    {
+      "key": "ui.starMap",
+      "writers": [
+        "src/ui/star-map.js"
+      ]
+    },
+    {
+      "key": "ui.store",
+      "writers": [
+        "src/state/store.js"
+      ]
+    },
+    {
+      "key": "ui.storyMusic",
+      "writers": [
+        "src/ui/story-music.js"
+      ]
+    },
+    {
+      "key": "ui.storyTarget",
+      "writers": [
+        "src/main.js"
+      ]
+    },
+    {
+      "key": "ui.voyage",
+      "writers": [
+        "src/ui/voyage.js"
+      ]
+    },
+    {
+      "key": "ui.voyageScenes",
+      "writers": [
+        "src/ui/voyage-scenes.js"
+      ]
+    },
+    {
+      "key": "ui.witness",
+      "writers": [
+        "src/ui/witness-card.js"
+      ]
+    }
+  ]
+}
