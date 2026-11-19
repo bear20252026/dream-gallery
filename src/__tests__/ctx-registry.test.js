@@ -112,3 +112,28 @@ describe('J1 登记册口径:同名局部 ctx 不得当成总线属性', () => {
     expect(shadowed.length).toBeLessThanOrEqual(12); // 规模哨兵:口径失控会暴涨
   });
 });
+
+// K1(2026-11-18):_root 域残留清零。原 ctx._jumpHold 是死写点(全仓零读者),
+// 而状态机 PlayerStates.js 读的是 ctx.player.jumpHold(白名单正门早有位)——
+// 恒 undefined ⇒ GlidingState 转移从未触发(滑翔动画轨断链)。归位正门后:
+// 物理权威仍是 player-physics 纯函数,状态机获得真实输入;根级不再有域外残留。
+describe('K1 _root 域收口:域外残留绝迹,jumpHold 走正门', () => {
+  const { scan } = require('../../scripts/admin/ctx-registry.cjs');
+
+  it('ctx._jumpHold 死写点绝迹;player.jumpHold 唯一写方=player.js', () => {
+    const rows = scan();
+    expect(rows.find((r) => r.key === '_jumpHold')).toBeUndefined();
+    const jh = rows.find((r) => r.key === 'player.jumpHold');
+    expect(jh && jh.writers).toEqual(['src/scene/player.js']);
+  });
+
+  it('_root 域只剩总线本体装配(ctx.js)与合法共写(onTick hot捕获),无域外残留', () => {
+    const rows = scan().filter((r) => !r.key.includes('.'));
+    const rogue = rows.filter(
+      (r) => !r.writers.every((w) => w === 'src/ctx.js' || w === 'src/hot.js')
+    );
+    expect(rogue.map((r) => `${r.key}←${r.writers.join(',')}`)).toEqual([]);
+    // 总线本体装配必须在册(判据不空转)
+    expect(rows.length).toBeGreaterThanOrEqual(10);
+  });
+});

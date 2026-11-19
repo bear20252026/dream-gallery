@@ -1,12 +1,6 @@
 {
   "rows": [
     {
-      "key": "_jumpHold",
-      "writers": [
-        "src/scene/player.js"
-      ]
-    },
-    {
       "key": "ent",
       "writers": [
         "src/ctx.js"
@@ -465,6 +459,12 @@
     },
     {
       "key": "player.drawMap",
+      "writers": [
+        "src/scene/player.js"
+      ]
+    },
+    {
+      "key": "player.jumpHold",
       "writers": [
         "src/scene/player.js"
       ]

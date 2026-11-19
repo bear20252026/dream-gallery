@@ -154,7 +154,10 @@ let jumpHold = false,
 let descendHold = false,
   descendPressed = false;
 function tickPhysics(dt) {
-  ctx._jumpHold = jumpHold; // 暴露给状态机(ctx.player 被 aliasNS 冻结,不能加属性)
+  // K1(2026-11-18):原写 ctx._jumpHold 是死写点(全仓零读者),而状态机读的是
+  // ctx.player.jumpHold(白名单正门早有位)——恒 undefined ⇒ GlidingState 转移从未触发。
+  // 归位正门:物理权威仍是 player-physics 纯函数,状态机由此获得真实输入(动画/查询轨)。
+  ctx.player.jumpHold = jumpHold;
   // 多世界切割(2026-09-06):非主世界零重力零碰撞——主世界物理整套短路。
   // 跳跃键转交太空:按下瞬间 boostT 爆发(跳跃感),按住 spaceUp 持续上升,
   // 由 planets.js 太空移动分支消费。此前重力先拉、太空再清零,上升有下坠感。

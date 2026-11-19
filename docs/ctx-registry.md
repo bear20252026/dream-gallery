@@ -21,11 +21,10 @@
 - `src/ui/story-compass.js`
 - `src/visitor-fp.js`
 
-## _root(14)
+## _root(13)
 
 | 属性 | 写方 | |
 |---|---|---|
-| `ctx._jumpHold` | `src/scene/player.js` |  |
 | `ctx.ent` | `src/ctx.js` |  |
 | `ctx.events` | `src/ctx.js` |  |
 | `ctx.gallery` | `src/ctx.js` |  |
@@ -131,11 +130,12 @@
 | `ctx.mode.texAllowed` | `src/gallery/mode.js` |  |
 | `ctx.mode.trackClick` | `src/gallery/mode.js` |  |
 
-## player(9)
+## player(10)
 
 | 属性 | 写方 | |
 |---|---|---|
 | `ctx.player.drawMap` | `src/scene/player.js` |  |
+| `ctx.player.jumpHold` | `src/scene/player.js` |  |
 | `ctx.player.ks` | `src/scene/player.js` |  |
 | `ctx.player.orbit` | `src/scene/player.js` |  |
 | `ctx.player.pl` | `src/scene/player.js` |  |
