@@ -12,7 +12,9 @@
 //   - 缓冲 + 节流:同类错误在窗口内合并,最多每 FLUSH_MS 发一次,避免刷屏拖垮页面
 
 import { expose } from './debug-hooks.js';
-//   - 尽力而为:上报本身绝不再抛错、不阻塞游戏(全部 try/catch 包裹)
+//   - 尽力而为:上报本身绝不再抛错、不阻塞游戏(全部 try/catch 包裹)。
+//     本文件现有 5 处**空 catch**,全是刻意的(2026-11-20 R6 逐条定性,每处都写了理由):
+//     它们都在"报"的路上,一旦改成出声,上报失败反而会刷屏、甚至递归回被包装的 console.error。
 //   - 去重视后的计数在服务端完成,这里只做轻量节流
 //   - 页面隐藏/关闭前用 sendBeacon 兜底发送未上报的缓冲
 const ENDPOINT = '/api/client-errors';
@@ -157,7 +159,9 @@ window.addEventListener('load', () => {
         });
       });
     });
-  } catch (e) {}
+  } catch (e) {
+    /* 上报侧吞错:监听注册失败只是少一路采集,不该拖住 load */
+  }
 });
 
 // ---------- 4. fetch 失败 ----------
@@ -178,12 +182,16 @@ try {
             message: '请求失败: ' + String(u).slice(0, 160),
             source: String((err && err.message) || err),
           });
-        } catch (e) {}
+        } catch (e) {
+          /* 上报侧吞错:这里还要把 err 抛回调用方,吞错不得改变 fetch 语义 */
+        }
         throw err; // 不改变原语义,继续把错误抛给调用方
       });
     };
   }
-} catch (e) {}
+} catch (e) {
+  /* 上报侧吞错:fetch 补丁装不上就退回原生 fetch,游戏照跑 */
+}
 
 // ---------- 5. 兜底:console.error 也可选上报(默认关,避免噪音) ----------
 // 需要时在主控台执行 window.__errCaptureConsole(true) 打开
@@ -206,11 +214,15 @@ try {
               .slice(0, 300),
           source: 'console',
         });
-      } catch (e) {}
+      } catch (e) {
+        /* 上报侧吞错:console.error 自身失败不能再抛,否则污染调用方 */
+      }
     }
     return origErr.apply(this, a);
   };
-} catch (e) {}
+} catch (e) {
+  /* 上报侧吞错:补丁装不上就退回原生 console.error */
+}
 
 // ---------- 离场兜底 ----------
 window.addEventListener('pagehide', () => flush(true));
