@@ -533,6 +533,27 @@ describe('⑤ 消费方埋点(以前被丢掉的 r.by 现在进了台账)', () =
     tts.handleTts(reqOf({}), res3, { text, voice: '' });
     await res3.text();
     await drain(10);
+    // —— 临时诊断(CI 确定性复现 3≠2,排查后删除)——
+    const _dir = process.env.TTS_CACHE_DIR || path.join(ROOT, '.tts-cache');
+    const _f1 = path.join(_dir, tts.ttsKey('', text) + '.mp3');
+    console.log(
+      'DBG tts',
+      JSON.stringify({
+        envCacheDir: process.env.TTS_CACHE_DIR || null,
+        dir: _dir,
+        key1: tts.ttsKey('', text),
+        exists1: fs.existsSync(_f1),
+        dirList: fs.existsSync(_dir) ? fs.readdirSync(_dir) : null,
+        res3code: res3.code,
+        res3len: res3.headers && res3.headers['Content-Length'],
+        mockCalls: synthTtsMock.mock.calls.length,
+        days: Object.keys(aiusage.ledger().days),
+        buckets: Object.fromEntries(
+          Object.entries(aiusage.ledger().days).map(([k, v]) => [k, v.tts ? v.tts.calls : null])
+        ),
+        recentTts: recentOf('tts').map((r) => ({ ch: r.ch, t: r.t })),
+      })
+    );
     expect(todayBucket('tts').calls).toBe(2);
     expect(synthTtsMock).toHaveBeenCalledTimes(1);
   });
