@@ -46,7 +46,12 @@ const fs = require('fs');
         title: document.title,
         hasCtx: !!window.__ctx,
         hasLoop: !!(window.__ctx && window.__ctx.loopManager),
+        frameTicks: window.__ctx && window.__ctx.loopManager ? window.__ctx.loopManager.frameTicks : null,
         fps: window.__ctx && window.__ctx.loopManager && window.__ctx.loopManager.getFPS ? window.__ctx.loopManager.getFPS() : null,
+        preloadState: window.__ctx && window.__ctx.preloadState ? String(window.__ctx.preloadState()) : null,
+        worldPhase: window.__ctx && window.__ctx.worldPhase ? String(window.__ctx.worldPhase()) : null,
+        bootState: window.__ctx && window.__ctx.bootState ? JSON.stringify(window.__ctx.bootState) : null,
+        worldErr: (document.getElementById('worldErr') || {}).textContent || null,
         hasC: !!document.querySelector('#c'),
         cChildren: document.querySelector('#c') ? document.querySelector('#c').children.length : -1,
         gate: !!document.getElementById('b612Gate'),
@@ -89,20 +94,23 @@ const fs = require('fs');
     document.querySelector('#b612Gate .gEnter').click();
   });
 
-  // ② 等世界真正启动:主循环 FPS>0(startWorld 在 finishIntro 时调用)
+  // ② 等世界真正启动:主循环已至少跑过一帧(startWorld 在 finishIntro 时调用,
+  // loopManager.start() 是 startWorld 的最后一步)。
+  // 用 frameTicks(累计帧数,单调递增)而不是 getFPS()>0:
+  // fps 是「最近 ~1s 窗口」的 Math.round 值,帧率低于 1fps 时恒为 0,
+  // 慢 runner(swiftshader 软渲染)上会假超时 —— 2026-11-20 CI 实测两次。
   try {
     await page.waitForFunction(
       () =>
         window.__ctx &&
         window.__ctx.loopManager &&
-        window.__ctx.loopManager.getFPS &&
-        window.__ctx.loopManager.getFPS() > 0,
+        typeof window.__ctx.loopManager.frameTicks === 'number' &&
+        window.__ctx.loopManager.frameTicks > 0,
       null,
       { timeout: 90000 }
     );
   } catch (e) {
-    // 2026-11-20:CI 上两次卡死在这条等待(本地与 CI 同码复现不了)。
-    // 原实现直接抛给最外层,诊断全丢 —— 补上转储,把页面异常/卡住请求带出去。
+    // 本地与 CI 同码复现不了时,靠 dumpDiag 把页面异常/卡住请求/引导状态带出去。
     await dumpDiag('世界 90s 未启动,诊断转储:');
     throw e;
   }

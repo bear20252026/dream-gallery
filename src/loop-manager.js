@@ -78,6 +78,11 @@ export class LoopManager {
 
     // 性能监控
     this.frameCount = 0;
+    // 累计已执行的帧数(单调递增,不受帧率影响)。
+    // 与 frameCount/fps 的区别:那两个是「最近 ~1s 窗口」的瞬时值,
+    // Math.round 在帧率低于 1fps 时会恒为 0 —— 冒烟门禁拿 getFPS()>0
+    // 当「世界已启动」在慢 runner(swiftshader 软渲染)上会假超时。
+    this.frameTicks = 0;
     this.fps = 0;
     this.fpsUpdateInterval = 1000; // 每秒更新一次 FPS
     this.lastFpsUpdate = 0;
@@ -235,6 +240,7 @@ export class LoopManager {
 
     // 更新 FPS 计数
     this.frameCount++;
+    this.frameTicks++;
     if (now - this.lastFpsUpdate > this.fpsUpdateInterval) {
       this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
       this.frameCount = 0;
@@ -598,6 +604,7 @@ export class LoopManager {
   getPerformanceInfo() {
     return {
       fps: this.fps,
+      frameTicks: this.frameTicks,
       lowQuality: this.lowQuality,
       pixelRatio: this.ctx.scene.rnd.getPixelRatio(),
       timeScale: this.ctx.loop.timeScale,
