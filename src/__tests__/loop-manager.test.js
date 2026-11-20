@@ -165,6 +165,24 @@ describe('LoopManager 启停', () => {
     lm.stop();
   });
 
+  it('frameTicks 单调累计且不随 fps 窗口重置(冒烟门禁的启动判据)', () => {
+    // 2026-11-20:冒烟门禁原用 getFPS() > 0 判「世界已启动」,而 fps 是
+    // 「最近 ~1s 窗口」的 Math.round 值 —— 帧率低于 1fps 时恒为 0,
+    // CI(swiftshader 软渲染)上两次假超时。改判累计帧数,与帧率解耦。
+    const { lm } = makeLoop();
+    lm.ctx.scene.rnd = { getPixelRatio: () => 2 }; // getPerformanceInfo 要读它
+    expect(lm.frameTicks).toBe(0);
+    lm.start(); // 同步跑首帧
+    expect(lm.frameTicks).toBe(1);
+    flushFrames(3);
+    expect(lm.frameTicks).toBe(4);
+    // 本用例时钟每帧只走 16ms,远不到 fpsUpdateInterval(1000ms):
+    // frameCount 与 fps 仍是「窗口未到期」的瞬时态,frameTicks 已如实累计
+    expect(lm.fps).toBe(0);
+    expect(lm.frameTicks).toBeGreaterThanOrEqual(lm.frameCount);
+    expect(lm.getPerformanceInfo().frameTicks).toBe(4);
+  });
+
   it('stop() 广播 loop:stopped 供订阅方收尾', () => {
     const calls = [];
     const off = eventBus.on('loop:stopped', () => calls.push(1));
