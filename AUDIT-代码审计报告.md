@@ -905,3 +905,45 @@ authz 的 TOKEN 是 config **模块加载时捕获的常量**——R6 回归首�
 | 报告 vN 副本 12 份 ~660KB | 交付历史，git 未跟踪 | 用户决定保留/归档 |
 
 **第六轮终验结论：三路评分全线上升（4.5/4/4.5），8 项实锤当场修复（含唯一安全相关空 catch 的 fail-closed 收编），repro 转硬闸，核实后不动项全部定性记录。PR #95 待合并。**
+
+---
+
+## 二十三、R6 后：§22.7 剩余欠账处置（2026-11-20 · 分支 fix/r6-audit-2026-11-18）
+
+> 用户指示「继续全部」。逐项处置如下，**三项核实后确认无实债**（不改代码，只给证据），两项已落地，一项启动。
+
+### 23.1 核实后无实债（三项）
+
+**① 类型债「typeof import ~3%」—— 报告口径与现状不符，实为 1 处。**
+`types/ctx.d.ts` 394 个属性行里，`typeof import` 的**类型位**只有 **1 处**（`audioManager`），占 0.25%，不是 12 处/~3%。回溯 git 历史：自 802efd0 起该数一直是 1，从未是 12。这唯一一处还是**刻意设计**——`ctx-writer-shapes.test.js:109` 把它钉死为 `typeof import('../src/scene/media/audio-manager.js').audioManager`，并在同用例里明令禁止手写形状（"手写形状就是回到 mA: Material[] 那条路"），即声明必须指回唯一写入方。**无债可收；改了反而破刻意设计 + 破钉死测试。**
+
+**② 空 catch（前端 101 / 后端 75）—— 逐域核实全良性，危险点确已修完。**
+- `src/error-report.js` 的 5 处空 catch **是模块契约**（模块头：「上报本身绝不再抛错、不阻塞游戏」）。它们都在"报"的路上，改成出声会在上报失败时刷屏、甚至递归回本文件包装的 `console.error`。本轮把每处理由写到行内（3e410e5），后来者不必重新推导。
+- 后端高风险域逐条核过：`upload/stream.js`（release/destroy 的 best-effort，模块注释明写"重试就可能是双扣"）、`upload/chunks.js`、`upload/quota.js`、`upload/names.js`、`upload/transcode.js`（unlink 残片）、`admin.js`（广播失败不该让批准失败）、`gate.js`（内联 HTML 串里的客户端轮询）、`abuse.js`（stat 容错）、`media-access.js`、`vision.js`、`r2outbox.js`、`sse-bus.js` —— 全部是清理类 best-effort。
+- **系统性静默风险已闭环**：即发即忘的 `saveGateData()` 全站有 ~60 处（store.js:146 已论证为何必须即发即忘：Node ≥15 未处理 rejection 会杀进程），其失败由 `store.js:123` 的 `[store] 保存未完全落盘` 在**写盘任务内**出声，不依赖调用方读结论。
+
+**③ 报告副本 —— 已归档去重。**
+`AUDIT-代码审计报告.v1~v11.md`（11 份 648K）移入 `AUDIT-archive/`；`.v12.md` 与 git 跟踪的 `AUDIT-代码审计报告.md` md5 完全相同（3b0bb3e1…，同一份内容），重复副本删除，仓库只留一份当前版。另补 `.gitignore` 忽略 `.DS_Store`（654da7f）。
+
+### 23.2 已落地（两项）
+
+**④ publish 其余 5 处 saveGateData —— 收编完成（419357a）。**
+原先 6 处 `try { saveGateData(); } catch (e) {}` 即发即忘，持久失败被完全藏起（重启后归属/待审回滚，后台看不到）。新增 `saveGateDataWarn()`：await 结论、读 `jsonOk`、失败 `console.error` 出声、把 warning 交给调用方。`publishAnonUpload` 2 处（反刷回滚 429 / 归属落账）、`publishWhiteboardSave` 5 处（归属/待审标记/摘除/反刷回滚/非公开视频待审）全部接上，202/201/429 响应带 `warning`。新增 `scripts/test/test-publish-persist.js`（基线 + `GATE_DATA_FILE` 指向不存在目录的注入，7 条断言钉死"失败不抛 / jsonOk 如实 / 仍回 202 / 带 warning"），并接入 `npm test`（7 组 → 8 组）。
+
+**⑤ .tmp 探针 —— 已清空。**
+51 文件 1.8MB 清空（保留空目录，`.gitignore:66` 覆盖）。
+
+### 23.3 已启动（一项）：ctx 真拆 L1 —— loop 域
+
+施工图建议「loop→gallery→player 小域先行」。**loop 域已拆完（8b800a8）**：整个域只有 `timeScale` 一个属性，而全仓唯一读写方就是 `LoopManager` 自己——单 owner 可变状态躺总线，是"隐式耦合"最纯粹的形态。
+
+- `LoopManager` 新增私有 `this.timeScale`；`pause`/`resume`/`_frame`/`getPerformanceInfo` 四处改读自有字段。
+- `ctx.loop` 与 `src/loop.js` 的 `GameLoop` 容器一并退场（其 `pause/resume` 从未被调用，是死代码）；`src/__tests__/GameLoop.test.js` 同删，timeScale 语义由 `loop-manager.test.js` 的 pause/resume 用例覆盖。
+- 登记册 169 → **167** 属性（`--write` 重生成）；锚点守卫改挂同样由注入型文件写入的 `media.dayHour`。
+- **新增守卫**：`ctx` 上不得再出现 `loop` 容器（防真拆回流）。
+
+**未做（诚实标注）**：gallery（8 属性/27 读写点/10 文件）与 player（9 属性/**219 读写点/47 文件**）真拆未启动。player 域是承重墙——报告第 364 行本就写明"此三项动承重墙，须单独评审"，219 个读写点的改造不应在收尾轮里顺手做。
+
+### 23.4 验证
+
+本地：lint 0 / tsc 0 / checkJs 2（=基线）/ Vitest **122 文件 1443 通过** / 后端 **8 组**通过 / `vite build` 通过 / 本地冒烟 5 项全绿（实机确认 `ctx.loop` 已消失、`lm.timeScale` 为数字、世界正常启动）。本机 swiftshader 仅 ~1fps，b612 旅程探针在"曲面步行后镜头同帧同步"一步 60s 未收敛——**判定为本机性能问题，非改动引入**（timeScale 恒为 1，`dt *= this.timeScale` 与原先 `dt *= (ctx.loop.timeScale ?? 1)` 行为等价；实测 `camY === plY`，dt 非 NaN）。CI 复验为准。
