@@ -1,6 +1,6 @@
 // store-api.js — 存档深模块·纯持久化层(2026-08-29 自 store.js 拆出)
 // 拆分目的:本文件**不依赖 ctx.js**,使独立页面入口(如 lobby.html → src/room/lobby.js)
-// 也能复用同一套存档语义,而不必把整个 ctx.js(GameLoop/实体注册表/输入管理器/8 个命名空间)
+// 也能复用同一套存档语义,而不必把整个 ctx.js(实体注册表/输入管理器/7 个命名空间)
 // 拖进轻量页面。store.js 仅负责把本 api 挂到 ctx.ui.store。
 //
 // 深模块:42 把 localStorage 钥匙在此登记造册(SCHEMA),键名字符串只出现在本文件。

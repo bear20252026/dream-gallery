@@ -1,6 +1,6 @@
 /**
  * dream-gallery 核心类型声明
- * 基于 src/ctx.js, src/engine.js, src/loop.js, src/events.js 的 JSDoc + 运行时分析
+ * 基于 src/ctx.js, src/engine.js, src/loop-manager.js, src/events.js 的 JSDoc + 运行时分析
  */
 
 import type {
@@ -785,8 +785,6 @@ export type InputManager = import('../src/engine.js').InputManager;
 
 export type GamePhase = 'input' | 'update' | 'render' | 'ui';
 
-export type GameLoop = import('../src/loop.js').GameLoop;
-
 // ===================== 事件总线 =====================
 
 export type EventBus = import('../src/event-bus.js').EventBus;
@@ -807,10 +805,9 @@ declare global {
 // ===================== 主上下文 =====================
 
 export interface GalleryCtx {
-  // 帧循环
+  // 帧循环(2026-11-20 L1:timeScale 已收回 LoopManager 私有,ctx.loop 退场)
   tickers: Array<(dt: number) => void>;
   onTick: (fn: (dt: number) => void) => () => void;
-  loop: GameLoop;
 
   // 引擎
   ent: EntityRegistry;

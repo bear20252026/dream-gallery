@@ -13,7 +13,6 @@ let clock;
 
 function makeCtx() {
   return {
-    loop: { timeScale: 1 },
     player: {},
     scene: {},
     media: {},
@@ -91,15 +90,15 @@ describe('LoopManager 启停', () => {
   });
 
   it('帧逐帧推进业务(dt 经 timeScale 缩放)', () => {
-    const { lm, ctx } = makeLoop();
+    const { lm } = makeLoop();
     lm.start();
-    ctx.loop.timeScale = 0.5;
+    lm.timeScale = 0.5;
     lm._executePhases.mockClear();
     flushFrames(2);
     expect(lm._executePhases).toHaveBeenCalledTimes(2);
     expect(lm.frameCount).toBe(3); // 首帧 + 两帧
     lm._executePhases.mockClear();
-    ctx.loop.timeScale = 1;
+    lm.timeScale = 1;
   });
 
   it('stop() 后不再执行帧回调,并撤销待执行的 RAF 句柄', () => {
@@ -152,16 +151,31 @@ describe('LoopManager 启停', () => {
   });
 
   it('pause/resume 只动 timeScale,不停循环', () => {
-    const { lm, ctx } = makeLoop();
+    const { lm } = makeLoop();
     lm.start();
     lm.pause();
-    expect(ctx.loop.timeScale).toBe(0);
+    expect(lm.timeScale).toBe(0);
     expect(lm._running).toBe(true);
     lm._executePhases.mockClear();
     flushFrames(1);
     expect(lm._executePhases).toHaveBeenCalledTimes(1);
     lm.resume();
-    expect(ctx.loop.timeScale).toBe(1);
+    expect(lm.timeScale).toBe(1);
+    lm.stop();
+  });
+
+  // L1(loop 域真拆):timeScale 是 LoopManager 私有,总线上不允许再出现 ctx.loop。
+  // 它曾是"单 owner 可变状态躺总线"的形态 —— 一旦回流,真拆就白做。
+  it('timeScale 由 LoopManager 自持,ctx 上不再有 loop 容器', () => {
+    const { lm, ctx } = makeLoop();
+    lm.ctx.scene.rnd = { getPixelRatio: () => 2 }; // getPerformanceInfo 要读它
+    expect(lm.timeScale).toBe(1);
+    expect(ctx.loop).toBeUndefined();
+    expect('loop' in ctx).toBe(false);
+    lm.pause();
+    expect(lm.getPerformanceInfo().timeScale).toBe(0);
+    lm.resume();
+    expect(lm.getPerformanceInfo().timeScale).toBe(1);
     lm.stop();
   });
 

@@ -247,18 +247,6 @@
       ]
     },
     {
-      "key": "loop",
-      "writers": [
-        "src/ctx.js"
-      ]
-    },
-    {
-      "key": "loop.timeScale",
-      "writers": [
-        "src/loop-manager.js"
-      ]
-    },
-    {
       "key": "media",
       "writers": [
         "src/ctx.js"

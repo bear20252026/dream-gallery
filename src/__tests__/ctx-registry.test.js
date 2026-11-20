@@ -87,9 +87,10 @@ describe('J1 登记册口径:同名局部 ctx 不得当成总线属性', () => {
   it('依赖注入型文件不算遮蔽:核心写方必须在册(防口径过宽误排除)', () => {
     // 首版遮蔽正则把 replyChoices(ctx,…)/new LoopManager(ctx)/constructor(ctx)
     // 当成绑定,误排除 14 个合法文件,属性数 176→145、loop.timeScale 直接丢失。
+    // (L1 真拆后 loop.timeScale 已不存在,锚点改挂同样由注入型文件写入的 media.dayHour。)
     const keys = new Set(scanDetailed().rows.map((r) => r.key));
     const must = [
-      'loop.timeScale', // loop-manager.js constructor(ctx) 注入
+      'media.dayHour', // loop-manager.js constructor(ctx) 注入型写入
       'tickers', // ctx.js 总线本体
       'scene.s',
       'player.pl',

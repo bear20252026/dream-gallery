@@ -4,7 +4,7 @@
 > 新属性/新写方/写方变更必须重新生成登记册并在 PR 里说明——这是 ctx 按域真拆前的所有权制度地基。
 > ⚠️ 标记 = 多写方(真拆时须先收编单一 owner)。注释行/解构读不计;动态键 ctx[k] 全仓必须保持 0。
 
-**总计 169 个属性,4 个多写方。**
+**总计 167 个属性,4 个多写方。**
 
 ### 遮蔽文件(已排除,须人工复核)
 
@@ -21,7 +21,7 @@
 - `src/ui/story-compass.js`
 - `src/visitor-fp.js`
 
-## _root(13)
+## _root(12)
 
 | 属性 | 写方 | |
 |---|---|---|
@@ -30,7 +30,6 @@
 | `ctx.gallery` | `src/ctx.js` |  |
 | `ctx.input` | `src/ctx.js` |  |
 | `ctx.kunlun` | `src/ctx.js` |  |
-| `ctx.loop` | `src/ctx.js` |  |
 | `ctx.media` | `src/ctx.js` |  |
 | `ctx.mode` | `src/ctx.js` |  |
 | `ctx.onTick` | `src/ctx.js`<br>`src/hot.js` | ⚠️多写方 |
@@ -84,12 +83,6 @@
 | `ctx.kunlun.spiritsNextKey` | `src/kunlun/spirits.js` |  |
 | `ctx.kunlun.spiritsState` | `src/kunlun/spirits.js` |  |
 | `ctx.kunlun.spiritsTTS` | `src/kunlun/spirits.js` |  |
-
-## loop(1)
-
-| 属性 | 写方 | |
-|---|---|---|
-| `ctx.loop.timeScale` | `src/loop-manager.js` |  |
 
 ## media(16)
 

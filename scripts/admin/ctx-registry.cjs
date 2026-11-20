@@ -68,7 +68,7 @@ function keysFromInline(body) {
  *      · `function wrapText(ctx, …)`(quiz.js 内部画字助手)
  *  - **依赖注入不算遮蔽**:boot-check/light-sweep/coord-hud/story-compass/
  *    loop-manager/dialog-replies 这些文件不 import 总线,ctx 由调用方传入,
- *    传进来的就是总线本体,必须扫(loop.timeScale 曾因此被误漏)。
+ *    传进来的就是总线本体,必须扫(首版正则过宽曾因此误漏 14 个合法文件)。
  *  - 调用实参 `replyChoices(ctx, …)` / `new LoopManager(ctx)` 更不是绑定。
  *  - ctx.js 是总线本体,永不遮蔽。
  *
