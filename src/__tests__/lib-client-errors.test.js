@@ -4,9 +4,17 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 
 process.env.TOKEN = 'vitest-token-abc';
+// 测试隔离(2026-11-20 实测):shadow/hotread 会加载 store.js,不重定向会在仓库根
+// 建出真的 gate_data.json / gate_data.db。必须在 require 之前设好。
+// client_errors.json 仍按本文件原设计走真实路径(beforeAll 快照 / afterAll 复原),
+// 故 CLIENT_ERRORS_FILE 不重定向。
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-client-errors-'));
+process.env.GATE_DATA_FILE = path.join(tmpDir, 'gate_data.json');
+process.env.SQLITE_PATH = path.join(tmpDir, 'gate_data.db');
 const require = createRequire(import.meta.url);
 const {
   handleReport,

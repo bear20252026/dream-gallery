@@ -3,6 +3,15 @@
 // 按 IP 限流;上游响应只下发播放必需字段,绝不透传原始响应(可能含敏感字段)。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// 测试隔离(2026-11-20 实测):ratelimit.js 直依赖 store.js,不重定向会在仓库根
+// 建出真的 gate_data.json / gate_data.db。必须在 require 之前设好。
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-music-proxy-'));
+process.env.GATE_DATA_FILE = path.join(tmpDir, 'gate_data.json');
+process.env.SQLITE_PATH = path.join(tmpDir, 'gate_data.db');
 
 const require = createRequire(import.meta.url);
 const ratelimit = require('../../lib/ratelimit.js');
