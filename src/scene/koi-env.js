@@ -6,8 +6,8 @@ import * as THREE from 'three';
 
 /**
  * @param {object} deps
- * @param {object} deps.voxCore createVoxCore 实例(rnd/rr/clamp/lerp/Vox/solid,共享 rng 保序)
- * @param {THREE.Group} deps.scene envGroup 桥接(原作品按 Scene 形状写 fog;编排层预置 envFog)
+ * @param {import('../shared/vox-core.js').VoxCore} deps.voxCore createVoxCore 实例(rnd/rr/clamp/lerp/Vox/solid,共享 rng 保序)
+ * @param {THREE.Scene} deps.scene envGroup 桥接(运行时是 Group,但原作品按 Scene 形状写 fog;编排层预置 envFog,类型如实声明为 Scene)
  * @param {THREE.Group} deps.koiGroup 庭园暖色点光挂这里(随鲤身)
  * @param {THREE.Group} deps.cloudGroup 云簇容器
  * @param {THREE.MeshStandardMaterial} deps.matSoft 云簇共享软材质
