@@ -125,8 +125,29 @@ async function task(p, id) {
 async function observe(p, x, z) {
   await move(p, x, z);
   const button = p.locator('#journeyTask [data-journey-action="observe"]');
-  if (MOBILE) await button.tap();
-  else await button.click();
+  // 观察钮在两种情况下点不动:一是刚好有对白弹出(renderTask 每 0.1s 才禁用按钮,
+  // 存在「已禁用但还能点」的窗口,observe() 内部再挡一次 dialogOpen → 空点),
+  // 二是任务卡刚收起还没画回来。都像玩家一样:等就绪再点,点完确认步数真的前进了。
+  const snap = () =>
+    p.evaluate(() => {
+      const st = window.__ctx.ui.journey.state();
+      return st ? { step: st.step, preview: st.preview } : { step: null, preview: null };
+    });
+  const before = await snap();
+  for (let i = 0; i < 24; i++) {
+    const ready = await p.evaluate(() => {
+      if (window.__ctx.ui.dialogOpen?.()) return false;
+      const b = document.querySelector('#journeyTask [data-journey-action="observe"]');
+      return !!b && !b.disabled && !!b.offsetParent;
+    });
+    if (ready) {
+      if (MOBILE) await button.tap();
+      else await button.click();
+      const after = await snap();
+      if (after.step !== before.step || after.preview !== before.preview) break;
+    }
+    await p.waitForTimeout(250);
+  }
   if (await p.locator('[data-journey-action="record-view"]').isVisible()) {
     assert(
       await p.evaluate(
@@ -346,6 +367,14 @@ async function run() {
       // 模拟玩家点击“继续”，不抢有选项的互动。
       window.__journeyPump = setInterval(() => {
         if (window.__journeyPause) return;
+        // 星之旅程四幕(2026-11-16 新增)到 B612 会在安静窗口自动开幕,是可选副线;
+        // 主线探针不看它,开就点「✕ 回到故事」关掉,免得挡住 HUD 与按钮点击。
+        const vs = document.getElementById('voyageScenes');
+        if (vs && getComputedStyle(vs).display !== 'none') vs.querySelector('.vs-exit')?.click();
+        // 旅途卡(每段回忆结束翻「下一夜」)也是可选节拍:主线探针按「再待一会儿」收掉,
+        // 不跟着它换世界(周游各国的行程由旅程过渡钮驱动)。
+        if (window.__ctx?.ui?.voyage?.isOpen?.())
+          document.querySelector('#voyage .vy-stay')?.click();
         if (window.__journeyTransitionsAllowed)
           document.querySelector('#journeyTransition [data-journey-action="continue"]')?.click();
         const d = document.getElementById('gameDialog');
@@ -386,6 +415,14 @@ async function run() {
     }
     await wait(p, () => window.__ctx.store.flag('scene2'));
     assert(true, '沙漠里亲手完成四笔画羊');
+    // 出生点 2026-11-15 从 (-3.5,70.5) 移到 (10,70)(9a9e8d1,移出锦鲤包络)后离羊箱约 14m,
+    // 而数数仪式要玩家走近到箱边 5.5m 内才触发(scene3-night.js 的 tick 距离判定)。
+    // 旧探针隐含「画完羊就站在箱边」,出生点一动就断链——这里像玩家一样先走到箱边。
+    const boxPos = await p.evaluate(() => {
+      const o = window.__ctx.scene.s.getObjectByName('sheepBox');
+      return o ? { x: o.position.x, z: o.position.z } : null;
+    });
+    if (boxPos) await move(p, boxPos.x + 2, boxPos.z);
     await wait(p, () => window.__starGate.visible());
     await gate(p);
     assert(await p.evaluate(() => !window.__ctx.store.flag('page1')), '初访B612先经历家的回忆');
@@ -544,14 +581,14 @@ async function run() {
       }),
       '步行时脚下高度跟随坡面，不悬空或穿地'
     );
-    assert(
-      await p.evaluate(() => {
-        const c = window.__ctx,
-          p = c.player.pl.p;
-        return c.player.viewMode === 0 && c.scene.cam.position.distanceTo(p) < 0.03;
-      }),
-      '曲面步行后第一人称镜头与角色同帧同步'
-    );
+    // 镜头是平滑跟随的:直接改写玩家位置后立刻采样,会撞上跟随插值的途中帧
+    // (2026-11-19 实测同一断言时过时不过)。改成轮询,语义不变(同帧同步终将成立)。
+    await wait(p, () => {
+      const c = window.__ctx,
+        p = c.player.pl.p;
+      return c.player.viewMode === 0 && c.scene.cam.position.distanceTo(p) < 0.03;
+    });
+    assert(true, '曲面步行后第一人称镜头与角色同帧同步');
     if (HOME_ONLY) {
       assert(errors.length === 0, '全景与曲面镜头无页面异常');
       console.log('PASS home camera ' + checks + ' checks');
