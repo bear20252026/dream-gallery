@@ -165,9 +165,30 @@ async function observe(p, x, z) {
 async function startStation(p, x, z) {
   await move(p, x, z);
   const action = p.locator('[data-journey-action="activate-goal"]');
-  await action.waitFor({ state: 'visible' });
-  if (MOBILE) await action.tap();
-  else await action.click();
+  // 与 observe() 同一个坑:activateGoal() 内部挡 dialogOpen/overlay,而「刚弹出对白」
+  // 的窗口里这一下会空掉,链条不起步、后续 task() 干等 60s。等就绪再点,
+  // 点完确认回忆链真的起了步(doStep 同帧置 interactionBusy)。
+  const chainState = () =>
+    p.evaluate(() => {
+      const h = window.__homeMemory?.state?.();
+      return h ? { step: h.step, busy: h.chainBusy || h.interactionBusy } : null;
+    });
+  const before = await chainState();
+  for (let i = 0; i < 40; i++) {
+    const ready = await p.evaluate(() => {
+      if (window.__ctx.ui.dialogOpen?.() || window.__ctx.overlay.anyOpen()) return false;
+      const b = document.querySelector('[data-journey-action="activate-goal"]');
+      return !!b && !!b.offsetParent;
+    });
+    if (ready) {
+      if (MOBILE) await action.tap();
+      else await action.click();
+      const after = await chainState();
+      if (after && (after.step !== before?.step || after.busy)) return;
+    }
+    await p.waitForTimeout(250);
+  }
+  throw Error('activate-goal 点击未能起步回忆链');
 }
 async function checkFinalUi(p) {
   // 旧存档仍有现实中的重逢对白，先像玩家一样读完再进入测试场。
