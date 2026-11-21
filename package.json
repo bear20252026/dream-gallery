@@ -59,22 +59,22 @@
     ]
   },
   "devDependencies": {
-    "@aws-sdk/client-s3": "^3.1101.0",
+    "@aws-sdk/client-s3": "^3.1172.0",
     "@eslint/js": "^10.0.1",
     "@gltf-transform/cli": "^4.5.0",
     "@gltf-transform/core": "^4.4.2",
     "@gltf-transform/extensions": "^4.4.2",
     "@gltf-transform/functions": "^4.4.2",
-    "@types/three": "^0.186.0",
+    "@types/three": "^0.187.0",
     "@vitest/coverage-v8": "4.1.12",
-    "dependency-cruiser": "^18.1.0",
+    "dependency-cruiser": "^18.8.0",
     "esbuild": "^0.28.1",
-    "eslint": "10.14.0",
+    "eslint": "10.15.0",
     "globals": "^17.8.0",
     "husky": "^9.1.7",
-    "lint-staged": "^17.3.0",
-    "playwright-core": "^1.61.1",
-    "prettier": "^3.9.6",
+    "lint-staged": "^17.6.1",
+    "playwright-core": "^1.65.1",
+    "prettier": "^3.10.1",
     "sharp": "0.35.5",
     "terser": "^5.51.2",
     "typescript": "^7.0.2",
@@ -82,11 +82,11 @@
     "vitest": "4.1.12"
   },
   "dependencies": {
-    "better-sqlite3": "^13.0.3",
+    "better-sqlite3": "^13.2.0",
     "dotenv": "^17.4.2",
     "hls.js": "^1.6.16",
-    "three": "^0.186.1",
-    "ws": "^8.18.0"
+    "three": "^0.187.0",
+    "ws": "^8.23.0"
   },
   "engines": {
     "node": ">=22.12"
