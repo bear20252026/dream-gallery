@@ -949,7 +949,12 @@ authz 的 TOKEN 是 config **模块加载时捕获的常量**——R6 回归首�
 - 新增 `src/__tests__/ctx-gallery-l2.test.js` 四条守卫，其中两条是这次特有的：**全 src 不得再出现命名空间/扁平两条路径的 `zG`/`zoomIn`**（扁平别名层会为所有命名空间属性在 ctx 根建访问器，只查命名空间会漏），以及 **`zG` 的写点必须只在 `painting-zoom.js`**（防状态分叉成两份）。
 - 实机复验：命名空间与扁平层均已无这两员；`zoomIn` 后 `isZoomed()=true`、`currentZoom()` 命中该画且**总线仍 undefined**；`zoomOut` 后双双复位；全程无页面异常。
 
-**未做（诚实标注）**：gallery 域余下 `paintGroups` / `wallSpecs` / `houseMats` / `hangOne` / `openHouseColor`，以及 player 域（9 属性 / **219 读写点 / 47 文件**）。前者牵动扁平别名层与**模块顶层解构快照**（`scene/player.js:7` 在导入期一次性解构 `onC3D`/`zoomOut`，`paintings.js:56` 在导入期直读 `wallSpecs`），"收进私有"会直接破坏现有访问路径，须先定序；后者是承重墙——报告第 364 行本就写明"此三项动承重墙，须单独评审"。
+**未做（诚实标注）**：gallery 域余下 `paintGroups` / `wallSpecs` / `houseMats` / `hangOne` / `openHouseColor`，以及 player 域（9 属性 / **219 读写点 / 47 文件**）。具体依据如下（不是"懒"，每条都指向一处真实约束）：
+
+- **`wallSpecs` 是模块顶层直读**：`paintings.js:56` 在导入期读它构建 `hW` 快照，所以装配顺序被隐式钉死（scene.js 必须先于 paintings.js 跑完）。收进私有必须改成惰性读取——那是**行为改动**，不是同义改写。
+- **`houseMats` 撞启动时序**：写方 `scene.js` 在 `WORLD_MODULES`，读方 `gate/housecolor.js` 在 `WELCOME_MODULES`（启动更早）。让 housecolor 直接 import scene.js 会把世界模块提前拉进预加载链——正是本审计最在意的启动顺序风险。要拆得先给这个接口找个不加重依赖的落点（独立小模块或注册式），属于设计题。
+- **扁平别名层 + 顶层解构快照**：`scene/player.js:7` 在导入期一次性解构 `onC3D`/`zoomOut`，扁平层会为所有命名空间属性在 ctx 根建访问器——任何"收进私有"都得同时清这两处，否则拿到 undefined。
+- player 域是承重墙：报告第 364 行本就写明"此三项动承重墙，须单独评审"。
 
 ### 23.4 验证
 
