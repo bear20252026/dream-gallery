@@ -7,6 +7,7 @@ import { ctx } from '../ctx.js';
 import { hotBegin, hotEnd } from '../hot.js';
 import { registerEternalHandler } from './eternal-handlers.js'; // C8:回调表单一owner,散写改注册API
 import { addGroundLayer } from '../shared/ground-resolver.js'; // 地面中央层栈(E1:off按身份移除,不依赖LIFO)
+import { isZoomed } from '../gallery/painting-zoom.js'; // L2:放大状态只经显式接口读,不碰总线
 const bag = hotBegin('resetview');
 const { s, onTick, iG } = ctx;
 
@@ -88,7 +89,7 @@ function oldestFrame() {
 }
 function startShow() {
   if (phase) return;
-  if (ctx.gallery.zG) return; // 有画正放大,不抢
+  if (isZoomed()) return; // 有画正放大,不抢
   const fg = oldestFrame();
   if (!fg) return;
   plane = fg.children[1];

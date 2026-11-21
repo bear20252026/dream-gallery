@@ -55,18 +55,6 @@
       ]
     },
     {
-      "key": "gallery.zG",
-      "writers": [
-        "src/gallery/painting-zoom.js"
-      ]
-    },
-    {
-      "key": "gallery.zoomIn",
-      "writers": [
-        "src/gallery/paintings.js"
-      ]
-    },
-    {
       "key": "input",
       "writers": [
         "src/ctx.js"

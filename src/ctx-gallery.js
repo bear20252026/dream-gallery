@@ -13,15 +13,15 @@ import { eventBus } from './event-bus.js';
  */
 export function createGalleryNamespace(vault) {
   const properties = [
-    'zoomIn',
     'paintGroups',
     'onC3D',
     'zoomOut',
-    'zG',
     'hangOne',
     'houseMats',
     'openHouseColor',
     'wallSpecs', // 审查#10(2026-10-08):墙体 InstancedMesh 化后,挂画墙清单由 scene.js 直供
+    // L2(2026-11-20):zG 与 zoomIn 已退场 —— 前者收进 painting-zoom.js 私有
+    // (只经 currentZoom/isZoomed 外泄),后者全仓无消费者(死挂载)。
   ];
 
   const proxy = {};
@@ -56,8 +56,6 @@ export const GALLERY_EVENTS = {
   ON_C3D_CHANGED: 'gallery:changed:onC3D',
   // 画框缩回复位变化
   ZOOM_OUT_CHANGED: 'gallery:changed:zoomOut',
-  // 当前放大的画框变化
-  ZG_CHANGED: 'gallery:changed:zG',
   // 挂画函数变化
   HANG_ONE_CHANGED: 'gallery:changed:hangOne',
   // 房屋材质变化

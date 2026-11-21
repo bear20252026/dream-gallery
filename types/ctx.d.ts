@@ -365,9 +365,8 @@ export interface GalleryNamespace {
   paintGroups: Group[];
   onC3D: (intersection: Intersection) => void;
   zoomOut: () => void;
-  /** 画框飞入放大 ← src/gallery/painting-zoom.js:20(挂点 paintings.js:657) */
-  zoomIn: (cg: Group) => void;
-  zG: Group | null;
+  // L2(2026-11-20):zoomIn 与 zG 已退场。前者全仓无消费者(死挂载),
+  // 后者收进 src/gallery/painting-zoom.js 私有,只经 currentZoom()/isZoomed() 外泄。
   /**
    * 挂一幅画并返回那个画框 Group。**唯一写入方 `src/gallery/paintings.js:309`,三个参数**:
    * `(mU 路径, caption 配文, aura 气质归类或 null)`;返回 `hangOn()`/`takeoverEmpty()` 建出的 `Group`

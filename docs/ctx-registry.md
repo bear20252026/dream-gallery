@@ -4,7 +4,7 @@
 > 新属性/新写方/写方变更必须重新生成登记册并在 PR 里说明——这是 ctx 按域真拆前的所有权制度地基。
 > ⚠️ 标记 = 多写方(真拆时须先收编单一 owner)。注释行/解构读不计;动态键 ctx[k] 全仓必须保持 0。
 
-**总计 167 个属性,4 个多写方。**
+**总计 165 个属性,4 个多写方。**
 
 ### 遮蔽文件(已排除,须人工复核)
 
@@ -38,7 +38,7 @@
 | `ctx.tickers` | `src/ctx.js` |  |
 | `ctx.ui` | `src/ctx.js` |  |
 
-## gallery(8)
+## gallery(6)
 
 | 属性 | 写方 | |
 |---|---|---|
@@ -48,8 +48,6 @@
 | `ctx.gallery.openHouseColor` | `src/gate/housecolor.js` |  |
 | `ctx.gallery.paintGroups` | `src/gallery/paintings.js` |  |
 | `ctx.gallery.wallSpecs` | `src/scene/scene.js` |  |
-| `ctx.gallery.zG` | `src/gallery/painting-zoom.js` |  |
-| `ctx.gallery.zoomIn` | `src/gallery/paintings.js` |  |
 
 ## kunlun(28)
 
