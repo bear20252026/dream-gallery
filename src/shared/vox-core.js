@@ -8,6 +8,14 @@
 import * as THREE from 'three';
 
 /**
+ * 体素核心实例形状(createVoxCore 的返回类型)。
+ * 下游场景模块统一以 `@param {import('../shared/vox-core.js').VoxCore} deps.voxCore`
+ * 引用这个共享实例——写成 `object` 会让解构出的 rnd/rr/Vox/solid 逐字段报 TS2339
+ * (2026-11-19 第六轮后 checkJs 基线从 2 漂到 17 的根因)。
+ * @typedef {ReturnType<typeof createVoxCore>} VoxCore
+ */
+
+/**
  * 创建一个体素核心实例(持有 rng 种子/颜色缓存/体素计数等实例状态)。
  * @param {{seed?:number, defaultMat?:THREE.Material}} [opts] seed 默认 90210;defaultMat 为 solid 缺省材质
  */

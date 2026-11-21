@@ -5,6 +5,7 @@
 // 断言:canvas 创建 / ctx 装配 / 动态光源 ≤ 40(灯光预算门禁)/ 无未捕获页面异常
 // 用法:BASE_URL=http://127.0.0.1:3311 PW_BROWSER=chromium node scripts/probe/smoke-gate.js
 const { BASE_URL, launch } = require('./browser');
+const fs = require('fs');
 
 (async () => {
   const b = await launch(['--use-gl=swiftshader', '--enable-unsafe-swiftshader']);
@@ -32,6 +33,48 @@ const { BASE_URL, launch } = require('./browser');
   const settle = (r) => pending.delete(r.url());
   page.on('requestfinished', settle);
   page.on('requestfailed', settle);
+
+  // 诊断转储(失败路径共用)。统一用 fs.writeSync(2, …) 而不是 console.error:
+  // 管道下 console.error 是异步的,紧跟 process.exit(1) 会把整段诊断吞掉
+  // ——2026-11-20 CI 实测「等世界启动 90s 超时」那条路径的日志就这么丢了。
+  const dumpDiag = async (label) => {
+    const out = [];
+    try {
+      const dump = await page.evaluate(() => ({
+        url: location.href,
+        readyState: document.readyState,
+        title: document.title,
+        hasCtx: !!window.__ctx,
+        hasLoop: !!(window.__ctx && window.__ctx.loopManager),
+        frameTicks: window.__ctx && window.__ctx.loopManager ? window.__ctx.loopManager.frameTicks : null,
+        fps: window.__ctx && window.__ctx.loopManager && window.__ctx.loopManager.getFPS ? window.__ctx.loopManager.getFPS() : null,
+        preloadState: window.__ctx && window.__ctx.preloadState ? String(window.__ctx.preloadState()) : null,
+        worldPhase: window.__ctx && window.__ctx.worldPhase ? String(window.__ctx.worldPhase()) : null,
+        bootState: window.__ctx && window.__ctx.bootState ? JSON.stringify(window.__ctx.bootState) : null,
+        worldErr: (document.getElementById('worldErr') || {}).textContent || null,
+        hasC: !!document.querySelector('#c'),
+        cChildren: document.querySelector('#c') ? document.querySelector('#c').children.length : -1,
+        gate: !!document.getElementById('b612Gate'),
+        load: document.getElementById('l') ? document.getElementById('l').style.display : 'no-#l',
+        bodyKids: [...document.body.children].slice(0, 14).map((x) => x.id || x.tagName).join(','),
+      }));
+      out.push(label + ' 页面状态:\n' + JSON.stringify(dump, null, 1));
+      const probeMod = await page.request
+        .get(BASE_URL + '/src/core/game-state.js')
+        .then(async (r) => r.status() + ' len=' + (await r.body()).length)
+        .catch((e) => 'fetch-err: ' + e.message);
+      out.push('服务端直取 /src/core/game-state.js → ' + probeMod);
+    } catch (e) {
+      out.push(label + ' 页面状态取用失败: ' + (e && e.message));
+    }
+    const now = Date.now();
+    const pend = [...pending.entries()].map(([u, t]) => 'PENDING ' + ((now - t) / 1000).toFixed(1) + 's ' + u.slice(-90));
+    if (pend.length) out.push('未完成请求:\n' + pend.slice(0, 12).join('\n'));
+    if (errs.length) out.push('页面异常:\n' + errs.slice(0, 8).join('\n'));
+    if (diag.length) out.push('网络/控制台诊断:\n' + diag.slice(0, 20).join('\n'));
+    fs.writeSync(2, out.join('\n') + '\n');
+  };
+
   await page.goto(BASE_URL + '/?noopening', { waitUntil: 'domcontentloaded', timeout: 60000 });
 
   // ① 过闸门:勾选同意 → ENTER(每次进入都显示,勾选后 ENTER 才点亮)
@@ -39,31 +82,7 @@ const { BASE_URL, launch } = require('./browser');
     await page.waitForSelector('#b612Gate', { timeout: 60000 });
   } catch (e) {
     // 闸门未出现:打印诊断转储再失败(便于 CI 排查模块图/静态服务问题)
-    const dump = await page.evaluate(() => ({
-      url: location.href,
-      readyState: document.readyState,
-      navType: (performance.getEntriesByType('navigation')[0] || {}).type,
-      navCount: performance.getEntriesByType('navigation').length,
-      title: document.title,
-      hasCtx: !!window.__ctx,
-      hasC: !!document.querySelector('#c'),
-      cChildren: document.querySelector('#c') ? document.querySelector('#c').children.length : -1,
-      gate: !!document.getElementById('b612Gate'),
-      load: document.getElementById('l') ? document.getElementById('l').style.display : 'no-#l',
-      bodyKids: [...document.body.children].slice(0, 14).map((x) => x.id || x.tagName).join(','),
-    }));
-    // 服务端直取一个"被中止"的模块:区分浏览器侧中止 vs 服务端响应异常
-    const probeMod = await page.request
-      .get(BASE_URL + '/src/core/game-state.js')
-      .then(async (r) => r.status() + ' len=' + (await r.body()).length)
-      .catch((e) => 'fetch-err: ' + e.message);
-    console.error('闸门 60s 未出现,诊断转储:\n' + JSON.stringify(dump, null, 1));
-    console.error('服务端直取 /src/core/game-state.js → ' + probeMod);
-    const now = Date.now();
-    const pend = [...pending.entries()].map(([u, t]) => 'PENDING ' + ((now - t) / 1000).toFixed(1) + 's ' + u.slice(-90));
-    if (pend.length) console.error('未完成请求:\n' + pend.slice(0, 12).join('\n'));
-    if (errs.length) console.error('页面异常:\n' + errs.slice(0, 8).join('\n'));
-    if (diag.length) console.error('网络/控制台诊断:\n' + diag.slice(0, 20).join('\n'));
+    await dumpDiag('闸门 60s 未出现,诊断转储:');
     throw e;
   }
   await page.evaluate(() => {
@@ -75,16 +94,26 @@ const { BASE_URL, launch } = require('./browser');
     document.querySelector('#b612Gate .gEnter').click();
   });
 
-  // ② 等世界真正启动:主循环 FPS>0(startWorld 在 finishIntro 时调用)
-  await page.waitForFunction(
-    () =>
-      window.__ctx &&
-      window.__ctx.loopManager &&
-      window.__ctx.loopManager.getFPS &&
-      window.__ctx.loopManager.getFPS() > 0,
-    null,
-    { timeout: 90000 }
-  );
+  // ② 等世界真正启动:主循环已至少跑过一帧(startWorld 在 finishIntro 时调用,
+  // loopManager.start() 是 startWorld 的最后一步)。
+  // 用 frameTicks(累计帧数,单调递增)而不是 getFPS()>0:
+  // fps 是「最近 ~1s 窗口」的 Math.round 值,帧率低于 1fps 时恒为 0,
+  // 慢 runner(swiftshader 软渲染)上会假超时 —— 2026-11-20 CI 实测两次。
+  try {
+    await page.waitForFunction(
+      () =>
+        window.__ctx &&
+        window.__ctx.loopManager &&
+        typeof window.__ctx.loopManager.frameTicks === 'number' &&
+        window.__ctx.loopManager.frameTicks > 0,
+      null,
+      { timeout: 90000 }
+    );
+  } catch (e) {
+    // 本地与 CI 同码复现不了时,靠 dumpDiag 把页面异常/卡住请求/引导状态带出去。
+    await dumpDiag('世界 90s 未启动,诊断转储:');
+    throw e;
+  }
   await page.waitForTimeout(4000); // 灯光/场景稳定
 
   const st = await page.evaluate(() => {
@@ -120,6 +149,7 @@ const { BASE_URL, launch } = require('./browser');
   await b.close();
   process.exit(fail ? 1 : 0);
 })().catch((e) => {
-  console.error('冒烟执行失败:', e && e.message);
+  // 同步写,避免 process.exit 把异步 stderr 吞掉
+  fs.writeSync(2, '冒烟执行失败: ' + (e && e.message) + '\n');
   process.exit(1);
 });

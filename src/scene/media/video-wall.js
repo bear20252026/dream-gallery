@@ -50,9 +50,13 @@ function reloadBigscreen() {
     });
 }
 // 后台上传/清空大屏视频 → 立即重拉配置(下次循环生效)
-onMediaChanged(function (d) {
+// R6:接住 off 挂世界退订注册表(E2 同款;原丢弃 ⇒ 重装配叠双份 reloadBigscreen)
+const offVideoWallMedia = onMediaChanged(function (d) {
   if (d && d.dir === 'videos') reloadBigscreen();
 });
+if (typeof window !== 'undefined' && window.__onWorldTeardown) {
+  window.__onWorldTeardown(offVideoWallMedia);
+}
 reloadBigscreen();
 
 // ===================== 视频 DOM 元素（创建时无 src，避免自动加载） =====================

@@ -1,6 +1,6 @@
 /**
  * dream-gallery 核心类型声明
- * 基于 src/ctx.js, src/engine.js, src/loop.js, src/events.js 的 JSDoc + 运行时分析
+ * 基于 src/ctx.js, src/engine.js, src/loop-manager.js, src/events.js 的 JSDoc + 运行时分析
  */
 
 import type {
@@ -365,9 +365,8 @@ export interface GalleryNamespace {
   paintGroups: Group[];
   onC3D: (intersection: Intersection) => void;
   zoomOut: () => void;
-  /** 画框飞入放大 ← src/gallery/painting-zoom.js:20(挂点 paintings.js:657) */
-  zoomIn: (cg: Group) => void;
-  zG: Group | null;
+  // L2(2026-11-20):zoomIn 与 zG 已退场。前者全仓无消费者(死挂载),
+  // 后者收进 src/gallery/painting-zoom.js 私有,只经 currentZoom()/isZoomed() 外泄。
   /**
    * 挂一幅画并返回那个画框 Group。**唯一写入方 `src/gallery/paintings.js:309`,三个参数**:
    * `(mU 路径, caption 配文, aura 气质归类或 null)`;返回 `hangOn()`/`takeoverEmpty()` 建出的 `Group`
@@ -785,8 +784,6 @@ export type InputManager = import('../src/engine.js').InputManager;
 
 export type GamePhase = 'input' | 'update' | 'render' | 'ui';
 
-export type GameLoop = import('../src/loop.js').GameLoop;
-
 // ===================== 事件总线 =====================
 
 export type EventBus = import('../src/event-bus.js').EventBus;
@@ -807,10 +804,9 @@ declare global {
 // ===================== 主上下文 =====================
 
 export interface GalleryCtx {
-  // 帧循环
+  // 帧循环(2026-11-20 L1:timeScale 已收回 LoopManager 私有,ctx.loop 退场)
   tickers: Array<(dt: number) => void>;
   onTick: (fn: (dt: number) => void) => () => void;
-  loop: GameLoop;
 
   // 引擎
   ent: EntityRegistry;

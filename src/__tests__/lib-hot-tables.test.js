@@ -11,9 +11,11 @@
 //   ⑦ 对账脚本三种机器可判的退出码 0/1/2。
 //
 // ===================== 测试隔离(硬要求)=====================
-// GATE_DATA_FILE / SQLITE_PATH / CLIENT_ERRORS_FILE 全部重定向到系统临时目录,
+// GATE_DATA_FILE / SQLITE_PATH / CLIENT_ERRORS_FILE / TTS_CACHE_DIR 全部重定向到系统临时目录,
 // **必须在 require lib 之前**设好 —— 否则 store.js 会打开仓库真实的 gate_data.db,
 // 影子写就会往开发机的真库里灌行(Windows EPERM / Linux ENOENT 会把 CI 打成假红)。
+// TTS_CACHE_DIR 同理:本文件的 runSweep/previewSweep 会连带 sweepTtsCache,
+// 不重定向就会去动仓库真实 .tts-cache(见 lib-retention.test.js 同一处注释)。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -31,6 +33,7 @@ const TMP_ERRORS = path.join(tmpDir, 'client_errors.json');
 process.env.GATE_DATA_FILE = TMP_JSON; // 必须在 require store 之前
 process.env.SQLITE_PATH = TMP_DB; // 影子表与 kv 快照同一个临时库
 process.env.CLIENT_ERRORS_FILE = TMP_ERRORS;
+process.env.TTS_CACHE_DIR = path.join(tmpDir, 'tts-cache'); // 真实 .tts-cache 不得被碰
 process.env.TOKEN = process.env.TOKEN || 'vitest-token-abc';
 process.env.RETENTION_DISABLED = '1'; // 自动定时器不启;表侧裁剪由用例显式放开
 delete process.env.SHADOW_WRITE; // 历史遗留:闸已随 B5 拆除,此清理仅防外部环境串扰(无实际效果)

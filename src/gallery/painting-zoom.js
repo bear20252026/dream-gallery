@@ -1,9 +1,22 @@
 // painting-zoom.js — 画框飞入放大/缩回复位交互(2026-09-20 自 paintings.js 拆分,审计「大文件拆分」)
-// 内聚状态:oFog(进入放大时的原雾密度)由本模块私有。
+// 内聚状态:oFog(进入放大时的原雾密度)、zG(当前放大对象)均由本模块私有。
+// 2026-11-20 L2(gallery 域真拆):zG 原躺在 ctx.gallery 上,被 5 个文件 9 处直读。
+// 现在只经下面两个显式接口外泄,总线不再持有这份状态。
 import { ctx } from '../ctx.js';
 import { tt } from '../shared/story-text.mjs';
 
 let oFog = null;
+let zG = null; // 当前正放大的画框(无则 null);唯一 owner 是本模块
+
+/** 当前正放大的画框(无则 null)。外部需要"是哪一个"时用这个。 */
+export function currentZoom() {
+  return zG;
+}
+
+/** 是否有画正放大。外部只做"是否"判断时用这个,别去读总线。 */
+export function isZoomed() {
+  return !!zG;
+}
 // 依赖注入(父模块 paintings.js 装配期调用 initPaintingZoom 传入;2026-09-20 拆分)
 let s, cam, lerp, THREE, captionAllowed, showAI, hideAI;
 export function initPaintingZoom(d) {
@@ -20,7 +33,7 @@ export function initPaintingZoom(d) {
 export function zoomIn(cg) {
   const d = cg.userData;
   d.zoomed = true;
-  ctx.gallery.zG = cg;
+  zG = cg;
   d.gazeT0 = Date.now(); // B612灵鉴 M2:凝视计时起点
   if (!oFog) oFog = s.fog.density;
   // 添加环境光晕
@@ -96,7 +109,7 @@ function springBounce(cg, tx, ty, tz, ts) {
 
 // 画框缩回复位;instant=true 时直接复位(切换放大对象时用,避免与新放大动画争抢)
 export function zoomOut(cg, instant) {
-  cg = cg || ctx.gallery.zG;
+  cg = cg || zG;
   if (!cg) return;
   const d = cg.userData;
   // B612灵鉴 M2:有效凝视(≥3秒)记一缕灵蕴
@@ -123,7 +136,7 @@ export function zoomOut(cg, instant) {
     cg.rotation.y = d.ry;
     cg.scale.set(1, 1, 1);
     d.zoomed = false;
-    if (ctx.gallery.zG === cg) ctx.gallery.zG = null;
+    if (zG === cg) zG = null;
     return;
   }
   const dur = 400; // 400ms缩回
@@ -149,8 +162,8 @@ export function zoomOut(cg, instant) {
       d.aF = requestAnimationFrame(animateOut);
     } else {
       d.zoomed = false;
-      if (ctx.gallery.zG === cg) {
-        ctx.gallery.zG = null;
+      if (zG === cg) {
+        zG = null;
         hideAI();
       } // 竞态防护:期间已有新画放大则不抢状态
       s.fog.density = oFog;

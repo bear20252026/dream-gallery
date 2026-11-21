@@ -125,13 +125,11 @@ export const ctx = /** @type {import('../types/ctx').GalleryCtx} */ ({});
 // 诊断钩子:探针脚本读取运行时状态(quizPassed/store/overlay 等)用
 if (typeof window !== 'undefined') window.__ctx = ctx;
 
-// ===================== 游戏主循环(2026-08-01 引擎化改造) =====================
-import { GameLoop } from './loop.js';
-ctx.loop = new GameLoop();
-// 单一驱动:只保留 ctx.tickers 一路,由 LoopManager 在 UPDATE 阶段统一执行。
+// ===================== 每帧回调队列(单一驱动) =====================
+// 只保留 ctx.tickers 一路,由 LoopManager 在 UPDATE 阶段统一执行。
 // 早期曾同时 ctx.tickers.push 又 ctx.loop.on('update'),导致每个 onTick 每帧执行两次(双循环 bug)。
-// GameLoop 实例保留,仅持有 timeScale(供 LoopManager.pause/resume/_frame 读写);
-// 阶段调度与 rAF 主循环已统一由 LoopManager 承担,GameLoop 内死实现于 2026-08-29 清理。
+// 2026-11-20 L1(loop 域真拆第一刀):timeScale 收回 LoopManager 私有,
+// GameLoop 容器(src/loop.js)与 ctx.loop 一并退场 —— 全仓唯一读写方就是 LoopManager。
 ctx.tickers = [];
 ctx.onTick = (fn) => {
   ctx.tickers.push(fn);
@@ -146,7 +144,7 @@ import { EntityRegistry, InputManager } from './engine.js';
 ctx.ent = new EntityRegistry();
 ctx.input = new InputManager();
 ctx.input.initDefaults();
-// 输入 tick 由 LoopManager 的 INPUT 阶段调用(单一主循环,不再经 ctx.loop)
+// 输入 tick 由 LoopManager 的 INPUT 阶段调用(单一主循环)
 
 // ===================== 命名空间别名层 + 扁平写软冻结(2026-08-22 架构优化) =====================
 // 扁平路径永久可用(老代码零改动);新代码用命名空间路径,读/写都经 get/set 委托到同一个真实存储 vault——

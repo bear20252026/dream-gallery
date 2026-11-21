@@ -8,6 +8,7 @@ const { cam, rnd, bounds, jT, jB, onC3D, zoomOut, OL, OR, OT, OBE, OBR, IL, IR, 
 import { mapCanvas, bUnmap, isBig, toggleBig, drawMap } from './minimap.js';
 import { tt } from '../shared/story-text.mjs';
 import { i18nText, i18nAttr } from '../ui/i18n-dom.js'; // 界面文字中英切换(2026-10-03)
+import { isZoomed } from '../gallery/painting-zoom.js'; // L2:放大状态只经显式接口读,不碰总线
 
 // ===================== 移动状态机(2026-08-01) =====================
 import { StateMachine } from '../player/StateMachine.js';
@@ -308,7 +309,7 @@ let mDg = false,
   cDY = 0,
   cT = 0;
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && ctx.gallery.zG) zoomOut();
+  if (e.key === 'Escape' && isZoomed()) zoomOut();
 });
 // 鼠标拖拽旋转视角:第一人称转玩家朝向,第三人称环绕角色(不转角色)
 document.addEventListener('mousemove', (e) => {

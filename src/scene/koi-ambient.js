@@ -6,7 +6,7 @@ import * as THREE from 'three';
 
 /**
  * @param {object} deps
- * @param {object} deps.voxCore createVoxCore 实例(rnd/rr/pick/shade/v3/Vox/solid,共享 rng 保序)
+ * @param {import('../shared/vox-core.js').VoxCore} deps.voxCore createVoxCore 实例(rnd/rr/pick/shade/v3/Vox/solid,共享 rng 保序)
  * @param {THREE.Group} deps.root 花瓣 InstancedMesh 挂 root(随飞行姿态)
  * @param {THREE.Group} deps.craneGroup 鹤群容器
  * @param {THREE.MeshStandardMaterial} deps.matPetal 花瓣共享材质

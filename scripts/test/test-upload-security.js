@@ -13,6 +13,9 @@ const path = require('path');
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'upload-sec-'));
 const tmpFile = path.join(tmpDir, 'gate_data.json');
 process.env.GATE_DATA_FILE = tmpFile; // 必须在 require store 之前
+// R6:authz/config 的 TOKEN 是模块加载时捕获的常量 —— 必须在任何 require 链之前设好,
+// 否则 config 固化空 TOKEN,后面再设 env 无效(本轮实测踩到)。
+process.env.TOKEN = process.env.TOKEN || 'r6-test-token';
 
 const { gateData, deviceKey, issueSession, revokeSession, sessionValid } = require('../../lib/store.js');
 const { isMineUpload, canServeMedia } = require('../../lib/siteconfig.js');
@@ -118,6 +121,44 @@ ok(sessionValid(gateData.applicants.vidC) === false, '吊销后 sessionValid 为
 ok(myUploads('vidC').length === 0, '吊销后的 vid 主张不了任何记录(永久失效)');
 ok(canServeMedia(reqOf('vidC', '/photos/c.png'), 'photos', 'c.png') === false,
   '同一吊销 vid 也取不到文件本体(清单与门禁一起收紧)');
+
+// ===================== R6(2026-11-18 第六轮审计):反刷判定 fail-closed =====================
+// 原 quota.sizePrecheck/check 把 abuse 抛错吞成 null(放行)——防线自身故障=上传防线静默拆除。
+// 现钉死:判定异常必须硬拒('bigfile'/'rate'),且错误可观测(console.error 出声)。
+{
+  const quota = require('../../lib/upload/quota.js');
+  const abuse = require('../../lib/abuse.js');
+  const origPre = abuse.abuseSizePrecheck, origChk = abuse.abuseCheck;
+  const origErr = console.error;
+  let logged = 0;
+  console.error = () => { logged++; };
+  abuse.abuseSizePrecheck = () => { throw new Error('R6 注入故障'); };
+  abuse.abuseCheck = () => { throw new Error('R6 注入故障'); };
+  try {
+    ok(quota.sizePrecheck('dk', 'x.png', 1024) === 'bigfile', 'R6:体积预检异常 ⇒ fail-closed 硬拒(bigfile),不再静默放行');
+    ok(quota.check('dk', 'x.png', 1024) === 'rate', 'R6:反刷判定异常 ⇒ fail-closed 硬拒(rate)');
+    ok(logged >= 2, 'R6:两次异常都 console.error 出声(吞错=拆防线不出声)');
+  } finally {
+    abuse.abuseSizePrecheck = origPre; abuse.abuseCheck = origChk; console.error = origErr;
+  }
+  // 正常路径不受影响:小文件放行
+  ok(quota.sizePrecheck('dk-r6', 'ok.png', 1024) === null, 'R6:正常小文件预检仍放行(判据不空转)');
+}
+
+// ===================== R6:chat 管理员 query token 通道 =====================
+// 原 handleChatPost 里 tokenOk(req,{}) 丢弃 query ⇒ 管理员 ?token= 发言被误标访客。
+// 现透传完整 query(与第五轮免审修复同口径);TOKEN_QUERY=0 时公网 query 仍拒(tokenOk 内部纪律)。
+{
+  const { tokenOk } = require('../../lib/authz.js');
+  const TOKEN = process.env.TOKEN; // 文件头已在 require 链之前设好(模块加载时捕获)
+  const reqQ = { headers: {}, url: '/api/chat?token=' + TOKEN, socket: { remoteAddress: '203.0.113.9' } };
+  ok(tokenOk(reqQ, { token: TOKEN }) === true, 'R6:完整 query 透传时管理员 token 判真');
+  ok(tokenOk(reqQ, {}) === false, 'R6:旧写法 {} 丢 query ⇒ 判假(这就是被修的缺陷形态)');
+  const prevTQ = process.env.TOKEN_QUERY;
+  process.env.TOKEN_QUERY = '0';
+  ok(tokenOk(reqQ, { token: TOKEN }) === false, 'R6:TOKEN_QUERY=0 公网 query 仍拒(fail-closed 纪律不因透传放松)');
+  if (prevTQ === undefined) delete process.env.TOKEN_QUERY; else process.env.TOKEN_QUERY = prevTQ;
+}
 
 console.log(`\n结果: ${passed} 通过, ${failed} 失败`);
 try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch (e) {}

@@ -55,18 +55,6 @@
       ]
     },
     {
-      "key": "gallery.zG",
-      "writers": [
-        "src/gallery/painting-zoom.js"
-      ]
-    },
-    {
-      "key": "gallery.zoomIn",
-      "writers": [
-        "src/gallery/paintings.js"
-      ]
-    },
-    {
       "key": "input",
       "writers": [
         "src/ctx.js"
@@ -244,18 +232,6 @@
       "key": "kunlun.spiritsTTS",
       "writers": [
         "src/kunlun/spirits.js"
-      ]
-    },
-    {
-      "key": "loop",
-      "writers": [
-        "src/ctx.js"
-      ]
-    },
-    {
-      "key": "loop.timeScale",
-      "writers": [
-        "src/loop-manager.js"
       ]
     },
     {

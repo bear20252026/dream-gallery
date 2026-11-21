@@ -74,3 +74,6 @@ public/sw.min.js
 
 # deploy.sh --pin-hostkey 的暂存产物(带外核对指纹无误后再 mv 成 scripts/known_hosts 并入库)
 scripts/known_hosts.new
+
+# macOS 目录元数据(本机噪音,不入库)
+.DS_Store

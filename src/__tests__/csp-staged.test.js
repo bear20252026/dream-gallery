@@ -6,6 +6,16 @@
 //  ④ CSP_STRICT_MODE=enforce 时换成真策略:同名头被严格版**覆盖**,且不再重复发 Report-Only;
 //  ⑤ 开发档 CSP_UNSAFE_EVAL=1 时严格版也照样摘掉 unsafe-inline(它摘的是内联授权,与 eval 无关)。
 import { describe, it, expect, beforeAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+// 测试隔离(2026-11-20 实测):security.js 经 media-access 间接加载 store.js,
+// 不重定向就会在仓库根建出真的 gate_data.json / gate_data.db。
+// 必须在下面那句动态 import 之前设好。
+const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-csp-staged-'));
+process.env.GATE_DATA_FILE = path.join(tmpDir, 'gate_data.json');
+process.env.SQLITE_PATH = path.join(tmpDir, 'gate_data.db');
 
 // 与 src/__tests__/lib-local-request.test.js 同款:lib 是 CJS,走动态 import 拿命名导出
 let security;

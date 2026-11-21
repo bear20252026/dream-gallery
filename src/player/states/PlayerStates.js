@@ -53,8 +53,10 @@ export class WalkingState extends PlayerState {
     const jD = ctx.player.jD;
     const ks = ctx.player.ks;
 
-    // 滑翔判定
-    if (!pl.onGround && pl.glideEnergy > 0) {
+    // 滑翔判定(R6:补齐 jumpHold 门槛,与物理权威 player-physics.js:60 三条件逐字对齐)。
+    // 原缺按键判定:无按键坠崖也会进 GlidingState 置 pl.gliding=true,下一帧被物理覆写
+    // ⇒ 单帧动画抖动。AirborneState 的同款判定本来就带 jumpHold,此处是漏网。
+    if (!pl.onGround && pl.glideEnergy > 0 && ctx.player.jumpHold) {
       return new GlidingState();
     }
 

@@ -2,7 +2,7 @@
 // 2026-09-03:原「白板作品固定展示区」(户外 z=47 玻璃墙 + 6 画位 + SSE 刷新)整套移除,
 //   白板 3D 入口已下线;whiteboard-*.png 的排除过滤仍保留,避免旧作品串挂到其他墙。
 import * as THREE from 'three';
-import { zoomIn, zoomOut, initPaintingZoom } from './painting-zoom.js';
+import { zoomIn, zoomOut, currentZoom, isZoomed, initPaintingZoom } from './painting-zoom.js';
 import { ctx } from '../ctx.js';
 import { onMediaFiles } from '../media-files.js'; // 共享媒体列表管道:单轮询+SSE+隐藏暂停,与晨光共用(2026-11-17 B7)
 import { P, V, AI_DESC, LINKS, VIDEO_WALL_SOURCES } from '../../data.js';
@@ -481,7 +481,7 @@ function onC3D(e) {
   // iG 是主世界交互物登记册,three 射线不要求对象在当前渲染场景里,
   // 不守卫会在小世界隔空点响琴声/放大画框(污染主场景)/打开外链
   if ((ctx.scene.activeWorld || 'main') !== 'main') {
-    if (ctx.gallery.zG) zoomOut();
+    if (isZoomed()) zoomOut();
     return;
   }
   let cx, cy;
@@ -497,7 +497,7 @@ function onC3D(e) {
   ray.setFromCamera(mP2, cam);
   const hs = ray.intersectObjects(iG, true);
   if (hs.length === 0) {
-    if (ctx.gallery.zG) zoomOut(ctx.gallery.zG);
+    if (isZoomed()) zoomOut(currentZoom());
     return;
   } // 点空白=关闭放大(退出普查 2026-07-26)
   if (hs.length > 0) {
@@ -556,7 +556,8 @@ function onC3D(e) {
     }
     if (cg.userData && cg.userData.isPainting && !cg.userData.empty) {
       // 空框(图库隐藏帧)不可点,不放大
-      if (ctx.gallery.zG && ctx.gallery.zG !== cg) zoomOut(ctx.gallery.zG, true); // 切换放大对象:旧的直接复位,避免动画竞态卡死
+      const z = currentZoom();
+      if (z && z !== cg) zoomOut(z, true); // 切换放大对象:旧的直接复位,避免动画竞态卡死
       if (!cg.userData.zoomed) {
         zoomIn(cg);
       } else {
@@ -586,7 +587,7 @@ function onC3D(e) {
       }
     }
   }
-  if (ctx.gallery.zG) zoomOut();
+  if (isZoomed()) zoomOut();
 }
 
 // 显示/隐藏AI文字面板(2026-07-26《B612灵鉴》:配文统一加前缀「B612 替你记得：」,AI=B612的记忆回声)
@@ -642,4 +643,4 @@ setInterval(function () {
 
 initPaintingZoom({ s, cam, lerp, THREE, captionAllowed, showAI, hideAI });
 Object.assign(ctx.gallery, { onC3D, zoomOut });
-ctx.gallery.zoomIn = zoomIn; // 2026-09-18 收编登记册
+// zoomIn 不再挂总线:全仓无消费者(paintings.js 自己 import 直接用),是死挂载。

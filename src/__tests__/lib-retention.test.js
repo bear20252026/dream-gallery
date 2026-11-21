@@ -9,8 +9,13 @@
 //   ⑤ startRetention/stopRetention 幂等且不残留定时器(定时器 unref,stop 之后计时器归零);
 //   ⑥ runSweep 可重复调用(幂等:第二轮除"补记时间戳"外不再改变数据)。
 // 必须用 createRequire 与被测模块共享同一 Node require 缓存(vitest ESM import 会产生双实例,
-// gateData 改动传不进去)。数据一律落系统临时目录(GATE_DATA_FILE / CLIENT_ERRORS_FILE),
-// **必须在 require lib 之前**设置;仓库真实的 gate_data.json / client_errors.json 不得被碰。
+// gateData 改动传不进去)。数据一律落系统临时目录(GATE_DATA_FILE / CLIENT_ERRORS_FILE /
+// TTS_CACHE_DIR),**必须在 require lib 之前**设置;仓库真实的 gate_data.json /
+// client_errors.json / .tts-cache 不得被碰。
+// TTS_CACHE_DIR 尤其关键:本文件多处注入 NOW + 1000*DAY 的未来时钟跑 runSweep,
+// sweepTtsCache 会按 mtime 把真实 .tts-cache/*.mp3 当过期缓存 unlink 掉
+// (2026-11-20 实测:探针文件被该用例删除,并与 lib-ai-usage.test.js 的
+// 「缓存命中不记账」断言形成跨 worker 竞态,CI 偶发 3≠2)。
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -20,6 +25,7 @@ import path from 'node:path';
 const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dg-retention-'));
 process.env.GATE_DATA_FILE = path.join(tmpDir, 'gate_data.json');
 process.env.CLIENT_ERRORS_FILE = path.join(tmpDir, 'client_errors.json');
+process.env.TTS_CACHE_DIR = path.join(tmpDir, 'tts-cache'); // 同上:真实 .tts-cache 不得被碰
 process.env.RETENTION_DISABLED = '1'; // 自动启动留给用例显式验证,避免测试期间有隐藏定时器
 process.env.TOKEN = process.env.TOKEN || 'vitest-token-abc';
 

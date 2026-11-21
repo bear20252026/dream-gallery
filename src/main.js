@@ -149,6 +149,7 @@ let preloadPromise = null; // 预加载记忆化:并发调用(onEnter 与 startW
 // ②resize 是匿名箭头且无从移除。现收拢成 teardownWorldWiring()(探针/HMR 的显式出口,
 // 不自造新生命周期:生产是整页刷新式应用,这条路径只服务可重装配的正确性)。
 let _unregisterRootTick = null;
+let _unregisterSmTick = null; // R6:状态机 tick 同款防双份(原匿名注册丢弃 unregister)
 let _resizeBound = false;
 function onWindowResize() {
   const { cam, rnd } = ctx.scene;
@@ -172,6 +173,10 @@ function teardownWorldWiring() {
     _unregisterRootTick();
     _unregisterRootTick = null;
   }
+  if (_unregisterSmTick) {
+    _unregisterSmTick();
+    _unregisterSmTick = null;
+  }
   if (_resizeBound) {
     window.removeEventListener('resize', onWindowResize);
     _resizeBound = false;
@@ -188,6 +193,7 @@ function teardownWorldWiring() {
 expose('teardownWorldWiring', teardownWorldWiring); // 显式出口:window.__teardownWorldWiring()
 expose('worldWiringState', () => ({
   rootTick: !!_unregisterRootTick,
+  smTick: !!_unregisterSmTick,
   resize: _resizeBound,
   disposed: compositionRoot.isDisposed(),
 })); // 自检用:两套接线是否在挂 + 组合根是否已 dispose
@@ -322,7 +328,9 @@ async function preloadWorld() {
     // 玩家状态机:世界就绪后初始化为空闲状态
     const { IdleState } = await import('./player/states/PlayerStates.js');
     ctx.player.playerSM.change(new IdleState());
-    ctx.onTick(function (dt) {
+    // R6:接住 unregister 并在重装配前摘旧的(与 rootTick 同纪律;原丢弃 ⇒ 二次装配叠双份 SM tick)
+    if (_unregisterSmTick) _unregisterSmTick();
+    _unregisterSmTick = ctx.onTick(function (dt) {
       ctx.player.playerSM.tick(dt);
     });
 

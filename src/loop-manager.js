@@ -54,13 +54,20 @@ function lerpAngle(a, b, t) {
 
 /**
  * 循环管理器
- * 合并旧的 an() 循环和新的 ctx.loop，统一游戏主循环
+ * 唯一游戏主循环:阶段调度(input/update/render/ui)+ 自适应画质 + 启停。
+ *
+ * 2026-11-20 L1(loop 域真拆第一刀):timeScale 从总线收回本类私有。
+ * 原先它躺在 `ctx.loop.timeScale` 上,而全仓唯一的读写方就是本类 ——
+ * 一个只有单个 owner 的可变状态挂在总线上,是"隐式耦合"最纯粹的形态。
+ * 现在 `ctx.loop` 与 src/loop.js 的 GameLoop 容器一起退场。
  */
 export class LoopManager {
   constructor(ctx) {
     this.ctx = ctx;
     this._running = false;
     this._lastTime = 0;
+    /** 时间缩放:1=常速,0=暂停。域内唯一 owner 就是本类(见文件头 L1)。 */
+    this.timeScale = 1;
     this._lastPosT = 0;
     this._lastDayT = 0;
     this._lastPlsT = 0;
@@ -78,6 +85,11 @@ export class LoopManager {
 
     // 性能监控
     this.frameCount = 0;
+    // 累计已执行的帧数(单调递增,不受帧率影响)。
+    // 与 frameCount/fps 的区别:那两个是「最近 ~1s 窗口」的瞬时值,
+    // Math.round 在帧率低于 1fps 时会恒为 0 —— 冒烟门禁拿 getFPS()>0
+    // 当「世界已启动」在慢 runner(swiftshader 软渲染)上会假超时。
+    this.frameTicks = 0;
     this.fps = 0;
     this.fpsUpdateInterval = 1000; // 每秒更新一次 FPS
     this.lastFpsUpdate = 0;
@@ -126,7 +138,7 @@ export class LoopManager {
    * 暂停循环
    */
   pause() {
-    this.ctx.loop.timeScale = 0;
+    this.timeScale = 0;
     eventBus.emit('loop:paused');
   }
 
@@ -134,7 +146,7 @@ export class LoopManager {
    * 恢复循环
    */
   resume() {
-    this.ctx.loop.timeScale = 1;
+    this.timeScale = 1;
     eventBus.emit('loop:resumed');
   }
 
@@ -230,11 +242,12 @@ export class LoopManager {
     const now = performance.now();
     let dt = Math.min((now - this._lastTime) / 1000, 0.1);
     this._lastTime = now;
-    // 兼容暂停:timeScale 由 LoopManager.pause/resume 写入 ctx.loop.timeScale
-    dt *= this.ctx.loop.timeScale ?? 1;
+    // 暂停:timeScale 由本类 pause/resume 写(见文件头 L1)
+    dt *= this.timeScale;
 
     // 更新 FPS 计数
     this.frameCount++;
+    this.frameTicks++;
     if (now - this.lastFpsUpdate > this.fpsUpdateInterval) {
       this.fps = Math.round((this.frameCount * 1000) / (now - this.lastFpsUpdate));
       this.frameCount = 0;
@@ -598,9 +611,10 @@ export class LoopManager {
   getPerformanceInfo() {
     return {
       fps: this.fps,
+      frameTicks: this.frameTicks,
       lowQuality: this.lowQuality,
       pixelRatio: this.ctx.scene.rnd.getPixelRatio(),
-      timeScale: this.ctx.loop.timeScale,
+      timeScale: this.timeScale,
     };
   }
 }
