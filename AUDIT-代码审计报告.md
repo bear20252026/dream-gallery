@@ -942,8 +942,15 @@ authz 的 TOKEN 是 config **模块加载时捕获的常量**——R6 回归首�
 - 登记册 169 → **167** 属性（`--write` 重生成）；锚点守卫改挂同样由注入型文件写入的 `media.dayHour`。
 - **新增守卫**：`ctx` 上不得再出现 `loop` 容器（防真拆回流）。
 
-**未做（诚实标注）**：gallery（8 属性/27 读写点/10 文件）与 player（9 属性/**219 读写点/47 文件**）真拆未启动。player 域是承重墙——报告第 364 行本就写明"此三项动承重墙，须单独评审"，219 个读写点的改造不应在收尾轮里顺手做。
+**L2 已补做（1d76098）：gallery 域的放大状态。** 复查时发现 §22.7 的"27 读写点"只是**直写口径**，实际形态更典型：`zG`（当前正放大的画框）唯一写方是 `painting-zoom.js`，却被 5 个文件 9 处直读；`zoomIn` 则是**全仓无消费者的死挂载**（paintings.js 自己 import 直接用）。已处置：
+
+- `zG` 收进 `painting-zoom.js` 私有，只经两个显式接口外泄——`currentZoom()`（要"是哪一个"）与 `isZoomed()`（只做"是否"判断）；9 处外部读点全改走接口（paintings.js 4 处、kunlun/resetview.js、kunlun/letgo.js、scene/player.js）。
+- `zoomIn` 的总线赋值与命名空间条目一并删除。登记册 **167 → 165**，`types/ctx.d.ts` 的 `GalleryNamespace` 同步。
+- 新增 `src/__tests__/ctx-gallery-l2.test.js` 四条守卫，其中两条是这次特有的：**全 src 不得再出现命名空间/扁平两条路径的 `zG`/`zoomIn`**（扁平别名层会为所有命名空间属性在 ctx 根建访问器，只查命名空间会漏），以及 **`zG` 的写点必须只在 `painting-zoom.js`**（防状态分叉成两份）。
+- 实机复验：命名空间与扁平层均已无这两员；`zoomIn` 后 `isZoomed()=true`、`currentZoom()` 命中该画且**总线仍 undefined**；`zoomOut` 后双双复位；全程无页面异常。
+
+**未做（诚实标注）**：gallery 域余下 `paintGroups` / `wallSpecs` / `houseMats` / `hangOne` / `openHouseColor`，以及 player 域（9 属性 / **219 读写点 / 47 文件**）。前者牵动扁平别名层与**模块顶层解构快照**（`scene/player.js:7` 在导入期一次性解构 `onC3D`/`zoomOut`，`paintings.js:56` 在导入期直读 `wallSpecs`），"收进私有"会直接破坏现有访问路径，须先定序；后者是承重墙——报告第 364 行本就写明"此三项动承重墙，须单独评审"。
 
 ### 23.4 验证
 
-本地：lint 0 / tsc 0 / checkJs 2（=基线）/ Vitest **122 文件 1443 通过** / 后端 **8 组**通过 / `vite build` 通过 / 本地冒烟 5 项全绿（实机确认 `ctx.loop` 已消失、`lm.timeScale` 为数字、世界正常启动）。本机 swiftshader 仅 ~1fps，b612 旅程探针在"曲面步行后镜头同帧同步"一步 60s 未收敛——**判定为本机性能问题，非改动引入**（timeScale 恒为 1，`dt *= this.timeScale` 与原先 `dt *= (ctx.loop.timeScale ?? 1)` 行为等价；实测 `camY === plY`，dt 非 NaN）。CI 复验为准。
+本地：lint 0 / tsc 0 / checkJs 2（=基线）/ Vitest **123 文件 1447 通过** / 后端 **8 组**通过 / `vite build` 通过 / 本地冒烟 5 项全绿（实机确认 `ctx.loop` 已消失、`lm.timeScale` 为数字、世界正常启动；L2 复验见 §23.3）。本机 swiftshader 仅 ~1fps，b612 旅程探针在"曲面步行后镜头同帧同步"一步 60s 未收敛——**判定为本机性能问题，非改动引入**（timeScale 恒为 1，`dt *= this.timeScale` 与原先 `dt *= (ctx.loop.timeScale ?? 1)` 行为等价；实测 `camY === plY`，dt 非 NaN）。CI 复验为准。
